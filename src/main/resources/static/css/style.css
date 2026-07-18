@@ -73,12 +73,13 @@ html[data-theme="day"] {
 }
 
 html[data-theme="forest"] {
-  --bg-0: #0a1411;
-  --bg-1: #102019;
-  --bg-2: #0c1a15;
-  --panel: rgba(18, 36, 30, 0.9);
-  --panel-solid: #142820;
-  --header-bg: rgba(12, 26, 21, 0.9);
+  /* 略透面板，透出银河星空 */
+  --bg-0: #030806;
+  --bg-1: #081410;
+  --bg-2: #060f0c;
+  --panel: rgba(10, 22, 18, 0.78);
+  --panel-solid: #0e1f18;
+  --header-bg: rgba(6, 14, 12, 0.72);
   --border: #2a4a3d;
   --border-focus: #3dba8c;
   --text: #e7f3ec;
@@ -178,12 +179,12 @@ html[data-theme="interact"] {
 
 /* 旧 wave 主题并入青松深色 */
 html[data-theme="wave"] {
-  --bg-0: #0a1411;
-  --bg-1: #102019;
-  --bg-2: #0c1a15;
-  --panel: rgba(18, 36, 30, 0.9);
-  --panel-solid: #142820;
-  --header-bg: rgba(12, 26, 21, 0.9);
+  --bg-0: #070f0c;
+  --bg-1: #0c1813;
+  --bg-2: #0a1410;
+  --panel: rgba(14, 28, 22, 0.82);
+  --panel-solid: #12241c;
+  --header-bg: rgba(10, 20, 16, 0.78);
   --border: #2a4a3d;
   --border-focus: #3dba8c;
   --text: #e7f3ec;

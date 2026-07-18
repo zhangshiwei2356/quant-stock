@@ -237,8 +237,8 @@
   };
 
   function applyTheme(theme) {
-    // 旧主题并入：交互粒子→日间，波浪→青松，代码雨/极光/Vanta→夜盘
-    if (theme === 'interact') theme = 'day';
+    // 旧主题并入：交互粒子→日间，波浪→青松，代码雨/极光/Vanta→夜盘，金融科技→日间
+    if (theme === 'interact' || theme === 'finance') theme = 'day';
     if (theme === 'wave') theme = 'forest';
     if (theme === 'matrix' || theme === 'aurora' || theme === 'vanta') theme = 'night';
     if (!THEME_KEYS[theme]) theme = 'night';
@@ -1465,7 +1465,7 @@
         '<li><b>组合回测</b>：勾选多只共享资金池回测；权益曲线 + 收益看板 + 成交流水 + 分股汇总；点击历史行在该行下方展开对应分析</li>' +
         '<li>回测起止时间默认留空 = 全量 K 线（单股/组合均支持填写）；初始资金默认 <b>100000</b></li>' +
         '<li>侧栏另有股票知识、本应用相关（介绍、交易规则、备忘录）</li>' +
-        '<li>页头主题：<b>夜盘·黑客帝国</b> / <b>日间·交互粒子</b> / <b>青松·3D星空</b> / 星空粒子，本地记住选择</li>' +
+        '<li>页头主题：黑客帝国 / 科技粒子 / 青松·3D星空 / 星空粒子，本地记住选择</li>' +
         '</ul>' +
         '<h4>策略与风控摘要</h4><ul>' +
         '<li>均线金叉死叉；可配置 MA60 / 放量 / ADX / RSI 过滤</li>' +

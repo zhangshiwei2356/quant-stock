@@ -11,16 +11,17 @@
         if (t === 'interact') t = 'day';
         if (t === 'wave') t = 'forest';
         if (t === 'matrix' || t === 'aurora' || t === 'vanta') t = 'night';
+        if (t === 'finance') t = 'day';
         var ok = { day: 1, forest: 1, night: 1, cosmos: 1 };
         if (ok[t]) document.documentElement.setAttribute('data-theme', t);
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css?v=20260718-day-tech"/>
+  <link rel="stylesheet" href="/css/style.css?v=20260718-milkyway"/>
   <script src="/js/jquery.min.js"></script>
   <script src="/js/echarts.min.js"></script>
   <script src="/js/particle-bg.js?v=20260718-day-tech"></script>
-  <script src="/js/starfield-bg.js?v=20260718-no-vanta"></script>
+  <script src="/js/starfield-bg.js?v=20260718-milkyway"></script>
 </head>
 <body>
 <canvas id="particle-canvas" aria-hidden="true"></canvas>
@@ -433,6 +434,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260718-home-collapse"></script>
+<script src="/js/stock-chart.js?v=20260718-no-finance"></script>
 </body>
 </html>
