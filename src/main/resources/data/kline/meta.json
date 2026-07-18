@@ -1,0 +1,34 @@
+{
+	"description":"三只股票近一年模拟K线（原始1分钟 + 预聚合多周期）",
+	"start":"2025-07-17",
+	"end":"2026-07-17",
+	"generatedAt":"2026-07-18 11:56:10",
+	"stocks":[
+		{
+			"code":"600036",
+			"name":"招商银行",
+			"basePrice":"35.00"
+		},
+		{
+			"code":"000001",
+			"name":"平安银行",
+			"basePrice":"11.50"
+		},
+		{
+			"code":"300059",
+			"name":"东方财富",
+			"basePrice":"18.80"
+		}
+	],
+	"periods":[
+		"MIN_1",
+		"MIN_5",
+		"MIN_15",
+		"MIN_30",
+		"MIN_60",
+		"DAY",
+		"WEEK",
+		"MONTH"
+	],
+	"note":"字段采用紧凑数组 [t,o,h,l,c,v]，启动时由 JsonBarDataStore 加载"
+}

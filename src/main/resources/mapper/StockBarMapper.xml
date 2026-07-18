@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.stock.mapper.StockBarMapper">
+
+    <resultMap id="BarMap" type="com.quant.stock.market.dto.StockBarDO">
+        <result column="stock_code" property="stockCode"/>
+        <result column="bar_time" property="barTime"/>
+        <result column="open" property="open"/>
+        <result column="high" property="high"/>
+        <result column="low" property="low"/>
+        <result column="close" property="close"/>
+        <result column="volume" property="volume"/>
+        <result column="amount" property="amount"/>
+    </resultMap>
+
+    <!-- tableName 仅允许 BarPeriod 枚举值，禁止外部拼接 -->
+    <select id="selectRange" resultMap="BarMap">
+        SELECT stock_code, bar_time, open, high, low, close, volume, amount
+        FROM ${tableName}
+        WHERE stock_code = #{stockCode}
+        <if test="start != null">
+            AND bar_time &gt;= #{start}
+        </if>
+        <if test="end != null">
+            AND bar_time &lt;= #{end}
+        </if>
+        ORDER BY bar_time ASC
+    </select>
+
+    <select id="countRange" resultType="int">
+        SELECT COUNT(1)
+        FROM ${tableName}
+        WHERE stock_code = #{stockCode}
+        <if test="start != null">
+            AND bar_time &gt;= #{start}
+        </if>
+        <if test="end != null">
+            AND bar_time &lt;= #{end}
+        </if>
+    </select>
+
+    <select id="selectMaxBarTime" resultType="java.time.LocalDateTime">
+        SELECT MAX(bar_time) FROM ${tableName} WHERE stock_code = #{stockCode}
+    </select>
+
+    <insert id="batchUpsert">
+        INSERT INTO ${tableName}
+        (stock_code, bar_time, open, high, low, close, volume, amount)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.stockCode}, #{item.barTime}, #{item.open}, #{item.high},
+             #{item.low}, #{item.close}, #{item.volume}, #{item.amount})
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            open = VALUES(open),
+            high = VALUES(high),
+            low = VALUES(low),
+            close = VALUES(close),
+            volume = VALUES(volume),
+            amount = VALUES(amount)
+    </insert>
+
+    <delete id="deleteRange">
+        DELETE FROM ${tableName}
+        WHERE stock_code = #{stockCode}
+        <if test="start != null">
+            AND bar_time &gt;= #{start}
+        </if>
+        <if test="end != null">
+            AND bar_time &lt;= #{end}
+        </if>
+    </delete>
+</mapper>

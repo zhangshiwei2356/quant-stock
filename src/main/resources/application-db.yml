@@ -1,0 +1,16 @@
+# 启用方式：mvn spring-boot:run -Dspring-boot.run.profiles=db
+# 或：java -jar app.jar --spring.profiles.active=db
+# 前置：创建库并执行 classpath:mapper/schema.sql
+
+spring:
+  autoconfigure:
+    exclude:
+      # 仍默认不强制 Redis；需要 Redis 时自行删掉下一行
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+
+quant:
+  db-enabled: true
+
+logging:
+  level:
+    com.quant.stock.mapper: DEBUG

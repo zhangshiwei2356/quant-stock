@@ -1,0 +1,13 @@
+target/
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+*.log
+.DS_Store
+*.class
+
+# 回测历史/分析落盘（保留目录占位）
+data/backtest/*.json
+!data/backtest/.gitkeep

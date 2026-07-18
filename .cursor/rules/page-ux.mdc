@@ -1,0 +1,35 @@
+---
+description: Spring Boot 静态页/模板页体验优化约定（单体不分离）
+alwaysApply: true
+---
+
+# 页面体验优化约定
+
+本项目为 **Spring Boot 单体、非前后端分离**（当前以 `static/` HTML + jQuery 为主；若引入 Thymeleaf/JSP 同样适用）。
+
+## 改造原则
+
+1. **保留后端绑定**：所有 `id`/`name`、表单 `action`/`method`、以及 Thymeleaf 的 `th:*` **禁止删除或改名**（除非任务明确要求改接口）
+2. **不引入 React/Vue**：交互用原生 JS / 现有 jQuery + CSS；避免变成前后端分离
+3. **先公共样式再逐页**：优先改 `css/style.css` 变量与通用类，再改具体页面
+4. **改完同步 README**（见 `sync-readme.mdc`）
+
+## 体验基线（本仓库已落地）
+
+- CSS 变量统一配色；面板毛玻璃/阴影；输入框 focus 描边
+- 按钮 hover 微抬升 + **loading**（防重复点击）
+- 表格：粘性表头、斑马纹、行 hover；空数据占位
+- 侧栏互斥菜单：无分隔横线的扁平导航；展开项用左侧细线缩进；股票池 / 单股回测 / 组合回测 / 股票知识 / 本应用相关；阅读与工作台视图切换；多股标签；选中竖条
+- 右上角 **Toast** 反馈成功/失败
+
+## 给后续改造的 prompt 要点
+
+改页面时在指令中明确：
+
+```
+保留所有现有 id / 按钮事件绑定 / API 调用不变；
+用现有 style.css 变量扩展样式，不要引入 React；
+表格加空状态，异步按钮加 loading，结果用 toast 提示。
+```
+
+若是 Thymeleaf 页，额外强调：**保留全部 th:*、th:field、th:errors**。

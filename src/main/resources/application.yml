@@ -1,0 +1,108 @@
+server:
+  port: 8080
+
+spring:
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    database: 0
+    timeout: 3000ms
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/quant_stock?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  # 默认不连库，保证本地无 MySQL 也能跑演示；启用库请用 --spring.profiles.active=db
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.mybatis.spring.boot.autoconfigure.MybatisAutoConfiguration
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+  type-aliases-package: com.quant.stock.market.dto
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+quant:
+  stock-codes: 600036,000001,300059
+  max-single-position: 0.3
+  max-total-position: 0.8
+  fee-rate: 0.0003
+  slip-point: 0.001
+  base-atr: 0.05
+  atr-min-threshold: 0.001
+  batch-pool-size: 10
+  # json：优先读 classpath:data/kline；mock：运行时合成；sdk：行情SDK
+  market-mode: json
+  mock-bar-days: 15
+  db-enabled: false
+
+  # ---- 策略过滤 ----
+  # ---- 策略过滤（代码已实现；模拟正弦行情上建议先关趋势/ADX，实盘全开）----
+  trend-filter-enabled: false
+  volume-filter-enabled: false
+  volume-confirm-ratio: 1.2
+  adx-filter-enabled: false
+  adx-min: 25
+  adx-chop-max: 20
+  rsi-buy-max: 60
+
+  # ---- 止损止盈 ----
+  stop-loss-enabled: true
+  atr-stop-multiplier: 2.0
+  hard-stop-capital-pct: 0.02
+  trailing-stop-enabled: true
+  trailing-atr-multiplier: 1.5
+
+  # ---- 金字塔 ----
+  pyramid-enabled: true
+  pyramid-first: 0.50
+  pyramid-second: 0.30
+  pyramid-third: 0.20
+  pyramid-add-pct: 0.01
+
+  # ---- 账户熔断 ----
+  daily-loss-limit-pct: 0.03
+  consecutive-loss-limit: 5
+  drawdown-reduce-pct: 0.15
+  drawdown-halt-pct: 0.25
+
+  # ---- 开仓过滤（模拟数据成交量较小，门槛放宽；实盘建议 5000000）----
+  quiet-open-enabled: true
+  quiet-close-enabled: true
+  min-avg-volume20: 1000
+  min-market-cap-yi: 50
+  market-cap-filter-enabled: true
+  # 流通股本（亿股）可覆盖默认启发式，例：
+  # float-shares-yi:
+  #   600036: 252
+  #   000001: 194
+  trade-mode: sim
+
+  # ---- 真实成本 ----
+  stamp-tax-rate: 0.001
+  slip-large: 0.0005
+  slip-mid: 0.002
+  slip-small: 0.005
+  vol-large-threshold: 20000000
+  vol-mid-threshold: 5000000
+  impact-coeff: 0.1
+  next-bar-open-fill: true
+
+  # ---- 安全与运维（本地演示 api-key 留空=不鉴权）----
+  # 公网/共享环境请设置环境变量 QUANT_API_KEY
+  api-key: ${QUANT_API_KEY:}
+  rate-limit-per-minute: ${QUANT_RATE_LIMIT:30}
+  history-dir: ${QUANT_HISTORY_DIR:data/backtest}
+
+logging:
+  level:
+    com.quant.stock: INFO
