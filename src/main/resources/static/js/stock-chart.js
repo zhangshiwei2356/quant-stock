@@ -1442,7 +1442,7 @@
 
   var knowledgeTopics = [
     { id: 'app', group: 'app', title: '本应用介绍', src: '/docs/app.html' },
-    { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html' },
+    { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260719-full' },
     { id: 'memo', group: 'app', title: '备忘录', src: '/docs/memo.html' },
     { id: 'ashare', group: 'stock', title: '中国A股介绍', src: '/docs/ashare.html' },
     { id: 'session', group: 'stock', title: '交易时间介绍', src: '/docs/session.html' },
