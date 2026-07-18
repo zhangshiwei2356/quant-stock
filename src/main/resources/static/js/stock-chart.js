@@ -550,7 +550,7 @@
   function renderPoolTabs() {
     var $tabs = $('#poolTabs').empty();
     if (!poolTabs.length) {
-      $tabs.append($('<div class="empty-state"/>').text('从左侧股票池点击股票开启信息（可同时打开多只）'));
+      $tabs.append($('<div class="empty-state"/>').text('从左侧列表点击股票开启信息（可同时打开多只）'));
       $('#poolMeta').text('');
       baseChart.clear();
       $('#barTableBody').html('<tr><td colspan="6" class="empty-state">暂无K线数据</td></tr>');
@@ -1217,7 +1217,7 @@
       toast('请先选择股票', 'err');
       return;
     }
-    if (!window.confirm('确认清除股票 ' + code + ' 的全部单股回测记录及对应分析？')) {
+    if (!window.confirm('确认清除股票 ' + code + ' 的全部个股回测记录及对应分析？')) {
       return;
     }
     withLoading($('#btnClearSingleHistory'), $.ajax({
@@ -1441,29 +1441,29 @@
   }
 
   var knowledgeTopics = [
-    { id: 'app', group: 'app', title: '本应用介绍', src: '/docs/app.html' },
-    { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260719-full' },
-    { id: 'memo', group: 'app', title: '备忘录', src: '/docs/memo.html' },
-    { id: 'ashare', group: 'stock', title: '中国A股介绍', src: '/docs/ashare.html?v=20260719-k' },
-    { id: 'session', group: 'stock', title: '交易时间介绍', src: '/docs/session.html?v=20260719-k' },
-    { id: 'kline', group: 'stock', title: 'K线介绍', src: '/docs/kline.html?v=20260719-k' },
-    { id: 'ma', group: 'stock', title: 'MA均线与金叉死叉', src: '/docs/ma.html?v=20260719-k' },
-    { id: 'volume', group: 'stock', title: '成交量与放量', src: '/docs/volume.html?v=20260719-k' },
-    { id: 'rsi', group: 'stock', title: 'RSI相对强弱', src: '/docs/rsi.html?v=20260719-k' },
-    { id: 'atr', group: 'stock', title: 'ATR真实波幅', src: '/docs/atr.html?v=20260719-k' },
-    { id: 'adx', group: 'stock', title: 'ADX趋势强度', src: '/docs/adx.html?v=20260719-k' },
-    { id: 'boll', group: 'stock', title: '布林带 BOLL', src: '/docs/boll.html?v=20260719-k' },
-    { id: 'limit', group: 'stock', title: '涨跌停与停牌', src: '/docs/limit.html?v=20260719-k' },
-    { id: 'tplus1', group: 'stock', title: 'T+1与整手', src: '/docs/tplus1.html?v=20260719-k' },
-    { id: 'cost', group: 'stock', title: '交易成本', src: '/docs/cost.html?v=20260719-k' },
-    { id: 'position', group: 'stock', title: '仓位与金字塔', src: '/docs/position.html?v=20260719-k' },
-    { id: 'risk', group: 'stock', title: '账户风控', src: '/docs/risk.html?v=20260719-k' },
-    { id: 'fill', group: 'stock', title: '撮合与静默', src: '/docs/fill.html?v=20260719-k' },
-    { id: 'metrics', group: 'stock', title: '权益回撤与胜率', src: '/docs/metrics.html?v=20260719-k' },
-    { id: 'backtest', group: 'stock', title: '回测要点', src: '/docs/backtest.html?v=20260719-k' }
+    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260719-menu' },
+    { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260719-menu' },
+    { id: 'memo', group: 'app', title: '数据待办', src: '/docs/memo.html?v=20260719-menu' },
+    { id: 'ashare', group: 'stock', title: 'A股基础', src: '/docs/ashare.html?v=20260719-menu' },
+    { id: 'session', group: 'stock', title: '交易时间', src: '/docs/session.html?v=20260719-menu' },
+    { id: 'kline', group: 'stock', title: 'K线', src: '/docs/kline.html?v=20260719-menu' },
+    { id: 'ma', group: 'stock', title: '均线 MA与金叉', src: '/docs/ma.html?v=20260719-menu' },
+    { id: 'volume', group: 'stock', title: '成交量与放量', src: '/docs/volume.html?v=20260719-menu' },
+    { id: 'rsi', group: 'stock', title: 'RSI相对强弱', src: '/docs/rsi.html?v=20260719-menu' },
+    { id: 'atr', group: 'stock', title: 'ATR真实波幅', src: '/docs/atr.html?v=20260719-menu' },
+    { id: 'adx', group: 'stock', title: 'ADX趋势强度', src: '/docs/adx.html?v=20260719-menu' },
+    { id: 'boll', group: 'stock', title: 'BOLL 布林带', src: '/docs/boll.html?v=20260719-menu' },
+    { id: 'limit', group: 'stock', title: '涨跌停与停牌', src: '/docs/limit.html?v=20260719-menu' },
+    { id: 'tplus1', group: 'stock', title: 'T+1与整手', src: '/docs/tplus1.html?v=20260719-menu' },
+    { id: 'cost', group: 'stock', title: '交易成本', src: '/docs/cost.html?v=20260719-menu' },
+    { id: 'position', group: 'stock', title: '仓位与金字塔', src: '/docs/position.html?v=20260719-menu' },
+    { id: 'risk', group: 'stock', title: '账户风控', src: '/docs/risk.html?v=20260719-menu' },
+    { id: 'fill', group: 'stock', title: '撮合时机', src: '/docs/fill.html?v=20260719-menu' },
+    { id: 'metrics', group: 'stock', title: '权益回撤与胜率', src: '/docs/metrics.html?v=20260719-menu' },
+    { id: 'backtest', group: 'stock', title: '回测要点', src: '/docs/backtest.html?v=20260719-menu' }
   ];
   var knowledgeHtmlCache = {};
-  var HOME_SRC = '/docs/home.html?v=20260719-nav-intro';
+  var HOME_SRC = '/docs/home.html?v=20260719-menu-rename';
   var homePanelReady = false;
   var pendingHomeLead = null;
   var docsPdfBusy = false;
@@ -1499,7 +1499,7 @@
       toast('没有可导出的文档', 'err');
       return;
     }
-    var packTitle = group === 'app' ? '本应用相关' : '股票知识';
+    var packTitle = group === 'app' ? '应用说明' : '量化知识';
     var filename = 'QuantStock-' + packTitle + '.pdf';
     docsPdfBusy = true;
     var oldText = $btn && $btn.length ? $.trim($btn.text()) : '';
@@ -1529,7 +1529,7 @@
       docsPdfBusy = false;
       if ($btn && $btn.length) {
         $btn.removeClass('is-loading').prop('disabled', false)
-          .text(oldText || (group === 'app' ? '下载本应用相关全部文档 PDF' : '下载全部股票知识 PDF'));
+          .text(oldText || (group === 'app' ? '下载应用说明全部文档 PDF' : '下载全部量化知识 PDF'));
       }
     }
 
@@ -1799,7 +1799,7 @@
     var introSrc = $btn.attr('data-intro');
     var introTitle = $btn.attr('data-intro-title') || $btn.clone().children().remove().end().text().trim();
     if (introSrc) {
-      showNavIntro({ bodyId: bodyId, title: introTitle, src: introSrc + (introSrc.indexOf('?') >= 0 ? '&' : '?') + 'v=20260719-pdf' });
+      showNavIntro({ bodyId: bodyId, title: introTitle, src: introSrc + (introSrc.indexOf('?') >= 0 ? '&' : '?') + 'v=20260719-menu-rename' });
       return;
     }
     // 无介绍配置时回退到原工作台

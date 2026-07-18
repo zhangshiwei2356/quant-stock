@@ -1,16 +1,16 @@
 ---
-description: 每次代码/功能改动必须同步更新 README 与「本应用介绍」
+description: 每次代码/功能改动必须同步更新 README 与「系统概述」
 alwaysApply: true
 ---
 
-# 同步更新 README 与本应用介绍
+# 同步更新 README 与系统概述
 
 对本仓库做任何实质性改动后，**同一轮改动内必须同步更新**：
 
 1. `README.md`
-2. 页面「本应用相关 → **本应用介绍**」：`src/main/resources/static/docs/app.html`
-3. 若涉及买卖时机、仓位、止损、撮合、账户风控等规则变化：同步更新「本应用相关 → **交易规则**」：`src/main/resources/static/docs/rules.html`
-4. 若涉及数据能力、过滤数据源、或备忘录中待办的落地：同步更新「本应用相关 → **备忘录**」：`src/main/resources/static/docs/memo.html`（详见 `sync-memo.mdc`）
+2. 页面「应用说明 → **系统概述**」：`src/main/resources/static/docs/app.html`
+3. 若涉及买卖时机、仓位、止损、撮合、账户风控等规则变化：同步更新「应用说明 → **交易规则**」：`src/main/resources/static/docs/rules.html`
+4. 若涉及数据能力、过滤数据源、或数据待办落地：同步更新「应用说明 → **数据待办**」：`src/main/resources/static/docs/memo.html`（详见 `sync-memo.mdc`）
 
 不要等到用户再提醒。
 
@@ -26,8 +26,8 @@ alwaysApply: true
 
 ## 更新要求
 
-1. README 与「本应用介绍」内容保持一致（启动方式、默认资金、数据区间、功能清单、策略风控摘要）
-2. 「本应用介绍」面向页面用户：用简短 HTML 要点，避免大段命令块；细节可指向 README
+1. README 与「系统概述」内容保持一致（启动方式、默认资金、数据区间、功能清单、策略风控摘要）
+2. 「系统概述」面向页面用户：用简短 HTML 要点，避免大段命令块；细节可指向 README
 3. 只改与本次改动相关的章节，保持简洁准确
 4. 默认值（端口、资金、时间留空含义等）以代码为准
 5. 新增配置开关：README 写清默认值；介绍页用一句话概括即可
@@ -35,12 +35,12 @@ alwaysApply: true
 ## 定位
 
 ```
-static/docs/app.html      → 本应用介绍
+static/docs/app.html      → 系统概述
 static/docs/rules.html    → 交易规则
-static/docs/memo.html     → 备忘录
+static/docs/memo.html     → 数据待办
 static/docs/home.html     → 初始化欢迎页（收起全部一级菜单时）
 stock-chart.js → knowledgeTopics → { id, title, src } 目录索引（一般无需改正文）
 ```
 ## 自检
 
-完成改动前确认：用户只读 README **或** 只看页面「本应用相关 → 本应用介绍」，都能按当前代码正确理解启动方式与核心能力；数据路线图以「备忘录」为准。
+完成改动前确认：用户只读 README **或** 只看页面「应用说明 → 系统概述」，都能按当前代码正确理解启动方式与核心能力；数据路线图以「数据待办」为准。

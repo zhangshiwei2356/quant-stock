@@ -17,7 +17,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css?v=20260719-pdf"/>
+  <link rel="stylesheet" href="/css/style.css?v=20260719-menu-rename"/>
   <script src="/js/jquery.min.js"></script>
   <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/echarts.min.js"></script>
@@ -52,8 +52,8 @@
   <aside class="sidebar">
     <div class="side-nav" data-nav="pool">
       <button type="button" class="side-nav-toggle" data-body="poolBody" data-mode="pool"
-              data-intro="/docs/nav-pool.html" data-intro-title="股票池" aria-expanded="false">
-        股票池 <span class="chevron">▸</span>
+              data-intro="/docs/nav-pool.html" data-intro-title="行情浏览" aria-expanded="false">
+        行情浏览 <span class="chevron">▸</span>
       </button>
       <div id="poolBody" class="side-nav-body">
         <p id="dataHint" class="hint"></p>
@@ -64,8 +64,8 @@
 
     <div class="side-nav" data-nav="single">
       <button type="button" class="side-nav-toggle" data-body="singleBody" data-mode="single"
-              data-intro="/docs/nav-single.html" data-intro-title="单股回测" aria-expanded="false">
-        单股回测 <span class="chevron">▸</span>
+              data-intro="/docs/nav-single.html" data-intro-title="个股回测" aria-expanded="false">
+        个股回测 <span class="chevron">▸</span>
       </button>
       <div id="singleBody" class="side-nav-body">
         <p class="hint">二级菜单：点选标的；右侧可改周期与资金</p>
@@ -86,16 +86,16 @@
 
     <div class="side-nav" data-nav="stock-knowledge">
       <button type="button" class="side-nav-toggle" data-body="stockKnowledgeMenu" data-mode="doc"
-              data-intro="/docs/nav-stock-knowledge.html" data-intro-title="股票知识" aria-expanded="false">
-        股票知识 <span class="chevron">▸</span>
+              data-intro="/docs/nav-stock-knowledge.html" data-intro-title="量化知识" aria-expanded="false">
+        量化知识 <span class="chevron">▸</span>
       </button>
       <ul id="stockKnowledgeMenu" class="side-nav-menu"></ul>
     </div>
 
     <div class="side-nav" data-nav="app-related">
       <button type="button" class="side-nav-toggle" data-body="appRelatedMenu" data-mode="doc"
-              data-intro="/docs/nav-app-related.html" data-intro-title="本应用相关" aria-expanded="false">
-        本应用相关 <span class="chevron">▸</span>
+              data-intro="/docs/nav-app-related.html" data-intro-title="应用说明" aria-expanded="false">
+        应用说明 <span class="chevron">▸</span>
       </button>
       <ul id="appRelatedMenu" class="side-nav-menu"></ul>
     </div>
@@ -127,7 +127,7 @@
       </section>
     </div>
 
-    <!-- 股票池：仅展示，多股信息 -->
+    <!-- 行情浏览：仅展示，多股信息 -->
     <div id="viewPool" class="workspace-view" hidden>
       <section class="panel">
         <h3>已开启股票</h3>
@@ -168,7 +168,7 @@
       </section>
     </div>
 
-    <!-- 单股回测 -->
+    <!-- 个股回测 -->
     <div id="viewSingle" class="workspace-view" hidden>
       <section class="panel">
         <div class="selected-stock-bar" id="singleSelectedBar">
@@ -178,7 +178,7 @@
           </div>
           <span class="selected-stock-tag">当前标的</span>
         </div>
-        <h3>单股回测参数</h3>
+        <h3>个股回测参数</h3>
         <div class="toolbar">
           <label class="field">股票代码
             <input id="stockCode" type="text" placeholder="600036" readonly/>
@@ -252,7 +252,7 @@
         </div>
       </section>
       <section class="panel">
-        <h3>单股回测历史
+        <h3>个股回测历史
           <button type="button" id="btnClearSingleHistory" class="danger" style="margin-left:12px;padding:4px 10px;font-size:12px;">清除该股记录</button>
         </h3>
         <p class="hint" style="margin:4px 0 8px;">落盘 <code>data/backtest/single-backtest-records.json</code> + 对应分析（同一 id）。点击一行在<strong>该行下方</strong>展开分析，再点同一行或「收起」折叠；清除会同时删除分析。</p>
@@ -342,7 +342,7 @@
           <button id="btnPortfolio" class="danger">执行组合回测</button>
         </div>
         <p id="backTimeHint" class="hint" style="margin:8px 0 0;"></p>
-        <p class="hint" style="margin:4px 0 0;">说明：组合引擎为<strong>日K简化模型</strong>（共享资金池）；完整 T+1/分钟撮合规则以单股回测为准。</p>
+        <p class="hint" style="margin:4px 0 0;">说明：组合引擎为<strong>日K简化模型</strong>（共享资金池）；完整 T+1/分钟撮合规则以个股回测为准。</p>
         <div class="metrics" id="pfMetrics" style="margin-top:8px;"></div>
       </section>
       <section class="panel" id="pfEquityPanel" hidden>
@@ -433,6 +433,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260719-pdf"></script>
+<script src="/js/stock-chart.js?v=20260719-menu-rename"></script>
 </body>
 </html>

@@ -31,17 +31,17 @@ mvn spring-boot:run
 
 ## 页面功能
 
-- 股票池、多周期 K 线（MA/BOLL/RSI）、明细表
+- 行情浏览、多周期 K 线（MA/BOLL/RSI）、明细表
 - 单只回测 / 批量扫描 / 组合回测
 - 回测时间：**默认留空 = 全量 K 线**；单股 / 组合回测均可填写起止时间截取
 - 初始资金默认：**100000**
 - 进入应用先显示**初始化页**；侧栏一级菜单互斥展开进入功能，再点同一菜单可全部收起并回到初始化页
-- 侧栏一级菜单：**股票池**（仅行情，可同时开启多只）、**单股回测**（K线买卖点 + 成交明细/收益汇总 + 回测/扫描）、**组合回测**、**股票知识**、**本应用相关**（介绍 / 交易规则 / **备忘录**）；知识阅读时隐藏工作台
+- 侧栏一级菜单：**行情浏览**（仅行情，可同时开启多只）、**个股回测**（K线买卖点 + 成交明细/收益汇总 + 回测/扫描）、**组合回测**、**量化知识**、**应用说明**（系统概述 / 交易规则 / **数据待办**）；知识阅读时隐藏工作台
 - 说明文档为独立 HTML 片段：`src/main/resources/static/docs/*.html`，由工作台 `stock.html` 知识面板按需加载（非多页 SPA）
 - 初始化欢迎页单独维护：`static/docs/home.html`，载入 `#viewHome`
 - 各一级菜单介绍页：`static/docs/nav-*.html`，展开菜单时载入 `#viewNavIntro`（点二级项再进工作台/文档）
-- 「股票知识 / 本应用相关」介绍页可一键导出该菜单下全部子文档为 PDF（浏览器端 html2pdf）
-- **股票知识**侧栏含：A股/交易时间/K线、MA·成交量·RSI·ATR·ADX·BOLL、涨跌停、T+1、交易成本、仓位金字塔、账户风控、撮合静默、权益回撤、回测要点等（均标注「本应用相关」用法）
+- 「量化知识 / 应用说明」介绍页可一键导出该菜单下全部子文档为 PDF（浏览器端 html2pdf）
+- **量化知识**侧栏含：A股基础/交易时间/K线、均线·成交量·RSI·ATR·ADX·BOLL、涨跌停、T+1、交易成本、仓位金字塔、账户风控、撮合时机、权益回撤、回测要点等（均标注「本系统用法」）
 - 页头主题（`localStorage` 记住）：**夜盘·黑客帝国** / **日间·科技粒子** / **青松·3D星空** / 星空粒子
 - 页面体验：交易台风格、输入聚焦动画、按钮 loading、表格斑马纹/粘性表头、Toast 提示、多股标签切换
 
@@ -60,13 +60,13 @@ mvn spring-boot:run
 | 接口 | 说明 |
 |------|------|
 | GET `/api/config` | 公开配置（是否需 API Key、限流、历史目录等） |
-| GET `/api/stock/pool` | 股票池（含名称） |
+| GET `/api/stock/pool` | 标的列表/股票池（含名称） |
 | GET `/api/data/summary` | 模拟数据概览 |
 | GET `/api/kline?code=&period=` | 统一周期 K 线（默认 DAY） |
 | GET `/api/kline/minute?code=` | 分钟 K（兼容） |
 | GET `/api/backtest/run?code=&period=&initCapital=&feeRate=&backStart=&backEnd=` | 单只回测（时间可空；结果写入历史 JSON） |
-| GET `/api/backtest/history?code=` | 单股回测历史（可按股票过滤） |
-| DELETE `/api/backtest/history?code=` | 清除某股票的全部单股回测记录 |
+| GET `/api/backtest/history?code=` | 个股回测历史（可按股票过滤） |
+| DELETE `/api/backtest/history?code=` | 清除某股票的全部个股回测记录 |
 | GET `/api/backtest/analysis?id=` | 按回测历史 id 取对应分析（与历史一一对应） |
 | GET `/api/batch/scanAllStock` | 批量扫描 |
 | POST `/api/portfolio/run` | 组合回测（结果写入历史 JSON） |
@@ -128,8 +128,8 @@ mvn spring-boot:run
 每次实质性改动需**同时**更新：
 
 1. 本 `README.md`
-2. 页面「本应用相关 → 本应用介绍」（`static/docs/app.html`）
-3. 规则变更时同步「本应用相关 → 交易规则」（`static/docs/rules.html`）
-4. 数据能力/待办落地时同步「本应用相关 → 备忘录」（`static/docs/memo.html`）
+2. 页面「应用说明 → 系统概述」（`static/docs/app.html`）
+3. 规则变更时同步「应用说明 → 交易规则」（`static/docs/rules.html`）
+4. 数据能力/待办落地时同步「应用说明 → 数据待办」（`static/docs/memo.html`）
 
 规则见 `.cursor/rules/sync-readme.mdc`、`.cursor/rules/sync-memo.mdc`。
