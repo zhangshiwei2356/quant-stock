@@ -1441,339 +1441,20 @@
   }
 
   var knowledgeTopics = [
-    {
-      id: 'app',
-      group: 'app',
-      title: '本应用介绍',
-      html:
-        '<p><b>Quant Stock</b> 是基于 Spring Boot 2.7 + TA4J 的 A 股量化回测单体应用（非前后端分离），页面内嵌于 <code>static/</code>。</p>' +
-        '<h4>如何启动</h4><ul>' +
-        '<li>项目根目录执行：<code>mvn spring-boot:run</code></li>' +
-        '<li>浏览器打开：<code>http://localhost:8080/stock.html</code></li>' +
-        '<li>默认连接本地 MySQL（localhost:3306/quant_stock，root/123456），并执行 <code>mapper/schema.sql</code></li>' +
-        '<li>空库启动时自动从 classpath JSON 导入日线 + 5 分钟模拟数据</li>' +
-        '</ul>' +
-        '<h4>行情与回测存储</h4><ul>' +
-        '<li>股票：600036 招商银行、000001 平安银行、300059 东方财富</li>' +
-        '<li>区间：约 2025-07-17 ~ 2026-07-17</li>' +
-        '<li>物理表：<code>market_daily</code>（日线）、<code>market_minute</code>（5分钟）；其它周期运行时聚合</li>' +
-        '<li>回测历史/分析：<code>bt_backtest_record</code> / <code>bt_backtest_analysis</code></li>' +
-        '<li>种子目录：<code>src/main/resources/data/kline/</code>（仅导入用）</li>' +
-        '</ul>' +
-        '<h4>页面能做什么</h4><ul>' +
-        '<li>进入应用先显示<strong>初始化页</strong>；展开左侧一级菜单进入功能，再点同一菜单可全部收起并回到初始化页</li>' +
-        '<li><b>股票池</b>：仅行情展示，可同时开启多只股票信息（标签切换）</li>' +
-        '<li><b>单股回测</b>：选股后可见基础K线+信号图（标注买卖点）+权益曲线+成交明细/收益汇总+K线表；历史与分析一一对应，点击历史行在<strong>该行下方</strong>展开决策分析</li>' +
-        '<li><b>组合回测</b>：勾选多只共享资金池回测；权益曲线 + 收益看板 + 成交流水 + 分股汇总；点击历史行在该行下方展开对应分析</li>' +
-        '<li>回测起止时间默认留空 = 全量 K 线（单股/组合均支持填写）；初始资金默认 <b>100000</b></li>' +
-        '<li>侧栏另有股票知识、本应用相关（介绍、交易规则、备忘录）</li>' +
-        '<li>页头主题：黑客帝国 / 科技粒子 / 青松·3D星空 / 星空粒子，本地记住选择</li>' +
-        '</ul>' +
-        '<h4>策略与风控摘要</h4><ul>' +
-        '<li>均线金叉死叉；可配置 MA60 / 放量 / ADX / RSI 过滤</li>' +
-        '<li>综合成本止损、移动止盈；T+1 <b>分档</b>；金字塔 50/30/20（成交后占档）</li>' +
-        '<li>撮合双口径：日K下一根开盘；分钟K≥次日09:45；涨跌停主板10%/创科20%</li>' +
-        '<li>单股 / 组合 / 实盘扫描均对齐上述核心规则（实盘为模拟现金账本）</li>' +
-        '<li>细则见「本应用相关 → 交易规则」</li>' +
-        '</ul>' +
-        '<h4>可选能力</h4><ul>' +
-        '<li>安全：可选 <code>QUANT_API_KEY</code>；限流 <code>QUANT_RATE_LIMIT</code></li>' +
-        '<li>市值股本：<code>quant.float-shares-yi.&lt;code&gt;</code></li>' +
-        '<li>扩展：<code>KlineSdkClient</code> / <code>trade-mode=sdk</code></li>' +
-        '</ul>' +
-        '<p>更完整说明见仓库根目录 <code>README.md</code>。应用变更时 README 与本页须同步更新。</p>'
-    },
-    {
-      id: 'rules',
-      group: 'app',
-      title: '交易规则',
-      html:
-        '<p>本页为应用<strong>完整规则说明</strong>（策略买卖、撮合成本、风控、单股/组合/批量扫描/实盘差异、页面默认与落库）。' +
-        '默认值来自 <code>application.yml</code> → <code>quant.*</code>；改配置后需重启，并同步更新本页。</p>' +
-
-        '<h4>一、统计口径</h4><ul>' +
-        '<li><b>权益</b> = 现金 + 持仓市值（成交已含佣金、印花税、滑点与冲击成本）</li>' +
-        '<li><b>峰值回撤</b> = (历史最高权益 − 当前权益) / 历史最高权益</li>' +
-        '<li><b>总收益率</b> = (期末权益 − 初始资金) / 初始资金</li>' +
-        '<li><b>胜率</b> = 盈利的完整开平回合数 / 全部完整开平回合数</li>' +
-        '<li><b>综合成本</b>（单票）= Σ(买入成交额 + 买入佣金) / 股数（不含印花税）</li>' +
-        '<li><b>成交汇总 tradeStats</b>：买卖次数/股数/手数/成交额、费用合计、总盈亏(=期末−初始)</li>' +
-        '</ul>' +
-
-        '<h4>二、买入何时触发</h4><ul>' +
-        '<li><b>金叉首开</b>：上一根 MA5≤MA20，本根 MA5&gt;MA20（收盘确认；有效信号通常需 K 线约≥65根）</li>' +
-        '<li><b>必过过滤</b>：RSI14 &lt; 60；ATR14 &gt; 0.001；' +
-        '<b>硬过滤</b>：模拟市值 &lt; 50 亿 → <strong>直接跳过、不开仓</strong></li>' +
-        '<li><b>可选过滤</b>（默认关）：MA60 上行、放量 &gt; 20日均量×1.2、ADX≥25 且非震荡</li>' +
-        '<li><b>金字塔加仓</b>（默认开）：该票浮盈≥1%（相对综合成本）且 MA5&gt;MA20、总仓≤80%；' +
-        '<strong>不重验</strong> RSI/ATR；<strong>仅成交成功后</strong>占档（50%→30%→20%）</li>' +
-        '<li><b>同日约束（按股票）</b>：该票当日已加仓成交 → 不再受理首开；首开成交当日也不会再挂同日加仓</li>' +
-        '<li>该票已有未成交买单时，不再挂新买单</li>' +
-        '</ul>' +
-
-        '<h4>三、买入数量怎么算</h4><ul>' +
-        '<li>目标满仓股数 = 可用资金 × <b>单只上限30%</b> × ATR调节 × <b>账户仓位系数</b> ÷ 现价，取整到 100 股</li>' +
-        '<li><b>ATR调节</b> = <code>baseAtr</code>(<b>0.05</b>) ÷ 当前ATR，再夹到 <b>[0.2, 1.5]</b></li>' +
-        '<li><b>账户仓位系数</b>（峰值回撤）：&lt;15%→1.0；≥15%且&lt;25%→0.5；≥25%→0</li>' +
-        '<li>总仓：持仓市值 + 拟买入额 ≤ 总权益 × <b>80%</b></li>' +
-        '<li>金字塔分批相对「目标满仓」：50% / 30% / 20%</li>' +
-        '</ul>' +
-
-        '<h4>四、卖出何时触发</h4><ul>' +
-        '<li><b>死叉</b>：挂卖 → 下一有效撮合卖出<strong>该标的全部持仓</strong>；已挂卖不刷新信号日</li>' +
-        '<li><b>同日优先级（回测）</b>：先止损/trail；若当日已止损清仓（<code>stoppedOutToday</code>）→ 忽略同日死叉</li>' +
-        '<li><b>止损线</b> = max(成本−2×ATR, 成本−权益×2%/股数)，只上移</li>' +
-        '<li><b>T+1</b>：仅 <code>openDate &lt; 今日</code> 的老仓可止损/trail</li>' +
-        '<li><b>移动止盈</b>：盘后 trail = 持仓最高 − 1.5×ATR（只上移）；次日盘中老仓最低价触及判定</li>' +
-        '<li><b>跌停</b>：相对昨收；挂卖连续 3 个交易日失败后按跌停价×0.99 强平</li>' +
-        '<li><b>回撤熔断</b>：峰值回撤≥25% → 挂清仓且禁新开；<strong>本轮粘性</strong>（回测结束或进程重启前不自动解除）</li>' +
-        '</ul>' +
-
-        '<h4>五、撮合与成本</h4><ul>' +
-        '<li><b>日K/周月</b>：收盘信号 → <b>下一根开盘价</b></li>' +
-        '<li><b>分钟序列</b>：开仓/死叉在<strong>信号日次日</strong>且 bar≥<b>09:45</b> 的第一根可用 K</li>' +
-        '<li><b>静默</b>：09:30–09:45、14:45–15:00 禁止挂新开信号（不会「当日静默窗口内 09:45 成交首开」）</li>' +
-        '<li>例外：老仓止损/trail 按触及价<strong>当根</strong>卖</li>' +
-        '<li>买单超过信号日 <b>+5 日历日</b>未成交 → 取消</li>' +
-        '<li>佣金万三；印花税千一（仅卖）</li>' +
-        '<li>分级滑点（近20均量）：≥2000万→0.05%；≥500万→0.2%；否则→0.5%</li>' +
-        '<li>冲击：min(0.1×本笔量/20日均量, 2%)；买上浮、卖下浮，与滑点叠加</li>' +
-        '</ul>' +
-
-        '<h4>六、开仓过滤与账户风控</h4><ul>' +
-        '<li>涨跌停相对昨收（主板±10% / 创科±20%，含 OHLC 封板）</li>' +
-        '<li>停牌量≤0 → 禁止开仓；持仓复牌无「首日必卖」专项规则</li>' +
-        '<li>低流动性：近20均量 &lt; <code>min-avg-volume20</code>（演示默认 <b>1000</b>）→ 不开</li>' +
-        '<li>单日亏≥昨收权益的 3% → 当日禁新开</li>' +
-        '<li>连亏 5 笔完整开平 → 当日禁开、<strong>次日自动恢复</strong></li>' +
-        '<li>回撤≥15% 仓位×0.5；≥25% 禁开+清仓挂单</li>' +
-        '</ul>' +
-
-        '<h4>七、买单/卖单未能成交的常见原因</h4><ul>' +
-        '<li>账户熔断禁开 / 单日亏损禁开 / 连亏禁开</li>' +
-        '<li>开盘静默 09:30–09:45 禁止新开成交</li>' +
-        '<li>开仓过滤未过：涨跌停、停牌、流动性、市值、收盘静默等</li>' +
-        '<li>加仓时涨停或停牌</li>' +
-        '<li>现金不足，或买入后突破总仓 80%</li>' +
-        '<li>仓位系数缩放后不足 1 手（100股）</li>' +
-        '<li>卖出遇跌停：累计失败，满 3 个交易日后强平</li>' +
-        '<li>买单超过信号日+5 日历日 → 过期取消</li>' +
-        '</ul>' +
-
-        '<h4>八、单只回测（页面「单股回测」）</h4><ul>' +
-        '<li>默认周期 <b>DAY</b>；起止时间留空 = 该股全量可用 K 线</li>' +
-        '<li>初始资金默认 <b>100000</b>（可改）</li>' +
-        '<li>决策顺序：①撮合挂单 → ②老仓止损/trail → ③账户风控 → ④收盘挂金叉/金字塔/死叉 → ⑤盘后更新 trail</li>' +
-        '<li>结果含：权益曲线、买卖点、成交明细、tradeStats、决策分析事件</li>' +
-        '<li>历史与分析一一对应，写入 MySQL：<code>bt_backtest_record</code> / <code>bt_backtest_analysis</code></li>' +
-        '</ul>' +
-
-        '<h4>九、组合回测（多股共享资金池）</h4><ul>' +
-        '<li>勾选多只成分股；<b>共用一份现金</b>与同一套账户风控（熔断/连亏/单日亏/仓位系数）</li>' +
-        '<li>强制用 <b>DAY</b> 行情；按各股交易日并集时间轴推进；某股当日无 K 则跳过该股</li>' +
-        '<li>单股 K 线不足约 65 根则不进入组合</li>' +
-        '<li>每只股票独立：持仓 lot、金字塔档位、挂单、止损/trail、<code>stoppedOutToday</code></li>' +
-        '<li>买卖规则与单股相同；买入手数仍受单只30%与总仓80%约束（相对组合总权益）</li>' +
-        '<li>熔断时：对<strong>所有仍有持仓的成分股</strong>挂清仓</li>' +
-        '<li>分股表现：按该股已实现盈亏、买卖统计、该股维度回撤等汇总；贡献率≈该股已实现盈亏/初始资金</li>' +
-        '<li>历史/分析同样落库（kind=PORTFOLIO）</li>' +
-        '</ul>' +
-
-        '<h4>十、批量扫描（单股回测页「扫描」）</h4><ul>' +
-        '<li>对配置股票池（默认 600036/000001/300059）线程池并发</li>' +
-        '<li>每只：全量 <b>DAY</b> K 线 + 初始资金 100000 跑一遍单股回测引擎</li>' +
-        '<li>K 线不足 20 根则跳过该股</li>' +
-        '<li>额外计算最新指标与「当前是否金叉可买」信号描述，按总收益率降序展示</li>' +
-        '<li>扫描结果为即时列表，不单独写入回测历史表（除非你再点单股回测保存）</li>' +
-        '</ul>' +
-
-        '<h4>十一、实盘分钟扫描（定时任务，模拟现金）</h4><ul>' +
-        '<li>交易时段约每分钟扫描（工作日 9–11、13–15 点）；模拟初始现金默认 100000</li>' +
-        '<li>规则意图对齐回测：金叉/金字塔/死叉、止损/trail、账户风控、09:45 撮合、跌停强平等</li>' +
-        '<li><b>已知差异</b>：实盘路径里 <code>stoppedOutToday</code> 未像回测那样在止损后置位，' +
-        '极端情况下同日仍可能再挂死叉（与回测「止损优先忽略死叉」不完全一致）</li>' +
-        '<li><code>trade-mode=sim</code>：下单即时成交；<code>sdk</code>：SUBMITTED 后由同步推进（桩实现）</li>' +
-        '<li>实盘持仓/现金默认在进程内存，不落 <code>trade_positions</code>（表已建，供后续扩展）</li>' +
-        '<li>收盘后任务：约 15:30 相关清算；16:00 可触发批量扫描日志等</li>' +
-        '</ul>' +
-
-        '<h4>十二、行情与页面产品规则</h4><ul>' +
-        '<li>行情真相源：MySQL <code>market_daily</code>（日线）+ <code>market_minute</code>（5分钟）；' +
-        '15/30/60分、周、月由运行时聚合；MIN_1 请求降级为 5 分钟序列</li>' +
-        '<li>空库启动时从 <code>classpath:data/kline</code> 的 DAY/MIN_5 JSON <b>导入一次</b>，运行时不再读 JSON 做展示</li>' +
-        '<li>股票池展示 / K 线图表：走统一 <code>MarketDataService#getKline</code></li>' +
-        '<li>回测时间留空 = 全量；填写则截取区间；初始资金默认 100000</li>' +
-        '<li>侧栏：一级菜单互斥；回测成功前可隐藏权益/成交等结果面板</li>' +
-        '<li>可选：API Key（<code>QUANT_API_KEY</code>）、回测类接口限流（默认 30 次/分钟/IP）</li>' +
-        '</ul>' +
-
-        '<h4>十三、单只回测 bar 内决策顺序（摘要）</h4><ol>' +
-        '<li>撮合已挂单（日K开盘 / 分钟次日≥09:45）</li>' +
-        '<li>仅老仓止损 / 移动止盈</li>' +
-        '<li>账户风控快照</li>' +
-        '<li>收盘挂金叉 / 金字塔 / 死叉</li>' +
-        '<li>盘后更新最高价与 trail</li>' +
-        '</ol>' +
-        '<p>配置入口：<code>application.yml</code> 的 <code>quant</code> 段。策略代码：' +
-        '<code>BackTestEngine</code> / <code>PortfolioBackTestEngine</code> / <code>BatchStockBackTestService</code> / <code>StrategyTask</code>。</p>'
-    },
-    {
-      id: 'memo',
-      group: 'app',
-      title: '备忘录',
-      html:
-        '<p>除不同周期 K 线价量外，完整量化系统还需<strong>基本面、事件驱动、另类数据、行情衍生</strong>四大类。本页记录与金叉策略相关的数据待办；应用实质性改动后须对照更新（见项目规则）。</p>' +
-        '<div class="memo-todo"><h4 style="margin-top:0">落地优先级（投入产出比）</h4><ol>' +
-        '<li><b>复权因子</b>（除权除息）— 未落地 · MA/ATR 不复权会失真</li>' +
-        '<li><b>资金流向</b>（主力净流入）— 未落地 · 金叉+流入增强置信度</li>' +
-        '<li><b>市值/流动性</b>（流通市值、日均成交额）— 部分：规则有、真数不足（现为股本启发式）</li>' +
-        '<li><b>财报</b>（PE、ROE、营收增速）— 未落地 · 建议金叉后再滤 PE/ROE</li>' +
-        '<li><b>停牌/ST 状态</b>— 部分：停牌量≤0；缺实时 ST/退市源</li>' +
-        '<li><b>新闻舆情</b>— 未落地 · 噪声大、需 NLP</li>' +
-        '</ol><p style="margin:0"><b>一句总结</b>：骨架已有；下一步优先<strong>复权因子</strong>与<strong>资金流向</strong>。</p></div>' +
-        '<h4>一、基本面数据（与金叉关联最密）</h4>' +
-        '<p>决定股票质地，可作买入前二次过滤（在 RSI&lt;60、ATR&gt;0.001 之上）。</p>' +
-        '<table><thead><tr><th>子类</th><th>数据项</th><th>策略用法</th></tr></thead><tbody>' +
-        '<tr><td>估值</td><td>PE / PB / PS / PEG</td><td>过滤估值过高，避免追高</td></tr>' +
-        '<tr><td>盈利</td><td>ROE、毛利率、净利率</td><td>避开业绩暴雷股</td></tr>' +
-        '<tr><td>成长</td><td>营收/净利同比增速</td><td>成长股与金叉共振</td></tr>' +
-        '<tr><td>财务健康</td><td>资产负债率、现金流、应收</td><td>避开高负债、现金流紧张</td></tr>' +
-        '<tr><td>市值</td><td>总市值、流通市值</td><td>已有「市值过低→不开」，需真实阈值</td></tr>' +
-        '</tbody></table>' +
-        '<p><b>实操建议</b>：金叉后加滤 <code>PE &lt; 行业PE中位数×1.5</code> 且 <code>ROE &gt; 10%</code>。</p>' +
-        '<h4>二、行情衍生数据</h4>' +
-        '<p>当前仅用 MA5/20/60、RSI14、ATR14；可扩展：</p>' +
-        '<table><thead><tr><th>类型</th><th>内容</th><th>价值</th></tr></thead><tbody>' +
-        '<tr><td>资金流向</td><td>主力净流入、大单、北向</td><td>金叉+流入=信号增强</td></tr>' +
-        '<tr><td>Level2</td><td>十档、逐笔、大单拆分</td><td>辨真假突破</td></tr>' +
-        '<tr><td>筹码</td><td>获利盘、套牢盘、集中度</td><td>上方抛压</td></tr>' +
-        '<tr><td>换手/流动性</td><td>换手率、日均额、价差</td><td>量化「低流动性→不开」</td></tr>' +
-        '<tr><td>波动率</td><td>历史/隐含波动、VIX</td><td>补充 ATR 视角</td></tr>' +
-        '</tbody></table>' +
-        '<h4>三、事件驱动数据</h4>' +
-        '<table><thead><tr><th>事件</th><th>内容</th><th>对金叉影响</th></tr></thead><tbody>' +
-        '<tr><td>财报</td><td>季年报、预告、修正</td><td>报前抢跑 / 报后确认</td></tr>' +
-        '<tr><td>分红送转</td><td>除权除息、送转比</td><td>需复权，否则 MA/RSI/ATR 失真</td></tr>' +
-        '<tr><td>增减持/回购</td><td>股东增减持、回购</td><td>增持+金叉强；减持警惕</td></tr>' +
-        '<tr><td>停复牌</td><td>起止日、原因</td><td>已有停牌不开；复牌首日需特殊处理</td></tr>' +
-        '<tr><td>ST/退市</td><td>ST/*ST、退市警示</td><td>必须过滤</td></tr>' +
-        '</tbody></table>' +
-        '<h4>四、另类数据</h4>' +
-        '<table><thead><tr><th>类型</th><th>内容</th><th>场景</th></tr></thead><tbody>' +
-        '<tr><td>新闻舆情</td><td>财经新闻、公告、政策</td><td>金叉+正面舆情增强</td></tr>' +
-        '<tr><td>社交媒体</td><td>股吧/雪球/微博热度</td><td>极端看多或作反向</td></tr>' +
-        '<tr><td>分析师</td><td>盈利预测、评级、目标价</td><td>上调+金叉强信号</td></tr>' +
-        '<tr><td>宏观</td><td>GDP/CPI/PMI/利率/社融</td><td>熊市金叉成功率更低</td></tr>' +
-        '<tr><td>行业</td><td>景气度、产业链价格</td><td>上行期金叉更有价值</td></tr>' +
-        '</tbody></table>' +
-        '<h4>五、数据频率分层</h4>' +
-        '<table><thead><tr><th>频率</th><th>粒度</th><th>用途 / 现状</th></tr></thead><tbody>' +
-        '<tr><td>Tick</td><td>每笔成交</td><td>高频 — 未接入</td></tr>' +
-        '<tr><td>分钟</td><td>1/5/15/30/60</td><td>已用（含 09:45 规则）</td></tr>' +
-        '<tr><td>日</td><td>日K</td><td>已用</td></tr>' +
-        '<tr><td>周/月</td><td>周K、月K</td><td>已有数据文件；大趋势过滤可加强</td></tr>' +
-        '</tbody></table>' +
-        '<p>改数据能力或落地上述待办时，请同步更新本备忘录中的「落地优先级」勾选状态。</p>'
-    },
-    {
-      id: 'ashare',
-      group: 'stock',
-      title: '中国A股介绍',
-      html: '<p>A股是人民币普通股票，在上海证券交易所（沪市）与深圳证券交易所（深市）上市交易，面向境内投资者。</p>' +
-        '<h4>常见板块</h4><ul>' +
-        '<li><b>主板</b>：沪市以 <code>6</code> 开头（如 600036），深市以 <code>000</code> 开头（如 000001）。</li>' +
-        '<li><b>创业板</b>：深市 <code>300</code> 开头（如 300059），成长型企业居多，涨跌幅限制更宽。</li>' +
-        '<li><b>科创板</b>：沪市 <code>688</code> 开头，注册制，投资者门槛更高。</li>' +
-        '</ul><h4>交易单位</h4><p>买卖通常以 <b>100 股</b>为一手（整数手），不足一手为碎股，规则受限。</p>'
-    },
-    {
-      id: 'session',
-      group: 'stock',
-      title: '交易时间介绍',
-      html: '<p>A股常规交易日为周一至周五（法定节假日休市）。</p>' +
-        '<h4>连续竞价时段</h4><ul>' +
-        '<li>上午：<code>09:30 – 11:30</code></li>' +
-        '<li>下午：<code>13:00 – 15:00</code></li>' +
-        '</ul><h4>集合竞价</h4><ul>' +
-        '<li>开盘集合竞价：<code>09:15 – 09:25</code></li>' +
-        '<li>收盘集合竞价：<code>14:57 – 15:00</code>（沪深略有差异，以交易所规则为准）</li>' +
-        '</ul><p>本系统风控中，开盘后 15 分钟与收盘前 15 分钟可配置为「静默不开新仓」，减少噪音行情干扰。</p>'
-    },
-    {
-      id: 'kline',
-      group: 'stock',
-      title: 'K线介绍',
-      html: '<p>K线（蜡烛图）用一根柱子概括一段时间的开高低收：</p><ul>' +
-        '<li><b>开盘价 Open</b>：区间第一笔成交价</li>' +
-        '<li><b>最高价 High / 最低价 Low</b>：区间极值</li>' +
-        '<li><b>收盘价 Close</b>：区间最后一笔成交价</li>' +
-        '<li><b>成交量 Volume</b>：区间成交股数合计</li>' +
-        '</ul><h4>本系统周期</h4><p>最小粒度是 <b>1 分钟K</b>；5/15/30/60 分钟、日、周、月均由 1 分钟聚合：开=首根开、收=末根收、高=最高、低=最低、量=求和。</p>' +
-        '<p>指标与回测应使用<strong>已闭合K线</strong>，未走完的当前K线默认剔除，避免用到未确认价格。</p>'
-    },
-    {
-      id: 'ma',
-      group: 'stock',
-      title: 'MA均线（MA5 / MA20 / MA60）',
-      html: '<p>移动平均线（Moving Average）是一段时间收盘价的算术平均，用来刻画趋势与成本重心。</p><ul>' +
-        '<li><code>MA5</code>：近 5 根K线均价，更灵敏，常看作短线成本</li>' +
-        '<li><code>MA20</code>：近 20 根，中短线趋势参考</li>' +
-        '<li><code>MA60</code>：近 60 根，偏大周期方向过滤</li>' +
-        '</ul><h4>金叉 / 死叉</h4><p><b>金叉</b>：短期均线由下向上穿越长期均线，常作买入参考；<b>死叉</b>则相反。</p>' +
-        '<p>震荡市中均线会反复交叉产生假信号，因此本系统可叠加大周期趋势、放量、ADX 等过滤。</p>'
-    },
-    {
-      id: 'rsi',
-      group: 'stock',
-      title: 'RSI相对强弱',
-      html: '<p>RSI（Relative Strength Index）衡量一段时间内涨跌力量对比，常用周期 14。</p><ul>' +
-        '<li>一般认为 <code>RSI &gt; 70</code> 偏超买，追高风险大</li>' +
-        '<li><code>RSI &lt; 30</code> 偏超卖，可能存在反弹机会</li>' +
-        '<li>本策略买入时默认要求 RSI 不过高（如 &lt; 60），减少高位接盘</li>' +
-        '</ul><p>RSI 在强趋势行情中可能长期处在高位或低位，不宜单独作为开平仓依据。</p>'
-    },
-    {
-      id: 'atr',
-      group: 'stock',
-      title: 'ATR真实波幅',
-      html: '<p>ATR（Average True Range）衡量价格波动幅度，不区分方向，常用 14 周期。</p><ul>' +
-        '<li>ATR 大：波动剧烈，止损需更宽，仓位宜更小</li>' +
-        '<li>ATR 小：波动温和，止损可收紧</li>' +
-        '</ul><h4>本系统用法</h4><ul>' +
-        '<li>动态仓位：波动大时降低投入资金</li>' +
-        '<li>止损：入场价 − 2×ATR；移动止盈：最高价 − 1.5×ATR</li>' +
-        '</ul>'
-    },
-    {
-      id: 'adx',
-      group: 'stock',
-      title: 'ADX趋势强度',
-      html: '<p>ADX（Average Directional Index）衡量趋势<strong>强度</strong>，不告诉涨跌方向。</p><ul>' +
-        '<li>经验上 <code>ADX &lt; 20</code> 多为震荡/无趋势，均线策略易假信号</li>' +
-        '<li><code>ADX &gt; 25</code> 趋势相对明确，更适合趋势跟踪</li>' +
-        '</ul><p>可在 <code>application.yml</code> 中开启 <code>adx-filter-enabled</code>，震荡市直接屏蔽开仓。</p>'
-    },
-    {
-      id: 'boll',
-      group: 'stock',
-      title: '布林带 BOLL',
-      html: '<p>布林带通常由 20 周期中轨（SMA）与上下轨（中轨 ± 2 倍标准差）构成。</p><ul>' +
-        '<li>价格贴近上轨：偏强或超买区</li>' +
-        '<li>价格贴近下轨：偏弱或超卖区</li>' +
-        '<li>带宽扩大：波动升温；收窄：波动下降，可能酝酿突破</li>' +
-        '</ul><p>本页K线图会叠加布林带虚线，便于观察震荡区间与突破。</p>'
-    },
-    {
-      id: 'backtest',
-      group: 'stock',
-      title: '回测要点',
-      html: '<p>回测是用历史K线模拟策略买卖，结果不等于实盘收益。</p><h4>本系统关键规则</h4><ul>' +
-        '<li>信号在K线收盘确认后，默认按<strong>下一根开盘价</strong>撮合，减少未来函数</li>' +
-        '<li>成本含佣金、卖出印花税、分级滑点与冲击成本</li>' +
-        '<li>支持 ATR/硬止损、移动止盈、金字塔分批建仓与账户熔断</li>' +
-        '</ul><p>回测时间留空表示使用全部可用数据；组合回测可按起止时间截取。</p>'
-    }
+    { id: 'app', group: 'app', title: '本应用介绍', src: '/docs/app.html' },
+    { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html' },
+    { id: 'memo', group: 'app', title: '备忘录', src: '/docs/memo.html' },
+    { id: 'ashare', group: 'stock', title: '中国A股介绍', src: '/docs/ashare.html' },
+    { id: 'session', group: 'stock', title: '交易时间介绍', src: '/docs/session.html' },
+    { id: 'kline', group: 'stock', title: 'K线介绍', src: '/docs/kline.html' },
+    { id: 'ma', group: 'stock', title: 'MA均线（MA5 / MA20 / MA60）', src: '/docs/ma.html' },
+    { id: 'rsi', group: 'stock', title: 'RSI相对强弱', src: '/docs/rsi.html' },
+    { id: 'atr', group: 'stock', title: 'ATR真实波幅', src: '/docs/atr.html' },
+    { id: 'adx', group: 'stock', title: 'ADX趋势强度', src: '/docs/adx.html' },
+    { id: 'boll', group: 'stock', title: '布林带 BOLL', src: '/docs/boll.html' },
+    { id: 'backtest', group: 'stock', title: '回测要点', src: '/docs/backtest.html' }
   ];
+  var knowledgeHtmlCache = {};
 
   function initKnowledge() {
     var $stock = $('#stockKnowledgeMenu').empty();
@@ -1881,8 +1562,27 @@
     $('.side-nav-menu li').removeClass('active');
     $('.side-nav-menu li[data-id="' + id + '"]').addClass('active');
     $('#knowledgeTitle').text(topic.title);
-    $('#knowledgeBody').html(topic.html);
+    $('#knowledgeBody').html('<p>加载中…</p>');
     try { $('#knowledgePanel')[0].scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
+
+    function render(html) {
+      $('#knowledgeBody').html(html || '<p>暂无内容</p>');
+    }
+    if (knowledgeHtmlCache[topic.src]) {
+      render(knowledgeHtmlCache[topic.src]);
+      return;
+    }
+    $.get(topic.src)
+      .done(function (html) {
+        knowledgeHtmlCache[topic.src] = html;
+        // 若用户已点开其它条目，勿覆盖
+        if ($('#knowledgeTitle').text() !== topic.title) return;
+        render(html);
+      })
+      .fail(function () {
+        if ($('#knowledgeTitle').text() !== topic.title) return;
+        render('<p>文档加载失败：' + topic.src + '</p>');
+      });
   }
 
   $('.side-nav-toggle').on('click', function () {

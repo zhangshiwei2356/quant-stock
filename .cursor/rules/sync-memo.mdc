@@ -7,7 +7,7 @@ alwaysApply: true
 
 对本仓库做任何**实质性改动**后，同一轮内必须检查页面「本应用相关 → **备忘录**」是否需要更新：
 
-定位：`src/main/resources/static/js/stock-chart.js` → `knowledgeTopics` → `{ id: 'memo', title: '备忘录' }`
+定位：`src/main/resources/static/docs/memo.html`（侧栏由 `stock-chart.js` 的 `knowledgeTopics` 索引加载）
 
 ## 何时必须更新备忘录
 

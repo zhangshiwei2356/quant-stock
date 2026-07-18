@@ -8,9 +8,9 @@ alwaysApply: true
 对本仓库做任何实质性改动后，**同一轮改动内必须同步更新**：
 
 1. `README.md`
-2. 页面「本应用相关 → **本应用介绍**」：`src/main/resources/static/js/stock-chart.js` 中 `knowledgeTopics` 里 `id: 'app'` 的条目
-3. 若涉及买卖时机、仓位、止损、撮合、账户风控等规则变化：同步更新「本应用相关 → **交易规则**」（`id: 'rules'`）
-4. 若涉及数据能力、过滤数据源、或备忘录中待办的落地：同步更新「本应用相关 → **备忘录**」（`id: 'memo'`，详见 `sync-memo.mdc`）
+2. 页面「本应用相关 → **本应用介绍**」：`src/main/resources/static/docs/app.html`
+3. 若涉及买卖时机、仓位、止损、撮合、账户风控等规则变化：同步更新「本应用相关 → **交易规则**」：`src/main/resources/static/docs/rules.html`
+4. 若涉及数据能力、过滤数据源、或备忘录中待办的落地：同步更新「本应用相关 → **备忘录**」：`src/main/resources/static/docs/memo.html`（详见 `sync-memo.mdc`）
 
 不要等到用户再提醒。
 
@@ -35,9 +35,10 @@ alwaysApply: true
 ## 定位
 
 ```
-stock-chart.js → knowledgeTopics → { id: 'app', title: '本应用介绍', ... }
-stock-chart.js → knowledgeTopics → { id: 'rules', title: '交易规则', ... }
-stock-chart.js → knowledgeTopics → { id: 'memo', title: '备忘录', ... }
+static/docs/app.html      → 本应用介绍
+static/docs/rules.html    → 交易规则
+static/docs/memo.html     → 备忘录
+stock-chart.js → knowledgeTopics → { id, title, src } 目录索引（一般无需改正文）
 ```
 ## 自检
 

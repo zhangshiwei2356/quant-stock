@@ -37,6 +37,7 @@ mvn spring-boot:run
 - 初始资金默认：**100000**
 - 进入应用先显示**初始化页**；侧栏一级菜单互斥展开进入功能，再点同一菜单可全部收起并回到初始化页
 - 侧栏一级菜单：**股票池**（仅行情，可同时开启多只）、**单股回测**（K线买卖点 + 成交明细/收益汇总 + 回测/扫描）、**组合回测**、**股票知识**、**本应用相关**（介绍 / 交易规则 / **备忘录**）；知识阅读时隐藏工作台
+- 说明文档为独立 HTML 片段：`src/main/resources/static/docs/*.html`，由工作台 `stock.html` 知识面板按需加载（非多页 SPA）
 - 页头主题（`localStorage` 记住）：**夜盘·黑客帝国** / **日间·科技粒子** / **青松·3D星空** / 星空粒子
 - 页面体验：交易台风格、输入聚焦动画、按钮 loading、表格斑马纹/粘性表头、Toast 提示、多股标签切换
 
@@ -123,8 +124,8 @@ mvn spring-boot:run
 每次实质性改动需**同时**更新：
 
 1. 本 `README.md`
-2. 页面「本应用相关 → 本应用介绍」（`static/js/stock-chart.js` 中 `id: 'app'`）
-3. 规则变更时同步「本应用相关 → 交易规则」（`id: 'rules'`）
-4. 数据能力/待办落地时同步「本应用相关 → 备忘录」（`id: 'memo'`）
+2. 页面「本应用相关 → 本应用介绍」（`static/docs/app.html`）
+3. 规则变更时同步「本应用相关 → 交易规则」（`static/docs/rules.html`）
+4. 数据能力/待办落地时同步「本应用相关 → 备忘录」（`static/docs/memo.html`）
 
 规则见 `.cursor/rules/sync-readme.mdc`、`.cursor/rules/sync-memo.mdc`。
