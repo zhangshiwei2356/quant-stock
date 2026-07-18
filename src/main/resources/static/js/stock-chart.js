@@ -102,13 +102,48 @@
     sync();
   }
 
-  function toast(msg, type) {
+  function placeThemeToastHost() {
+    var $host = $('#toastHost');
+    var el = document.querySelector('.theme-field') || document.getElementById('themeSelect');
+    if (!el) {
+      $host.removeClass('toast-host--theme').css({ top: '', right: '', left: '', bottom: '', transform: '' });
+      return;
+    }
+    var r = el.getBoundingClientRect();
+    var gap = 10;
+    $host.addClass('toast-host--theme').css({
+      top: Math.round(r.bottom + gap) + 'px',
+      right: Math.max(12, Math.round(window.innerWidth - r.right)) + 'px',
+      left: 'auto',
+      bottom: 'auto',
+      transform: 'none'
+    });
+  }
+
+  /**
+   * @param {string} msg
+   * @param {string} [type] ok|err|info
+   * @param {{ place?: 'theme'|'default' }} [opts]
+   */
+  function toast(msg, type, opts) {
+    opts = opts || {};
+    var $host = $('#toastHost');
+    if (opts.place === 'theme') {
+      placeThemeToastHost();
+    } else {
+      $host.removeClass('toast-host--theme').css({ top: '', right: '', left: '', bottom: '', transform: '' });
+    }
     var $t = $('<div class="toast"/>').addClass(type || 'info').text(msg);
-    $('#toastHost').append($t);
+    $host.append($t);
     setTimeout(function () {
       $t.addClass('out');
-      setTimeout(function () { $t.remove(); }, 250);
-    }, 2800);
+      setTimeout(function () {
+        $t.remove();
+        if (opts.place === 'theme' && !$host.children('.toast').length) {
+          $host.removeClass('toast-host--theme').css({ top: '', right: '', left: '', bottom: '', transform: '' });
+        }
+      }, 250);
+    }, opts.place === 'theme' ? 2200 : 2800);
   }
 
   function cssVar(name, fallback) {
@@ -151,9 +186,19 @@
     }, true);
   }
 
+  function setSingleResultPanelsVisible(show) {
+    $('#singleEquityPanel, #singleTradePanel').prop('hidden', !show);
+    if (show) {
+      setTimeout(function () {
+        try { singleEquityChart.resize(); } catch (e) {}
+      }, 60);
+    }
+  }
+
   function clearSingleEquityChart() {
     lastSingleEquity = null;
     try { singleEquityChart.clear(); } catch (e) {}
+    setSingleResultPanelsVisible(false);
   }
 
   function refreshChartsForTheme() {
@@ -186,13 +231,35 @@
     });
   }
 
+  var THEME_KEYS = {
+    day: 1, forest: 1, night: 1, cosmos: 1,
+    interact: 1, wave: 1, matrix: 1
+  };
+
   function applyTheme(theme) {
-    if (theme !== 'day' && theme !== 'forest' && theme !== 'night') {
-      theme = 'night';
-    }
+    // 旧主题并入：交互粒子→日间，波浪→青松，代码雨/极光/Vanta→夜盘
+    if (theme === 'interact') theme = 'day';
+    if (theme === 'wave') theme = 'forest';
+    if (theme === 'matrix' || theme === 'aurora' || theme === 'vanta') theme = 'night';
+    if (!THEME_KEYS[theme]) theme = 'night';
     document.documentElement.setAttribute('data-theme', theme);
     try { localStorage.setItem('quant-theme', theme); } catch (e) {}
     $('#themeSelect').val(theme);
+
+    if (window.QuantStarfieldBg && typeof window.QuantStarfieldBg.stop === 'function') {
+      window.QuantStarfieldBg.stop();
+    }
+
+    if (theme === 'forest') {
+      if (window.QuantParticleBg && typeof window.QuantParticleBg.stop === 'function') {
+        window.QuantParticleBg.stop();
+      }
+      if (window.QuantStarfieldBg && typeof window.QuantStarfieldBg.start === 'function') {
+        window.QuantStarfieldBg.start();
+      }
+    } else if (window.QuantParticleBg && typeof window.QuantParticleBg.setTheme === 'function') {
+      window.QuantParticleBg.setTheme(theme);
+    }
     refreshChartsForTheme();
   }
 
@@ -262,11 +329,23 @@
     }
   }
 
+  function setPortfolioResultPanelsVisible(show) {
+    $('#pfEquityPanel, #pfTradePanel, #pfStockPanel').prop('hidden', !show);
+    if (show) {
+      setTimeout(function () {
+        try { equityChart.resize(); } catch (e) {}
+      }, 60);
+    }
+  }
+
   function clearPortfolioResult() {
     $('#pfTradeBody').html('<tr><td colspan="10" class="empty-state">执行组合回测后显示买卖明细</td></tr>');
     $('#pfTradeSummary').empty().prop('hidden', true);
     $('#pfStockBody').html('<tr><td colspan="10" class="empty-state">回测后按股票汇总</td></tr>');
     $('#pfMetrics').empty();
+    lastEquity = null;
+    try { equityChart.clear(); } catch (e) {}
+    setPortfolioResultPanelsVisible(false);
   }
 
   function renderPortfolioTradeTable(pf) {
@@ -585,6 +664,7 @@
     options = options || {};
     if (!code) return;
     var prev = singleCode;
+    var sameCode = prev === code;
     singleCode = code;
     currentCode = code;
     $('#stockCode').val(code);
@@ -622,7 +702,10 @@
     if (!options.skipKline) {
       loadSingleKline({ silent: true });
     }
-    loadSingleHistory(code);
+    // 同标的重复进入时跳过历史刷新，避免把已展开的分析冲掉；无行数据时仍加载
+    if (options.forceHistory || (!options.skipHistory && (!sameCode || !$('#singleHistoryBody tr.history-row').length))) {
+      loadSingleHistory(code);
+    }
   }
 
   function buildCandleOption(bars, indicators, marks) {
@@ -912,6 +995,7 @@
   function clearTradeResult() {
     $('#tradeBody').html('<tr><td colspan="9" class="empty-state">执行回测后显示买卖明细</td></tr>');
     $('#tradeSummary').empty().prop('hidden', true);
+    setSingleResultPanelsVisible(false);
   }
 
   function formatRange(start, end) {
@@ -968,7 +1052,7 @@
 
   function loadSingleHistory(code) {
     var $tb = $('#singleHistoryBody');
-    $('#singleHistoryAnalysisDetail').html('<p class="hint">点击上方回测记录一行，展示对应分析（为何买卖、看了哪些数据、买多少股）。</p>');
+    collapseHistoryAnalysis($tb);
     if (!code) {
       $tb.html('<tr><td colspan="14" class="empty-state">请先选择股票</td></tr>');
       return;
@@ -982,16 +1066,59 @@
       });
   }
 
-  function renderAnalysisDetail(rec, detailId) {
-    var $box = $('#' + detailId).empty();
+  var HISTORY_COLSPAN = 14;
+
+  function collapseHistoryAnalysis($tb) {
+    if (!$tb || !$tb.length) return;
+    $tb.find('tr.history-row').removeClass('active').removeAttr('data-expanded');
+    $tb.find('tr.history-analysis-row').remove();
+  }
+
+  /** 在记录行正下方插入/复用分析展开行 */
+  function ensureInlineAnalysisRow($tr, colSpan) {
+    var id = String($tr.attr('data-id') || '');
+    var $next = $tr.next('tr.history-analysis-row');
+    if ($next.length && String($next.attr('data-for-id') || '') === id) {
+      return $next.find('.analysis-detail-panel');
+    }
+    $tr.closest('tbody').find('tr.history-analysis-row').remove();
+    var $row = $('<tr class="history-analysis-row"/>').attr('data-for-id', id);
+    var $cell = $('<td class="history-analysis-cell"/>').attr('colspan', colSpan || HISTORY_COLSPAN);
+    var $panel = $('<div class="knowledge-body analysis-detail-panel"/>').attr('data-open-id', id);
+    $cell.append($panel);
+    $row.append($cell);
+    $tr.after($row);
+    try {
+      $row[0].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    } catch (e) {}
+    return $panel;
+  }
+
+  function renderAnalysisDetail(rec, $panel, $tb) {
+    var openId = $panel.attr('data-open-id');
+    $panel.empty();
+    if (openId) {
+      $panel.attr('data-open-id', openId);
+    }
+    var $head = $('<div class="analysis-detail-head"/>');
+    $head.append($('<span/>').html('<b>回测分析</b>'));
+    var $collapse = $('<button type="button" class="secondary analysis-collapse-btn"/>').text('收起');
+    $collapse.on('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      collapseHistoryAnalysis($tb);
+    });
+    $head.append($collapse);
+    $panel.append($head);
+
     if (!rec || !rec.id) {
-      $box.append($('<p class="hint"/>').text('未找到与该回测记录对应的分析（旧记录可能无分析，请重新回测）。'));
+      $panel.append($('<p class="hint"/>').text('未找到与该回测记录对应的分析（旧记录可能无分析，请重新回测）。'));
       return;
     }
     var events = rec.events || [];
-    $box.append($('<p/>').html('<b>摘要</b>：' + (rec.summary || '-')));
+    $panel.append($('<p/>').html('<b>摘要</b>：' + (rec.summary || '-')));
     if (!events.length) {
-      $box.append($('<p class="hint"/>').text('无事件明细'));
+      $panel.append($('<p class="hint"/>').text('无事件明细'));
       return;
     }
     var $ul = $('<ol/>');
@@ -1012,27 +1139,53 @@
         (dataStr ? ('<br/><span class="hint">数据：' + dataStr + '</span>') : '')
       ));
     });
-    $box.append($ul);
+    $panel.append($ul);
   }
 
-  function showHistoryAnalysis(id, apiPath, detailId) {
+  function showHistoryAnalysis(id, apiPath, $tr, $tb, colSpan) {
+    id = String(id || '');
+    var $panel = ensureInlineAnalysisRow($tr, colSpan);
     if (!id) {
-      $('#' + detailId).html('<p class="hint">该记录无 id，无法关联分析。</p>');
+      $panel.html('<p class="hint">该记录无 id，无法关联分析。</p>');
       return;
     }
-    $('#' + detailId).html('<p class="hint">加载分析中…</p>');
+    $panel.attr('data-open-id', id).html('<p class="hint">加载分析中…</p>');
     $.getJSON(apiPath, { id: id })
       .done(function (rec) {
-        renderAnalysisDetail(rec, detailId);
+        if (!$panel.closest('tbody').length) return;
+        if (String($panel.attr('data-open-id') || '') !== id) return;
+        if (!$tr.hasClass('active')) return;
+        renderAnalysisDetail(rec, $panel, $tb);
       })
       .fail(function () {
-        $('#' + detailId).html('<p class="hint">加载分析失败</p>');
+        if (!$panel.closest('tbody').length) return;
+        if (String($panel.attr('data-open-id') || '') !== id) return;
+        $panel.attr('data-open-id', id).html('<p class="hint">加载分析失败</p>');
       });
   }
 
+  /** 点击行：在该行下方展开分析；再点同一行收起；点其它行则切换到对应行下方 */
+  function bindHistoryTableToggle($tb, apiPath, colSpan) {
+    if (!$tb || !$tb.length) return;
+    $tb.off('click.historyToggle').on('click.historyToggle', 'tr.history-row', function (e) {
+      if ($(e.target).closest('button, a, input, label').length) return;
+      var $tr = $(this);
+      var id = String($tr.attr('data-id') || '');
+      var expanded = $tr.hasClass('active') || $tr.attr('data-expanded') === '1';
+      if (expanded) {
+        collapseHistoryAnalysis($tb);
+        return;
+      }
+      collapseHistoryAnalysis($tb);
+      $tr.addClass('active').attr('data-expanded', '1');
+      showHistoryAnalysis(id, apiPath, $tr, $tb, colSpan || HISTORY_COLSPAN);
+    });
+  }
+
   function renderSingleHistory(rows) {
-    var $tb = $('#singleHistoryBody').empty();
-    $('#singleHistoryAnalysisDetail').html('<p class="hint">点击上方回测记录一行，展示对应分析（为何买卖、看了哪些数据、买多少股）。</p>');
+    var $tb = $('#singleHistoryBody');
+    bindHistoryTableToggle($tb, '/api/backtest/analysis', HISTORY_COLSPAN);
+    $tb.empty();
     if (!rows.length) {
       $tb.append($('<tr/>').append($('<td colspan="14" class="empty-state"/>').text('暂无该股回测记录')));
       return;
@@ -1054,11 +1207,6 @@
         .append($('<td/>').text(num(s.buyAmount)))
         .append($('<td/>').text(num(s.sellAmount)))
         .append($('<td/>').text(num(s.totalFee)));
-      $tr.on('click', function () {
-        $tb.find('tr').removeClass('active');
-        $tr.addClass('active');
-        showHistoryAnalysis(r.id, '/api/backtest/analysis', 'singleHistoryAnalysisDetail');
-      });
       $tb.append($tr);
     });
   }
@@ -1084,7 +1232,7 @@
   }
 
   function loadPortfolioHistory() {
-    $('#portfolioHistoryAnalysisDetail').html('<p class="hint">点击上方回测记录一行，展示对应分析。</p>');
+    collapseHistoryAnalysis($('#portfolioHistoryBody'));
     $.getJSON('/api/portfolio/history')
       .done(function (rows) {
         renderPortfolioHistory(rows || []);
@@ -1095,8 +1243,9 @@
   }
 
   function renderPortfolioHistory(rows) {
-    var $tb = $('#portfolioHistoryBody').empty();
-    $('#portfolioHistoryAnalysisDetail').html('<p class="hint">点击上方回测记录一行，展示对应分析。</p>');
+    var $tb = $('#portfolioHistoryBody');
+    bindHistoryTableToggle($tb, '/api/portfolio/analysis', HISTORY_COLSPAN);
+    $tb.empty();
     if (!rows.length) {
       $tb.append($('<tr/>').append($('<td colspan="14" class="empty-state"/>').text('暂无组合回测记录')));
       return;
@@ -1119,11 +1268,6 @@
         .append($('<td/>').text(num(s.buyAmount)))
         .append($('<td/>').text(num(s.sellAmount)))
         .append($('<td/>').text(num(s.totalFee)));
-      $tr.on('click', function () {
-        $tb.find('tr').removeClass('active');
-        $tr.addClass('active');
-        showHistoryAnalysis(r.id, '/api/portfolio/analysis', 'portfolioHistoryAnalysisDetail');
-      });
       $tb.append($tr);
     });
   }
@@ -1173,6 +1317,7 @@
           equityTimes: bt.equityTimes || [],
           equityCurve: bt.equityCurve || []
         };
+        setSingleResultPanelsVisible(true);
         renderEquityChart(lastSingleEquity, singleEquityChart);
         renderTradeTable(bt);
         loadSingleHistory(code);
@@ -1279,6 +1424,7 @@
           ' 胜率<b>' + pct(pf.winRate) + '</b>'
         );
         lastEquity = pf;
+        setPortfolioResultPanelsVisible(true);
         renderEquityChart(pf);
         renderPortfolioTradeTable(pf);
         renderPortfolioStockBreakdown(pf);
@@ -1288,7 +1434,10 @@
           document.getElementById('pfTradeSummary').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         } catch (e) {}
         resizeCharts();
-      }).fail(function () { toast('组合回测失败', 'err'); }));
+      }).fail(function () {
+        setPortfolioResultPanelsVisible(false);
+        toast('组合回测失败', 'err');
+      }));
   }
 
   var knowledgeTopics = [
@@ -1310,12 +1459,13 @@
         '<li>目录：<code>src/main/resources/data/kline/</code></li>' +
         '</ul>' +
         '<h4>页面能做什么</h4><ul>' +
+        '<li>进入应用先显示<strong>初始化页</strong>；展开左侧一级菜单进入功能，再点同一菜单可全部收起并回到初始化页</li>' +
         '<li><b>股票池</b>：仅行情展示，可同时开启多只股票信息（标签切换）</li>' +
-        '<li><b>单股回测</b>：选股后可见基础K线+信号图（标注买卖点）+权益曲线+成交明细/收益汇总+K线表；历史记录与分析一一对应，点击历史行查看决策分析</li>' +
-        '<li><b>组合回测</b>：勾选多只共享资金池回测；权益曲线 + 收益看板 + 成交流水 + 分股汇总；点击历史行查看对应分析</li>' +
+        '<li><b>单股回测</b>：选股后可见基础K线+信号图（标注买卖点）+权益曲线+成交明细/收益汇总+K线表；历史与分析一一对应，点击历史行在<strong>该行下方</strong>展开决策分析</li>' +
+        '<li><b>组合回测</b>：勾选多只共享资金池回测；权益曲线 + 收益看板 + 成交流水 + 分股汇总；点击历史行在该行下方展开对应分析</li>' +
         '<li>回测起止时间默认留空 = 全量 K 线（单股/组合均支持填写）；初始资金默认 <b>100000</b></li>' +
         '<li>侧栏另有股票知识、本应用相关（介绍、交易规则、备忘录）</li>' +
-        '<li>页头可切换主题：夜盘深色 / 日间浅色 / 青松深色（本地记住选择）</li>' +
+        '<li>页头主题：<b>夜盘·黑客帝国</b> / <b>日间·交互粒子</b> / <b>青松·3D星空</b> / 星空粒子，本地记住选择</li>' +
         '</ul>' +
         '<h4>策略与风控摘要</h4><ul>' +
         '<li>均线金叉死叉；可配置 MA60 / 放量 / ADX / RSI 过滤</li>' +
@@ -1558,17 +1708,53 @@
   function setSideNavOpen(bodyId) {
     $('.side-nav-toggle').each(function () {
       var id = $(this).attr('data-body');
-      var open = bodyId && id === bodyId;
+      // 必须是严格 boolean：jQuery toggleClass(cls, null/undefined) 会变成“切换”而非“关闭”
+      var open = !!(bodyId && id === bodyId);
       $(this).attr('aria-expanded', open ? 'true' : 'false').toggleClass('open', open);
       $('#' + id).toggleClass('open', open);
     });
   }
 
-  function hideAllWorkspaceViews() {
-    $('#viewPool, #viewSingle, #viewPortfolio').prop('hidden', true);
+  var homeCollapsed = false;
+
+  function setHomeCollapsed(collapsed) {
+    homeCollapsed = !!collapsed;
+    var onHome = !$('#viewHome').prop('hidden');
+    $('#viewHome').toggleClass('home-collapsed', homeCollapsed);
+    $('body').toggleClass('home-theme-peek', homeCollapsed && onHome);
+    $('#btnExpandHome').prop('hidden', !(homeCollapsed && onHome));
   }
 
-  function showMode(mode) {
+  function hideAllWorkspaceViews() {
+    $('#viewHome, #viewPool, #viewSingle, #viewPortfolio').prop('hidden', true);
+    $('body').removeClass('home-theme-peek');
+    $('#btnExpandHome').prop('hidden', true);
+  }
+
+  /** 初始化页：无一级菜单展开时展示 */
+  function showHome(options) {
+    options = options || {};
+    $('body').removeClass('mode-doc');
+    $('#knowledgePanel').prop('hidden', true);
+    $('.side-nav-menu li').removeClass('active');
+    hideAllWorkspaceViews();
+    $('#viewHome').prop('hidden', false);
+    if (options.collapseNav !== false) {
+      setSideNavOpen(null);
+    }
+    var lead = options.lead || '左侧尚未展开菜单。点击下方入口，或展开左侧一级菜单进入对应功能。';
+    $('#homeLead').text(lead);
+    // 进入欢迎页默认展开；若显式要求保持收起则沿用
+    setHomeCollapsed(options.keepCollapsed ? homeCollapsed : false);
+  }
+
+  /**
+   * @param {string} mode pool|single|portfolio
+   * @param {{expandNav?: boolean}} [options] expandNav 默认 true；为 false 时只切主区、不强制展开一级菜单
+   */
+  function showMode(mode, options) {
+    options = options || {};
+    var expandNav = options.expandNav !== false;
     lastWorkspaceMode = mode || 'pool';
     $('body').removeClass('mode-doc');
     $('#knowledgePanel').prop('hidden', true);
@@ -1577,19 +1763,19 @@
 
     if (lastWorkspaceMode === 'single') {
       $('#viewSingle').prop('hidden', false);
-      setSideNavOpen('singleBody');
+      if (expandNav) setSideNavOpen('singleBody');
       if (singleCode) {
         selectSingleStock(singleCode, { silent: true });
       }
     } else if (lastWorkspaceMode === 'portfolio') {
       $('#viewPortfolio').prop('hidden', false);
-      setSideNavOpen('portfolioBody');
+      if (expandNav) setSideNavOpen('portfolioBody');
       syncPortfolioCodes();
       loadPortfolioHistory();
     } else {
       lastWorkspaceMode = 'pool';
       $('#viewPool').prop('hidden', false);
-      setSideNavOpen('poolBody');
+      if (expandNav) setSideNavOpen('poolBody');
     }
     resizeCharts();
   }
@@ -1622,24 +1808,42 @@
     var mode = $btn.attr('data-mode');
     var wasOpen = $btn.attr('aria-expanded') === 'true';
 
+    // 再次点击已展开的一级菜单：全部收起，右侧回到初始化页
     if (wasOpen) {
-      if (mode === 'doc') {
-        showMode(lastWorkspaceMode);
-      } else {
-        setSideNavOpen(null);
-      }
+      showHome();
       return;
     }
 
-    setSideNavOpen(bodyId);
     if (mode === 'doc') {
+      setSideNavOpen(bodyId);
       $('body').addClass('mode-doc');
       hideAllWorkspaceViews();
       $('#knowledgePanel').prop('hidden', true);
       $('.side-nav-menu li').removeClass('active');
+      $('#viewHome').prop('hidden', false);
+      $('#homeLead').text('已展开说明菜单，请在左侧点选条目阅读；或再点同一菜单收起并回到本页。');
+      setHomeCollapsed(false);
     } else {
-      showMode(mode);
+      showMode(mode); // 切入对应工作台并展开该一级菜单
     }
+  });
+
+  $('.home-actions').on('click', '[data-open-nav]', function () {
+    var bodyId = $(this).attr('data-open-nav');
+    var $btn = $('.side-nav-toggle[data-body="' + bodyId + '"]');
+    if (!$btn.length) return;
+    if ($btn.attr('aria-expanded') === 'true') return;
+    $btn.trigger('click');
+  });
+
+  $('#btnCollapseHome').on('click', function () {
+    setHomeCollapsed(true);
+    toast('欢迎页已收起，可切换主题欣赏背景', 'info', { place: 'theme' });
+  });
+
+  $('#btnExpandHome').on('click', function () {
+    setHomeCollapsed(false);
+    toast('已展开欢迎页', 'ok');
   });
 
   $('.side-nav-menu').on('click', 'li', function () {
@@ -1647,7 +1851,7 @@
   });
 
   $('#knowledgeClose').on('click', function () {
-    showMode(lastWorkspaceMode);
+    showMode(lastWorkspaceMode || 'pool');
   });
 
   $('#stockList').on('click', 'li', function () {
@@ -1707,15 +1911,23 @@
   $(window).on('resize', resizeCharts);
 
   $('#themeSelect').on('change', function () {
-    applyTheme($(this).val());
-    toast('已切换主题', 'ok');
+    var val = $(this).val();
+    var label = ($(this).find('option:selected').text() || val || '').replace(/\s+/g, ' ').trim();
+    applyTheme(val);
+    toast('已切换为「' + label + '」', 'ok', { place: 'theme' });
+  });
+
+  $(window).on('resize', function () {
+    if ($('#toastHost').hasClass('toast-host--theme')) {
+      placeThemeToastHost();
+    }
   });
 
   initKnowledge();
   initTheme();
   loadSummary();
   loadPool();
-  showMode('pool');
+  showHome();
   bindCapitalHint($('#initCapital'), $('#initCapitalHint'));
   bindCapitalHint($('#pfInitCapital'), $('#pfInitCapitalHint'));
 })();

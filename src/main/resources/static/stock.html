@@ -8,18 +8,25 @@
     (function () {
       try {
         var t = localStorage.getItem('quant-theme');
-        if (t === 'day' || t === 'forest' || t === 'night') {
-          document.documentElement.setAttribute('data-theme', t);
-        }
+        if (t === 'interact') t = 'day';
+        if (t === 'wave') t = 'forest';
+        if (t === 'matrix' || t === 'aurora' || t === 'vanta') t = 'night';
+        var ok = { day: 1, forest: 1, night: 1, cosmos: 1 };
+        if (ok[t]) document.documentElement.setAttribute('data-theme', t);
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css"/>
+  <link rel="stylesheet" href="/css/style.css?v=20260718-day-tech"/>
   <script src="/js/jquery.min.js"></script>
   <script src="/js/echarts.min.js"></script>
+  <script src="/js/particle-bg.js?v=20260718-day-tech"></script>
+  <script src="/js/starfield-bg.js?v=20260718-no-vanta"></script>
 </head>
 <body>
+<canvas id="particle-canvas" aria-hidden="true"></canvas>
+<div id="starfield-bg" aria-hidden="true"></div>
 <div id="toastHost" aria-live="polite"></div>
+<button type="button" id="btnExpandHome" class="home-expand-fab" hidden title="展开欢迎页">显示欢迎页</button>
 <header class="app-header">
   <div class="brand">
     <span class="brand-mark">QS</span>
@@ -31,9 +38,10 @@
   <div class="header-actions">
     <label class="theme-field" for="themeSelect">主题
       <select id="themeSelect" aria-label="主题选择">
-        <option value="night">夜盘深色</option>
-        <option value="day">日间浅色</option>
-        <option value="forest">青松深色</option>
+        <option value="night">夜盘深色 · 黑客帝国</option>
+        <option value="day">日间浅色 · 科技粒子</option>
+        <option value="forest">青松深色 · 3D星空</option>
+        <option value="cosmos">星空粒子</option>
       </select>
     </label>
   </div>
@@ -41,10 +49,10 @@
 <div class="layout">
   <aside class="sidebar">
     <div class="side-nav" data-nav="pool">
-      <button type="button" class="side-nav-toggle open" data-body="poolBody" data-mode="pool" aria-expanded="true">
+      <button type="button" class="side-nav-toggle" data-body="poolBody" data-mode="pool" aria-expanded="false">
         股票池 <span class="chevron">▸</span>
       </button>
-      <div id="poolBody" class="side-nav-body open">
+      <div id="poolBody" class="side-nav-body">
         <p id="dataHint" class="hint"></p>
         <p class="hint">点击股票可开启信息，支持同时打开多只</p>
         <ul id="stockList"></ul>
@@ -95,8 +103,32 @@
       <article id="knowledgeBody" class="knowledge-body"></article>
     </section>
 
+    <!-- 初始化 / 全部收起时的欢迎页 -->
+    <div id="viewHome" class="workspace-view">
+      <section class="panel home-panel" id="homePanel">
+        <div class="home-toolbar">
+          <button type="button" id="btnCollapseHome" class="secondary home-collapse-btn" title="收起欢迎页，查看主题背景">收起 · 查看主题</button>
+        </div>
+        <p class="home-brand">Quant Stock</p>
+        <h3 class="home-title">开始使用</h3>
+        <p class="home-lead" id="homeLead">左侧尚未展开菜单。点击下方入口，或展开左侧一级菜单进入对应功能。</p>
+        <div class="home-actions">
+          <button type="button" class="home-action" data-open-nav="poolBody" data-mode="pool">股票池</button>
+          <button type="button" class="home-action" data-open-nav="singleBody" data-mode="single">单股回测</button>
+          <button type="button" class="home-action" data-open-nav="portfolioBody" data-mode="portfolio">组合回测</button>
+          <button type="button" class="home-action secondary" data-open-nav="stockKnowledgeMenu" data-mode="doc">股票知识</button>
+          <button type="button" class="home-action secondary" data-open-nav="appRelatedMenu" data-mode="doc">本应用相关</button>
+        </div>
+        <ul class="home-tips">
+          <li>工作台菜单：展开后显示行情 / 回测界面；再点同一菜单可收起并回到本页</li>
+          <li>说明类菜单：展开后点选左侧条目阅读；「返回工作台」可回到上次功能页</li>
+          <li>页头可切换主题；也可点右上「收起 · 查看主题」欣赏动态背景</li>
+        </ul>
+      </section>
+    </div>
+
     <!-- 股票池：仅展示，多股信息 -->
-    <div id="viewPool" class="workspace-view">
+    <div id="viewPool" class="workspace-view" hidden>
       <section class="panel">
         <h3>已开启股票</h3>
         <div id="poolTabs" class="stock-tabs"></div>
@@ -190,11 +222,11 @@
           <div id="signalChart" class="chart-box"></div>
         </div>
       </section>
-      <section class="panel">
+      <section class="panel" id="singleEquityPanel" hidden>
         <h3>单股权益曲线</h3>
         <div id="singleEquityChart" class="chart-box" style="height:280px;"></div>
       </section>
-      <section class="panel">
+      <section class="panel" id="singleTradePanel" hidden>
         <h3>成交明细与收益</h3>
         <div id="tradeSummary" class="result-board" hidden></div>
         <h4 class="result-table-title">成交流水</h4>
@@ -223,8 +255,8 @@
         <h3>单股回测历史
           <button type="button" id="btnClearSingleHistory" class="danger" style="margin-left:12px;padding:4px 10px;font-size:12px;">清除该股记录</button>
         </h3>
-        <p class="hint" style="margin:4px 0 8px;">落盘 <code>data/backtest/single-backtest-records.json</code> + 对应分析 <code>single-backtest-analysis.json</code>（同一 id）。点击一行查看该次回测的决策分析；清除会同时删除分析。</p>
-        <div class="table-wrap" style="max-height:320px;overflow:auto;">
+        <p class="hint" style="margin:4px 0 8px;">落盘 <code>data/backtest/single-backtest-records.json</code> + 对应分析（同一 id）。点击一行在<strong>该行下方</strong>展开分析，再点同一行或「收起」折叠；清除会同时删除分析。</p>
+        <div class="table-wrap history-table-wrap">
           <table>
             <thead>
             <tr>
@@ -248,9 +280,6 @@
             <tr><td colspan="14" class="empty-state">暂无该股回测记录</td></tr>
             </tbody>
           </table>
-        </div>
-        <div id="singleHistoryAnalysisDetail" class="knowledge-body" style="margin-top:10px;max-height:320px;overflow:auto;">
-          <p class="hint">点击上方回测记录一行，展示对应分析（为何买卖、看了哪些数据、买多少股）。</p>
         </div>
       </section>
       <section class="panel">
@@ -316,11 +345,11 @@
         <p class="hint" style="margin:4px 0 0;">说明：组合引擎为<strong>日K简化模型</strong>（共享资金池）；完整 T+1/分钟撮合规则以单股回测为准。</p>
         <div class="metrics" id="pfMetrics" style="margin-top:8px;"></div>
       </section>
-      <section class="panel">
+      <section class="panel" id="pfEquityPanel" hidden>
         <h3>组合权益曲线</h3>
         <div id="equityChart" class="chart-box" style="height:280px;"></div>
       </section>
-      <section class="panel">
+      <section class="panel" id="pfTradePanel" hidden>
         <h3>成交明细与收益</h3>
         <div id="pfTradeSummary" class="result-board" hidden></div>
         <h4 class="result-table-title">成交流水</h4>
@@ -346,7 +375,7 @@
           </table>
         </div>
       </section>
-      <section class="panel">
+      <section class="panel" id="pfStockPanel" hidden>
         <h3>分股表现</h3>
         <div class="table-wrap" style="max-height:280px;">
           <table>
@@ -374,8 +403,8 @@
         <h3>组合回测历史
           <button type="button" id="btnClearPortfolioHistory" class="danger" style="margin-left:12px;padding:4px 10px;font-size:12px;">清除全部记录</button>
         </h3>
-        <p class="hint" style="margin:4px 0 8px;">落盘 <code>portfolio-backtest-records.json</code> + 对应分析（同一 id）。点击一行查看该次回测分析；清除会同时删除分析。</p>
-        <div class="table-wrap" style="max-height:320px;overflow:auto;">
+        <p class="hint" style="margin:4px 0 8px;">落盘 <code>portfolio-backtest-records.json</code> + 对应分析（同一 id）。点击一行在<strong>该行下方</strong>展开分析，再点同一行或「收起」折叠；清除会同时删除分析。</p>
+        <div class="table-wrap history-table-wrap">
           <table>
             <thead>
             <tr>
@@ -400,13 +429,10 @@
             </tbody>
           </table>
         </div>
-        <div id="portfolioHistoryAnalysisDetail" class="knowledge-body" style="margin-top:10px;max-height:320px;overflow:auto;">
-          <p class="hint">点击上方回测记录一行，展示对应分析。</p>
-        </div>
       </section>
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js"></script>
+<script src="/js/stock-chart.js?v=20260718-home-collapse"></script>
 </body>
 </html>
