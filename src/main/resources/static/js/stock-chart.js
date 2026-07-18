@@ -1549,10 +1549,15 @@
     $('#knowledgePanel').prop('hidden', true);
     $('.side-nav-menu li').removeClass('active');
     hideAllWorkspaceViews();
-    $('#viewNavIntro').prop('hidden', false);
+    var $intro = $('#viewNavIntro');
+    $intro.prop('hidden', false);
+    // 重播入场动画
+    $intro.removeClass('nav-intro-anim');
+    void $intro[0].offsetWidth;
+    $intro.addClass('nav-intro-anim');
     setSideNavOpen(bodyId || null);
     $('#navIntroTitle').text(title);
-    $('#navIntroBody').html('<p>加载中…</p>');
+    $('#navIntroBody').html('<p class="nav-intro-loading">加载介绍中…</p>');
 
     function render(html) {
       $('#navIntroBody').html(html || '<p>暂无介绍</p>');
@@ -1683,7 +1688,7 @@
     var introSrc = $btn.attr('data-intro');
     var introTitle = $btn.attr('data-intro-title') || $btn.clone().children().remove().end().text().trim();
     if (introSrc) {
-      showNavIntro({ bodyId: bodyId, title: introTitle, src: introSrc + (introSrc.indexOf('?') >= 0 ? '&' : '?') + 'v=20260719-nav' });
+      showNavIntro({ bodyId: bodyId, title: introTitle, src: introSrc + (introSrc.indexOf('?') >= 0 ? '&' : '?') + 'v=20260719-nav-ui' });
       return;
     }
     // 无介绍配置时回退到原工作台
