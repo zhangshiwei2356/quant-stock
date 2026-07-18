@@ -1466,6 +1466,117 @@
   var HOME_SRC = '/docs/home.html?v=20260719-nav-intro';
   var homePanelReady = false;
   var pendingHomeLead = null;
+  var docsPdfBusy = false;
+
+  function fetchTopicHtml(topic) {
+    if (knowledgeHtmlCache[topic.src]) {
+      return $.Deferred().resolve(knowledgeHtmlCache[topic.src]).promise();
+    }
+    return $.get(topic.src).then(function (html) {
+      knowledgeHtmlCache[topic.src] = html;
+      return html;
+    });
+  }
+
+  function pad2(n) {
+    return (n < 10 ? '0' : '') + n;
+  }
+
+  /**
+   * 将指定 group（stock|app）下全部知识文档合并导出 PDF
+   */
+  function downloadDocsPdf(group, $btn) {
+    if (docsPdfBusy) {
+      toast('正在生成 PDF，请稍候…', 'info');
+      return;
+    }
+    if (typeof html2pdf === 'undefined') {
+      toast('PDF 组件未加载，请刷新页面后重试', 'err');
+      return;
+    }
+    var topics = knowledgeTopics.filter(function (t) { return t.group === group; });
+    if (!topics.length) {
+      toast('没有可导出的文档', 'err');
+      return;
+    }
+    var packTitle = group === 'app' ? '本应用相关' : '股票知识';
+    var filename = 'QuantStock-' + packTitle + '.pdf';
+    docsPdfBusy = true;
+    var oldText = $btn && $btn.length ? $.trim($btn.text()) : '';
+    if ($btn && $btn.length) {
+      $btn.addClass('is-loading').prop('disabled', true).text('正在生成 PDF…');
+    }
+    toast('正在汇总「' + packTitle + '」文档并生成 PDF…', 'info');
+
+    var collected = [];
+    var chain = $.Deferred().resolve().promise();
+    topics.forEach(function (t) {
+      chain = chain.then(function () {
+        return fetchTopicHtml(t).then(function (html) {
+          collected.push({ topic: t, html: html });
+        });
+      });
+    });
+
+    function finishOk() {
+      toast('已下载：' + filename, 'ok');
+    }
+    function finishErr(err) {
+      console.error(err);
+      toast('PDF 生成失败，请重试', 'err');
+    }
+    function finishAlways() {
+      docsPdfBusy = false;
+      if ($btn && $btn.length) {
+        $btn.removeClass('is-loading').prop('disabled', false)
+          .text(oldText || (group === 'app' ? '下载本应用相关全部文档 PDF' : '下载全部股票知识 PDF'));
+      }
+    }
+
+    chain.then(function () {
+      var now = new Date();
+      var stamp = now.getFullYear() + '-' + pad2(now.getMonth() + 1) + '-' + pad2(now.getDate()) +
+        ' ' + pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+      var $root = $('<div class="pdf-export-root"/>');
+      $root.append(
+        '<div class="pdf-export-cover">' +
+        '<h1>Quant Stock · ' + packTitle + '</h1>' +
+        '<p class="pdf-meta">共 ' + collected.length + ' 篇 · 导出时间 ' + stamp + '</p>' +
+        '</div>'
+      );
+      collected.forEach(function (p, i) {
+        var $sec = $('<section class="pdf-export-section"/>');
+        $sec.append($('<h2/>').text((i + 1) + '. ' + p.topic.title));
+        var clean = String(p.html || '').replace(/<!--[\s\S]*?-->/g, '');
+        $sec.append($('<div class="pdf-export-body"/>').html(clean));
+        $root.append($sec);
+      });
+      $root.css({
+        position: 'fixed',
+        left: '-12000px',
+        top: '0',
+        zIndex: '-1',
+        pointerEvents: 'none'
+      });
+      $('body').append($root);
+
+      var opt = {
+        margin: [10, 10, 12, 10],
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['css', 'legacy'] }
+      };
+
+      return Promise.resolve(html2pdf().set(opt).from($root[0]).save()).then(function () {
+        $root.remove();
+      }, function (err) {
+        $root.remove();
+        throw err || new Error('PDF 生成失败');
+      });
+    }).then(finishOk, finishErr).then(finishAlways, finishAlways);
+  }
 
   function loadHomePanel(done) {
     if (homePanelReady) {
@@ -1688,7 +1799,7 @@
     var introSrc = $btn.attr('data-intro');
     var introTitle = $btn.attr('data-intro-title') || $btn.clone().children().remove().end().text().trim();
     if (introSrc) {
-      showNavIntro({ bodyId: bodyId, title: introTitle, src: introSrc + (introSrc.indexOf('?') >= 0 ? '&' : '?') + 'v=20260719-nav-ui' });
+      showNavIntro({ bodyId: bodyId, title: introTitle, src: introSrc + (introSrc.indexOf('?') >= 0 ? '&' : '?') + 'v=20260719-pdf' });
       return;
     }
     // 无介绍配置时回退到原工作台
@@ -1698,6 +1809,13 @@
   $('#viewNavIntro').on('click', '[data-enter-mode]', function () {
     var mode = $(this).attr('data-enter-mode');
     if (mode) showMode(mode);
+  });
+
+  $('#viewNavIntro').on('click', '[data-download-docs]', function () {
+    var group = $(this).attr('data-download-docs');
+    if (group === 'stock' || group === 'app') {
+      downloadDocsPdf(group, $(this));
+    }
   });
 
   $('#viewHome').on('click', '[data-open-nav]', function () {

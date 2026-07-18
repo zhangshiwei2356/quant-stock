@@ -40,6 +40,7 @@ mvn spring-boot:run
 - 说明文档为独立 HTML 片段：`src/main/resources/static/docs/*.html`，由工作台 `stock.html` 知识面板按需加载（非多页 SPA）
 - 初始化欢迎页单独维护：`static/docs/home.html`，载入 `#viewHome`
 - 各一级菜单介绍页：`static/docs/nav-*.html`，展开菜单时载入 `#viewNavIntro`（点二级项再进工作台/文档）
+- 「股票知识 / 本应用相关」介绍页可一键导出该菜单下全部子文档为 PDF（浏览器端 html2pdf）
 - **股票知识**侧栏含：A股/交易时间/K线、MA·成交量·RSI·ATR·ADX·BOLL、涨跌停、T+1、交易成本、仓位金字塔、账户风控、撮合静默、权益回撤、回测要点等（均标注「本应用相关」用法）
 - 页头主题（`localStorage` 记住）：**夜盘·黑客帝国** / **日间·科技粒子** / **青松·3D星空** / 星空粒子
 - 页面体验：交易台风格、输入聚焦动画、按钮 loading、表格斑马纹/粘性表头、Toast 提示、多股标签切换
