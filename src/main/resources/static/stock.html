@@ -17,7 +17,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css?v=20260719-menu-rename"/>
+  <link rel="stylesheet" href="/css/style.css?v=20260719-sidebar-nav"/>
   <script src="/js/jquery.min.js"></script>
   <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/echarts.min.js"></script>
@@ -50,55 +50,82 @@
 </header>
 <div class="layout">
   <aside class="sidebar">
-    <div class="side-nav" data-nav="pool">
-      <button type="button" class="side-nav-toggle" data-body="poolBody" data-mode="pool"
-              data-intro="/docs/nav-pool.html" data-intro-title="行情浏览" aria-expanded="false">
-        行情浏览 <span class="chevron">▸</span>
-      </button>
-      <div id="poolBody" class="side-nav-body">
-        <p id="dataHint" class="hint"></p>
-        <p class="hint">点击股票可开启信息，支持同时打开多只</p>
-        <ul id="stockList"></ul>
+    <div class="sidebar-head">
+      <span class="sidebar-title">功能导航</span>
+      <span class="sidebar-head-tag">MENU</span>
+    </div>
+
+    <section class="nav-group" data-group="workbench" aria-label="工作台">
+      <div class="nav-group-rail" aria-hidden="true"><span>工作台</span></div>
+      <div class="nav-group-body">
+        <div class="side-nav" data-nav="pool">
+          <button type="button" class="side-nav-toggle" data-body="poolBody" data-mode="pool"
+                  data-intro="/docs/nav-pool.html" data-intro-title="行情浏览" aria-expanded="false">
+            <span class="nav-idx">01</span>
+            <span class="nav-label">行情浏览</span>
+            <span class="chevron">▸</span>
+          </button>
+          <div id="poolBody" class="side-nav-body">
+            <p id="dataHint" class="hint"></p>
+            <p class="hint">点击股票可开启信息，支持同时打开多只</p>
+            <ul id="stockList"></ul>
+          </div>
+        </div>
+
+        <div class="side-nav" data-nav="single">
+          <button type="button" class="side-nav-toggle" data-body="singleBody" data-mode="single"
+                  data-intro="/docs/nav-single.html" data-intro-title="个股回测" aria-expanded="false">
+            <span class="nav-idx">02</span>
+            <span class="nav-label">个股回测</span>
+            <span class="chevron">▸</span>
+          </button>
+          <div id="singleBody" class="side-nav-body">
+            <p class="hint">二级菜单：点选标的；右侧可改周期与资金</p>
+            <ul id="singleStockList" class="sub-menu-list"></ul>
+          </div>
+        </div>
+
+        <div class="side-nav" data-nav="portfolio">
+          <button type="button" class="side-nav-toggle" data-body="portfolioBody" data-mode="portfolio"
+                  data-intro="/docs/nav-portfolio.html" data-intro-title="组合回测" aria-expanded="false">
+            <span class="nav-idx">03</span>
+            <span class="nav-label">组合回测</span>
+            <span class="chevron">▸</span>
+          </button>
+          <div id="portfolioBody" class="side-nav-body">
+            <p class="hint">勾选多只股票组成组合</p>
+            <ul id="portfolioStockList" class="check-list"></ul>
+          </div>
+        </div>
       </div>
-    </div>
+    </section>
 
-    <div class="side-nav" data-nav="single">
-      <button type="button" class="side-nav-toggle" data-body="singleBody" data-mode="single"
-              data-intro="/docs/nav-single.html" data-intro-title="个股回测" aria-expanded="false">
-        个股回测 <span class="chevron">▸</span>
-      </button>
-      <div id="singleBody" class="side-nav-body">
-        <p class="hint">二级菜单：点选标的；右侧可改周期与资金</p>
-        <ul id="singleStockList" class="sub-menu-list"></ul>
+    <section class="nav-group nav-group--docs" data-group="docs" aria-label="说明文档">
+      <div class="nav-group-rail" aria-hidden="true"><span>说明</span></div>
+      <div class="nav-group-body">
+        <div class="side-nav" data-nav="stock-knowledge">
+          <button type="button" class="side-nav-toggle" data-body="stockKnowledgeMenu" data-mode="doc"
+                  data-intro="/docs/nav-stock-knowledge.html" data-intro-title="量化知识" aria-expanded="false">
+            <span class="nav-idx">04</span>
+            <span class="nav-label">量化知识</span>
+            <span class="chevron">▸</span>
+          </button>
+          <ul id="stockKnowledgeMenu" class="side-nav-menu"></ul>
+        </div>
+
+        <div class="side-nav" data-nav="app-related">
+          <button type="button" class="side-nav-toggle" data-body="appRelatedMenu" data-mode="doc"
+                  data-intro="/docs/nav-app-related.html" data-intro-title="应用说明" aria-expanded="false">
+            <span class="nav-idx">05</span>
+            <span class="nav-label">应用说明</span>
+            <span class="chevron">▸</span>
+          </button>
+          <ul id="appRelatedMenu" class="side-nav-menu"></ul>
+        </div>
       </div>
-    </div>
+    </section>
 
-    <div class="side-nav" data-nav="portfolio">
-      <button type="button" class="side-nav-toggle" data-body="portfolioBody" data-mode="portfolio"
-              data-intro="/docs/nav-portfolio.html" data-intro-title="组合回测" aria-expanded="false">
-        组合回测 <span class="chevron">▸</span>
-      </button>
-      <div id="portfolioBody" class="side-nav-body">
-        <p class="hint">勾选多只股票组成组合</p>
-        <ul id="portfolioStockList" class="check-list"></ul>
-      </div>
-    </div>
-
-    <div class="side-nav" data-nav="stock-knowledge">
-      <button type="button" class="side-nav-toggle" data-body="stockKnowledgeMenu" data-mode="doc"
-              data-intro="/docs/nav-stock-knowledge.html" data-intro-title="量化知识" aria-expanded="false">
-        量化知识 <span class="chevron">▸</span>
-      </button>
-      <ul id="stockKnowledgeMenu" class="side-nav-menu"></ul>
-    </div>
-
-    <div class="side-nav" data-nav="app-related">
-      <button type="button" class="side-nav-toggle" data-body="appRelatedMenu" data-mode="doc"
-              data-intro="/docs/nav-app-related.html" data-intro-title="应用说明" aria-expanded="false">
-        应用说明 <span class="chevron">▸</span>
-      </button>
-      <ul id="appRelatedMenu" class="side-nav-menu"></ul>
-    </div>
+    <p class="sidebar-foot">点菜单展开介绍 · 再点收起回首页 · 点 QS 亦可回初始化页</p>
   </aside>
 
   <div class="main">
