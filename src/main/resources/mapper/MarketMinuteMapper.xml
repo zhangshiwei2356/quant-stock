@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.stock.mapper.MarketMinuteMapper">
+
+    <resultMap id="MinuteMap" type="com.quant.stock.market.dto.MarketMinuteDO">
+        <id column="id" property="id"/>
+        <result column="symbol" property="symbol"/>
+        <result column="trade_time" property="tradeTime"/>
+        <result column="open" property="open"/>
+        <result column="high" property="high"/>
+        <result column="low" property="low"/>
+        <result column="close" property="close"/>
+        <result column="volume" property="volume"/>
+        <result column="amount" property="amount"/>
+    </resultMap>
+
+    <select id="countBySymbol" resultType="int">
+        SELECT COUNT(1) FROM market_minute WHERE symbol = #{symbol}
+    </select>
+
+    <select id="selectRange" resultMap="MinuteMap">
+        SELECT id, symbol, trade_time, open, high, low, close, volume, amount
+        FROM market_minute
+        WHERE symbol = #{symbol}
+        <if test="start != null">AND trade_time &gt;= #{start}</if>
+        <if test="end != null">AND trade_time &lt;= #{end}</if>
+        ORDER BY trade_time ASC
+    </select>
+
+    <insert id="batchUpsert">
+        INSERT INTO market_minute
+        (symbol, trade_time, open, high, low, close, volume, amount)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.symbol}, #{item.tradeTime}, #{item.open}, #{item.high}, #{item.low},
+             #{item.close}, #{item.volume}, #{item.amount})
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            open = VALUES(open), high = VALUES(high), low = VALUES(low),
+            close = VALUES(close), volume = VALUES(volume), amount = VALUES(amount)
+    </insert>
+</mapper>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.stock.mapper.StockBasicMapper">
+
+    <resultMap id="BasicMap" type="com.quant.stock.market.dto.StockBasicDO">
+        <id column="id" property="id"/>
+        <result column="symbol" property="symbol"/>
+        <result column="name" property="name"/>
+        <result column="market" property="market"/>
+        <result column="industry" property="industry"/>
+        <result column="list_date" property="listDate"/>
+        <result column="delist_date" property="delistDate"/>
+        <result column="is_st" property="isSt"/>
+        <result column="status" property="status"/>
+    </resultMap>
+
+    <select id="countAll" resultType="int">
+        SELECT COUNT(1) FROM stock_basic
+    </select>
+
+    <select id="selectAll" resultMap="BasicMap">
+        SELECT id, symbol, name, market, industry, list_date, delist_date, is_st, status
+        FROM stock_basic ORDER BY symbol
+    </select>
+
+    <insert id="upsert">
+        INSERT INTO stock_basic
+        (symbol, name, market, industry, list_date, delist_date, is_st, status)
+        VALUES
+        (#{symbol}, #{name}, #{market}, #{industry}, #{listDate}, #{delistDate}, #{isSt}, #{status})
+        ON DUPLICATE KEY UPDATE
+            name = VALUES(name), market = VALUES(market), industry = VALUES(industry),
+            is_st = VALUES(is_st), status = VALUES(status)
+    </insert>
+</mapper>

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.stock.mapper.MarketDailyMapper">
+
+    <resultMap id="DailyMap" type="com.quant.stock.market.dto.MarketDailyDO">
+        <id column="id" property="id"/>
+        <result column="symbol" property="symbol"/>
+        <result column="trade_date" property="tradeDate"/>
+        <result column="open" property="open"/>
+        <result column="high" property="high"/>
+        <result column="low" property="low"/>
+        <result column="close" property="close"/>
+        <result column="volume" property="volume"/>
+        <result column="amount" property="amount"/>
+        <result column="turnover_rate" property="turnoverRate"/>
+        <result column="limit_up" property="limitUp"/>
+        <result column="limit_down" property="limitDown"/>
+    </resultMap>
+
+    <select id="countBySymbol" resultType="int">
+        SELECT COUNT(1) FROM market_daily WHERE symbol = #{symbol}
+    </select>
+
+    <select id="selectRange" resultMap="DailyMap">
+        SELECT id, symbol, trade_date, open, high, low, close, volume, amount,
+               turnover_rate, limit_up, limit_down
+        FROM market_daily
+        WHERE symbol = #{symbol}
+        <if test="start != null">AND trade_date &gt;= #{start}</if>
+        <if test="end != null">AND trade_date &lt;= #{end}</if>
+        ORDER BY trade_date ASC
+    </select>
+
+    <insert id="batchUpsert">
+        INSERT INTO market_daily
+        (symbol, trade_date, open, high, low, close, volume, amount, turnover_rate, limit_up, limit_down)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.symbol}, #{item.tradeDate}, #{item.open}, #{item.high}, #{item.low}, #{item.close},
+             #{item.volume}, #{item.amount}, #{item.turnoverRate}, #{item.limitUp}, #{item.limitDown})
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            open = VALUES(open), high = VALUES(high), low = VALUES(low), close = VALUES(close),
+            volume = VALUES(volume), amount = VALUES(amount),
+            limit_up = VALUES(limit_up), limit_down = VALUES(limit_down)
+    </insert>
+</mapper>

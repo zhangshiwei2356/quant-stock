@@ -8,22 +8,20 @@ spring:
     database: 0
     timeout: 3000ms
   datasource:
-    url: jdbc:mysql://127.0.0.1:3306/quant_stock?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-    username: ${MYSQL_USER:root}
-    password: ${MYSQL_PASSWORD:root}
+    url: jdbc:mysql://localhost:3306/quant_stock?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: "123456"
     driver-class-name: com.mysql.cj.jdbc.Driver
-  # 默认不连库，保证本地无 MySQL 也能跑演示；启用库请用 --spring.profiles.active=db
+  # 默认连 MySQL；仍不强制 Redis
   autoconfigure:
     exclude:
-      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
       - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
-      - org.mybatis.spring.boot.autoconfigure.MybatisAutoConfiguration
 
 mybatis:
   mapper-locations: classpath:mapper/*.xml
   configuration:
     map-underscore-to-camel-case: true
-  type-aliases-package: com.quant.stock.market.dto
+  type-aliases-package: com.quant.stock.market.dto,com.quant.stock.backtest.dto
 
 management:
   endpoints:
@@ -40,13 +38,12 @@ quant:
   base-atr: 0.05
   atr-min-threshold: 0.001
   batch-pool-size: 10
-  # json：优先读 classpath:data/kline；mock：运行时合成；sdk：行情SDK
-  market-mode: json
+  # db：优先读 MySQL market_daily / market_minute；启动空库时从 classpath JSON 导入
+  market-mode: db
   mock-bar-days: 15
-  db-enabled: false
+  db-enabled: true
 
   # ---- 策略过滤 ----
-  # ---- 策略过滤（代码已实现；模拟正弦行情上建议先关趋势/ADX，实盘全开）----
   trend-filter-enabled: false
   volume-filter-enabled: false
   volume-confirm-ratio: 1.2
@@ -75,16 +72,12 @@ quant:
   drawdown-reduce-pct: 0.15
   drawdown-halt-pct: 0.25
 
-  # ---- 开仓过滤（模拟数据成交量较小，门槛放宽；实盘建议 5000000）----
+  # ---- 开仓过滤 ----
   quiet-open-enabled: true
   quiet-close-enabled: true
   min-avg-volume20: 1000
   min-market-cap-yi: 50
   market-cap-filter-enabled: true
-  # 流通股本（亿股）可覆盖默认启发式，例：
-  # float-shares-yi:
-  #   600036: 252
-  #   000001: 194
   trade-mode: sim
 
   # ---- 真实成本 ----
@@ -97,8 +90,7 @@ quant:
   impact-coeff: 0.1
   next-bar-open-fill: true
 
-  # ---- 安全与运维（本地演示 api-key 留空=不鉴权）----
-  # 公网/共享环境请设置环境变量 QUANT_API_KEY
+  # ---- 安全与运维 ----
   api-key: ${QUANT_API_KEY:}
   rate-limit-per-minute: ${QUANT_RATE_LIMIT:30}
   history-dir: ${QUANT_HISTORY_DIR:data/backtest}
@@ -106,3 +98,4 @@ quant:
 logging:
   level:
     com.quant.stock: INFO
+    com.quant.stock.mapper: INFO

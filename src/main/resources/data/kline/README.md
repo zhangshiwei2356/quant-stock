@@ -1,6 +1,15 @@
-# 模拟K线数据说明
+# 模拟K线数据说明（种子文件）
 
 目录：`classpath:data/kline/`
+
+应用默认连接 MySQL `quant_stock`，行情真相源为表：
+
+- `market_daily`（日线）
+- `market_minute`（5 分钟）
+
+**启动时若库中无数据**，`MockDataImporter` 会自动从本目录的 `DAY.json` / `MIN_5.json` 导入，并写入 `stock_basic`、`factor_daily`。
+
+运行时查询**不再优先读 JSON**（`quant.market-mode=db`）。
 
 ## 股票（近一年 2025-07-17 ~ 2026-07-17）
 
@@ -10,38 +19,18 @@
 | 000001 | 平安银行 |
 | 300059 | 东方财富 |
 
-## 文件结构（对应分表）
+## 重新导入
 
-```
-kline/
-  meta.json
-  600036/
-    MIN_1.json   # stock_bar_1min
-    MIN_5.json
-    MIN_15.json
-    MIN_30.json
-    MIN_60.json
-    DAY.json
-    WEEK.json
-    MONTH.json
-  000001/ ...
-  300059/ ...
+清空后重启即可：
+
+```sql
+TRUNCATE market_daily;
+TRUNCATE market_minute;
+TRUNCATE factor_daily;
+TRUNCATE stock_basic;
 ```
 
-## JSON 格式
-
-```json
-{
-  "stockCode": "600036",
-  "period": "DAY",
-  "table": "stock_bar_day",
-  "fields": ["t","o","h","l","c","v"],
-  "count": 262,
-  "bars": [["2025-07-17 09:30:00", 35.01, 35.2, 34.9, 35.1, 12345], ...]
-}
-```
-
-## 重新生成
+或重新生成 JSON 种子：
 
 ```bash
 mvn -q compile exec:java -Dexec.mainClass=com.quant.stock.market.mock.MockKlineDataGenerator

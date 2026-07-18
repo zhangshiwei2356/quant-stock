@@ -11,15 +11,23 @@ mvn spring-boot:run
 
 浏览器打开：http://localhost:8080/stock.html
 
-默认 **无需 Redis / MySQL**：使用 classpath 下 JSON 模拟 K 线即可演示。
+默认连接本地 **MySQL**（`localhost:3306/quant_stock`，用户 `root` / 密码 `123456`）。  
+启动前请执行一次建表脚本；空库时会自动从 classpath JSON 导入日线 + 5 分钟模拟数据。仍默认不连 Redis。
 
-## 模拟数据
+```bash
+# 建库建表（Windows 示例）
+"C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -uroot -p123456 < src/main/resources/mapper/schema.sql
+mvn spring-boot:run
+```
 
-- 目录：`src/main/resources/data/kline/`
+## 模拟数据 / 行情表
+
+- 种子目录：`src/main/resources/data/kline/`（仅导入用）
 - 股票：600036 招商银行、000001 平安银行、300059 东方财富
 - 区间：约 `2025-07-17` ~ `2026-07-17`
-- 周期文件：`MIN_1` / `MIN_5` / `MIN_15` / `MIN_30` / `MIN_60` / `DAY` / `WEEK` / `MONTH`（对应分表设计）
-- 重新生成：`mvn -q compile exec:java -Dexec.mainClass=com.quant.stock.market.mock.MockKlineDataGenerator`
+- **物理表**：`market_daily`（日线）、`market_minute`（5 分钟）；其余周期运行时聚合
+- 回测历史/分析：`bt_backtest_record` / `bt_backtest_analysis`
+- 重新生成种子 JSON：`mvn -q compile exec:java -Dexec.mainClass=com.quant.stock.market.mock.MockKlineDataGenerator`
 
 ## 页面功能
 
@@ -36,10 +44,9 @@ mvn spring-boot:run
 
 | 配置 / 环境变量 | 说明 |
 |----------------|------|
-| `MYSQL_USER` / `MYSQL_PASSWORD` | 数据源账号（默认 root/root，勿用于公网） |
+| `spring.datasource.*` | 默认 `localhost:3306/quant_stock`，`root` / `123456`（本地演示，勿用于公网） |
 | `QUANT_API_KEY` / `quant.api-key` | 非空则 `/api/**` 需请求头 `X-API-Key`（`/api/config` 除外） |
 | `QUANT_RATE_LIMIT` / `quant.rate-limit-per-minute` | 回测/组合/批量每 IP 每分钟上限（默认 30，≤0 关闭） |
-| `QUANT_HISTORY_DIR` / `quant.history-dir` | 回测历史目录（默认 `data/backtest`） |
 
 前端在启用 API Key 时会提示并写入 `localStorage.quantApiKey`。
 
@@ -92,16 +99,12 @@ mvn spring-boot:run
 - **分股表现**（买/卖次数手数、金额、费用、已实现盈亏、胜率、最大回撤）
 - 组合历史 JSON（含 tradeStats）
 
+默认已启用 MySQL（`quant.db-enabled=true`，`market-mode=db`）。
+
 1. 执行 `src/main/resources/mapper/schema.sql`
-2. 通过环境变量设置 `MYSQL_PASSWORD`（勿把真实密码提交进仓库）
-3. 启用 profile：
+2. `mvn spring-boot:run`（空库自动导入 DAY + MIN_5）
 
-```bash
-mvn spring-boot:run -Dspring-boot.run.profiles=db
-```
-
-查询：`MarketDataService#getKline`（JSON → 分表 → 降级聚合 → mock）。  
-收盘任务 15:30：写 1 分钟并聚合各大周期。
+查询：`MarketDataService#getKline`（MySQL 核心表 → 聚合 → 兜底 mock）。
 
 ## 扩展点
 

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.stock.mapper.BacktestAnalysisMapper">
+
+    <resultMap id="AnaMap" type="com.quant.stock.backtest.dto.BtBacktestAnalysisDO">
+        <id column="id" property="id"/>
+        <result column="record_id" property="recordId"/>
+        <result column="kind" property="kind"/>
+        <result column="saved_at" property="savedAt"/>
+        <result column="stock_code" property="stockCode"/>
+        <result column="stock_codes_json" property="stockCodesJson"/>
+        <result column="period" property="period"/>
+        <result column="back_start" property="backStart"/>
+        <result column="back_end" property="backEnd"/>
+        <result column="init_capital" property="initCapital"/>
+        <result column="final_asset" property="finalAsset"/>
+        <result column="total_trade_num" property="totalTradeNum"/>
+        <result column="event_count" property="eventCount"/>
+        <result column="summary" property="summary"/>
+        <result column="events_json" property="eventsJson"/>
+    </resultMap>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO bt_backtest_analysis
+        (record_id, kind, saved_at, stock_code, stock_codes_json, period, back_start, back_end,
+         init_capital, final_asset, total_trade_num, event_count, summary, events_json)
+        VALUES
+        (#{recordId}, #{kind}, #{savedAt}, #{stockCode}, #{stockCodesJson}, #{period},
+         #{backStart}, #{backEnd}, #{initCapital}, #{finalAsset}, #{totalTradeNum},
+         #{eventCount}, #{summary}, #{eventsJson})
+    </insert>
+
+    <select id="selectByRecordId" resultMap="AnaMap">
+        SELECT * FROM bt_backtest_analysis WHERE record_id = #{recordId} LIMIT 1
+    </select>
+
+    <select id="selectByKind" resultMap="AnaMap">
+        SELECT * FROM bt_backtest_analysis
+        WHERE kind = #{kind}
+        <if test="stockCode != null and stockCode != ''">
+            AND stock_code = #{stockCode}
+        </if>
+        ORDER BY saved_at DESC, id DESC
+    </select>
+
+    <delete id="deleteSingleByCode">
+        DELETE FROM bt_backtest_analysis WHERE kind = 'SINGLE' AND stock_code = #{stockCode}
+    </delete>
+
+    <delete id="deleteAllByKind">
+        DELETE FROM bt_backtest_analysis WHERE kind = #{kind}
+    </delete>
+</mapper>

@@ -9,8 +9,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 /**
  * 启动类。
  * <ul>
- *   <li>默认：不连 MySQL/Redis（application.yml 排除自动配置），内存 mock 行情演示</li>
- *   <li>连库：--spring.profiles.active=db ，并执行 mapper/schema.sql</li>
+ *   <li>默认连接本地 MySQL（localhost:3306/quant_stock），读取 market_daily / market_minute</li>
+ *   <li>空库时自动从 classpath:data/kline 导入 DAY+MIN_5 模拟数据</li>
+ *   <li>仍默认不连 Redis</li>
  * </ul>
  */
 @SpringBootApplication

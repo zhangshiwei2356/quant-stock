@@ -1,244 +1,218 @@
 package com.quant.stock.backtest;
 
 import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONWriter;
 import com.alibaba.fastjson2.TypeReference;
 import com.quant.stock.backtest.dto.BackTestQueryDTO;
 import com.quant.stock.backtest.dto.BackTestResult;
 import com.quant.stock.backtest.dto.BackTestTradeStats;
+import com.quant.stock.backtest.dto.BackTradeRecord;
+import com.quant.stock.backtest.dto.BtBacktestRecordDO;
 import com.quant.stock.backtest.dto.PortfolioBacktestHistoryRecord;
 import com.quant.stock.backtest.dto.PortfolioResultDTO;
 import com.quant.stock.backtest.dto.SingleBacktestHistoryRecord;
-import com.quant.stock.config.QuantProperties;
+import com.quant.stock.backtest.dto.SingleStockBackResult;
+import com.quant.stock.mapper.BacktestRecordMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import javax.annotation.PostConstruct;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * 回测历史落盘目录由 {@code quant.history-dir} 配置（默认 data/backtest）。
+ * 回测历史：优先写入 MySQL {@code bt_backtest_record}（quant.db-enabled=true）。
  */
 @Slf4j
 @Service
 public class BackTestHistoryStore {
 
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final TypeReference<List<SingleBacktestHistoryRecord>> SINGLE_TYPE =
-            new TypeReference<List<SingleBacktestHistoryRecord>>() {};
-    private static final TypeReference<List<PortfolioBacktestHistoryRecord>> PORTFOLIO_TYPE =
-            new TypeReference<List<PortfolioBacktestHistoryRecord>>() {};
+    private static final TypeReference<List<BackTradeRecord>> TRADE_TYPE =
+            new TypeReference<List<BackTradeRecord>>() {};
+    private static final TypeReference<List<String>> STR_LIST =
+            new TypeReference<List<String>>() {};
+    private static final TypeReference<List<SingleStockBackResult>> STOCK_RES_TYPE =
+            new TypeReference<List<SingleStockBackResult>>() {};
 
-    private final QuantProperties props;
-    private Path dir;
-    private Path singleFile;
-    private Path portfolioFile;
-
-    private final ReentrantReadWriteLock singleLock = new ReentrantReadWriteLock();
-    private final ReentrantReadWriteLock portfolioLock = new ReentrantReadWriteLock();
-
-    public BackTestHistoryStore(QuantProperties props) {
-        this.props = props;
-    }
-
-    @PostConstruct
-    public void init() {
-        String configured = props.getHistoryDir();
-        if (!StringUtils.hasText(configured)) {
-            configured = "data/backtest";
-        }
-        dir = Paths.get(configured.trim());
-        singleFile = dir.resolve("single-backtest-records.json");
-        portfolioFile = dir.resolve("portfolio-backtest-records.json");
-        try {
-            Files.createDirectories(dir);
-            ensureFile(singleFile);
-            ensureFile(portfolioFile);
-            log.info("回测历史目录: {}", dir.toAbsolutePath());
-        } catch (IOException e) {
-            log.error("初始化回测历史目录失败: {}", e.getMessage());
-        }
-    }
+    @Autowired(required = false)
+    private BacktestRecordMapper backtestRecordMapper;
 
     public SingleBacktestHistoryRecord appendSingle(String period, String backStart, String backEnd,
                                                     BackTestResult result) {
         if (result == null) {
             return null;
         }
+        String id = UUID.randomUUID().toString().replace("-", "");
+        String savedAt = LocalDateTime.now().format(FMT);
         SingleBacktestHistoryRecord rec = SingleBacktestHistoryRecord.fromResult(
-                UUID.randomUUID().toString().replace("-", ""),
-                LocalDateTime.now().format(FMT),
-                period, emptyToNull(backStart), emptyToNull(backEnd), result);
-        singleLock.writeLock().lock();
-        try {
-            List<SingleBacktestHistoryRecord> list = readSingleUnlocked();
-            list.add(0, rec);
-            writeJson(singleFile, list);
+                id, savedAt, period, emptyToNull(backStart), emptyToNull(backEnd), result);
+        if (backtestRecordMapper == null) {
+            log.warn("未启用 MySQL，单股回测历史未持久化 id={}", id);
             return rec;
-        } finally {
-            singleLock.writeLock().unlock();
         }
+        BtBacktestRecordDO row = BtBacktestRecordDO.builder()
+                .recordId(id)
+                .kind("SINGLE")
+                .savedAt(LocalDateTime.parse(savedAt, FMT))
+                .stockCode(result.getStockCode())
+                .period(period)
+                .backStart(emptyToNull(backStart))
+                .backEnd(emptyToNull(backEnd))
+                .initCapital(result.getInitCapital())
+                .finalAsset(result.getFinalAsset())
+                .totalRate(result.getTotalRate())
+                .maxDrawdown(result.getMaxDrawDown())
+                .totalTradeNum(result.getTotalTradeNum())
+                .winRate(result.getWinRate())
+                .tradeStatsJson(JSON.toJSONString(rec.getTradeStats()))
+                .tradesJson(JSON.toJSONString(rec.getTrades()))
+                .build();
+        backtestRecordMapper.insert(row);
+        return rec;
     }
 
     public PortfolioBacktestHistoryRecord appendPortfolio(BackTestQueryDTO query, PortfolioResultDTO result) {
         if (result == null) {
             return null;
         }
+        String id = UUID.randomUUID().toString().replace("-", "");
+        String savedAt = LocalDateTime.now().format(FMT);
         PortfolioBacktestHistoryRecord rec = PortfolioBacktestHistoryRecord.fromResult(
-                UUID.randomUUID().toString().replace("-", ""),
-                LocalDateTime.now().format(FMT),
-                query, result);
-        portfolioLock.writeLock().lock();
-        try {
-            List<PortfolioBacktestHistoryRecord> list = readPortfolioUnlocked();
-            list.add(0, rec);
-            writeJson(portfolioFile, list);
+                id, savedAt, query, result);
+        if (backtestRecordMapper == null) {
+            log.warn("未启用 MySQL，组合回测历史未持久化 id={}", id);
             return rec;
-        } finally {
-            portfolioLock.writeLock().unlock();
         }
+        BtBacktestRecordDO row = BtBacktestRecordDO.builder()
+                .recordId(id)
+                .kind("PORTFOLIO")
+                .savedAt(LocalDateTime.parse(savedAt, FMT))
+                .stockCode(null)
+                .stockCodesJson(query == null ? null : JSON.toJSONString(query.getStockCodeList()))
+                .period("DAY")
+                .backStart(query == null || query.getBackStart() == null ? null
+                        : query.getBackStart().format(FMT))
+                .backEnd(query == null || query.getBackEnd() == null ? null
+                        : query.getBackEnd().format(FMT))
+                .initCapital(result.getInitCapital())
+                .finalAsset(result.getFinalAsset())
+                .totalRate(result.getTotalRate())
+                .maxDrawdown(result.getMaxDrawDown())
+                .totalTradeNum(result.getTotalTradeNum())
+                .winRate(result.getWinRate())
+                .tradeStatsJson(JSON.toJSONString(rec.getTradeStats()))
+                .tradesJson(JSON.toJSONString(rec.getTrades()))
+                .stockResultsJson(JSON.toJSONString(rec.getStockResults()))
+                .build();
+        backtestRecordMapper.insert(row);
+        return rec;
     }
 
     public List<SingleBacktestHistoryRecord> listSingle(String stockCode) {
-        singleLock.readLock().lock();
-        try {
-            List<SingleBacktestHistoryRecord> all = readSingleUnlocked();
-            for (SingleBacktestHistoryRecord r : all) {
-                enrichSingleStats(r);
-            }
-            if (stockCode == null || stockCode.trim().isEmpty()) {
-                return all;
-            }
-            String code = stockCode.trim();
-            List<SingleBacktestHistoryRecord> filtered = new ArrayList<SingleBacktestHistoryRecord>();
-            for (SingleBacktestHistoryRecord r : all) {
-                if (r != null && code.equals(r.getStockCode())) {
-                    filtered.add(r);
-                }
-            }
-            return filtered;
-        } finally {
-            singleLock.readLock().unlock();
+        if (backtestRecordMapper == null) {
+            return Collections.emptyList();
         }
+        List<BtBacktestRecordDO> rows = backtestRecordMapper.selectByKind("SINGLE",
+                StringUtils.hasText(stockCode) ? stockCode.trim() : null);
+        List<SingleBacktestHistoryRecord> out = new ArrayList<SingleBacktestHistoryRecord>();
+        for (BtBacktestRecordDO r : rows) {
+            out.add(toSingle(r));
+        }
+        return out;
     }
 
     public List<PortfolioBacktestHistoryRecord> listPortfolio() {
-        portfolioLock.readLock().lock();
-        try {
-            List<PortfolioBacktestHistoryRecord> list = readPortfolioUnlocked();
-            for (PortfolioBacktestHistoryRecord r : list) {
-                enrichPortfolioStats(r);
-            }
-            return list;
-        } finally {
-            portfolioLock.readLock().unlock();
+        if (backtestRecordMapper == null) {
+            return Collections.emptyList();
         }
+        List<BtBacktestRecordDO> rows = backtestRecordMapper.selectByKind("PORTFOLIO", null);
+        List<PortfolioBacktestHistoryRecord> out = new ArrayList<PortfolioBacktestHistoryRecord>();
+        for (BtBacktestRecordDO r : rows) {
+            out.add(toPortfolio(r));
+        }
+        return out;
     }
 
     public int clearSingleByCode(String stockCode) {
-        if (stockCode == null || stockCode.trim().isEmpty()) {
+        if (backtestRecordMapper == null || !StringUtils.hasText(stockCode)) {
             return 0;
         }
-        String code = stockCode.trim();
-        singleLock.writeLock().lock();
-        try {
-            List<SingleBacktestHistoryRecord> list = readSingleUnlocked();
-            int before = list.size();
-            Iterator<SingleBacktestHistoryRecord> it = list.iterator();
-            while (it.hasNext()) {
-                SingleBacktestHistoryRecord r = it.next();
-                if (r != null && code.equals(r.getStockCode())) {
-                    it.remove();
-                }
-            }
-            writeJson(singleFile, list);
-            return before - list.size();
-        } finally {
-            singleLock.writeLock().unlock();
-        }
+        return backtestRecordMapper.deleteSingleByCode(stockCode.trim());
     }
 
     public int clearAllPortfolio() {
-        portfolioLock.writeLock().lock();
-        try {
-            List<PortfolioBacktestHistoryRecord> list = readPortfolioUnlocked();
-            int n = list.size();
-            writeJson(portfolioFile, Collections.emptyList());
-            return n;
-        } finally {
-            portfolioLock.writeLock().unlock();
+        if (backtestRecordMapper == null) {
+            return 0;
         }
+        return backtestRecordMapper.deleteAllByKind("PORTFOLIO");
     }
 
-    private List<SingleBacktestHistoryRecord> readSingleUnlocked() {
-        return readList(singleFile, SINGLE_TYPE);
-    }
-
-    private List<PortfolioBacktestHistoryRecord> readPortfolioUnlocked() {
-        return readList(portfolioFile, PORTFOLIO_TYPE);
-    }
-
-    private void enrichSingleStats(SingleBacktestHistoryRecord r) {
-        if (r == null || r.getTradeStats() != null) {
-            return;
+    private SingleBacktestHistoryRecord toSingle(BtBacktestRecordDO r) {
+        List<BackTradeRecord> trades = parseTrades(r.getTradesJson());
+        BackTestTradeStats stats = r.getTradeStatsJson() == null ? null
+                : JSON.parseObject(r.getTradeStatsJson(), BackTestTradeStats.class);
+        if (stats == null) {
+            stats = BackTestTradeStats.from(trades, r.getInitCapital(), r.getFinalAsset());
         }
-        r.setTradeStats(BackTestTradeStats.from(r.getTrades(), r.getInitCapital(), r.getFinalAsset()));
+        return SingleBacktestHistoryRecord.builder()
+                .id(r.getRecordId())
+                .savedAt(r.getSavedAt() == null ? null : r.getSavedAt().format(FMT))
+                .stockCode(r.getStockCode())
+                .period(r.getPeriod())
+                .backStart(r.getBackStart())
+                .backEnd(r.getBackEnd())
+                .initCapital(r.getInitCapital())
+                .finalAsset(r.getFinalAsset())
+                .totalRate(r.getTotalRate())
+                .maxDrawDown(r.getMaxDrawdown())
+                .totalTradeNum(r.getTotalTradeNum())
+                .winRate(r.getWinRate())
+                .tradeStats(stats)
+                .trades(trades)
+                .build();
     }
 
-    private void enrichPortfolioStats(PortfolioBacktestHistoryRecord r) {
-        if (r == null || r.getTradeStats() != null) {
-            return;
+    private PortfolioBacktestHistoryRecord toPortfolio(BtBacktestRecordDO r) {
+        List<BackTradeRecord> trades = parseTrades(r.getTradesJson());
+        BackTestTradeStats stats = r.getTradeStatsJson() == null ? null
+                : JSON.parseObject(r.getTradeStatsJson(), BackTestTradeStats.class);
+        if (stats == null) {
+            stats = BackTestTradeStats.from(trades, r.getInitCapital(), r.getFinalAsset());
         }
-        r.setTradeStats(BackTestTradeStats.from(r.getTrades(), r.getInitCapital(), r.getFinalAsset()));
+        List<String> codes = r.getStockCodesJson() == null ? null
+                : JSON.parseObject(r.getStockCodesJson(), STR_LIST);
+        List<SingleStockBackResult> stockResults = r.getStockResultsJson() == null
+                ? new ArrayList<SingleStockBackResult>()
+                : JSON.parseObject(r.getStockResultsJson(), STOCK_RES_TYPE);
+        return PortfolioBacktestHistoryRecord.builder()
+                .id(r.getRecordId())
+                .savedAt(r.getSavedAt() == null ? null : r.getSavedAt().format(FMT))
+                .stockCodeList(codes)
+                .backStart(r.getBackStart())
+                .backEnd(r.getBackEnd())
+                .initCapital(r.getInitCapital())
+                .finalAsset(r.getFinalAsset())
+                .totalRate(r.getTotalRate())
+                .maxDrawDown(r.getMaxDrawdown())
+                .totalTradeNum(r.getTotalTradeNum())
+                .winRate(r.getWinRate())
+                .tradeStats(stats)
+                .stockResults(stockResults == null ? new ArrayList<SingleStockBackResult>() : stockResults)
+                .trades(trades)
+                .build();
     }
 
-    private <T> List<T> readList(Path file, TypeReference<List<T>> type) {
-        try {
-            if (file == null || !Files.exists(file) || Files.size(file) == 0) {
-                return new ArrayList<T>();
-            }
-            String text = new String(Files.readAllBytes(file), StandardCharsets.UTF_8).trim();
-            if (text.isEmpty() || "null".equals(text)) {
-                return new ArrayList<T>();
-            }
-            List<T> list = JSON.parseObject(text, type);
-            return list == null ? new ArrayList<T>() : new ArrayList<T>(list);
-        } catch (Exception e) {
-            log.warn("读取回测历史失败 {}: {}", file, e.getMessage());
-            return new ArrayList<T>();
+    private List<BackTradeRecord> parseTrades(String json) {
+        if (!StringUtils.hasText(json)) {
+            return new ArrayList<BackTradeRecord>();
         }
-    }
-
-    private void writeJson(Path file, Object data) {
-        try {
-            Files.createDirectories(file.getParent());
-            String json = JSON.toJSONString(data,
-                    JSONWriter.Feature.PrettyFormat,
-                    JSONWriter.Feature.WriteMapNullValue);
-            Files.write(file, json.getBytes(StandardCharsets.UTF_8));
-        } catch (IOException e) {
-            log.error("写入回测历史失败 {}: {}", file, e.getMessage());
-            throw new IllegalStateException("写入回测历史失败: " + e.getMessage(), e);
-        }
-    }
-
-    private void ensureFile(Path file) throws IOException {
-        if (!Files.exists(file)) {
-            Files.write(file, "[]".getBytes(StandardCharsets.UTF_8));
-        }
+        List<BackTradeRecord> list = JSON.parseObject(json, TRADE_TYPE);
+        return list == null ? new ArrayList<BackTradeRecord>() : list;
     }
 
     private static String emptyToNull(String s) {

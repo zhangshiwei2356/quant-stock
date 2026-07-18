@@ -20,9 +20,9 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 统一K线查询入口：对外按 BarPeriod 路由分表，屏蔽存储细节。
+ * 统一K线查询入口：对外按 BarPeriod 路由，屏蔽存储细节。
  * <p>
- * 查询优先级：classpath JSON → Redis → MySQL分表 → mock/sdk
+ * 查询优先级：MySQL(market_daily/minute) → Redis → 旧分表 → classpath JSON → mock/sdk
  */
 @Slf4j
 @Service
@@ -37,7 +37,11 @@ public class MarketDataService {
     @Autowired(required = false)
     private RedisTemplate<String, Object> redisTemplate;
 
-    /** 启用 quant.db-enabled=true 后注入 */
+    /** 启用 quant.db-enabled=true 后注入：核心日线/5分钟表 */
+    @Autowired(required = false)
+    private CoreMarketBarService coreMarketBarService;
+
+    /** 兼容旧 stock_bar_* 分表 */
     @Autowired(required = false)
     private BarStorageService barStorageService;
 
@@ -49,7 +53,7 @@ public class MarketDataService {
     }
 
     /**
-     * 统一查询：优先读对应周期表；缺失则从1分钟降级实时聚合
+     * 统一查询
      */
     public List<BarDTO> getKline(String code, BarPeriod period, LocalDateTime start, LocalDateTime end) {
         if (StrUtil.isBlank(code)) {
@@ -59,8 +63,50 @@ public class MarketDataService {
             period = BarPeriod.MIN_1;
         }
 
-        // 0) classpath JSON 模拟数据
-        if (jsonBarDataStore.available()) {
+        // 0) MySQL 核心表（market_daily / market_minute）
+        if (coreMarketBarService != null) {
+            try {
+                List<BarDTO> fromDb = coreMarketBarService.load(code, period, start, end);
+                if (fromDb != null && !fromDb.isEmpty()) {
+                    List<BarDTO> closed = BarAggregateUtil.filterClosedBars(fromDb);
+                    putCache(code, period, closed);
+                    return closed;
+                }
+            } catch (Exception e) {
+                log.warn("核心行情表查询失败 code={} period={}: {}", code, period, e.getMessage());
+            }
+        }
+
+        List<BarDTO> cached = getFromCache(code, period);
+        if (cached != null && !cached.isEmpty()) {
+            return filterByTime(BarAggregateUtil.filterClosedBars(cached), start, end);
+        }
+
+        // 1) 兼容旧分表
+        if (barStorageService != null) {
+            try {
+                List<BarDTO> fromTable = barStorageService.loadBars(code, period, start, end);
+                if (fromTable != null && !fromTable.isEmpty()) {
+                    List<BarDTO> closed = BarAggregateUtil.filterClosedBars(fromTable);
+                    putCache(code, period, closed);
+                    return closed;
+                }
+                if (!period.isRaw()) {
+                    List<BarDTO> minute = barStorageService.loadBars(code, BarPeriod.MIN_1, start, end);
+                    if (minute != null && !minute.isEmpty()) {
+                        List<BarDTO> agg = BarAggregateUtil.aggregate(minute, period.getAggregatePeriod());
+                        List<BarDTO> closed = BarAggregateUtil.filterClosedBars(agg);
+                        putCache(code, period, closed);
+                        return closed;
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("分表查询失败，降级 code={} period={}: {}", code, period, e.getMessage());
+            }
+        }
+
+        // 2) classpath JSON（仅作兜底；正式环境以 MySQL 为准）
+        if (jsonBarDataStore.available() && !"db".equalsIgnoreCase(quantProperties.getMarketMode())) {
             List<BarDTO> fromJson = jsonBarDataStore.getBars(code, period, start, end);
             if (fromJson != null && !fromJson.isEmpty()) {
                 return BarAggregateUtil.filterClosedBars(fromJson);
@@ -74,39 +120,10 @@ public class MarketDataService {
             }
         }
 
-        List<BarDTO> cached = getFromCache(code, period);
-        if (cached != null && !cached.isEmpty()) {
-            return filterByTime(BarAggregateUtil.filterClosedBars(cached), start, end);
-        }
-
-        // 1) 优先读分表
-        if (barStorageService != null) {
-            try {
-                List<BarDTO> fromTable = barStorageService.loadBars(code, period, start, end);
-                if (fromTable != null && !fromTable.isEmpty()) {
-                    List<BarDTO> closed = BarAggregateUtil.filterClosedBars(fromTable);
-                    putCache(code, period, closed);
-                    return closed;
-                }
-                // 2) 聚合表无数据：从1min降级实时聚合
-                if (!period.isRaw()) {
-                    List<BarDTO> minute = barStorageService.loadBars(code, BarPeriod.MIN_1, start, end);
-                    if (minute != null && !minute.isEmpty()) {
-                        List<BarDTO> agg = BarAggregateUtil.aggregate(minute, period.getAggregatePeriod());
-                        List<BarDTO> closed = BarAggregateUtil.filterClosedBars(agg);
-                        putCache(code, period, closed);
-                        return closed;
-                    }
-                }
-            } catch (Exception e) {
-                log.warn("分表查询失败，降级内存行情 code={} period={}: {}", code, period, e.getMessage());
-            }
-        }
-
-        // 3) 无库 / 无数据：mock 或 sdk 拉1分钟，再按需聚合
+        // 3) mock / sdk
         List<BarDTO> minuteBars = loadMinuteBarsInternal(code);
         minuteBars = filterByTime(minuteBars, start, end);
-        if (period.isRaw()) {
+        if (period.isRaw() || period == BarPeriod.MIN_5) {
             return BarAggregateUtil.filterClosedBars(minuteBars);
         }
         return BarAggregateUtil.filterClosedBars(
@@ -138,7 +155,16 @@ public class MarketDataService {
     }
 
     private List<BarDTO> loadMinuteBarsInternal(String code) {
-        if (jsonBarDataStore.available()) {
+        if (coreMarketBarService != null) {
+            try {
+                List<BarDTO> fromDb = coreMarketBarService.load(code, BarPeriod.MIN_5, null, null);
+                if (fromDb != null && !fromDb.isEmpty()) {
+                    return fromDb;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        if (jsonBarDataStore.available() && !"db".equalsIgnoreCase(quantProperties.getMarketMode())) {
             List<BarDTO> fromJson = jsonBarDataStore.getBars(code, BarPeriod.MIN_1);
             if (fromJson != null && !fromJson.isEmpty()) {
                 return fromJson;

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.stock.mapper.FactorDailyMapper">
+
+    <delete id="deleteBySymbol">
+        DELETE FROM factor_daily WHERE symbol = #{symbol}
+    </delete>
+
+    <insert id="batchUpsert">
+        INSERT INTO factor_daily
+        (symbol, trade_date, ma5, ma20, ma60, rsi14, atr14, adx, volume_ma20, ma60_up, is_volume_break)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.symbol}, #{item.tradeDate}, #{item.ma5}, #{item.ma20}, #{item.ma60},
+             #{item.rsi14}, #{item.atr14}, #{item.adx}, #{item.volumeMa20},
+             #{item.ma60Up}, #{item.isVolumeBreak})
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            ma5 = VALUES(ma5), ma20 = VALUES(ma20), ma60 = VALUES(ma60),
+            rsi14 = VALUES(rsi14), atr14 = VALUES(atr14), adx = VALUES(adx),
+            volume_ma20 = VALUES(volume_ma20), ma60_up = VALUES(ma60_up),
+            is_volume_break = VALUES(is_volume_break)
+    </insert>
+</mapper>
