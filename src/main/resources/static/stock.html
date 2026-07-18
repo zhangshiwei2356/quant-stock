@@ -17,7 +17,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css?v=20260718-milkyway"/>
+  <link rel="stylesheet" href="/css/style.css?v=20260719-nav-intro"/>
   <script src="/js/jquery.min.js"></script>
   <script src="/js/echarts.min.js"></script>
   <script src="/js/particle-bg.js?v=20260718-day-tech"></script>
@@ -29,13 +29,13 @@
 <div id="toastHost" aria-live="polite"></div>
 <button type="button" id="btnExpandHome" class="home-expand-fab" hidden title="展开欢迎页">显示欢迎页</button>
 <header class="app-header">
-  <div class="brand">
+  <button type="button" class="brand" id="btnBrandHome" title="回到初始化页（收起全部菜单）" aria-label="Quant Stock，回到初始化页">
     <span class="brand-mark">QS</span>
     <div>
       <div class="brand-title">Quant Stock</div>
       <div class="brand-sub">A股量化回测工作台</div>
     </div>
-  </div>
+  </button>
   <div class="header-actions">
     <label class="theme-field" for="themeSelect">主题
       <select id="themeSelect" aria-label="主题选择">
@@ -50,7 +50,8 @@
 <div class="layout">
   <aside class="sidebar">
     <div class="side-nav" data-nav="pool">
-      <button type="button" class="side-nav-toggle" data-body="poolBody" data-mode="pool" aria-expanded="false">
+      <button type="button" class="side-nav-toggle" data-body="poolBody" data-mode="pool"
+              data-intro="/docs/nav-pool.html" data-intro-title="股票池" aria-expanded="false">
         股票池 <span class="chevron">▸</span>
       </button>
       <div id="poolBody" class="side-nav-body">
@@ -61,7 +62,8 @@
     </div>
 
     <div class="side-nav" data-nav="single">
-      <button type="button" class="side-nav-toggle" data-body="singleBody" data-mode="single" aria-expanded="false">
+      <button type="button" class="side-nav-toggle" data-body="singleBody" data-mode="single"
+              data-intro="/docs/nav-single.html" data-intro-title="单股回测" aria-expanded="false">
         单股回测 <span class="chevron">▸</span>
       </button>
       <div id="singleBody" class="side-nav-body">
@@ -71,7 +73,8 @@
     </div>
 
     <div class="side-nav" data-nav="portfolio">
-      <button type="button" class="side-nav-toggle" data-body="portfolioBody" data-mode="portfolio" aria-expanded="false">
+      <button type="button" class="side-nav-toggle" data-body="portfolioBody" data-mode="portfolio"
+              data-intro="/docs/nav-portfolio.html" data-intro-title="组合回测" aria-expanded="false">
         组合回测 <span class="chevron">▸</span>
       </button>
       <div id="portfolioBody" class="side-nav-body">
@@ -81,14 +84,16 @@
     </div>
 
     <div class="side-nav" data-nav="stock-knowledge">
-      <button type="button" class="side-nav-toggle" data-body="stockKnowledgeMenu" data-mode="doc" aria-expanded="false">
+      <button type="button" class="side-nav-toggle" data-body="stockKnowledgeMenu" data-mode="doc"
+              data-intro="/docs/nav-stock-knowledge.html" data-intro-title="股票知识" aria-expanded="false">
         股票知识 <span class="chevron">▸</span>
       </button>
       <ul id="stockKnowledgeMenu" class="side-nav-menu"></ul>
     </div>
 
     <div class="side-nav" data-nav="app-related">
-      <button type="button" class="side-nav-toggle" data-body="appRelatedMenu" data-mode="doc" aria-expanded="false">
+      <button type="button" class="side-nav-toggle" data-body="appRelatedMenu" data-mode="doc"
+              data-intro="/docs/nav-app-related.html" data-intro-title="本应用相关" aria-expanded="false">
         本应用相关 <span class="chevron">▸</span>
       </button>
       <ul id="appRelatedMenu" class="side-nav-menu"></ul>
@@ -104,27 +109,18 @@
       <article id="knowledgeBody" class="knowledge-body"></article>
     </section>
 
-    <!-- 初始化 / 全部收起时的欢迎页 -->
+    <!-- 初始化 / 全部收起时的欢迎页：正文见 /docs/home.html -->
     <div id="viewHome" class="workspace-view">
-      <section class="panel home-panel" id="homePanel">
-        <div class="home-toolbar">
-          <button type="button" id="btnCollapseHome" class="secondary home-collapse-btn" title="收起欢迎页，查看主题背景">收起 · 查看主题</button>
+      <div id="homeMount"><p class="home-lead">加载欢迎页…</p></div>
+    </div>
+
+    <!-- 一级菜单介绍页：正文见 /docs/nav-*.html -->
+    <div id="viewNavIntro" class="workspace-view" hidden>
+      <section class="panel nav-intro-panel">
+        <div class="nav-intro-head">
+          <h3 id="navIntroTitle">功能介绍</h3>
         </div>
-        <p class="home-brand">Quant Stock</p>
-        <h3 class="home-title">开始使用</h3>
-        <p class="home-lead" id="homeLead">左侧尚未展开菜单。点击下方入口，或展开左侧一级菜单进入对应功能。</p>
-        <div class="home-actions">
-          <button type="button" class="home-action" data-open-nav="poolBody" data-mode="pool">股票池</button>
-          <button type="button" class="home-action" data-open-nav="singleBody" data-mode="single">单股回测</button>
-          <button type="button" class="home-action" data-open-nav="portfolioBody" data-mode="portfolio">组合回测</button>
-          <button type="button" class="home-action secondary" data-open-nav="stockKnowledgeMenu" data-mode="doc">股票知识</button>
-          <button type="button" class="home-action secondary" data-open-nav="appRelatedMenu" data-mode="doc">本应用相关</button>
-        </div>
-        <ul class="home-tips">
-          <li>工作台菜单：展开后显示行情 / 回测界面；再点同一菜单可收起并回到本页</li>
-          <li>说明类菜单：展开后点选左侧条目阅读；「返回工作台」可回到上次功能页</li>
-          <li>页头可切换主题；也可点右上「收起 · 查看主题」欣赏动态背景</li>
-        </ul>
+        <article id="navIntroBody" class="nav-intro-body"></article>
       </section>
     </div>
 
@@ -434,6 +430,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260719-rules-full"></script>
+<script src="/js/stock-chart.js?v=20260719-nav-intro"></script>
 </body>
 </html>

@@ -38,6 +38,7 @@ alwaysApply: true
 static/docs/app.html      → 本应用介绍
 static/docs/rules.html    → 交易规则
 static/docs/memo.html     → 备忘录
+static/docs/home.html     → 初始化欢迎页（收起全部一级菜单时）
 stock-chart.js → knowledgeTopics → { id, title, src } 目录索引（一般无需改正文）
 ```
 ## 自检

@@ -311,6 +311,29 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+  margin: 0;
+  padding: 4px 8px 4px 4px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+
+.brand:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.brand:active {
+  transform: scale(0.99);
+}
+
+.brand:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .brand-mark {
@@ -891,6 +914,40 @@ body.home-theme-peek .app-header {
 
 .home-expand-fab[hidden] {
   display: none !important;
+}
+
+.nav-intro-panel {
+  max-width: 720px;
+}
+
+.nav-intro-head h3 {
+  margin: 0 0 8px;
+  font-size: 1.25rem;
+}
+
+.nav-intro-body {
+  line-height: 1.65;
+}
+
+.nav-intro-body .nav-intro-lead {
+  font-size: 15px;
+  margin: 0 0 14px;
+}
+
+.nav-intro-body h4 {
+  margin: 18px 0 8px;
+  font-size: 1rem;
+}
+
+.nav-intro-body ul,
+.nav-intro-body ol {
+  margin: 0 0 10px;
+  padding-left: 1.25em;
+}
+
+.nav-intro-body .hint {
+  margin-top: 12px;
+  opacity: 0.85;
 }
 
 .home-brand {

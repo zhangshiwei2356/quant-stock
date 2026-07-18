@@ -1,2 +1,14 @@
 <!-- 片段：由 stock.html 知识面板加载 -->
-<p>ADX（Average Directional Index）衡量趋势<strong>强度</strong>，不告诉涨跌方向。</p><ul><li>经验上 <code>ADX &lt; 20</code> 多为震荡/无趋势，均线策略易假信号</li><li><code>ADX &gt; 25</code> 趋势相对明确，更适合趋势跟踪</li></ul><p>可在 <code>application.yml</code> 中开启 <code>adx-filter-enabled</code>，震荡市直接屏蔽开仓。</p>
+<p>ADX（Average Directional Index）衡量趋势<strong>强度</strong>，不直接告诉涨跌方向。常与 +DI/−DI 一起使用；本应用主要用 ADX 数值过滤震荡市。</p>
+<ul>
+  <li>经验上 ADX 偏低多为震荡/无趋势，均线交叉假信号多</li>
+  <li>ADX 升高表示趋势相对明确，更适合趋势跟踪</li>
+</ul>
+
+<h4>本应用相关</h4>
+<ul>
+  <li>配置开关 <code>adx-filter-enabled</code>（yml 默认 <b>关</b>）</li>
+  <li>开启后须同时满足：ADX ≥ <code>adx-min</code>（默认 25），且 ADX ≥ <code>adx-chop-max</code>（默认 20，低于视为震荡拒单）</li>
+  <li>仅过滤<strong>金叉买入</strong>；死叉卖出不受 ADX 限制</li>
+  <li>计算预热较长，故有效回测 K 线需约 ≥65 根</li>
+</ul>

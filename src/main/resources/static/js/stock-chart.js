@@ -1444,17 +1444,57 @@
     { id: 'app', group: 'app', title: '本应用介绍', src: '/docs/app.html' },
     { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260719-full' },
     { id: 'memo', group: 'app', title: '备忘录', src: '/docs/memo.html' },
-    { id: 'ashare', group: 'stock', title: '中国A股介绍', src: '/docs/ashare.html' },
-    { id: 'session', group: 'stock', title: '交易时间介绍', src: '/docs/session.html' },
-    { id: 'kline', group: 'stock', title: 'K线介绍', src: '/docs/kline.html' },
-    { id: 'ma', group: 'stock', title: 'MA均线（MA5 / MA20 / MA60）', src: '/docs/ma.html' },
-    { id: 'rsi', group: 'stock', title: 'RSI相对强弱', src: '/docs/rsi.html' },
-    { id: 'atr', group: 'stock', title: 'ATR真实波幅', src: '/docs/atr.html' },
-    { id: 'adx', group: 'stock', title: 'ADX趋势强度', src: '/docs/adx.html' },
-    { id: 'boll', group: 'stock', title: '布林带 BOLL', src: '/docs/boll.html' },
-    { id: 'backtest', group: 'stock', title: '回测要点', src: '/docs/backtest.html' }
+    { id: 'ashare', group: 'stock', title: '中国A股介绍', src: '/docs/ashare.html?v=20260719-k' },
+    { id: 'session', group: 'stock', title: '交易时间介绍', src: '/docs/session.html?v=20260719-k' },
+    { id: 'kline', group: 'stock', title: 'K线介绍', src: '/docs/kline.html?v=20260719-k' },
+    { id: 'ma', group: 'stock', title: 'MA均线与金叉死叉', src: '/docs/ma.html?v=20260719-k' },
+    { id: 'volume', group: 'stock', title: '成交量与放量', src: '/docs/volume.html?v=20260719-k' },
+    { id: 'rsi', group: 'stock', title: 'RSI相对强弱', src: '/docs/rsi.html?v=20260719-k' },
+    { id: 'atr', group: 'stock', title: 'ATR真实波幅', src: '/docs/atr.html?v=20260719-k' },
+    { id: 'adx', group: 'stock', title: 'ADX趋势强度', src: '/docs/adx.html?v=20260719-k' },
+    { id: 'boll', group: 'stock', title: '布林带 BOLL', src: '/docs/boll.html?v=20260719-k' },
+    { id: 'limit', group: 'stock', title: '涨跌停与停牌', src: '/docs/limit.html?v=20260719-k' },
+    { id: 'tplus1', group: 'stock', title: 'T+1与整手', src: '/docs/tplus1.html?v=20260719-k' },
+    { id: 'cost', group: 'stock', title: '交易成本', src: '/docs/cost.html?v=20260719-k' },
+    { id: 'position', group: 'stock', title: '仓位与金字塔', src: '/docs/position.html?v=20260719-k' },
+    { id: 'risk', group: 'stock', title: '账户风控', src: '/docs/risk.html?v=20260719-k' },
+    { id: 'fill', group: 'stock', title: '撮合与静默', src: '/docs/fill.html?v=20260719-k' },
+    { id: 'metrics', group: 'stock', title: '权益回撤与胜率', src: '/docs/metrics.html?v=20260719-k' },
+    { id: 'backtest', group: 'stock', title: '回测要点', src: '/docs/backtest.html?v=20260719-k' }
   ];
   var knowledgeHtmlCache = {};
+  var HOME_SRC = '/docs/home.html?v=20260719-nav-intro';
+  var homePanelReady = false;
+  var pendingHomeLead = null;
+
+  function loadHomePanel(done) {
+    if (homePanelReady) {
+      if (typeof done === 'function') done();
+      return;
+    }
+    $.get(HOME_SRC)
+      .done(function (html) {
+        $('#homeMount').html(html);
+        homePanelReady = true;
+        if (pendingHomeLead != null) {
+          $('#homeLead').text(pendingHomeLead);
+          pendingHomeLead = null;
+        }
+        if (typeof done === 'function') done();
+      })
+      .fail(function () {
+        $('#homeMount').html('<section class="panel home-panel"><p class="home-lead">欢迎页加载失败：' + HOME_SRC + '</p></section>');
+        if (typeof done === 'function') done();
+      });
+  }
+
+  function setHomeLead(text) {
+    if ($('#homeLead').length) {
+      $('#homeLead').text(text);
+    } else {
+      pendingHomeLead = text;
+    }
+  }
 
   function initKnowledge() {
     var $stock = $('#stockKnowledgeMenu').empty();
@@ -1490,9 +1530,47 @@
   }
 
   function hideAllWorkspaceViews() {
-    $('#viewHome, #viewPool, #viewSingle, #viewPortfolio').prop('hidden', true);
+    $('#viewHome, #viewNavIntro, #viewPool, #viewSingle, #viewPortfolio').prop('hidden', true);
     $('body').removeClass('home-theme-peek');
     $('#btnExpandHome').prop('hidden', true);
+  }
+
+  var navIntroCache = {};
+
+  /** 一级菜单专属介绍页（非全局初始化页） */
+  function showNavIntro(options) {
+    options = options || {};
+    var bodyId = options.bodyId;
+    var title = options.title || '功能介绍';
+    var src = options.src;
+    if (!src) return;
+
+    $('body').removeClass('mode-doc home-theme-peek');
+    $('#knowledgePanel').prop('hidden', true);
+    $('.side-nav-menu li').removeClass('active');
+    hideAllWorkspaceViews();
+    $('#viewNavIntro').prop('hidden', false);
+    setSideNavOpen(bodyId || null);
+    $('#navIntroTitle').text(title);
+    $('#navIntroBody').html('<p>加载中…</p>');
+
+    function render(html) {
+      $('#navIntroBody').html(html || '<p>暂无介绍</p>');
+    }
+    if (navIntroCache[src]) {
+      render(navIntroCache[src]);
+      return;
+    }
+    $.get(src)
+      .done(function (html) {
+        navIntroCache[src] = html;
+        if ($('#navIntroTitle').text() !== title) return;
+        render(html);
+      })
+      .fail(function () {
+        if ($('#navIntroTitle').text() !== title) return;
+        render('<p>介绍页加载失败：' + src + '</p>');
+      });
   }
 
   /** 初始化页：无一级菜单展开时展示 */
@@ -1507,9 +1585,14 @@
       setSideNavOpen(null);
     }
     var lead = options.lead || '左侧尚未展开菜单。点击下方入口，或展开左侧一级菜单进入对应功能。';
-    $('#homeLead').text(lead);
+    setHomeLead(lead);
     // 进入欢迎页默认展开；若显式要求保持收起则沿用
-    setHomeCollapsed(options.keepCollapsed ? homeCollapsed : false);
+    var collapsed = options.keepCollapsed ? homeCollapsed : false;
+    setHomeCollapsed(collapsed);
+    loadHomePanel(function () {
+      setHomeLead(lead);
+      setHomeCollapsed(collapsed);
+    });
   }
 
   /**
@@ -1588,30 +1671,31 @@
   $('.side-nav-toggle').on('click', function () {
     var $btn = $(this);
     var bodyId = $btn.attr('data-body');
-    var mode = $btn.attr('data-mode');
     var wasOpen = $btn.attr('aria-expanded') === 'true';
 
-    // 再次点击已展开的一级菜单：全部收起，右侧回到初始化页
+    // 再次点击已展开的一级菜单：全部收起，右侧回到全局初始化页
     if (wasOpen) {
       showHome();
       return;
     }
 
-    if (mode === 'doc') {
-      setSideNavOpen(bodyId);
-      $('body').addClass('mode-doc');
-      hideAllWorkspaceViews();
-      $('#knowledgePanel').prop('hidden', true);
-      $('.side-nav-menu li').removeClass('active');
-      $('#viewHome').prop('hidden', false);
-      $('#homeLead').text('已展开说明菜单，请在左侧点选条目阅读；或再点同一菜单收起并回到本页。');
-      setHomeCollapsed(false);
-    } else {
-      showMode(mode); // 切入对应工作台并展开该一级菜单
+    // 展开一级菜单：展示该菜单专属介绍页（不展示全局初始化页）
+    var introSrc = $btn.attr('data-intro');
+    var introTitle = $btn.attr('data-intro-title') || $btn.clone().children().remove().end().text().trim();
+    if (introSrc) {
+      showNavIntro({ bodyId: bodyId, title: introTitle, src: introSrc + (introSrc.indexOf('?') >= 0 ? '&' : '?') + 'v=20260719-nav' });
+      return;
     }
+    // 无介绍配置时回退到原工作台
+    showMode($btn.attr('data-mode'));
   });
 
-  $('.home-actions').on('click', '[data-open-nav]', function () {
+  $('#viewNavIntro').on('click', '[data-enter-mode]', function () {
+    var mode = $(this).attr('data-enter-mode');
+    if (mode) showMode(mode);
+  });
+
+  $('#viewHome').on('click', '[data-open-nav]', function () {
     var bodyId = $(this).attr('data-open-nav');
     var $btn = $('.side-nav-toggle[data-body="' + bodyId + '"]');
     if (!$btn.length) return;
@@ -1619,7 +1703,7 @@
     $btn.trigger('click');
   });
 
-  $('#btnCollapseHome').on('click', function () {
+  $('#viewHome').on('click', '#btnCollapseHome', function () {
     setHomeCollapsed(true);
     toast('欢迎页已收起，可切换主题欣赏背景', 'info', { place: 'theme' });
   });
@@ -1627,6 +1711,11 @@
   $('#btnExpandHome').on('click', function () {
     setHomeCollapsed(false);
     toast('已展开欢迎页', 'ok');
+  });
+
+  $('#btnBrandHome').on('click', function () {
+    showHome({ lead: '已回到初始化页。点击下方入口，或展开左侧一级菜单进入对应功能。' });
+    toast('已收起菜单，回到初始化页', 'ok');
   });
 
   $('.side-nav-menu').on('click', 'li', function () {
