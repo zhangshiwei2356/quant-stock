@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -22,6 +23,7 @@ public class DataHealthService {
 
     private static final int DAILY_STALE_DAYS = 5;
     private static final int MINUTE_STALE_HOURS = 48;
+    private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final JdbcTemplate jdbc;
     private final TradePoolService tradePoolService;
@@ -51,7 +53,7 @@ public class DataHealthService {
             }
         }
         Map<String, Object> m = new LinkedHashMap<String, Object>();
-        m.put("asOf", now.toString());
+        m.put("asOf", now.format(DT_FMT));
         m.put("universeSize", codes.size());
         m.put("okCount", ok);
         m.put("warnCount", warn);
@@ -83,7 +85,7 @@ public class DataHealthService {
             m.put("dailyCount", dailyCnt == null ? 0 : dailyCnt);
             m.put("maxDaily", maxDaily == null ? null : maxDaily.toString());
             m.put("minuteCount", minuteCnt == null ? 0 : minuteCnt);
-            m.put("maxMinute", maxMinute == null ? null : maxMinute.toString());
+            m.put("maxMinute", maxMinute == null ? null : maxMinute.format(DT_FMT));
 
             if (dailyCnt == null || dailyCnt <= 0 || maxDaily == null) {
                 issues.add("日线为空");

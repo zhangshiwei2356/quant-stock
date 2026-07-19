@@ -123,17 +123,17 @@ public final class DbTableCatalog {
                 "旧版分表聚合进度元数据，标记各周期最后聚合时间。",
                 "K 线聚合任务维护；新逻辑以 market_* 为主。",
                 "兼容旧聚合流程，避免重复聚合；新部署可逐步弱化依赖。");
-        add(m, "trade_pool_report", "目标池入选分析报告", "交易目标池", "id DESC",
+        add(m, "trade_pool_report", "目标池入选分析报告", "目标池", "id DESC",
                 "盘后扫描入选时生成的完整分析快照（JSON+摘要），供行展开回看。",
                 "pool-rebuild / after-market-batch-scan / 手动扫描时由 TradePoolService 写入。",
                 "目标池行展开报告；通过 trade_pool.report_id 关联。");
-        add(m, "trade_pool", "量化交易目标池", "交易目标池", "id DESC",
+        add(m, "trade_pool", "量化交易目标池", "目标池", "id DESC",
                 "唯一目标池：盘后扫描按 TopN 自动覆盖；status=1 为活跃入池标的。",
                 "BATCH_SCAN 扫描写入；亦可手工移出（status=0，不卖持仓）。",
                 "scan-and-trade 只扫描本表 status=1 的代码；移出仅停用，不记历史表。");
-        add(m, "sys_schedule_job", "定时任务配置", "定时任务", "id DESC",
+        add(m, "sys_schedule_job", "定时任务配置", "运维中心", "id DESC",
                 "动态定时任务定义（cron/固定间隔、启停、是否已实现）。",
-                "schema 种子初始化；页面「定时任务」管理修改。",
+                "schema 种子初始化；页面「运维中心 → 任务管理」修改。",
                 "DynamicScheduleService 按本表注册/重载调度；改配置后立即生效。");
         TABLES = Collections.unmodifiableMap(m);
     }

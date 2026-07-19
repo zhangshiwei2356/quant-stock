@@ -80,6 +80,16 @@
     return Number(v).toFixed(d == null ? 2 : d);
   }
 
+  /** 时间展示：去掉 ISO 的 T / 毫秒，统一为 yyyy-MM-dd HH:mm:ss */
+  function fmtDateTimeDisplay(v) {
+    if (v == null || v === '') return '—';
+    var s = String(v).trim();
+    if (!s) return '—';
+    s = s.replace('T', ' ').replace(/\.\d+/, '');
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(s)) s += ':00';
+    return s;
+  }
+
   /** 资金中文简写：100000 → 10万 */
   function formatCapitalCn(v) {
     var n = Number(v);
@@ -881,7 +891,7 @@
 
       var $tb = $('#tpPoolBody').empty();
       if (!items.length) {
-        $tb.html('<tr><td colspan="6" class="empty-state">目标池为空，可点「扫描更新」或开启定时任务 pool-rebuild</td></tr>');
+        $tb.html('<tr><td colspan="6" class="empty-state">目标池为空，可点「扫描更新」或在运维中心开启 pool-rebuild</td></tr>');
       } else {
         items.forEach(function (it) {
           poolNames[it.code] = it.name || it.code;
@@ -1739,29 +1749,29 @@
   }
 
   var knowledgeTopics = [
-    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260720-pf-picker' },
-    { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260720-pf-picker' },
-    { id: 'memo', group: 'app', title: '应用待办', src: '/docs/memo.html?v=20260720-ops-views' },
-    { id: 'ashare', group: 'stock', title: 'A股基础', src: '/docs/ashare.html?v=20260719-menu' },
-    { id: 'session', group: 'stock', title: '交易时间', src: '/docs/session.html?v=20260719-menu' },
-    { id: 'kline', group: 'stock', title: 'K线', src: '/docs/kline.html?v=20260719-menu' },
-    { id: 'ma', group: 'stock', title: '均线 MA与金叉', src: '/docs/ma.html?v=20260719-menu' },
-    { id: 'volume', group: 'stock', title: '成交量与放量', src: '/docs/volume.html?v=20260719-menu' },
-    { id: 'rsi', group: 'stock', title: 'RSI相对强弱', src: '/docs/rsi.html?v=20260719-menu' },
-    { id: 'atr', group: 'stock', title: 'ATR真实波幅', src: '/docs/atr.html?v=20260719-menu' },
-    { id: 'adx', group: 'stock', title: 'ADX趋势强度', src: '/docs/adx.html?v=20260719-menu' },
-    { id: 'boll', group: 'stock', title: 'BOLL 布林带', src: '/docs/boll.html?v=20260719-menu' },
-    { id: 'limit', group: 'stock', title: '涨跌停与停牌', src: '/docs/limit.html?v=20260719-menu' },
-    { id: 'tplus1', group: 'stock', title: 'T+1与整手', src: '/docs/tplus1.html?v=20260719-menu' },
-    { id: 'cost', group: 'stock', title: '交易成本', src: '/docs/cost.html?v=20260719-menu' },
-    { id: 'position', group: 'stock', title: '仓位与金字塔', src: '/docs/position.html?v=20260719-menu' },
-    { id: 'risk', group: 'stock', title: '账户风控', src: '/docs/risk.html?v=20260719-menu' },
-    { id: 'fill', group: 'stock', title: '撮合时机', src: '/docs/fill.html?v=20260719-menu' },
-    { id: 'metrics', group: 'stock', title: '权益回撤与胜率', src: '/docs/metrics.html?v=20260719-menu' },
-    { id: 'backtest', group: 'stock', title: '回测要点', src: '/docs/backtest.html?v=20260719-menu' }
+    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260720-nav-rename' },
+    { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260720-nav-rename' },
+    { id: 'memo', group: 'app', title: '待办清单', src: '/docs/memo.html?v=20260720-nav-rename' },
+    { id: 'ashare', group: 'stock', title: 'A股基础', src: '/docs/ashare.html?v=20260720-nav-rename' },
+    { id: 'session', group: 'stock', title: '交易时间', src: '/docs/session.html?v=20260720-nav-rename' },
+    { id: 'kline', group: 'stock', title: 'K线', src: '/docs/kline.html?v=20260720-nav-rename' },
+    { id: 'ma', group: 'stock', title: '均线与金叉', src: '/docs/ma.html?v=20260720-nav-rename' },
+    { id: 'volume', group: 'stock', title: '成交量与放量', src: '/docs/volume.html?v=20260720-nav-rename' },
+    { id: 'rsi', group: 'stock', title: 'RSI', src: '/docs/rsi.html?v=20260720-nav-rename' },
+    { id: 'atr', group: 'stock', title: 'ATR', src: '/docs/atr.html?v=20260720-nav-rename' },
+    { id: 'adx', group: 'stock', title: 'ADX', src: '/docs/adx.html?v=20260720-nav-rename' },
+    { id: 'boll', group: 'stock', title: '布林带', src: '/docs/boll.html?v=20260720-nav-rename' },
+    { id: 'limit', group: 'stock', title: '涨跌停与停牌', src: '/docs/limit.html?v=20260720-nav-rename' },
+    { id: 'tplus1', group: 'stock', title: 'T+1与整手', src: '/docs/tplus1.html?v=20260720-nav-rename' },
+    { id: 'cost', group: 'stock', title: '交易成本', src: '/docs/cost.html?v=20260720-nav-rename' },
+    { id: 'position', group: 'stock', title: '仓位与金字塔', src: '/docs/position.html?v=20260720-nav-rename' },
+    { id: 'risk', group: 'stock', title: '账户风控', src: '/docs/risk.html?v=20260720-nav-rename' },
+    { id: 'fill', group: 'stock', title: '撮合时机', src: '/docs/fill.html?v=20260720-nav-rename' },
+    { id: 'metrics', group: 'stock', title: '权益回撤与胜率', src: '/docs/metrics.html?v=20260720-nav-rename' },
+    { id: 'backtest', group: 'stock', title: '回测要点', src: '/docs/backtest.html?v=20260720-nav-rename' }
   ];
   var knowledgeHtmlCache = {};
-  var HOME_SRC = '/docs/home.html?v=20260719-tradepool-single';
+  var HOME_SRC = '/docs/home.html?v=20260720-nav-rename';
   var homePanelReady = false;
   var pendingHomeLead = null;
   var docsPdfBusy = false;
@@ -2596,7 +2606,7 @@
     $('#viewDbTable').prop('hidden', false);
 
     if (!tableName) {
-      $('#dbTableTitle').text('库表浏览');
+      $('#dbTableTitle').text('数据表');
       $('#dbTableHint').text('请从左侧选择一张表');
       $('#dbTableSummary').text('');
       clearDbTableMeta();
@@ -2942,7 +2952,7 @@
     var introSrc = $btn.attr('data-intro');
     var introTitle = $btn.attr('data-intro-title') || $btn.clone().children().remove().end().text().trim();
     if (introSrc) {
-      showNavIntro({ bodyId: bodyId, title: introTitle, src: introSrc + (introSrc.indexOf('?') >= 0 ? '&' : '?') + 'v=20260720-app-pdf' });
+      showNavIntro({ bodyId: bodyId, title: introTitle, src: introSrc + (introSrc.indexOf('?') >= 0 ? '&' : '?') + 'v=20260720-nav-rename' });
       return;
     }
     // 无介绍配置时回退到原工作台
@@ -3075,7 +3085,7 @@
         $('#healthWarn').attr('class', 'value ' + (data.warnCount > 0 ? 'pnl-neg' : ''))
           .text(String(data.warnCount == null ? '—' : data.warnCount));
         $('#healthBadge').text(String(data.warnCount == null ? 0 : data.warnCount));
-        $('#healthMeta').text(data.asOf ? ('检查时间 ' + data.asOf) : '');
+        $('#healthMeta').text(data.asOf ? ('检查时间：' + fmtDateTimeDisplay(data.asOf)) : '');
         var items = data.items || [];
         var $tb = $('#healthBody').empty();
         if (!items.length) {
@@ -3094,7 +3104,7 @@
             + '<td class="mono">' + escHtml(String(it.dailyCount == null ? '—' : it.dailyCount)) + '</td>'
             + '<td class="mono">' + escHtml(it.maxDaily || '—') + '</td>'
             + '<td class="mono">' + escHtml(String(it.minuteCount == null ? '—' : it.minuteCount)) + '</td>'
-            + '<td class="mono">' + escHtml(it.maxMinute || '—') + '</td>'
+            + '<td class="mono">' + escHtml(it.maxMinute ? fmtDateTimeDisplay(it.maxMinute) : '—') + '</td>'
             + '<td>' + escHtml(it.issueText || '—') + '</td>'
             + '</tr>'
           );
@@ -3113,12 +3123,22 @@
         if (data.hint) $('#paramsHint').text(data.hint);
         var $g = $('#paramsGroups').empty();
         (data.groups || []).forEach(function (grp) {
-          var $sec = $('<div class="result-group" style="margin-bottom:12px;"/>');
+          var $sec = $('<div class="result-group"/>');
           $sec.append($('<div class="result-group-title"/>').text(grp.title || ''));
           (grp.items || []).forEach(function (it) {
+            var label = it.label || it.key || '';
+            var key = it.key || '';
+            var $lab = $('<span class="label params-kv-label"/>');
+            $lab.append($('<span class="params-kv-cn"/>').text(label));
+            if (key && key !== label) {
+              $lab.append($('<span class="params-kv-key mono"/>').text(key));
+            }
+            if (it.note) {
+              $lab.append($('<span class="params-kv-note"/>').attr('title', it.note).text(it.note));
+            }
             $sec.append(
-              $('<div class="result-kv"/>')
-                .append($('<span class="label"/>').text(it.key || ''))
+              $('<div class="result-kv params-kv"/>')
+                .append($lab)
                 .append($('<span class="value mono"/>').text(it.value == null ? '—' : String(it.value)))
             );
           });
@@ -3127,15 +3147,18 @@
         var cfgs = data.systemConfig || [];
         var $tb = $('#paramsCfgBody').empty();
         if (!cfgs.length) {
-          $tb.html('<tr><td colspan="4" class="empty-state">无 system_config 或未启用数据库</td></tr>');
+          $tb.html('<tr><td colspan="5" class="empty-state">无 system_config 或未启用数据库</td></tr>');
           return;
         }
         cfgs.forEach(function (c) {
+          var label = c.label || c.description || c.key || '';
+          var note = (c.description && c.description !== label) ? c.description : '';
           $tb.append(
             '<tr>'
+            + '<td>' + escHtml(label) + '</td>'
             + '<td class="mono">' + escHtml(c.key) + '</td>'
-            + '<td class="mono">' + escHtml(c.value) + '</td>'
-            + '<td>' + escHtml(c.description || '') + '</td>'
+            + '<td class="mono">' + escHtml(c.value == null ? '—' : String(c.value)) + '</td>'
+            + '<td class="muted">' + escHtml(note) + '</td>'
             + '<td class="mono">' + escHtml(c.updatedAt || '—') + '</td>'
             + '</tr>'
           );

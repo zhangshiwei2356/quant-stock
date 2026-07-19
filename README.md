@@ -36,12 +36,12 @@ mvn spring-boot:run
 - 回测时间：**默认留空 = 全量 K 线**；单股 / 组合回测均可填写起止时间截取
 - 初始资金默认：**100000**
 - 进入应用先显示**初始化页**；侧栏一级菜单互斥展开进入功能，再点同一菜单可全部收起并回到初始化页
-- 侧栏一级菜单：**行情浏览** / **个股回测** / **组合回测**（工作台内搜索选股，支持代码/名称模糊匹配；组合为多选）、**交易目标池**（池内 / 扫描历史）、**定时任务**（任务管理 / 数据健康 / 运行参数）、**账户概览**、**量化知识**、**应用说明**、**库表浏览**；知识阅读时隐藏工作台
+- 侧栏一级菜单（工作台）：**行情浏览** → **个股回测** → **组合回测** → **目标池**（当前池 / 扫描历史）→ **账户概览** → **运维中心**（任务管理 / 数据健康 / 运行参数）→ **数据表**；说明：**量化知识** / **应用说明**；知识阅读时隐藏工作台
 - 说明文档为独立 HTML 片段：`src/main/resources/static/docs/*.html`，由工作台 `stock.html` 知识面板按需加载（非多页 SPA）
 - 初始化欢迎页单独维护：`static/docs/home.html`，载入 `#viewHome`
 - 各一级菜单介绍页：`static/docs/nav-*.html`，展开菜单时载入 `#viewNavIntro`（点二级项再进工作台/文档）
 - 「量化知识 / 应用说明」介绍页可一键导出该菜单下全部子文档为 PDF（服务端 iText，`GET /api/docs/pdf/{stock|app}`）
-- **量化知识**侧栏含：A股基础/交易时间/K线、均线·成交量·RSI·ATR·ADX·BOLL、涨跌停、T+1、交易成本、仓位金字塔、账户风控、撮合时机、权益回撤、回测要点等（均标注「本系统用法」）
+- **量化知识**侧栏含：A股基础/交易时间/K线、均线与金叉·成交量·RSI·ATR·ADX·布林带、涨跌停、T+1、交易成本、仓位金字塔、账户风控、撮合时机、权益回撤、回测要点等（均标注「本系统用法」）
 - 页头主题（`localStorage` 记住；无选择时默认）：**日间** / 夜盘 / 银河 / 极光
 - 页面体验：交易台风格、输入聚焦动画、按钮 loading、表格斑马纹/粘性表头、Toast 提示、多股标签切换
 
@@ -88,16 +88,16 @@ mvn spring-boot:run
 | POST `/api/schedule/jobs/{code}/run` | 立即执行一次 |
 | POST `/api/schedule/reload` | 按库表重载调度 |
 
-## 定时任务（库表管理，种子默认全关）
+## 运维中心 · 定时任务（库表管理，种子默认全关）
 
 - 表：`sys_schedule_job`（见 `mapper/schema.sql`；启动时自动建表+种子）
-- 页面：侧栏「定时任务」可启停、改 cron/固定间隔、执行一次
+- 页面：侧栏「运维中心 → 任务管理」可启停、改 cron/固定间隔、执行一次；另有「数据健康」「运行参数」（参数项展示中文说明 + 配置键）
 - 总闸：`quant.schedule.enabled`（默认 **true**）；为 false 时不注册触发器，库表仍可编辑
 - **唯一目标池**：盘后 `pool-rebuild` / `after-market-batch-scan` 扫描后自动覆盖 `trade_pool`；无需人工确认；扫描无入选时清空池
 - **入池打分**：多因子综合分（均线趋势 / MA60 斜率 / ADX / 动量排名 / ATR / 流动性），默认 ≥45 分且具备多头雏形才入选；回测收益率仅作参考
 - 配置：`quant.pool-score-min`、`pool-min-list-days`、`pool-min-avg-amount20`（生产可开 5000 万成交额过滤）
 - `pool-rebuild` 与 `after-market-batch-scan` **启用其一即可**；`scan-and-trade` 只扫目标池内活跃标的
-- 页面「交易目标池」可手动扫描更新或移出（**移出≠卖出**）
+- 页面「目标池」可手动扫描更新或移出（**移出≠卖出**）
 - 行情浏览：全市场（`stock_basic`）
 - 已实现：`scan-and-trade` / `pool-rebuild` / `after-market-batch-scan`
 - 未实现（页面标「未实现」，待外部 API）：`settle-after-close` / `sync-orders` / `market-collect` / `position-pnl-sync` / `data-validate`
@@ -159,6 +159,6 @@ mvn spring-boot:run
 1. 本 `README.md`
 2. 页面「应用说明 → 系统概述」（`static/docs/app.html`）
 3. 规则变更时同步「应用说明 → 交易规则」（`static/docs/rules.html`）
-4. 能力/待办落地时同步「应用说明 → 应用待办」（`static/docs/memo.html`）
+4. 能力/待办落地时同步「应用说明 → 待办清单」（`static/docs/memo.html`）
 
 规则见 `.cursor/rules/sync-readme.mdc`、`.cursor/rules/sync-memo.mdc`。

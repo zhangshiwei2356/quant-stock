@@ -18,7 +18,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css?v=20260720-pf-picker"/>
+  <link rel="stylesheet" href="/css/style.css?v=20260720-params-cn"/>
   <script src="/js/jquery.min.js"></script>
   <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/echarts.min.js"></script>
@@ -73,28 +73,10 @@
           </div>
         </div>
 
-        <div class="side-nav" data-nav="tradepool">
-          <button type="button" class="side-nav-toggle" data-body="tradepoolBody" data-mode="tradepool"
-                  data-intro="/docs/nav-tradepool.html" data-intro-title="交易目标池" aria-expanded="false">
-            <span class="nav-idx">02</span>
-            <span class="nav-label">交易目标池</span>
-            <span class="chevron">▸</span>
-          </button>
-          <div id="tradepoolBody" class="side-nav-body">
-            <p class="hint">盘后扫描自动覆盖；二级：池内 / 扫描历史</p>
-            <ul id="tradepoolMenu" class="side-nav-menu">
-              <li data-tp-panel="pool" role="button" tabindex="0">
-                池内标的 <span class="trade-pool-count" id="sidePoolCount">0</span>
-              </li>
-              <li data-tp-panel="history" role="button" tabindex="0">扫描历史</li>
-            </ul>
-          </div>
-        </div>
-
         <div class="side-nav" data-nav="single">
           <button type="button" class="side-nav-toggle" data-body="singleBody" data-mode="single"
                   data-intro="/docs/nav-single.html" data-intro-title="个股回测" aria-expanded="false">
-            <span class="nav-idx">03</span>
+            <span class="nav-idx">02</span>
             <span class="nav-label">个股回测</span>
             <span class="chevron">▸</span>
           </button>
@@ -107,7 +89,7 @@
         <div class="side-nav" data-nav="portfolio">
           <button type="button" class="side-nav-toggle" data-body="portfolioBody" data-mode="portfolio"
                   data-intro="/docs/nav-portfolio.html" data-intro-title="组合回测" aria-expanded="false">
-            <span class="nav-idx">04</span>
+            <span class="nav-idx">03</span>
             <span class="nav-label">组合回测</span>
             <span class="chevron">▸</span>
           </button>
@@ -117,19 +99,20 @@
           </div>
         </div>
 
-        <div class="side-nav" data-nav="schedule">
-          <button type="button" class="side-nav-toggle" data-body="scheduleBody" data-mode="schedule"
-                  data-intro="/docs/nav-schedule.html" data-intro-title="定时任务" aria-expanded="false">
-            <span class="nav-idx">05</span>
-            <span class="nav-label">定时任务</span>
+        <div class="side-nav" data-nav="tradepool">
+          <button type="button" class="side-nav-toggle" data-body="tradepoolBody" data-mode="tradepool"
+                  data-intro="/docs/nav-tradepool.html" data-intro-title="目标池" aria-expanded="false">
+            <span class="nav-idx">04</span>
+            <span class="nav-label">目标池</span>
             <span class="chevron">▸</span>
           </button>
-          <div id="scheduleBody" class="side-nav-body">
-            <p class="hint">定时任务 / 数据健康 / 运行参数</p>
-            <ul id="scheduleMenu" class="side-nav-menu">
-              <li data-schedule-panel="jobs" role="button" tabindex="0">任务管理</li>
-              <li data-schedule-panel="health" role="button" tabindex="0">数据健康</li>
-              <li data-schedule-panel="params" role="button" tabindex="0">运行参数</li>
+          <div id="tradepoolBody" class="side-nav-body">
+            <p class="hint">盘后扫描自动覆盖；二级：当前池 / 扫描历史</p>
+            <ul id="tradepoolMenu" class="side-nav-menu">
+              <li data-tp-panel="pool" role="button" tabindex="0">
+                当前池 <span class="trade-pool-count" id="sidePoolCount">0</span>
+              </li>
+              <li data-tp-panel="history" role="button" tabindex="0">扫描历史</li>
             </ul>
           </div>
         </div>
@@ -137,19 +120,19 @@
         <div class="side-nav" data-nav="account">
           <button type="button" class="side-nav-toggle" data-body="accountBody" data-mode="account"
                   data-intro="/docs/nav-account.html" data-intro-title="账户概览" aria-expanded="false">
-            <span class="nav-idx">06</span>
+            <span class="nav-idx">05</span>
             <span class="nav-label">账户概览</span>
             <span class="chevron">▸</span>
           </button>
           <div id="accountBody" class="side-nav-body">
-            <p class="hint">本地模拟账本；二级菜单分看资金 / 持仓 / 委托 / 日结 / 风控</p>
+            <p class="hint">本地模拟账本；二级：资金 / 持仓 / 委托 / 日结 / 风控</p>
             <ul id="accountMenu" class="side-nav-menu">
-              <li data-account-panel="funds" role="button" tabindex="0">资金与权益</li>
+              <li data-account-panel="funds" role="button" tabindex="0">资金权益</li>
               <li data-account-panel="positions" role="button" tabindex="0">
                 当前持仓 <span class="trade-pool-count" id="sidePosCount">0</span>
               </li>
               <li data-account-panel="orders" role="button" tabindex="0">
-                近期委托 <span class="trade-pool-count" id="sideOrderCount">0</span>
+                委托记录 <span class="trade-pool-count" id="sideOrderCount">0</span>
               </li>
               <li data-account-panel="cashflows" role="button" tabindex="0">
                 权益日结 <span class="trade-pool-count" id="sideCfCount">0</span>
@@ -158,6 +141,36 @@
                 风控事件 <span class="trade-pool-count" id="sideRiskCount">0</span>
               </li>
             </ul>
+          </div>
+        </div>
+
+        <div class="side-nav" data-nav="schedule">
+          <button type="button" class="side-nav-toggle" data-body="scheduleBody" data-mode="schedule"
+                  data-intro="/docs/nav-schedule.html" data-intro-title="运维中心" aria-expanded="false">
+            <span class="nav-idx">06</span>
+            <span class="nav-label">运维中心</span>
+            <span class="chevron">▸</span>
+          </button>
+          <div id="scheduleBody" class="side-nav-body">
+            <p class="hint">任务管理 / 数据健康 / 运行参数</p>
+            <ul id="scheduleMenu" class="side-nav-menu">
+              <li data-schedule-panel="jobs" role="button" tabindex="0">任务管理</li>
+              <li data-schedule-panel="health" role="button" tabindex="0">数据健康</li>
+              <li data-schedule-panel="params" role="button" tabindex="0">运行参数</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="side-nav" data-nav="dbtables">
+          <button type="button" class="side-nav-toggle" data-body="dbtablesBody" data-mode="dbtables"
+                  data-intro="/docs/nav-dbtables.html" data-intro-title="数据表" aria-expanded="false">
+            <span class="nav-idx">07</span>
+            <span class="nav-label">数据表</span>
+            <span class="chevron">▸</span>
+          </button>
+          <div id="dbtablesBody" class="side-nav-body">
+            <p class="hint">本应用 MySQL 表白名单；点表名分页查看</p>
+            <ul id="dbtablesMenu" class="side-nav-menu"></ul>
           </div>
         </div>
       </div>
@@ -169,7 +182,7 @@
         <div class="side-nav" data-nav="stock-knowledge">
           <button type="button" class="side-nav-toggle" data-body="stockKnowledgeMenu" data-mode="doc"
                   data-intro="/docs/nav-stock-knowledge.html" data-intro-title="量化知识" aria-expanded="false">
-            <span class="nav-idx">07</span>
+            <span class="nav-idx">08</span>
             <span class="nav-label">量化知识</span>
             <span class="chevron">▸</span>
           </button>
@@ -179,24 +192,11 @@
         <div class="side-nav" data-nav="app-related">
           <button type="button" class="side-nav-toggle" data-body="appRelatedMenu" data-mode="doc"
                   data-intro="/docs/nav-app-related.html" data-intro-title="应用说明" aria-expanded="false">
-            <span class="nav-idx">08</span>
+            <span class="nav-idx">09</span>
             <span class="nav-label">应用说明</span>
             <span class="chevron">▸</span>
           </button>
           <ul id="appRelatedMenu" class="side-nav-menu"></ul>
-        </div>
-
-        <div class="side-nav" data-nav="dbtables">
-          <button type="button" class="side-nav-toggle" data-body="dbtablesBody" data-mode="dbtables"
-                  data-intro="/docs/nav-dbtables.html" data-intro-title="库表浏览" aria-expanded="false">
-            <span class="nav-idx">09</span>
-            <span class="nav-label">库表浏览</span>
-            <span class="chevron">▸</span>
-          </button>
-          <div id="dbtablesBody" class="side-nav-body">
-            <p class="hint">本应用 MySQL 表白名单；点表名分页查看</p>
-            <ul id="dbtablesMenu" class="side-nav-menu"></ul>
-          </div>
         </div>
       </div>
     </section>
@@ -224,7 +224,7 @@
         <header class="nav-intro-head">
           <p class="nav-intro-eyebrow">一级菜单</p>
           <h3 id="navIntroTitle">功能介绍</h3>
-          <p class="nav-intro-sub">先了解本模块，再从左侧二级菜单进入具体功能</p>
+          <p class="nav-intro-sub">先了解本模块，再从左侧进入工作台或文档</p>
         </header>
         <article id="navIntroBody" class="nav-intro-body"></article>
       </section>
@@ -442,10 +442,10 @@
       </section>
     </div>
 
-    <!-- 交易目标池（唯一活跃池） -->
+    <!-- 目标池（唯一活跃池） -->
     <div id="viewTradePool" class="workspace-view" hidden>
       <section class="panel">
-        <h3>池内标的 <span id="tpPoolBadge" class="trade-pool-count">0</span></h3>
+        <h3>当前池 <span id="tpPoolBadge" class="trade-pool-count">0</span></h3>
         <p class="hint">当前生效的可买名单（盘后扫描自动覆盖）。实盘分钟扫描只盯本列表；「移出」仅退出池，不停仓、不卖出。点击一行展开分析。</p>
         <div class="toolbar" style="margin-top:8px;">
           <button type="button" id="btnTpRebuild">扫描更新</button>
@@ -481,7 +481,7 @@
       </section>
     </div>
 
-    <!-- 交易目标池 · 扫描历史 -->
+    <!-- 目标池 · 扫描历史 -->
     <div id="viewTpHistory" class="workspace-view" hidden>
       <section class="panel">
         <h3>扫描历史</h3>
@@ -556,29 +556,29 @@
     <div id="viewSysParams" class="workspace-view" hidden>
       <section class="panel">
         <h3>运行参数</h3>
-        <p class="hint" id="paramsHint">当前生效配置只读视图（yml / QuantProperties + system_config）。</p>
+        <p class="hint" id="paramsHint">当前生效配置只读视图（中文说明对照配置项键名；yml / QuantProperties + system_config）。</p>
         <div class="toolbar" style="margin-top:8px;">
           <button type="button" id="btnParamsRefresh" class="secondary">刷新</button>
         </div>
-        <div id="paramsGroups" style="margin-top:12px;"></div>
-        <h4 style="margin:20px 0 8px;">system_config</h4>
+        <div id="paramsGroups" class="result-groups params-groups" style="margin-top:12px;"></div>
+        <h4 style="margin:20px 0 8px;">动态配置 <span class="field-hint">system_config</span></h4>
         <div class="table-wrap" style="max-height:none;">
           <table class="tp-table">
             <thead>
-            <tr><th>键</th><th>值</th><th>说明</th><th>更新时间</th></tr>
+            <tr><th>中文说明</th><th>配置键</th><th>值</th><th>备注</th><th>更新时间</th></tr>
             </thead>
             <tbody id="paramsCfgBody">
-            <tr><td colspan="4" class="empty-state">加载中…</td></tr>
+            <tr><td colspan="5" class="empty-state">加载中…</td></tr>
             </tbody>
           </table>
         </div>
       </section>
     </div>
 
-    <!-- 库表浏览 -->
+    <!-- 数据表 -->
     <div id="viewDbTable" class="workspace-view" hidden>
       <section class="panel">
-        <h3 id="dbTableTitle">库表浏览</h3>
+        <h3 id="dbTableTitle">数据表</h3>
         <p class="hint" id="dbTableHint">从左侧选择一张表</p>
         <div id="dbTableMeta" class="db-table-meta" hidden>
           <button type="button" id="btnDbMetaToggle" class="db-meta-summary" aria-expanded="false" title="展开/收起表说明">
@@ -641,10 +641,10 @@
       </section>
     </div>
 
-    <!-- 定时任务管理 -->
+    <!-- 运维中心 · 任务管理 -->
     <div id="viewSchedule" class="workspace-view" hidden>
       <section class="panel">
-        <h3>定时任务管理</h3>
+        <h3>任务管理</h3>
         <p class="hint" id="scheduleHint">任务配置存 MySQL <code>sys_schedule_job</code>；种子默认全关。改启停或 cron 后立即重载调度。点击行空白处可展开任务详细介绍。</p>
         <div class="toolbar" style="margin-top:8px;">
           <button type="button" id="btnScheduleRefresh" class="secondary">刷新</button>
@@ -673,10 +673,10 @@
       </section>
     </div>
 
-    <!-- 账户概览 · 资金与权益 -->
+    <!-- 账户概览 · 资金权益 -->
     <div id="viewAcctFunds" class="workspace-view" hidden>
       <section class="panel">
-        <h3>资金与权益 <span class="trade-pool-count" id="acctModeBadge">LOCAL_SIM</span></h3>
+        <h3>资金权益 <span class="trade-pool-count" id="acctModeBadge">LOCAL_SIM</span></h3>
         <p class="hint" id="acctFundsHint">本地模拟账本（非券商柜台）。成交/持仓/现金已落库，重启可恢复。</p>
         <div class="toolbar" style="margin-top:8px;">
           <button type="button" id="btnAcctRefreshFunds" class="secondary">刷新</button>
@@ -745,10 +745,10 @@
       </section>
     </div>
 
-    <!-- 账户概览 · 近期委托 -->
+    <!-- 账户概览 · 委托记录 -->
     <div id="viewAcctOrders" class="workspace-view" hidden>
       <section class="panel">
-        <h3>近期委托 <span id="acctOrderBadge" class="trade-pool-count">0</span></h3>
+        <h3>委托记录 <span id="acctOrderBadge" class="trade-pool-count">0</span></h3>
         <p class="hint">优先读库 trade_orders（重启可恢复）；库空时回退内存网关。</p>
         <div class="toolbar" style="margin-top:8px;">
           <button type="button" id="btnAcctRefreshOrders" class="secondary">刷新</button>
@@ -946,6 +946,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260720-app-pdf"></script>
+<script src="/js/stock-chart.js?v=20260720-health-time"></script>
 </body>
 </html>

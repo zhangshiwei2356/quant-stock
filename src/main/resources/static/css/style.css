@@ -1943,6 +1943,49 @@ button.loading::before {
   font-size: 12px;
 }
 
+/* 运行参数：中文说明 + 配置键对照 */
+.params-groups {
+  margin-bottom: 4px;
+}
+.params-kv {
+  align-items: flex-start;
+}
+.params-kv-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  max-width: 68%;
+  color: var(--text) !important;
+}
+.params-kv-cn {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.35;
+}
+.params-kv-key {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+  opacity: 0.92;
+  word-break: break-all;
+}
+.params-kv-note {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tp-table td.muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .result-note {
   font-size: 12px;
   color: var(--muted);
