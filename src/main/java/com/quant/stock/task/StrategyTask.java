@@ -11,15 +11,18 @@ import com.quant.stock.pool.TradePoolService;
 import com.quant.stock.risk.LimitBoardHelper;
 import com.quant.stock.risk.LiveAccountRiskState;
 import com.quant.stock.risk.OpenFilterService;
+import com.quant.stock.risk.RiskControlLogService;
 import com.quant.stock.risk.RiskControlService;
 import com.quant.stock.strategy.IndicatorSignalUtil;
 import com.quant.stock.strategy.MaCrossStrategy;
+import com.quant.stock.trade.LiveLedgerService;
 import com.quant.stock.trade.TradeCostModel;
 import com.quant.stock.trade.TradeGatewayService;
 import com.quant.stock.trade.dto.OrderDTO;
 import com.quant.stock.util.PositionAmountUtil;
 import com.quant.stock.util.RedisLockUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -67,6 +70,9 @@ public class StrategyTask {
     @Autowired(required = false)
     private TradePoolService tradePoolService;
 
+    private final ObjectProvider<LiveLedgerService> liveLedgerProvider;
+    private final ObjectProvider<RiskControlLogService> riskLogProvider;
+
     private volatile BigDecimal simCash = new BigDecimal("100000");
     private final Map<String, LiveBook> books = new ConcurrentHashMap<String, LiveBook>();
 
@@ -80,7 +86,9 @@ public class StrategyTask {
                         TradeCostModel tradeCostModel,
                         PositionAmountUtil positionAmountUtil,
                         RedisLockUtil redisLockUtil,
-                        BatchStockBackTestService batchStockBackTestService) {
+                        BatchStockBackTestService batchStockBackTestService,
+                        ObjectProvider<LiveLedgerService> liveLedgerProvider,
+                        ObjectProvider<RiskControlLogService> riskLogProvider) {
         this.quantProperties = quantProperties;
         this.marketDataService = marketDataService;
         this.maCrossStrategy = maCrossStrategy;
@@ -92,12 +100,51 @@ public class StrategyTask {
         this.positionAmountUtil = positionAmountUtil;
         this.redisLockUtil = redisLockUtil;
         this.batchStockBackTestService = batchStockBackTestService;
+        this.liveLedgerProvider = liveLedgerProvider;
+        this.riskLogProvider = riskLogProvider;
     }
 
     @PostConstruct
     public void init() {
+        restoreLedger();
         accountRiskState.reset(simCash);
-        log.info("StrategyTask 已就绪（调度由 DynamicScheduleService / sys_schedule_job 控制）");
+        log.info("StrategyTask 已就绪（调度由 DynamicScheduleService / sys_schedule_job 控制），模拟现金={}", simCash);
+    }
+
+    private void restoreLedger() {
+        LiveLedgerService ledger = liveLedgerProvider.getIfAvailable();
+        if (ledger == null) {
+            return;
+        }
+        BigDecimal cash = ledger.loadCashOrNull();
+        if (cash != null && cash.compareTo(BigDecimal.ZERO) > 0) {
+            simCash = cash;
+        }
+        Map<String, PositionState> loaded = ledger.loadPositions();
+        for (Map.Entry<String, PositionState> e : loaded.entrySet()) {
+            PositionState src = e.getValue();
+            LiveBook book = books.computeIfAbsent(e.getKey(), k -> new LiveBook());
+            book.pos.restoreLots(src.snapshotLots(), src.getStopPrice(), src.getHighestSinceEntry());
+            tradeGatewayService.restorePositionQty(e.getKey(), book.pos.getShares());
+            if (book.pos.hasPosition()) {
+                book.pyramidStage = 1;
+            }
+        }
+        log.info("已从库恢复模拟账本: 现金={}, 持仓只数={}", simCash, loaded.size());
+    }
+
+    private void persistBook(String code, LiveBook book, OrderDTO order, LocalDate tradeDay, BigDecimal fee) {
+        LiveLedgerService ledger = liveLedgerProvider.getIfAvailable();
+        if (ledger == null) {
+            return;
+        }
+        ledger.saveCash(simCash);
+        if (order != null) {
+            tradeGatewayService.persistOrder(order, tradeDay, fee);
+        }
+        if (book != null) {
+            ledger.upsertPosition(code, book.pos);
+        }
     }
 
     public void scanAndTrade() {
@@ -149,7 +196,15 @@ public class StrategyTask {
                 }
 
                 BigDecimal equity = markEquity(close);
+                boolean wasHalted = accountRiskState.isHalted();
                 accountRiskState.onEquity(tradeDay, equity);
+                if (!wasHalted && accountRiskState.isHalted()) {
+                    RiskControlLogService riskLog = riskLogProvider.getIfAvailable();
+                    if (riskLog != null) {
+                        riskLog.record(tradeDay, code, "DRAWDOWN_HALT",
+                                accountRiskState.drawdown(equity), "熔断禁开并挂清仓");
+                    }
+                }
                 BigDecimal posScale = accountRiskState.positionScale(equity);
                 if (book.pos.hasPosition() && accountRiskState.isHalted() && !book.pendingSell) {
                     book.pendingSell = true;
@@ -299,6 +354,7 @@ public class StrategyTask {
             } else {
                 book.pyramidStage = Math.max(book.pyramidStage, 1);
             }
+            persistBook(code, book, order, tradeDay, fee);
             log.info("策略买入: {} {}@{} x{} fee={}", code, order.getOrderId(), deal, vol, fee);
         }
     }
@@ -334,6 +390,7 @@ public class StrategyTask {
         book.limitDownFailDays = 0;
         book.lastLimitDownFailDay = null;
         accountRiskState.onClosedRound(pnl.compareTo(BigDecimal.ZERO) > 0, tradeDay);
+        persistBook(code, book, order, tradeDay, fee);
         log.info("策略卖出: {} {}@{} x{} fee={} pnl={}", code, order.getOrderId(), deal, vol, fee, pnl);
     }
 
@@ -348,7 +405,26 @@ public class StrategyTask {
      */
     public void settleAfterClose() {
         BigDecimal closeEquity = markEquity(null);
+        BigDecimal posMv = calcPositionMv();
+        BigDecimal prev = accountRiskState.getPrevCloseEquity();
+        BigDecimal dailyPnl = prev == null ? BigDecimal.ZERO : closeEquity.subtract(prev);
+        BigDecimal dailyPnlRate = prev != null && prev.compareTo(BigDecimal.ZERO) > 0
+                ? dailyPnl.divide(prev, 6, RoundingMode.HALF_UP) : BigDecimal.ZERO;
         accountRiskState.onDayClose(closeEquity);
+        LiveLedgerService ledger = liveLedgerProvider.getIfAvailable();
+        if (ledger != null) {
+            ledger.saveCash(simCash);
+            ledger.upsertDailyCashflow(
+                    LocalDate.now(),
+                    simCash,
+                    posMv,
+                    closeEquity,
+                    accountRiskState.getPeakEquity(),
+                    dailyPnl,
+                    dailyPnlRate,
+                    accountRiskState.drawdown(closeEquity),
+                    accountRiskState.getConsecutiveLosses());
+        }
         log.info("收盘清算开始, 模拟现金={}, 权益={}, 持仓={}",
                 simCash, closeEquity, tradeGatewayService.queryPositions());
         if (barStorageService == null) {
@@ -467,7 +543,23 @@ public class StrategyTask {
                     ? book.pos.getLastBuyDate().toString() : null);
             row.put("pyramidStage", book == null ? 0 : book.pyramidStage);
             row.put("pendingBuy", book != null && book.pendingBuyVol != null && book.pendingBuyVol > 0);
+            row.put("pendingBuyVol", book != null ? book.pendingBuyVol : null);
             row.put("pendingSell", book != null && book.pendingSell);
+            LocalDate today = LocalDate.now();
+            int sellable = book != null && book.pos != null ? book.pos.sellableShares(today) : 0;
+            row.put("sellableShares", sellable);
+            List<Map<String, Object>> lots = new ArrayList<Map<String, Object>>();
+            if (book != null && book.pos != null) {
+                for (PositionState.LotView lv : book.pos.snapshotLots()) {
+                    Map<String, Object> lot = new LinkedHashMap<String, Object>();
+                    lot.put("openDate", lv.openDate == null ? null : lv.openDate.toString());
+                    lot.put("shares", lv.shares);
+                    lot.put("cost", lv.cost);
+                    lot.put("sellable", lv.openDate != null && lv.openDate.isBefore(today));
+                    lots.add(lot);
+                }
+            }
+            row.put("lots", lots);
             list.add(row);
         }
         return list;

@@ -177,6 +177,71 @@ public class PositionState {
     }
 
     /**
+     * 从持久化快照恢复（单档近似：T+1 以 entryDate 为准）。
+     */
+    public void restoreSnapshot(int volume, BigDecimal costAvg, LocalDate entryDate,
+                                BigDecimal stop, BigDecimal highest) {
+        clear();
+        if (volume <= 0 || costAvg == null || costAvg.compareTo(BigDecimal.ZERO) <= 0 || entryDate == null) {
+            return;
+        }
+        this.shares = volume;
+        this.avgCost = costAvg.setScale(4, RoundingMode.HALF_UP);
+        this.totalBuyCost = costAvg.multiply(BigDecimal.valueOf(volume));
+        this.lastBuyDate = entryDate;
+        this.stopPrice = stop == null ? BigDecimal.ZERO : stop;
+        this.highestSinceEntry = highest == null || highest.compareTo(BigDecimal.ZERO) <= 0 ? costAvg : highest;
+        lots.add(new Lot(entryDate, volume, totalBuyCost));
+    }
+
+    /** 导出批次（落库用） */
+    public List<LotView> snapshotLots() {
+        List<LotView> out = new ArrayList<LotView>();
+        for (Lot lot : lots) {
+            out.add(new LotView(lot.openDate, lot.shares, lot.cost));
+        }
+        return out;
+    }
+
+    /** 从批次恢复（优先于单档快照） */
+    public void restoreLots(List<LotView> views, BigDecimal stop, BigDecimal highest) {
+        clear();
+        if (views == null || views.isEmpty()) {
+            return;
+        }
+        for (LotView v : views) {
+            if (v == null || v.shares <= 0 || v.openDate == null || v.cost == null) {
+                continue;
+            }
+            lots.add(new Lot(v.openDate, v.shares, v.cost));
+            shares += v.shares;
+            totalBuyCost = totalBuyCost.add(v.cost);
+            if (lastBuyDate == null || v.openDate.isAfter(lastBuyDate)) {
+                lastBuyDate = v.openDate;
+            }
+        }
+        if (shares > 0) {
+            avgCost = totalBuyCost.divide(BigDecimal.valueOf(shares), 4, RoundingMode.HALF_UP);
+        }
+        this.stopPrice = stop == null ? BigDecimal.ZERO : stop;
+        this.highestSinceEntry = highest == null || highest.compareTo(BigDecimal.ZERO) <= 0
+                ? avgCost : highest;
+    }
+
+    /** 持仓批次只读视图 */
+    public static final class LotView {
+        public final LocalDate openDate;
+        public final int shares;
+        public final BigDecimal cost;
+
+        public LotView(LocalDate openDate, int shares, BigDecimal cost) {
+            this.openDate = openDate;
+            this.shares = shares;
+            this.cost = cost;
+        }
+    }
+
+    /**
      * 止损线 = max(成本−2×ATR, 成本−权益×hardPct/股数)，且只上移不下移。
      */
     public void raiseStopByCost(BigDecimal atr, BigDecimal equity, BigDecimal atrMult, BigDecimal hardPct) {

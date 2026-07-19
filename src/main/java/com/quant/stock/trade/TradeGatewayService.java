@@ -4,11 +4,12 @@ import cn.hutool.core.util.IdUtil;
 import com.quant.stock.config.QuantProperties;
 import com.quant.stock.trade.dto.OrderDTO;
 import com.quant.stock.util.RedisLockUtil;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -22,15 +23,23 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class TradeGatewayService {
 
     private final RedisLockUtil redisLockUtil;
     private final QuantProperties props;
+    private final ObjectProvider<LiveLedgerService> liveLedgerProvider;
 
     private final Map<String, Integer> positions = new ConcurrentHashMap<String, Integer>();
     private final Map<String, OrderDTO> orders = new ConcurrentHashMap<String, OrderDTO>();
     private final Map<String, String> idempotentIndex = new ConcurrentHashMap<String, String>();
+
+    public TradeGatewayService(RedisLockUtil redisLockUtil,
+                               QuantProperties props,
+                               ObjectProvider<LiveLedgerService> liveLedgerProvider) {
+        this.redisLockUtil = redisLockUtil;
+        this.props = props;
+        this.liveLedgerProvider = liveLedgerProvider;
+    }
 
     public OrderDTO placeOrder(String stockCode, OrderDTO.Side side, BigDecimal price, int volume) {
         return placeOrder(stockCode, side, price, volume, null);
@@ -69,9 +78,31 @@ public class TradeGatewayService {
                 applyPosition(side, stockCode, volume);
                 orders.put(orderId, order);
                 idempotentIndex.put(cid, orderId);
+                persistOrder(order, null, null);
                 return order;
             }
         });
+    }
+
+    /** 启动恢复：用持久化持仓覆盖网关数量账本（不产生委托）。 */
+    public void restorePositionQty(String stockCode, int volume) {
+        if (stockCode == null || stockCode.trim().isEmpty()) {
+            return;
+        }
+        if (volume <= 0) {
+            positions.remove(stockCode);
+        } else {
+            positions.put(stockCode, volume);
+        }
+    }
+
+    /** 策略成交后可补写费用与信号日 */
+    public void persistOrder(OrderDTO order, LocalDate signalDate, BigDecimal fee) {
+        LiveLedgerService ledger = liveLedgerProvider.getIfAvailable();
+        if (ledger == null || order == null) {
+            return;
+        }
+        ledger.upsertOrder(order, signalDate, fee);
     }
 
     protected String placeOrderSdk(OrderDTO order) {

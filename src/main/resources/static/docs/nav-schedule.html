@@ -1,26 +1,25 @@
 <!-- 一级菜单介绍：定时任务 -->
-<p class="nav-intro-lead">在页面上<strong>启停</strong>预置任务、修改 <strong>cron / 固定间隔</strong>；配置写入 MySQL，改完立即重载，无需改 yml 重启。</p>
+<p class="nav-intro-lead">管理预置定时任务，并查看<strong>数据健康</strong>与<strong>运行参数</strong>。任务配置写入 MySQL，改完立即重载。</p>
 <div class="nav-intro-grid">
   <section class="nav-intro-card">
-    <h4><span class="nav-intro-card-tag">说明</span>怎么管</h4>
+    <h4><span class="nav-intro-card-tag">二级</span>菜单说明</h4>
     <ul class="nav-intro-list">
-      <li>表 <code>sys_schedule_job</code>：种子任务默认<strong>全关</strong></li>
-      <li>已实现：盘后入池扫描（覆盖唯一目标池）、分钟扫描（只打目标池）</li>
-      <li>未实现（待外部 API）：收盘清算、订单同步、行情采集、持仓盈亏同步、数据校验</li>
-      <li>链路：全市场扫描 → 自动覆盖唯一目标池 → 分钟扫描；<code>pool-rebuild</code> 与 <code>after-market-batch-scan</code> 启用其一即可</li>
-      <li>总闸 <code>quant.schedule.enabled</code>：false 时不注册触发器，库表仍可编辑</li>
+      <li><strong>任务管理</strong>：启停任务、改 cron / 间隔（表 <code>sys_schedule_job</code>）</li>
+      <li><strong>数据健康</strong>：全市场日线/分钟覆盖与滞后检查</li>
+      <li><strong>运行参数</strong>：当前生效 yml 参数 + <code>system_config</code> 只读</li>
     </ul>
   </section>
   <section class="nav-intro-card nav-intro-card--steps">
     <h4><span class="nav-intro-card-tag">步骤</span>建议流程</h4>
     <ol class="nav-intro-steps">
       <li>确认 MySQL 已建库且 <code>quant.db-enabled=true</code></li>
-      <li>进入管理页，只打开需要的任务并核对 cron</li>
-      <li>多实例部署时依赖 Redis/本地锁，避免重复执行</li>
+      <li>在「任务管理」只打开需要的任务并核对 cron</li>
+      <li>用「数据健康」核对行情是否滞后后再开扫描</li>
     </ol>
   </section>
 </div>
 <div class="nav-intro-cta">
-  <button type="button" class="nav-intro-btn" data-enter-mode="schedule">进入定时任务管理</button>
+  <button type="button" class="nav-intro-btn" data-enter-mode="schedule" data-schedule-panel="jobs">进入任务管理</button>
+  <button type="button" class="nav-intro-btn secondary" data-enter-mode="schedule" data-schedule-panel="health">数据健康</button>
 </div>
 <p class="nav-intro-hint">再点一次「定时任务」可收起并回初始化页。</p>

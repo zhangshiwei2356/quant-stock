@@ -36,4 +36,24 @@
         ORDER BY created_at DESC
         LIMIT 1
     </select>
+
+    <select id="selectBatchSummaries" resultType="map">
+        SELECT batch_id AS batchId,
+               COUNT(1) AS reportCount,
+               MIN(created_at) AS createdAt,
+               MAX(score) AS maxScore,
+               AVG(score) AS avgScore
+        FROM trade_pool_report
+        WHERE batch_id IS NOT NULL AND batch_id &lt;&gt; ''
+        GROUP BY batch_id
+        ORDER BY MIN(created_at) DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectByBatchId" resultMap="ReportMap">
+        SELECT id, symbol, name, score, reason, summary, analysis_json, batch_id, created_at
+        FROM trade_pool_report
+        WHERE batch_id = #{batchId}
+        ORDER BY score DESC, id ASC
+    </select>
 </mapper>

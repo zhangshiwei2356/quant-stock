@@ -154,7 +154,7 @@
     </ul>
   </li>
   <li><code>trade-mode=sim</code>：下单即时成交；<code>sdk</code>：SUBMITTED 后由同步推进（桩）</li>
-  <li>实盘持仓/现金默认在进程内存，不落 <code>trade_positions</code>（表已建，供后续扩展）</li>
+  <li>本地模拟持仓/现金在成交后落库：<code>trade_positions</code> / <code>trade_position_lots</code>、<code>system_config(sim.cash)</code>；收盘写 <code>trade_cashflows</code>；启动可恢复</li>
   <li>收盘后任务：约 15:30 相关清算；16:00 可触发批量扫描日志等</li>
 </ul>
 

@@ -1,24 +1,26 @@
 <!-- 一级菜单介绍：账户概览 -->
-<p class="nav-intro-lead">查看<strong>本地模拟账本</strong>的资金权益、当前持仓与近期委托——对应实盘扫描 <code>scan-and-trade</code> 的运行结果。</p>
+<p class="nav-intro-lead">查看<strong>本地模拟账本</strong>的资金、持仓（含 T+1 批次）、委托（库表）、日结与风控事件。</p>
 <div class="nav-intro-grid">
   <section class="nav-intro-card">
     <h4><span class="nav-intro-card-tag">范围</span>能看什么</h4>
     <ul class="nav-intro-list">
-      <li><strong>资金与权益</strong>：现金、市值、总权益、回撤、当日盈亏、熔断状态</li>
-      <li><strong>当前持仓</strong>：数量、成本、现价、浮盈、止损线</li>
-      <li><strong>近期委托</strong>：进程内网关订单（买卖、状态）</li>
+      <li><strong>资金与权益</strong>：现金、市值、回撤、熔断状态</li>
+      <li><strong>当前持仓</strong>：点行展开批次；可卖股数 / 挂单 / 金字塔</li>
+      <li><strong>近期委托</strong>：优先读 <code>trade_orders</code>（重启可恢复）</li>
+      <li><strong>权益日结 / 风控事件</strong>：日结曲线与熔断日志</li>
     </ul>
   </section>
   <section class="nav-intro-card nav-intro-card--steps">
     <h4><span class="nav-intro-card-tag">注意</span>数据来源</h4>
     <ol class="nav-intro-steps">
-      <li>当前为<strong>本地模拟</strong>，非券商柜台实时持仓</li>
-      <li>需开启分钟扫描并有目标池标的成交后，持仓/委托才会变化</li>
-      <li>进程重启后内存账本会重置（初始现金默认 10 万）</li>
+      <li>本地模拟，非券商柜台</li>
+      <li>成交/持仓/现金已落库；日结需跑过 <code>settle-after-close</code></li>
+      <li>原始表亦可在「库表浏览」中查看</li>
     </ol>
   </section>
 </div>
 <div class="nav-intro-cta">
   <button type="button" class="nav-intro-btn" data-enter-mode="account" data-account-panel="funds">进入资金与权益</button>
+  <button type="button" class="nav-intro-btn secondary" data-enter-mode="account" data-account-panel="positions">查看持仓批次</button>
 </div>
 <p class="nav-intro-hint">再点一次「账户概览」可收起并回初始化页。</p>

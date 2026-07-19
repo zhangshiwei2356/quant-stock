@@ -22,6 +22,9 @@
   var signalChart = echarts.init(document.getElementById('signalChart'));
   var singleEquityChart = echarts.init(document.getElementById('singleEquityChart'));
   var equityChart = echarts.init(document.getElementById('equityChart'));
+  var acctEquityChart = document.getElementById('acctEquityChart')
+    ? echarts.init(document.getElementById('acctEquityChart')) : null;
+  var lastAcctEquity = null;
 
   function storedApiKey() {
     try { return localStorage.getItem('quantApiKey') || ''; } catch (e) { return ''; }
@@ -222,6 +225,9 @@
     if (lastEquity) {
       renderEquityChart(lastEquity, equityChart);
     }
+    if (lastAcctEquity && acctEquityChart) {
+      renderEquityChart(lastAcctEquity, acctEquityChart);
+    }
   }
 
   function withLoading($btn, promiseLike) {
@@ -279,6 +285,7 @@
         signalChart.resize();
         singleEquityChart.resize();
         equityChart.resize();
+        if (acctEquityChart) acctEquityChart.resize();
       } catch (e) {}
     }, 60);
   }
@@ -1227,19 +1234,30 @@
     return n > 0 ? '+' + t : t;
   }
 
+  function isAllSingleHistory() {
+    return $('#chkAllSingleHistory').is(':checked');
+  }
+
+  function singleHistoryColSpan() {
+    return isAllSingleHistory() ? 15 : 14;
+  }
+
   function loadSingleHistory(code) {
     var $tb = $('#singleHistoryBody');
     collapseHistoryAnalysis($tb);
-    if (!code) {
+    var all = isAllSingleHistory();
+    $('#singleHistoryHead .hist-code-col').prop('hidden', !all);
+    if (!all && !code) {
       $tb.html('<tr><td colspan="14" class="empty-state">请先选择股票</td></tr>');
       return;
     }
-    $.getJSON('/api/backtest/history', { code: code })
+    var params = all ? {} : { code: code };
+    $.getJSON('/api/backtest/history', params)
       .done(function (rows) {
-        renderSingleHistory(rows || []);
+        renderSingleHistory(rows || [], all);
       })
       .fail(function () {
-        $tb.html('<tr><td colspan="14" class="empty-state">加载历史失败</td></tr>');
+        $tb.html('<tr><td colspan="' + singleHistoryColSpan() + '" class="empty-state">加载历史失败</td></tr>');
       });
   }
 
@@ -1359,17 +1377,23 @@
     });
   }
 
-  function renderSingleHistory(rows) {
+  function renderSingleHistory(rows, showCode) {
+    showCode = !!showCode;
+    var colSpan = showCode ? 15 : 14;
     var $tb = $('#singleHistoryBody');
-    bindHistoryTableToggle($tb, '/api/backtest/analysis', HISTORY_COLSPAN);
+    bindHistoryTableToggle($tb, '/api/backtest/analysis', colSpan);
     $tb.empty();
     if (!rows.length) {
-      $tb.append($('<tr/>').append($('<td colspan="14" class="empty-state"/>').text('暂无该股回测记录')));
+      $tb.append($('<tr/>').append($('<td colspan="' + colSpan + '" class="empty-state"/>')
+        .text(showCode ? '暂无回测记录' : '暂无该股回测记录')));
       return;
     }
     rows.forEach(function (r) {
       var s = resolveTradeStats(r);
       var $tr = $('<tr class="history-row"/>').css('cursor', 'pointer').attr('data-id', r.id || '');
+      if (showCode) {
+        $tr.append($('<td/>').html('<b>' + escHtml(r.stockCode || '—') + '</b>'));
+      }
       $tr.append($('<td/>').text(r.savedAt || '-'))
         .append($('<td/>').text(r.period || '-'))
         .append($('<td/>').text(formatRange(r.backStart, r.backEnd)))
@@ -1618,9 +1642,9 @@
   }
 
   var knowledgeTopics = [
-    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260719-menu' },
-    { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260719-menu' },
-    { id: 'memo', group: 'app', title: '数据待办', src: '/docs/memo.html?v=20260719-menu' },
+    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260720-ops-views' },
+    { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260720-todo' },
+    { id: 'memo', group: 'app', title: '应用待办', src: '/docs/memo.html?v=20260720-ops-views' },
     { id: 'ashare', group: 'stock', title: 'A股基础', src: '/docs/ashare.html?v=20260719-menu' },
     { id: 'session', group: 'stock', title: '交易时间', src: '/docs/session.html?v=20260719-menu' },
     { id: 'kline', group: 'stock', title: 'K线', src: '/docs/kline.html?v=20260719-menu' },
@@ -1940,7 +1964,7 @@
   }
 
   function hideAllWorkspaceViews() {
-    $('#viewHome, #viewNavIntro, #viewPool, #viewSingle, #viewPortfolio, #viewTradePool, #viewDbTable, #viewSchedule, #viewAcctFunds, #viewAcctPositions, #viewAcctOrders').prop('hidden', true);
+    $('#viewHome, #viewNavIntro, #viewPool, #viewSingle, #viewPortfolio, #viewTradePool, #viewTpHistory, #viewDbTable, #viewSchedule, #viewDataHealth, #viewSysParams, #viewAcctFunds, #viewAcctPositions, #viewAcctOrders, #viewAcctCashflows, #viewAcctRiskLogs').prop('hidden', true);
     $('body').removeClass('home-theme-peek');
     $('#btnExpandHome').prop('hidden', true);
   }
@@ -1954,27 +1978,72 @@
     }
   }
 
-  function setTradePoolMenuActive() {
+  var lastTpPanel = 'pool';
+  var lastSchedulePanel = 'jobs';
+
+  function setTradePoolMenuActive(panel) {
     $('#tradepoolMenu li').removeClass('active');
-    $('#tradepoolMenu li[data-tp-panel="pool"]').addClass('active');
+    if (panel) {
+      $('#tradepoolMenu li[data-tp-panel="' + panel + '"]').addClass('active');
+    }
   }
 
-  function showTradePool() {
+  function setScheduleMenuActive(panel) {
+    $('#scheduleMenu li').removeClass('active');
+    if (panel) {
+      $('#scheduleMenu li[data-schedule-panel="' + panel + '"]').addClass('active');
+    }
+  }
+
+  function showTradePool(panel) {
+    panel = panel || lastTpPanel || 'pool';
+    if (panel !== 'pool' && panel !== 'history') panel = 'pool';
+    lastTpPanel = panel;
     lastWorkspaceMode = 'tradepool';
     $('body').removeClass('mode-doc');
     $('#knowledgePanel').prop('hidden', true);
     $('.side-nav-menu li').removeClass('active');
     hideAllWorkspaceViews();
     setSideNavOpen('tradepoolBody');
-    setTradePoolMenuActive();
-    $('#viewTradePool').prop('hidden', false);
-    loadTradePoolManage();
+    setTradePoolMenuActive(panel);
+    if (panel === 'history') {
+      $('#viewTpHistory').prop('hidden', false);
+      loadTpScanHistory();
+    } else {
+      $('#viewTradePool').prop('hidden', false);
+      loadTradePoolManage();
+    }
+    resizeCharts();
+  }
+
+  function showSchedulePanel(panel) {
+    panel = panel || lastSchedulePanel || 'jobs';
+    if (panel !== 'jobs' && panel !== 'health' && panel !== 'params') panel = 'jobs';
+    lastSchedulePanel = panel;
+    lastWorkspaceMode = 'schedule';
+    $('body').removeClass('mode-doc');
+    $('#knowledgePanel').prop('hidden', true);
+    $('.side-nav-menu li').removeClass('active');
+    hideAllWorkspaceViews();
+    setSideNavOpen('scheduleBody');
+    setScheduleMenuActive(panel);
+    if (panel === 'health') {
+      $('#viewDataHealth').prop('hidden', false);
+      loadDataHealth();
+    } else if (panel === 'params') {
+      $('#viewSysParams').prop('hidden', false);
+      loadSysParams();
+    } else {
+      $('#viewSchedule').prop('hidden', false);
+      loadScheduleJobs();
+    }
     resizeCharts();
   }
 
   function showAccountPanel(panel) {
     panel = panel || lastAccountPanel || 'funds';
-    if (panel !== 'funds' && panel !== 'positions' && panel !== 'orders') {
+    if (panel !== 'funds' && panel !== 'positions' && panel !== 'orders'
+        && panel !== 'cashflows' && panel !== 'risklogs') {
       panel = 'funds';
     }
     lastAccountPanel = panel;
@@ -1987,13 +2056,123 @@
     setAccountMenuActive(panel);
     if (panel === 'positions') {
       $('#viewAcctPositions').prop('hidden', false);
+      loadAccountOverview();
     } else if (panel === 'orders') {
       $('#viewAcctOrders').prop('hidden', false);
+      loadAccountOverview();
+    } else if (panel === 'cashflows') {
+      $('#viewAcctCashflows').prop('hidden', false);
+      loadAccountCashflows();
+      loadAccountOverview();
+    } else if (panel === 'risklogs') {
+      $('#viewAcctRiskLogs').prop('hidden', false);
+      loadAccountRiskLogs();
+      loadAccountOverview();
     } else {
       $('#viewAcctFunds').prop('hidden', false);
+      loadAccountOverview();
     }
-    loadAccountOverview();
     resizeCharts();
+  }
+
+  function riskRuleLabel(t) {
+    var map = {
+      DRAWDOWN_HALT: '峰值回撤熔断',
+      DAILY_LOSS: '单日亏损禁开',
+      CONSECUTIVE_LOSS: '连亏禁开'
+    };
+    return map[t] || t || '—';
+  }
+
+  function renderAccountCashflows(data) {
+    data = data || {};
+    var rows = data.items || [];
+    $('#acctCfBadge').text(String(data.count != null ? data.count : rows.length));
+    $('#sideCfCount').text(String(data.count != null ? data.count : rows.length));
+    if (data.hint) $('#acctCfHint').text(data.hint);
+    $('#acctCfMeta').text(rows.length ? ('共 ' + rows.length + ' 个交易日') : '');
+    lastAcctEquity = {
+      equityTimes: data.equityTimes || [],
+      equityCurve: data.equityCurve || []
+    };
+    if (acctEquityChart) {
+      if (lastAcctEquity.equityTimes.length) {
+        renderEquityChart(lastAcctEquity, acctEquityChart);
+      } else {
+        try { acctEquityChart.clear(); } catch (e) {}
+      }
+    }
+    var $tb = $('#acctCfBody').empty();
+    if (!rows.length) {
+      $tb.append($('<tr/>').append($('<td colspan="9" class="empty-state"/>').text('暂无日结（请先跑收盘清算）')));
+      return;
+    }
+    rows.forEach(function (it) {
+      $tb.append(
+        '<tr>'
+        + '<td class="mono">' + escHtml(it.tradeDate || '—') + '</td>'
+        + '<td class="mono">' + escHtml(num(it.cash)) + '</td>'
+        + '<td class="mono">' + escHtml(num(it.marketValue)) + '</td>'
+        + '<td class="mono"><b>' + escHtml(num(it.totalEquity)) + '</b></td>'
+        + '<td class="mono">' + escHtml(num(it.peakEquity)) + '</td>'
+        + '<td class="mono ' + pnlClass(it.dailyPnl) + '">' + escHtml(num(it.dailyPnl)) + '</td>'
+        + '<td class="mono ' + pnlClass(it.dailyPnlRate) + '">' + escHtml(pctFine(it.dailyPnlRate)) + '</td>'
+        + '<td class="mono">' + escHtml(pct(it.drawdownRate)) + '</td>'
+        + '<td class="mono">' + escHtml(String(it.consecutiveLossCount == null ? 0 : it.consecutiveLossCount)) + '</td>'
+        + '</tr>'
+      );
+    });
+  }
+
+  function renderAccountRiskLogs(data) {
+    data = data || {};
+    var rows = data.items || [];
+    $('#acctRiskBadge').text(String(data.count != null ? data.count : rows.length));
+    $('#sideRiskCount').text(String(data.count != null ? data.count : rows.length));
+    if (data.hint) $('#acctRiskHint').text(data.hint);
+    $('#acctRiskMeta').text(rows.length ? ('共 ' + rows.length + ' 条') : '');
+    var $tb = $('#acctRiskBody').empty();
+    if (!rows.length) {
+      $tb.append($('<tr/>').append($('<td colspan="6" class="empty-state"/>').text('暂无风控事件')));
+      return;
+    }
+    rows.forEach(function (it) {
+      $tb.append(
+        '<tr>'
+        + '<td class="mono">' + escHtml(it.createdAt || '—') + '</td>'
+        + '<td class="mono">' + escHtml(it.logDate || '—') + '</td>'
+        + '<td><b>' + escHtml(it.symbol || '—') + '</b></td>'
+        + '<td>' + escHtml(riskRuleLabel(it.ruleType)) + '</td>'
+        + '<td class="mono">' + escHtml(it.triggerValue == null ? '—' : pct(it.triggerValue)) + '</td>'
+        + '<td>' + escHtml(it.actionTaken || '—') + '</td>'
+        + '</tr>'
+      );
+    });
+  }
+
+  function loadAccountCashflows() {
+    $.getJSON('/api/account/cashflows', { limit: 120 })
+      .done(function (data) {
+        renderAccountCashflows(data);
+        setTimeout(function () {
+          try { if (acctEquityChart) acctEquityChart.resize(); } catch (e) {}
+        }, 60);
+      })
+      .fail(function (xhr) {
+        var msg = (xhr && xhr.responseJSON && xhr.responseJSON.message) || '权益日结加载失败';
+        $('#acctCfHint').text(msg);
+        toast(msg, 'err');
+      });
+  }
+
+  function loadAccountRiskLogs() {
+    $.getJSON('/api/account/risk-logs', { limit: 100 })
+      .done(renderAccountRiskLogs)
+      .fail(function (xhr) {
+        var msg = (xhr && xhr.responseJSON && xhr.responseJSON.message) || '风控事件加载失败';
+        $('#acctRiskHint').text(msg);
+        toast(msg, 'err');
+      });
   }
 
   function pnlClass(v) {
@@ -2038,33 +2217,72 @@
     $('#acctLossStreak').text(data.consecutiveLosses == null ? '—' : String(data.consecutiveLosses));
   }
 
+  function pendingLabel(it) {
+    var parts = [];
+    if (it.pendingBuy) parts.push('待买' + (it.pendingBuyVol ? it.pendingBuyVol : ''));
+    if (it.pendingSell) parts.push('待卖');
+    return parts.length ? parts.join('/') : '—';
+  }
+
   function renderAccountPositions(items) {
     items = items || [];
     $('#acctPosBadge').text(String(items.length));
     $('#sidePosCount').text(String(items.length));
     var $body = $('#acctPosBody').empty();
     if (!items.length) {
-      $body.html('<tr><td colspan="10" class="empty-state">暂无持仓</td></tr>');
+      $body.html('<tr><td colspan="11" class="empty-state">暂无持仓</td></tr>');
       $('#acctPosHint').text('无持仓');
       return;
     }
     items.forEach(function (it) {
+      var code = it.code || '';
+      var $tr = $('<tr class="acct-pos-row"/>')
+        .attr('data-code', code)
+        .css('cursor', 'pointer')
+        .html(
+          '<td><b>' + escHtml(code) + '</b></td>'
+          + '<td>' + escHtml(it.name || '') + '</td>'
+          + '<td class="mono">' + escHtml(String(it.volume == null ? '—' : it.volume)) + '</td>'
+          + '<td class="mono">' + escHtml(String(it.sellableShares == null ? '—' : it.sellableShares)) + '</td>'
+          + '<td class="mono">' + escHtml(num(it.avgCost)) + '</td>'
+          + '<td class="mono">' + escHtml(num(it.lastPrice)) + '</td>'
+          + '<td class="mono">' + escHtml(num(it.marketValue)) + '</td>'
+          + '<td class="mono ' + pnlClass(it.unrealizedPnlPct) + '">' + escHtml(pctFine(it.unrealizedPnlPct)) + '</td>'
+          + '<td class="mono">' + escHtml(num(it.stopPrice)) + '</td>'
+          + '<td>' + escHtml(pendingLabel(it)) + '</td>'
+          + '<td class="mono">' + escHtml(String(it.pyramidStage == null ? 0 : it.pyramidStage)) + '</td>'
+        );
+      $body.append($tr);
+      var lots = it.lots || [];
+      var lotHtml = '<div class="hint" style="margin:0 0 6px;">持仓批次（点行切换）· 最高价 '
+        + escHtml(num(it.highestSinceEntry)) + ' · 买入日 ' + escHtml(it.lastBuyDate || '—') + '</div>';
+      if (!lots.length) {
+        lotHtml += '<p class="hint" style="margin:0;">无批次明细</p>';
+      } else {
+        lotHtml += '<table class="tp-table"><thead><tr><th>开仓日</th><th>股数</th><th>成本</th><th>可卖</th></tr></thead><tbody>';
+        lots.forEach(function (lot) {
+          lotHtml += '<tr><td class="mono">' + escHtml(lot.openDate || '—') + '</td>'
+            + '<td class="mono">' + escHtml(String(lot.shares)) + '</td>'
+            + '<td class="mono">' + escHtml(num(lot.cost)) + '</td>'
+            + '<td>' + (lot.sellable ? '是' : '否(T+1)') + '</td></tr>';
+        });
+        lotHtml += '</tbody></table>';
+      }
       $body.append(
-        '<tr>'
-        + '<td><b>' + escHtml(it.code) + '</b></td>'
-        + '<td>' + escHtml(it.name || '') + '</td>'
-        + '<td class="mono">' + escHtml(String(it.volume == null ? '—' : it.volume)) + '</td>'
-        + '<td class="mono">' + escHtml(num(it.avgCost)) + '</td>'
-        + '<td class="mono">' + escHtml(num(it.lastPrice)) + '</td>'
-        + '<td class="mono">' + escHtml(num(it.marketValue)) + '</td>'
-        + '<td class="mono ' + pnlClass(it.unrealizedPnl) + '">' + escHtml(num(it.unrealizedPnl)) + '</td>'
-        + '<td class="mono ' + pnlClass(it.unrealizedPnlPct) + '">' + escHtml(pctFine(it.unrealizedPnlPct)) + '</td>'
-        + '<td class="mono">' + escHtml(num(it.stopPrice)) + '</td>'
-        + '<td class="mono">' + escHtml(it.lastBuyDate || '—') + '</td>'
-        + '</tr>'
+        $('<tr class="acct-pos-lots" hidden/>').attr('data-code', code)
+          .append($('<td colspan="11"/>').html(lotHtml))
       );
     });
-    $('#acctPosHint').text('共 ' + items.length + ' 只');
+    $('#acctPosHint').text('共 ' + items.length + ' 只 · 点击行展开批次');
+  }
+
+  function orderTypeLabel(t) {
+    var map = {
+      1: '首开/买入', 2: '加仓30', 3: '加仓20',
+      4: '死叉/卖出', 5: '止损', 6: '止盈', 7: '熔断'
+    };
+    if (t == null || t === '') return '—';
+    return map[t] || map[String(t)] || ('类型' + t);
   }
 
   function renderAccountOrders(items) {
@@ -2073,27 +2291,36 @@
     $('#sideOrderCount').text(String(items.length));
     var $body = $('#acctOrderBody').empty();
     if (!items.length) {
-      $body.html('<tr><td colspan="8" class="empty-state">暂无委托</td></tr>');
+      $body.html('<tr><td colspan="13" class="empty-state">暂无委托</td></tr>');
       $('#acctOrderHint').text('无委托');
       return;
     }
-    // 新单在前
-    var rows = items.slice().reverse();
+    var rows = items.slice();
+    if (rows.length && rows[0].source !== 'DB') {
+      rows = rows.slice().reverse();
+    }
     rows.forEach(function (it) {
+      var filled = it.filledVolume != null ? it.filledVolume : (it.status === 'FILLED' ? it.volume : '—');
       $body.append(
         '<tr>'
         + '<td class="mono">' + escHtml(it.orderId || it.clientOrderId || '—') + '</td>'
         + '<td><b>' + escHtml(it.code) + '</b></td>'
-        + '<td>' + escHtml(it.name || '') + '</td>'
         + '<td>' + escHtml(sideLabel(it.side)) + '</td>'
+        + '<td>' + escHtml(orderTypeLabel(it.orderType)) + '</td>'
         + '<td class="mono">' + escHtml(num(it.price)) + '</td>'
         + '<td class="mono">' + escHtml(String(it.volume == null ? '—' : it.volume)) + '</td>'
+        + '<td class="mono">' + escHtml(String(filled)) + '</td>'
         + '<td class="mono">' + escHtml(num(it.amount)) + '</td>'
+        + '<td class="mono">' + escHtml(it.fee == null ? '—' : num(it.fee)) + '</td>'
         + '<td>' + escHtml(orderStatusLabel(it.status)) + '</td>'
+        + '<td class="mono">' + escHtml(it.signalDate || '—') + '</td>'
+        + '<td class="mono">' + escHtml(it.executionDate || '—') + '</td>'
+        + '<td>' + escHtml(it.source || '—') + '</td>'
         + '</tr>'
       );
     });
-    $('#acctOrderHint').text('共 ' + rows.length + ' 笔');
+    var src = rows[0] && rows[0].source === 'DB' ? '库表' : '内存';
+    $('#acctOrderHint').text('共 ' + rows.length + ' 笔 · 来源 ' + src);
   }
 
   function loadAccountOverview() {
@@ -2204,7 +2431,7 @@
       syncPortfolioCodes();
       loadPortfolioHistory();
     } else if (lastWorkspaceMode === 'tradepool') {
-      showTradePool();
+      showTradePool(options.panel || lastTpPanel || 'pool');
       return;
     } else if (lastWorkspaceMode === 'account') {
       showAccountPanel(options.panel || lastAccountPanel || 'funds');
@@ -2214,9 +2441,8 @@
       showDbTable(options.table || dbTableState.name || '');
       return;
     } else if (lastWorkspaceMode === 'schedule') {
-      $('#viewSchedule').prop('hidden', false);
-      if (expandNav) setSideNavOpen('scheduleBody');
-      loadScheduleJobs();
+      showSchedulePanel(options.panel || lastSchedulePanel || 'jobs');
+      return;
     } else {
       lastWorkspaceMode = 'pool';
       $('#viewPool').prop('hidden', false);
@@ -2627,15 +2853,19 @@
       showMode('account', { panel: $(this).attr('data-account-panel') || 'funds' });
       return;
     }
+    if (mode === 'tradepool') {
+      showTradePool($(this).attr('data-tp-panel') || 'pool');
+      return;
+    }
+    if (mode === 'schedule') {
+      showSchedulePanel($(this).attr('data-schedule-panel') || 'jobs');
+      return;
+    }
     showMode(mode);
   });
 
-  $('#btnEnterSchedule').on('click', function () {
-    showMode('schedule');
-  });
-
   $('#tradepoolMenu').on('click', 'li', function () {
-    showMode('tradepool');
+    showTradePool($(this).attr('data-tp-panel') || 'pool');
   });
 
   $('#tradepoolMenu').on('keydown', 'li', function (e) {
@@ -2643,6 +2873,197 @@
       e.preventDefault();
       $(this).trigger('click');
     }
+  });
+
+  $('#scheduleMenu').on('click', 'li', function () {
+    showSchedulePanel($(this).attr('data-schedule-panel') || 'jobs');
+  });
+
+  $('#scheduleMenu').on('keydown', 'li', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      $(this).trigger('click');
+    }
+  });
+
+  $('#acctPosBody').on('click', 'tr.acct-pos-row', function () {
+    var code = $(this).attr('data-code');
+    var $lot = $('#acctPosBody tr.acct-pos-lots[data-code="' + code + '"]');
+    var open = !$lot.prop('hidden');
+    $('#acctPosBody tr.acct-pos-lots').prop('hidden', true);
+    $('#acctPosBody tr.acct-pos-row').removeClass('active');
+    if (!open) {
+      $lot.prop('hidden', false);
+      $(this).addClass('active');
+    }
+  });
+
+  function loadTpScanHistory() {
+    $('#tpHistDetail').prop('hidden', true);
+    $.getJSON('/api/stock/trade-pool/batches', { limit: 30 })
+      .done(function (data) {
+        if (data.hint) $('#tpHistHint').text(data.hint);
+        var items = (data && data.items) || [];
+        $('#tpHistMeta').text('共 ' + items.length + ' 个批次');
+        var $tb = $('#tpHistBody').empty();
+        if (!items.length) {
+          $tb.html('<tr><td colspan="6" class="empty-state">暂无扫描批次（请先扫描更新）</td></tr>');
+          return;
+        }
+        items.forEach(function (it) {
+          $tb.append(
+            $('<tr/>').html(
+              '<td class="mono"><b>' + escHtml(it.batchId || '—') + '</b></td>'
+              + '<td class="mono">' + escHtml(it.createdAt || '—') + '</td>'
+              + '<td class="mono">' + escHtml(String(it.reportCount == null ? '—' : it.reportCount)) + '</td>'
+              + '<td class="mono">' + escHtml(fmtPoolScore(it.maxScore)) + '</td>'
+              + '<td class="mono">' + escHtml(fmtPoolScore(it.avgScore)) + '</td>'
+              + '<td><button type="button" class="secondary tp-hist-open" data-batch="'
+              + escHtml(it.batchId || '') + '">明细</button></td>'
+            )
+          );
+        });
+      })
+      .fail(function (xhr) {
+        var msg = (xhr.responseJSON && xhr.responseJSON.message) || '加载扫描历史失败';
+        $('#tpHistBody').html('<tr><td colspan="6" class="empty-state">' + escHtml(msg) + '</td></tr>');
+      });
+  }
+
+  function loadTpBatchDetail(batchId) {
+    if (!batchId) return;
+    $('#tpHistDetail').prop('hidden', false);
+    $('#tpHistDetailId').text(batchId);
+    $('#tpHistDetailBody').html('<tr><td colspan="5" class="empty-state">加载中…</td></tr>');
+    $.getJSON('/api/stock/trade-pool/batches/' + encodeURIComponent(batchId))
+      .done(function (data) {
+        var items = (data && data.items) || [];
+        var $tb = $('#tpHistDetailBody').empty();
+        if (!items.length) {
+          $tb.html('<tr><td colspan="5" class="empty-state">该批次无报告</td></tr>');
+          return;
+        }
+        items.forEach(function (it) {
+          $tb.append(
+            '<tr>'
+            + '<td><b>' + escHtml(it.code) + '</b></td>'
+            + '<td>' + escHtml(it.name || '') + '</td>'
+            + '<td class="mono">' + escHtml(fmtPoolScore(it.score)) + '</td>'
+            + '<td>' + escHtml(it.reason || '') + '</td>'
+            + '<td><button type="button" class="secondary tp-hist-report" data-id="'
+            + escHtml(String(it.reportId || '')) + '">查看</button></td>'
+            + '</tr>'
+          );
+        });
+      })
+      .fail(function (xhr) {
+        var msg = (xhr.responseJSON && xhr.responseJSON.message) || '加载批次明细失败';
+        $('#tpHistDetailBody').html('<tr><td colspan="5" class="empty-state">' + escHtml(msg) + '</td></tr>');
+      });
+  }
+
+  function loadDataHealth() {
+    $('#healthBody').html('<tr><td colspan="7" class="empty-state">检查中…</td></tr>');
+    $.getJSON('/api/ops/data-health')
+      .done(function (data) {
+        if (data.hint) $('#healthHint').text(data.hint);
+        $('#healthUniverse').text(String(data.universeSize == null ? '—' : data.universeSize));
+        $('#healthOk').text(String(data.okCount == null ? '—' : data.okCount));
+        $('#healthWarn').attr('class', 'value ' + (data.warnCount > 0 ? 'pnl-neg' : ''))
+          .text(String(data.warnCount == null ? '—' : data.warnCount));
+        $('#healthBadge').text(String(data.warnCount == null ? 0 : data.warnCount));
+        $('#healthMeta').text(data.asOf ? ('检查时间 ' + data.asOf) : '');
+        var items = data.items || [];
+        var $tb = $('#healthBody').empty();
+        if (!items.length) {
+          $tb.html('<tr><td colspan="7" class="empty-state">无标的或未启用数据库</td></tr>');
+          return;
+        }
+        // 告警优先
+        items.sort(function (a, b) {
+          return (a.ok === b.ok) ? 0 : (a.ok ? 1 : -1);
+        });
+        items.forEach(function (it) {
+          $tb.append(
+            '<tr>'
+            + '<td><b>' + escHtml(it.code) + '</b></td>'
+            + '<td>' + (it.ok ? '<span class="tag-buy">正常</span>' : '<span class="tag-wait">告警</span>') + '</td>'
+            + '<td class="mono">' + escHtml(String(it.dailyCount == null ? '—' : it.dailyCount)) + '</td>'
+            + '<td class="mono">' + escHtml(it.maxDaily || '—') + '</td>'
+            + '<td class="mono">' + escHtml(String(it.minuteCount == null ? '—' : it.minuteCount)) + '</td>'
+            + '<td class="mono">' + escHtml(it.maxMinute || '—') + '</td>'
+            + '<td>' + escHtml(it.issueText || '—') + '</td>'
+            + '</tr>'
+          );
+        });
+      })
+      .fail(function (xhr) {
+        var msg = (xhr.responseJSON && xhr.responseJSON.message) || '数据健康检查失败';
+        $('#healthHint').text(msg);
+        toast(msg, 'err');
+      });
+  }
+
+  function loadSysParams() {
+    $.getJSON('/api/ops/params')
+      .done(function (data) {
+        if (data.hint) $('#paramsHint').text(data.hint);
+        var $g = $('#paramsGroups').empty();
+        (data.groups || []).forEach(function (grp) {
+          var $sec = $('<div class="result-group" style="margin-bottom:12px;"/>');
+          $sec.append($('<div class="result-group-title"/>').text(grp.title || ''));
+          (grp.items || []).forEach(function (it) {
+            $sec.append(
+              $('<div class="result-kv"/>')
+                .append($('<span class="label"/>').text(it.key || ''))
+                .append($('<span class="value mono"/>').text(it.value == null ? '—' : String(it.value)))
+            );
+          });
+          $g.append($sec);
+        });
+        var cfgs = data.systemConfig || [];
+        var $tb = $('#paramsCfgBody').empty();
+        if (!cfgs.length) {
+          $tb.html('<tr><td colspan="4" class="empty-state">无 system_config 或未启用数据库</td></tr>');
+          return;
+        }
+        cfgs.forEach(function (c) {
+          $tb.append(
+            '<tr>'
+            + '<td class="mono">' + escHtml(c.key) + '</td>'
+            + '<td class="mono">' + escHtml(c.value) + '</td>'
+            + '<td>' + escHtml(c.description || '') + '</td>'
+            + '<td class="mono">' + escHtml(c.updatedAt || '—') + '</td>'
+            + '</tr>'
+          );
+        });
+      })
+      .fail(function (xhr) {
+        var msg = (xhr.responseJSON && xhr.responseJSON.message) || '加载运行参数失败';
+        $('#paramsHint').text(msg);
+        toast(msg, 'err');
+      });
+  }
+
+  $('#btnTpHistRefresh').on('click', loadTpScanHistory);
+  $('#btnHealthRefresh').on('click', loadDataHealth);
+  $('#btnParamsRefresh').on('click', loadSysParams);
+
+  $('#tpHistBody').on('click', '.tp-hist-open', function (e) {
+    e.preventDefault();
+    loadTpBatchDetail($(this).attr('data-batch'));
+  });
+
+  $('#tpHistDetailBody').on('click', '.tp-hist-report', function (e) {
+    e.preventDefault();
+    var id = $(this).attr('data-id');
+    if (!id) return;
+    $.getJSON('/api/stock/trade-pool/report/' + encodeURIComponent(id))
+      .done(function (rec) {
+        var summary = (rec && (rec.summary || rec.recommendReason || rec.signal)) || '已加载报告';
+        toast('报告 #' + id + '：' + String(summary).slice(0, 80), 'ok');
+      })
+      .fail(function () { toast('报告加载失败', 'err'); });
   });
 
   $('#accountMenu').on('click', 'li', function () {
@@ -2658,6 +3079,14 @@
 
   $('#btnAcctRefreshFunds, #btnAcctRefreshPos, #btnAcctRefreshOrders').on('click', function () {
     loadAccountOverview();
+  });
+
+  $('#btnAcctRefreshCf').on('click', function () {
+    loadAccountCashflows();
+  });
+
+  $('#btnAcctRefreshRisk').on('click', function () {
+    loadAccountRiskLogs();
   });
 
   $('#dbtablesMenu').on('click', 'li[data-table]', function () {
@@ -2717,18 +3146,48 @@
     loadTradePoolManage();
   });
 
+  function renderTpFunnel(res) {
+    res = res || {};
+    $('#tpFunnel').prop('hidden', false);
+    $('#tpFunnelUniverse').text(String(res.universe != null ? res.universe : '—'));
+    $('#tpFunnelCoarse').text(String(res.afterCoarse != null ? res.afterCoarse : '—'));
+    $('#tpFunnelScan').text(String(res.afterScan != null ? res.afterScan : (res.scanned != null ? res.scanned : '—')));
+    $('#tpFunnelLiq').text(String(res.afterLiquidity != null ? res.afterLiquidity : (res.scanned != null ? res.scanned : '—')));
+    $('#tpFunnelSelected').text(String(res.selected != null ? res.selected : '—'));
+    var meta = '下限 ' + (res.scoreMin != null ? res.scoreMin : '—')
+      + ' · 上限 ' + (res.tradePoolMax != null ? res.tradePoolMax : '—');
+    if (res.batchId) meta += ' · ' + res.batchId;
+    $('#tpFunnelMeta').text(meta);
+    if (res.reportFileName) {
+      $('#tpReportLink')
+        .attr('href', '/api/stock/trade-pool/reports/' + encodeURIComponent(res.reportFileName))
+        .prop('hidden', false)
+        .show();
+    } else {
+      $('#tpReportLink').prop('hidden', true).hide();
+    }
+  }
+
   $('#btnTpRebuild').on('click', function () {
     var $btn = $(this);
     $btn.prop('disabled', true).text('扫描中…');
-    $.post('/api/stock/trade-pool/rebuild').done(function (res) {
+    // analyze = 覆盖目标池 + 落盘 Markdown（含 rebuild 漏斗字段）
+    $.post('/api/stock/trade-pool/analyze').done(function (res) {
+      renderTpFunnel(res);
       toast('目标池已更新：' + (res.selected != null ? res.selected : 0)
-        + ' 只（全市场 ' + (res.universe || 0) + '）', 'ok');
+        + ' 只 · 全市场 ' + (res.universe || 0)
+        + ' → 入选 ' + (res.selected || 0), 'ok');
       loadTradePoolManage();
     }).fail(function (xhr) {
       toast((xhr.responseJSON && xhr.responseJSON.message) || '扫描失败', 'err');
     }).always(function () {
       $btn.prop('disabled', false).text('扫描更新');
     });
+  });
+
+  $('#chkAllSingleHistory').on('change', function () {
+    var code = ($('#stockCode').val() || singleCode || '').trim();
+    loadSingleHistory(code);
   });
 
   $('#tpPoolBody').on('click', 'tr.tp-pool-row', function (e) {

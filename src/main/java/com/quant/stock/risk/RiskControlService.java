@@ -1,5 +1,6 @@
 package com.quant.stock.risk;
 
+import com.quant.stock.calendar.TradingCalendar;
 import com.quant.stock.config.QuantProperties;
 import com.quant.stock.market.BarAggregateUtil;
 import com.quant.stock.market.dto.BarDTO;
@@ -25,8 +26,12 @@ public class RiskControlService {
     private final PositionAmountUtil positionAmountUtil;
     private final OpenFilterService openFilterService;
     private final LiveAccountRiskState accountRiskState;
+    private final TradingCalendar tradingCalendar;
 
     public boolean isTradingTime(LocalDateTime now) {
+        if (now == null || !tradingCalendar.isAshareTradingDay(now.toLocalDate())) {
+            return false;
+        }
         return BarAggregateUtil.isTradingMinute(now) && !openFilterService.isQuietPeriod(now);
     }
 

@@ -118,6 +118,57 @@ public class TradePoolService {
         return m;
     }
 
+    /** 扫描批次列表（按时间倒序） */
+    public Map<String, Object> listScanBatches(int limit) {
+        int lim = Math.max(1, Math.min(limit <= 0 ? 30 : limit, 100));
+        List<Map<String, Object>> raw = reportMapper.selectBatchSummaries(lim);
+        List<Map<String, Object>> batches = new ArrayList<Map<String, Object>>();
+        if (raw != null) {
+            for (Map<String, Object> r : raw) {
+                Map<String, Object> m = new LinkedHashMap<String, Object>();
+                m.put("batchId", r.get("batchId"));
+                m.put("reportCount", r.get("reportCount"));
+                m.put("createdAt", r.get("createdAt") == null ? null : r.get("createdAt").toString());
+                m.put("maxScore", r.get("maxScore"));
+                m.put("avgScore", r.get("avgScore"));
+                batches.add(m);
+            }
+        }
+        Map<String, Object> out = new LinkedHashMap<String, Object>();
+        out.put("count", batches.size());
+        out.put("items", batches);
+        out.put("hint", "每次「扫描更新」或 pool-rebuild 生成一批 trade_pool_report。");
+        return out;
+    }
+
+    /** 某一扫描批次入选明细 */
+    public Map<String, Object> listScanBatchDetail(String batchId) {
+        if (batchId == null || batchId.trim().isEmpty()) {
+            throw new IllegalArgumentException("batchId 不能为空");
+        }
+        List<TradePoolReportDO> rows = reportMapper.selectByBatchId(batchId.trim());
+        List<Map<String, Object>> items = new ArrayList<Map<String, Object>>();
+        if (rows != null) {
+            for (TradePoolReportDO r : rows) {
+                Map<String, Object> m = new LinkedHashMap<String, Object>();
+                m.put("reportId", r.getId());
+                m.put("code", r.getSymbol());
+                m.put("name", r.getName());
+                m.put("score", r.getScore());
+                m.put("reason", r.getReason());
+                m.put("summary", r.getSummary());
+                m.put("batchId", r.getBatchId());
+                m.put("createdAt", r.getCreatedAt() == null ? null : r.getCreatedAt().toString());
+                items.add(m);
+            }
+        }
+        Map<String, Object> out = new LinkedHashMap<String, Object>();
+        out.put("batchId", batchId.trim());
+        out.put("count", items.size());
+        out.put("items", items);
+        return out;
+    }
+
     private Map<String, Object> reportViewById(Long reportId) {
         TradePoolReportDO report = reportMapper.selectById(reportId);
         if (report == null || report.getAnalysisJson() == null || report.getAnalysisJson().isEmpty()) {
@@ -324,7 +375,33 @@ public class TradePoolService {
         out.put("analysis", rows);
         out.put("eligibleCodes", selectedCodes);
         out.put("reportPath", reportPath);
+        if (reportPath != null) {
+            try {
+                out.put("reportFileName", Paths.get(reportPath).getFileName().toString());
+            } catch (Exception ignored) {
+                // leave unset
+            }
+        }
         return out;
+    }
+
+    /**
+     * 安全读取 historyDir/reports 下 pool-*.md 报告内容（供下载）。
+     */
+    public byte[] readReportFile(String fileName) {
+        if (fileName == null || !fileName.matches("pool-\\d{8}-\\d{6}\\.md")) {
+            throw new IllegalArgumentException("非法报告文件名");
+        }
+        Path file = Paths.get(quantProperties.getHistoryDir(), "reports", fileName).normalize();
+        Path dir = Paths.get(quantProperties.getHistoryDir(), "reports").normalize();
+        if (!file.startsWith(dir) || !Files.isRegularFile(file)) {
+            throw new IllegalArgumentException("报告不存在: " + fileName);
+        }
+        try {
+            return Files.readAllBytes(file);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("读取报告失败: " + e.getMessage());
+        }
     }
 
     /**
@@ -338,24 +415,32 @@ public class TradePoolService {
             nameByCode.put(u.get("code"), u.get("name"));
         }
         List<String> codes = coarseFilter(uni);
+        int afterCoarse = codes.size();
         List<BatchScanResultDTO> scanned = codes.isEmpty()
                 ? new ArrayList<BatchScanResultDTO>()
                 : new ArrayList<BatchScanResultDTO>(batchStockBackTestService.scan(codes));
+        int afterScan = scanned.size();
         filterByAvgAmount(scanned);
+        int afterLiquidity = scanned.size();
         int max = Math.max(1, quantProperties.getTradePoolMax());
         List<BatchScanResultDTO> picked = poolSelectScorer.pickTop(scanned, max);
         String batchId = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
                 + "-" + UUID.randomUUID().toString().substring(0, 8);
         List<String> selected = replaceActivePool(picked, nameByCode, batchId);
-        log.info("[pool-rebuild] universe={} scanned={} selected={} batchId={} scoreMin={}",
-                uni.size(), scanned.size(), selected.size(), batchId, quantProperties.getPoolScoreMin());
+        log.info("[pool-rebuild] universe={} afterCoarse={} afterScan={} afterLiquidity={} selected={} batchId={} scoreMin={}",
+                uni.size(), afterCoarse, afterScan, afterLiquidity, selected.size(), batchId,
+                quantProperties.getPoolScoreMin());
         Map<String, Object> out = new LinkedHashMap<String, Object>();
         out.put("universe", uni.size());
-        out.put("scanned", scanned.size());
+        out.put("afterCoarse", afterCoarse);
+        out.put("afterScan", afterScan);
+        out.put("afterLiquidity", afterLiquidity);
+        out.put("scanned", afterLiquidity);
         out.put("selected", selected.size());
         out.put("codes", selected);
         out.put("batchId", batchId);
         out.put("scoreMin", quantProperties.getPoolScoreMin());
+        out.put("tradePoolMax", max);
         return out;
     }
 
@@ -505,8 +590,11 @@ public class TradePoolService {
             sb.append("# 量化目标池扫描分析报告\n\n");
             sb.append("- 生成时间：").append(LocalDateTime.now()).append('\n');
             sb.append("- 全市场：").append(rebuild.get("universe")).append(" 只\n");
-            sb.append("- 扫描有效：").append(rebuild.get("scanned")).append(" 只\n");
+            sb.append("- 粗筛后：").append(rebuild.get("afterCoarse")).append(" 只\n");
+            sb.append("- 扫描返回：").append(rebuild.get("afterScan")).append(" 只\n");
+            sb.append("- 流动性后：").append(rebuild.get("afterLiquidity")).append(" 只\n");
             sb.append("- 写入目标池：").append(rebuild.get("selected")).append(" 只\n");
+            sb.append("- 分数下限：").append(rebuild.get("scoreMin")).append('\n');
             sb.append("- 批次：").append(rebuild.get("batchId")).append('\n');
             sb.append("- 入选代码：").append(eligible.isEmpty() ? "（无）" : String.join(", ", eligible)).append("\n\n");
             sb.append("| 代码 | 名称 | 分数 | 原因 | 来源 | 报告ID |\n");

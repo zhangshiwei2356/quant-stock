@@ -43,7 +43,7 @@ public class DocsPdfService {
         List<Topic> list = new ArrayList<Topic>();
         list.add(new Topic("app", "app", "系统概述", "app.html"));
         list.add(new Topic("rules", "app", "交易规则", "rules.html"));
-        list.add(new Topic("memo", "app", "数据待办", "memo.html"));
+        list.add(new Topic("memo", "app", "应用待办", "memo.html"));
         list.add(new Topic("ashare", "stock", "A股基础", "ashare.html"));
         list.add(new Topic("session", "stock", "交易时间", "session.html"));
         list.add(new Topic("kline", "stock", "K线", "kline.html"));
