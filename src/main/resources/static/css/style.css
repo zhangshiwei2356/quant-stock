@@ -625,6 +625,21 @@ button.side-nav-toggle:active:not(:disabled) {
   margin-left: 12px;
 }
 
+/* 嵌在 side-nav-body 内的二级菜单：随父级展开，勿单独再折叠 */
+.side-nav-body .side-nav-menu {
+  max-height: none;
+  opacity: 1;
+  overflow: visible;
+  margin: 0;
+  padding: 0;
+  border-left: none;
+  transition: none;
+}
+.side-nav-body.open .side-nav-menu {
+  max-height: none;
+  opacity: 1;
+}
+
 .side-nav-body .hint {
   margin: 4px 8px 8px;
   padding: 0;
@@ -935,7 +950,10 @@ button.side-nav-toggle:active:not(:disabled) {
 
 body.mode-doc .side-nav[data-nav="pool"] .side-nav-toggle,
 body.mode-doc .side-nav[data-nav="single"] .side-nav-toggle,
-body.mode-doc .side-nav[data-nav="portfolio"] .side-nav-toggle {
+body.mode-doc .side-nav[data-nav="portfolio"] .side-nav-toggle,
+body.mode-doc .side-nav[data-nav="tradepool"] .side-nav-toggle,
+body.mode-doc .side-nav[data-nav="dbtables"] .side-nav-toggle,
+body.mode-doc .side-nav[data-nav="schedule"] .side-nav-toggle {
   opacity: 0.72;
 }
 
@@ -1291,16 +1309,61 @@ body.home-theme-peek .app-header {
   filter: none;
 }
 
-/* PDF 导出离屏容器（浅色纸面，便于打印阅读） */
-.pdf-export-root {
+/* PDF 导出宿主：同文档可见（供截图），置于底层不挡操作 */
+#pdfExportHost,
+#pdfExportHost.pdf-export-host-active {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 800px;
+  max-height: none;
+  overflow: visible;
+  opacity: 1;
+  pointer-events: none;
+  z-index: -1;
+  background: #ffffff;
+}
+
+/* PDF 导出纸面：强隔离，不被工作台主题覆盖 */
+.pdf-export-root,
+.pdf-export-isolate {
   box-sizing: border-box;
   width: 720px;
   padding: 28px 32px 36px;
-  background: #ffffff;
-  color: #1f2937;
-  font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
-  line-height: 1.65;
-  text-align: left;
+  background: #ffffff !important;
+  color: #1f2937 !important;
+  font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif !important;
+  line-height: 1.65 !important;
+  text-align: left !important;
+}
+.pdf-export-isolate,
+.pdf-export-isolate * {
+  color: #1f2937 !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  filter: none !important;
+  mix-blend-mode: normal !important;
+}
+.pdf-export-isolate h1,
+.pdf-export-isolate h2 {
+  color: #0f766e !important;
+}
+.pdf-export-isolate h4 {
+  color: #0f172a !important;
+}
+.pdf-export-isolate .pdf-meta,
+.pdf-export-isolate .hint {
+  color: #64748b !important;
+}
+.pdf-export-isolate .pdf-export-body,
+.pdf-export-isolate .pdf-export-body p,
+.pdf-export-isolate .pdf-export-body li {
+  color: #334155 !important;
+}
+.pdf-export-isolate code {
+  color: #0f172a !important;
+  background: #f1f5f9 !important;
 }
 
 .pdf-export-cover {
@@ -1325,8 +1388,7 @@ body.home-theme-peek .app-header {
   margin: 0 0 22px;
   padding-bottom: 16px;
   border-bottom: 1px solid #e2e8f0;
-  page-break-inside: avoid;
-  break-inside: avoid;
+  /* 长文勿 avoid，否则单篇过高仍可能撑爆 canvas */
 }
 
 .pdf-export-section:last-child {
@@ -1344,7 +1406,13 @@ body.home-theme-peek .app-header {
 
 .pdf-export-body {
   font-size: 12.5px;
-  color: #334155;
+  color: #334155 !important;
+}
+.pdf-export-body b,
+.pdf-export-body strong,
+.pdf-export-body li,
+.pdf-export-body p {
+  color: inherit;
 }
 
 .pdf-export-body h4 {
@@ -1899,6 +1967,328 @@ button.loading::before {
   border-radius: 8px;
 }
 
+/* 交易候选池（行情浏览侧栏） */
+.trade-pool-box {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+.trade-pool-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.trade-pool-count {
+  min-width: 20px;
+  padding: 1px 6px;
+  text-align: center;
+  font-size: 11px;
+  border-radius: 4px;
+  background: rgba(47, 111, 237, 0.12);
+  color: #2f6fed;
+}
+.trade-pool-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  max-height: 140px;
+  overflow: auto;
+}
+.trade-pool-list li {
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.trade-pool-list li:hover {
+  background: var(--row-alt);
+}
+.trade-pool-list li .stock-name {
+  color: var(--muted);
+}
+
+.db-table-meta {
+  margin: 10px 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel-solid, var(--panel)) 55%, transparent);
+  overflow: hidden;
+}
+.db-meta-summary {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  box-shadow: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.db-meta-summary:hover {
+  background: var(--row-hover);
+  transform: none;
+  filter: none;
+}
+.db-meta-summary-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.db-meta-chevron {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12px;
+  transition: transform 0.2s ease;
+}
+.db-table-meta.is-open .db-meta-chevron {
+  transform: rotate(90deg);
+  color: var(--accent);
+}
+.db-meta-detail {
+  padding: 0 12px 10px;
+  display: grid;
+  gap: 8px;
+  border-top: 1px dashed var(--border);
+  padding-top: 10px;
+}
+.db-meta-detail[hidden] {
+  display: none !important;
+}
+.db-meta-row {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 10px;
+  align-items: start;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.db-meta-tag {
+  flex-shrink: 0;
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  text-align: center;
+  line-height: 1.6;
+  height: fit-content;
+}
+.db-meta-text {
+  color: var(--text);
+  min-width: 0;
+}
+.db-table-wrap {
+  overflow: auto;
+  max-width: 100%;
+}
+.db-data-table {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.db-data-table th,
+.db-data-table td {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.db-data-table th.db-col-th {
+  white-space: normal;
+  vertical-align: bottom;
+  line-height: 1.25;
+  min-width: 88px;
+}
+.db-data-table .db-col-label {
+  display: block;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+.db-data-table .db-col-name {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  font-family: Consolas, "Courier New", monospace;
+  color: var(--muted);
+}
+.db-data-table td.db-cell-null {
+  color: var(--muted);
+  font-style: italic;
+}
+.db-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 12px;
+}
+.field-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.field-inline select,
+.field-inline input {
+  font-size: 12px;
+}
+#dbtablesMenu li {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  line-height: 1.35;
+}
+#dbtablesMenu .db-tbl-title {
+  color: var(--text);
+  font-size: 12px;
+}
+#dbtablesMenu .db-tbl-name {
+  color: var(--muted);
+  font-size: 11px;
+  font-family: Consolas, "Courier New", monospace;
+}
+#dbtablesMenu li.active .db-tbl-title {
+  color: var(--text);
+}
+
+tr.tp-pend-row.active {
+  background: rgba(47, 111, 237, 0.08);
+}
+tr.tp-analysis-row td.tp-analysis-cell {
+  padding: 0;
+  background: var(--row-alt);
+  border-bottom: 1px solid var(--border);
+}
+.tp-analysis-panel {
+  padding: 12px 14px 16px;
+}
+.tp-analysis-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin: 10px 0;
+}
+.tp-analysis-metrics .metric {
+  display: inline-flex;
+  flex-direction: column;
+  min-width: 72px;
+  font-size: 12px;
+}
+.tp-analysis-metrics .metric em {
+  font-style: normal;
+  color: var(--muted);
+  font-size: 11px;
+}
+.tp-analysis-metrics .metric b {
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+/* 定时任务管理 */
+tr.sch-job-row.active {
+  background: rgba(47, 111, 237, 0.08);
+}
+tr.sch-detail-row td.sch-detail-cell {
+  padding: 0;
+  background: var(--row-alt);
+  border-bottom: 1px solid var(--border);
+}
+.sch-detail-panel {
+  padding: 12px 14px 16px;
+}
+.sch-detail-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 10px;
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text);
+}
+.sch-detail-line .db-meta-tag {
+  flex-shrink: 0;
+}
+.schedule-table .sch-trigger,
+.schedule-table .sch-remark,
+.schedule-table .sch-type {
+  width: 100%;
+  min-width: 120px;
+  max-width: 260px;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+.schedule-table .sch-remark { max-width: 180px; }
+.schedule-name { font-weight: 600; }
+.schedule-code { color: var(--muted); font-size: 11px; margin-top: 2px; }
+.schedule-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.schedule-badge--todo {
+  color: #9a5b00;
+  border-color: #e0b46a;
+  background: rgba(224, 180, 106, 0.18);
+}
+.schedule-ok { color: #1a7f4b; font-weight: 600; }
+.schedule-warn { color: #b86e00; font-weight: 600; }
+.schedule-off { color: var(--muted); }
+.schedule-actions { white-space: nowrap; }
+.schedule-actions button { padding: 4px 8px; font-size: 12px; }
+.schedule-switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+  vertical-align: middle;
+}
+.schedule-switch input { opacity: 0; width: 0; height: 0; }
+.schedule-switch span {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+  background: #c5ccd6;
+  border-radius: 22px;
+  transition: 0.15s;
+}
+.schedule-switch span::before {
+  content: "";
+  position: absolute;
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  top: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: 0.15s;
+}
+.schedule-switch input:checked + span { background: #2f6fed; }
+.schedule-switch input:checked + span::before { transform: translateX(18px); }
+.mono { font-family: ui-monospace, Consolas, monospace; font-size: 11px; }
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -1945,6 +2335,11 @@ tbody tr:hover { background: var(--row-hover); }
 
 .pnl-pos { color: var(--buy); font-weight: 600; }
 .pnl-neg { color: var(--sell); font-weight: 600; }
+
+/* 账户概览：权益数字强调 */
+#acctEquity, #acctCash {
+  font-variant-numeric: tabular-nums;
+}
 
 .empty-state {
   padding: 28px 12px;

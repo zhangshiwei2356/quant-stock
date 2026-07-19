@@ -1,8 +1,8 @@
 {
-	"description":"三只股票近一年模拟K线（原始1分钟 + 预聚合多周期）",
+	"description":"五只股票近一年模拟K线（原始1分钟 + 预聚合多周期）",
 	"start":"2025-07-17",
 	"end":"2026-07-17",
-	"generatedAt":"2026-07-18 11:56:10",
+	"generatedAt":"2026-07-19 22:32:53",
 	"stocks":[
 		{
 			"code":"600036",
@@ -18,6 +18,16 @@
 			"code":"300059",
 			"name":"东方财富",
 			"basePrice":"18.80"
+		},
+		{
+			"code":"601318",
+			"name":"中国平安",
+			"basePrice":"45.00"
+		},
+		{
+			"code":"000858",
+			"name":"五粮液",
+			"basePrice":"128.00"
 		}
 	],
 	"periods":[
@@ -30,5 +40,5 @@
 		"WEEK",
 		"MONTH"
 	],
-	"note":"字段采用紧凑数组 [t,o,h,l,c,v]，启动时由 JsonBarDataStore 加载"
+	"note":"字段采用紧凑数组 [t,o,h,l,c,v]；MySQL 导入用 DAY + MIN_5"
 }

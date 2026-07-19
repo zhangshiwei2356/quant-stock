@@ -32,6 +32,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
             path = "";
         }
         if (!path.startsWith("/api/") || path.startsWith("/api/config")
+                || path.startsWith("/api/schedule")
                 || !StringUtils.hasText(props.getApiKey())) {
             filterChain.doFilter(request, response);
             return;

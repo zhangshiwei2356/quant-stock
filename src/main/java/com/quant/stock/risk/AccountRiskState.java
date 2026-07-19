@@ -37,6 +37,20 @@ public class AccountRiskState {
         this.props = props;
     }
 
+    public BigDecimal getPeakEquity() {
+        BigDecimal p = peakEquity.get();
+        return p == null ? BigDecimal.ZERO : p;
+    }
+
+    public BigDecimal getPrevCloseEquity() {
+        BigDecimal p = prevCloseEquity.get();
+        return p == null ? BigDecimal.ZERO : p;
+    }
+
+    public int getConsecutiveLosses() {
+        return consecutiveLosses.get();
+    }
+
     public void reset(BigDecimal initCapital) {
         peakEquity.set(initCapital);
         prevCloseEquity.set(initCapital);

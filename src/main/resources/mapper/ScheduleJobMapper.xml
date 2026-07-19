@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.stock.mapper.ScheduleJobMapper">
+
+    <resultMap id="JobMap" type="com.quant.stock.task.dto.ScheduleJobDO">
+        <id column="id" property="id"/>
+        <result column="job_code" property="jobCode"/>
+        <result column="job_name" property="jobName"/>
+        <result column="trigger_type" property="triggerType"/>
+        <result column="cron_expr" property="cronExpr"/>
+        <result column="interval_ms" property="intervalMs"/>
+        <result column="enabled" property="enabled"/>
+        <result column="implemented" property="implemented"/>
+        <result column="last_run_at" property="lastRunAt"/>
+        <result column="remark" property="remark"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="cols">
+        id, job_code, job_name, trigger_type, cron_expr, interval_ms,
+        enabled, implemented, last_run_at, remark, created_at, updated_at
+    </sql>
+
+    <select id="selectAll" resultMap="JobMap">
+        SELECT <include refid="cols"/>
+        FROM sys_schedule_job
+        ORDER BY id
+    </select>
+
+    <select id="selectByCode" resultMap="JobMap">
+        SELECT <include refid="cols"/>
+        FROM sys_schedule_job
+        WHERE job_code = #{jobCode}
+        LIMIT 1
+    </select>
+
+    <select id="countAll" resultType="int">
+        SELECT COUNT(1) FROM sys_schedule_job
+    </select>
+
+    <insert id="insertIgnore">
+        INSERT IGNORE INTO sys_schedule_job
+        (job_code, job_name, trigger_type, cron_expr, interval_ms, enabled, implemented, remark)
+        VALUES
+        (#{jobCode}, #{jobName}, #{triggerType}, #{cronExpr}, #{intervalMs},
+         #{enabled}, #{implemented}, #{remark})
+    </insert>
+
+    <update id="updateByCode">
+        UPDATE sys_schedule_job
+        <set>
+            <if test="jobName != null">job_name = #{jobName},</if>
+            <if test="triggerType != null">trigger_type = #{triggerType},</if>
+            <if test="cronExpr != null">cron_expr = #{cronExpr},</if>
+            <if test="intervalMs != null">interval_ms = #{intervalMs},</if>
+            <if test="enabled != null">enabled = #{enabled},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </set>
+        WHERE job_code = #{jobCode}
+    </update>
+
+    <update id="updateEnabled">
+        UPDATE sys_schedule_job
+        SET enabled = #{enabled}
+        WHERE job_code = #{jobCode}
+    </update>
+
+    <update id="updateLastRunAt">
+        UPDATE sys_schedule_job
+        SET last_run_at = #{lastRunAt}
+        WHERE job_code = #{jobCode}
+    </update>
+</mapper>

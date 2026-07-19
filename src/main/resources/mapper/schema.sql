@@ -228,6 +228,65 @@ CREATE TABLE IF NOT EXISTS `bar_aggregate_meta` (
   PRIMARY KEY (`stock_code`, `period`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='聚合元数据(兼容)';
 
+-- ---------- 模块：交易目标池（盘后扫描自动覆盖） ----------
+CREATE TABLE IF NOT EXISTS `trade_pool_report` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `symbol` VARCHAR(10) NOT NULL COMMENT '股票代码',
+  `name` VARCHAR(32) DEFAULT NULL,
+  `score` DECIMAL(12,6) DEFAULT NULL,
+  `reason` VARCHAR(256) DEFAULT NULL COMMENT '入选依据摘要',
+  `summary` VARCHAR(1024) DEFAULT NULL,
+  `analysis_json` LONGTEXT COMMENT '完整分析 JSON',
+  `batch_id` VARCHAR(32) DEFAULT NULL COMMENT '同一次扫描批次',
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  KEY `idx_symbol_time` (`symbol`, `created_at`),
+  KEY `idx_batch` (`batch_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='目标池入选分析报告';
+
+CREATE TABLE IF NOT EXISTS `trade_pool` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `symbol` VARCHAR(10) NOT NULL COMMENT '股票代码',
+  `name` VARCHAR(32) DEFAULT NULL COMMENT '简称',
+  `status` TINYINT NOT NULL DEFAULT 1 COMMENT '1在池 0停用',
+  `score` DECIMAL(12,6) DEFAULT NULL COMMENT '扫描分数',
+  `reason` VARCHAR(256) DEFAULT NULL COMMENT '入选原因',
+  `source` VARCHAR(16) NOT NULL DEFAULT 'BATCH_SCAN' COMMENT 'BATCH_SCAN/MANUAL',
+  `report_id` BIGINT DEFAULT NULL COMMENT '关联 trade_pool_report.id',
+  `entered_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY `uk_symbol` (`symbol`),
+  KEY `idx_status` (`status`),
+  KEY `idx_report` (`report_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='量化交易目标池（盘后扫描自动覆盖；盘中开仓名单）';
+
+-- ---------- 模块：定时任务（页面可启停/改 cron；种子默认全关） ----------
+CREATE TABLE IF NOT EXISTS `sys_schedule_job` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `job_code` VARCHAR(64) NOT NULL COMMENT '任务编码，唯一',
+  `job_name` VARCHAR(128) NOT NULL COMMENT '展示名称',
+  `trigger_type` VARCHAR(16) NOT NULL DEFAULT 'CRON' COMMENT 'CRON / FIXED_RATE',
+  `cron_expr` VARCHAR(64) DEFAULT NULL COMMENT 'cron 表达式（CRON 时必填）',
+  `interval_ms` BIGINT DEFAULT NULL COMMENT '固定间隔毫秒（FIXED_RATE 时必填）',
+  `enabled` TINYINT NOT NULL DEFAULT 0 COMMENT '1启用 0停用',
+  `implemented` TINYINT NOT NULL DEFAULT 1 COMMENT '1已实现 0占位待开发',
+  `last_run_at` DATETIME DEFAULT NULL COMMENT '最近一次执行时间',
+  `remark` VARCHAR(512) DEFAULT NULL,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY `uk_job_code` (`job_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='动态定时任务配置';
+
+INSERT IGNORE INTO `sys_schedule_job`
+(`job_code`, `job_name`, `trigger_type`, `cron_expr`, `interval_ms`, `enabled`, `implemented`, `remark`) VALUES
+('market-collect', '行情采集', 'FIXED_RATE', NULL, 30000, 0, 0, '未实现：待接入真实行情 API（本地仅有骨架）'),
+('scan-and-trade', '实盘分钟扫描交易', 'CRON', '0 */1 9-11,13-15 * * MON-FRI', NULL, 0, 1, '仅扫描唯一目标池（trade_pool status=1）'),
+('sync-orders', '订单状态同步', 'FIXED_RATE', NULL, 10000, 0, 0, '未实现：待接入券商委托查询 API（当前仅本地桩）'),
+('position-pnl-sync', '持仓盈亏同步', 'CRON', '0 */1 9-15 * * MON-FRI', NULL, 0, 0, '未实现：待接入券商持仓/成本 API（本地仅有骨架）'),
+('settle-after-close', '收盘清算与K线聚合', 'CRON', '0 30 15 * * MON-FRI', NULL, 0, 0, '未实现：待接入真实行情 API（账户清算本地可用，拉取/聚合依赖行情源）'),
+('pool-rebuild', '全市场入池扫描', 'CRON', '0 10 15 * * MON-FRI', NULL, 0, 1, '全市场扫描覆盖唯一目标池；与 after-market-batch-scan 启用其一即可'),
+('after-market-batch-scan', '盘后入池扫描', 'CRON', '0 0 16 * * MON-FRI', NULL, 0, 1, '工作日 16:00 覆盖唯一目标池；与 pool-rebuild 启用其一即可'),
+('data-validate', '数据校验', 'CRON', '0 0 17 * * MON-FRI', NULL, 0, 0, '未实现：待接入外部行情对账 API（本地仅有骨架）');
+
 -- 初始化配置（忽略重复）
 INSERT IGNORE INTO `system_config` (`config_key`, `config_value`, `type`, `description`) VALUES
 ('base_atr', '0.05', 1, 'ATR调节基准系数'),

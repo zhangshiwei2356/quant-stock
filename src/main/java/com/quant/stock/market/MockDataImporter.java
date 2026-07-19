@@ -60,12 +60,6 @@ public class MockDataImporter {
     }
 
     public void importIfNeeded() throws Exception {
-        String probe = "000001";
-        if (marketDailyMapper.countBySymbol(probe) > 0 && marketMinuteMapper.countBySymbol(probe) > 0) {
-            log.info("MySQL 已有行情数据，跳过 JSON 导入");
-            return;
-        }
-        log.info("开始从 classpath JSON 导入模拟行情到 MySQL ...");
         PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
         Resource metaRes = resolver.getResource(BASE + "meta.json");
         if (!metaRes.exists()) {
@@ -77,17 +71,30 @@ public class MockDataImporter {
         if (stocks == null || stocks.isEmpty()) {
             return;
         }
+        int imported = 0;
         for (int i = 0; i < stocks.size(); i++) {
             JSONObject s = stocks.getJSONObject(i);
             String code = s.getString("code");
             String name = s.getString("name");
+            boolean hasDaily = marketDailyMapper.countBySymbol(code) > 0;
+            boolean hasMinute = marketMinuteMapper.countBySymbol(code) > 0;
+            if (hasDaily && hasMinute) {
+                upsertBasic(code, name);
+                continue;
+            }
+            log.info("增量导入模拟行情 symbol={} ...", code);
             upsertBasic(code, name);
             importDaily(resolver, code);
             importMinute(resolver, code);
             computeFactors(code);
+            imported++;
             log.info("导入完成 symbol={}", code);
         }
-        log.info("全部模拟数据已写入 MySQL（market_daily / market_minute / factor_daily / stock_basic）");
+        if (imported == 0) {
+            log.info("MySQL 已覆盖 meta 中全部股票，跳过 JSON 导入");
+        } else {
+            log.info("本次增量导入 {} 只股票到 MySQL", imported);
+        }
     }
 
     private void upsertBasic(String code, String name) {

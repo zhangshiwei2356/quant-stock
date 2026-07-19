@@ -617,6 +617,178 @@
     loadPoolKline(code);
   }
 
+  function fmtScore(v) {
+    if (v == null || v === '') return '—';
+    var n = Number(v);
+    if (isNaN(n)) return String(v);
+    return (n * 100).toFixed(2) + '%';
+  }
+
+  /** 目标池综合分（0~100）；兼容旧版小数收益率 */
+  function fmtPoolScore(v) {
+    if (v == null || v === '') return '—';
+    var n = Number(v);
+    if (isNaN(n)) return String(v);
+    if (Math.abs(n) <= 1.0001) {
+      return (n * 100).toFixed(2) + '%';
+    }
+    return n.toFixed(1) + '分';
+  }
+
+  var TP_POOL_COLSPAN = 6;
+
+  function collapseTpPoolAnalysis() {
+    var $tb = $('#tpPoolBody');
+    $tb.find('tr.tp-pool-row').removeClass('active').removeAttr('data-expanded');
+    $tb.find('tr.tp-analysis-row').remove();
+  }
+
+  function ensureTpAnalysisRow($tr) {
+    var forKey = String($tr.attr('data-code') || '');
+    var $next = $tr.next('tr.tp-analysis-row');
+    if ($next.length && String($next.attr('data-for-key') || '') === forKey) {
+      return $next.find('.tp-analysis-panel');
+    }
+    $tr.closest('tbody').find('tr.tp-analysis-row').remove();
+    var $row = $('<tr class="tp-analysis-row"/>').attr('data-for-key', forKey);
+    var $cell = $('<td class="tp-analysis-cell"/>').attr('colspan', TP_POOL_COLSPAN);
+    var $panel = $('<div class="tp-analysis-panel knowledge-body"/>');
+    $cell.append($panel);
+    $row.append($cell);
+    $tr.after($row);
+    try {
+      $row[0].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    } catch (e) {}
+    return $panel;
+  }
+
+  function renderTpPoolAnalysis(rec, $panel) {
+    $panel.empty();
+    var $head = $('<div class="analysis-detail-head"/>');
+    $head.append($('<span/>').html('<b>入选分析报告</b> · ' + escHtml(rec.code || '') + ' ' + escHtml(rec.name || '')));
+    var $collapse = $('<button type="button" class="secondary analysis-collapse-btn"/>').text('收起');
+    $collapse.on('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      collapseTpPoolAnalysis();
+    });
+    $head.append($collapse);
+    $panel.append($head);
+    $panel.append($('<p/>').html('<b>结论</b>：' + escHtml(rec.decision || '—')));
+    $panel.append($('<p/>').html('<b>摘要</b>：' + escHtml(rec.summary || '—')));
+    if (rec.poolReason) {
+      $panel.append($('<p class="hint"/>').text('入池备注：' + rec.poolReason));
+    }
+    var $metrics = $('<div class="metrics tp-analysis-metrics"/>');
+    function chip(label, val) {
+      return $('<span class="metric"/>').html('<em>' + label + '</em><b>' + escHtml(val == null ? '—' : String(val)) + '</b>');
+    }
+    $metrics.append(chip('综合分', rec.scoreLabel || rec.scorePct || fmtPoolScore(rec.score)))
+      .append(chip('最大回撤', rec.maxDrawDownPct))
+      .append(chip('胜率', rec.winRatePct))
+      .append(chip('交易次数', rec.trades))
+      .append(chip('收盘', rec.lastClose))
+      .append(chip('MA5', rec.ma5))
+      .append(chip('MA20', rec.ma20))
+      .append(chip('RSI', rec.rsi14))
+      .append(chip('ATR', rec.atr14))
+      .append(chip('金叉可买', rec.canBuyNow ? '是' : '否'))
+      .append(chip('入选依据', rec.recommendReason));
+    $panel.append($metrics);
+    $panel.append($('<p/>').html('<b>信号</b>：' + escHtml(rec.signal || '—')));
+    if (rec.scannedAt) {
+      $panel.append($('<p class="hint"/>').text('扫描时间：' + rec.scannedAt));
+    }
+    if (rec.enteredAt) {
+      $panel.append($('<p class="hint"/>').text('入池时间：' + rec.enteredAt));
+    }
+    if (rec.reportCreatedAt) {
+      $panel.append($('<p class="hint"/>').text('报告生成时间：' + rec.reportCreatedAt));
+    }
+    if (rec.reportId != null) {
+      $panel.append($('<p class="hint"/>').text('报告ID：' + rec.reportId + (rec.fromDb ? '（已落库）' : '')));
+    }
+  }
+
+  function showTpPoolAnalysis($tr) {
+    var code = String($tr.attr('data-code') || '');
+    var reportId = $tr.attr('data-report-id');
+    var $panel = ensureTpAnalysisRow($tr);
+    if (!code) {
+      $panel.html('<p class="hint">无股票代码</p>');
+      return;
+    }
+    $panel.attr('data-open-code', code).html('<p class="hint">加载分析中…</p>');
+    var url = reportId
+      ? '/api/stock/trade-pool/report/' + encodeURIComponent(reportId)
+      : '/api/stock/trade-pool/' + encodeURIComponent(code) + '/analysis';
+    $.getJSON(url)
+      .done(function (rec) {
+        if (!$panel.closest('tbody').length) return;
+        if (String($panel.attr('data-open-code') || '') !== code) return;
+        if (!$tr.hasClass('active')) return;
+        renderTpPoolAnalysis(rec || {}, $panel);
+      })
+      .fail(function (xhr) {
+        if (!$panel.closest('tbody').length) return;
+        if (String($panel.attr('data-open-code') || '') !== code) return;
+        // reportId 失效时回退按代码取分析
+        if (reportId) {
+          $.getJSON('/api/stock/trade-pool/' + encodeURIComponent(code) + '/analysis')
+            .done(function (rec) {
+              if (!$panel.closest('tbody').length) return;
+              if (String($panel.attr('data-open-code') || '') !== code) return;
+              if (!$tr.hasClass('active')) return;
+              renderTpPoolAnalysis(rec || {}, $panel);
+            })
+            .fail(function (xhr2) {
+              var msg2 = (xhr2.responseJSON && xhr2.responseJSON.message) || '加载分析失败';
+              $panel.html('<p class="hint">' + escHtml(msg2) + '</p>');
+            });
+          return;
+        }
+        var msg = (xhr.responseJSON && xhr.responseJSON.message) || '加载分析失败';
+        $panel.html('<p class="hint">' + escHtml(msg) + '</p>');
+      });
+  }
+
+  function loadTradePoolManage() {
+    collapseTpPoolAnalysis();
+    $.getJSON('/api/stock/trade-pool').done(function (data) {
+      var items = (data && data.items) || [];
+      var maxFinal = data && data.maxFinal != null ? data.maxFinal : 30;
+      var count = data && data.count != null ? data.count : items.length;
+      $('#sidePoolCount, #tpPoolBadge').text(String(count));
+      $('#tpPoolHint').text('目标池 ' + count + ' / 上限 ' + maxFinal);
+
+      var $tb = $('#tpPoolBody').empty();
+      if (!items.length) {
+        $tb.html('<tr><td colspan="6" class="empty-state">目标池为空，可点「扫描更新」或开启定时任务 pool-rebuild</td></tr>');
+      } else {
+        items.forEach(function (it) {
+          poolNames[it.code] = it.name || it.code;
+          $tb.append(
+            $('<tr class="tp-pool-row"/>')
+              .attr('data-code', it.code)
+              .attr('data-report-id', it.reportId != null ? it.reportId : '')
+              .css('cursor', 'pointer')
+              .html(
+                '<td><b>' + escHtml(it.code) + '</b></td>'
+                + '<td>' + escHtml(it.name || '') + '</td>'
+                + '<td class="mono">' + escHtml(fmtPoolScore(it.score)) + '</td>'
+                + '<td>' + escHtml(it.reason || '') + '</td>'
+                + '<td class="mono">' + escHtml(it.enteredAt || '—') + '</td>'
+                + '<td><button type="button" class="secondary tp-remove" data-code="' + escHtml(it.code) + '">移出</button></td>'
+              )
+          );
+        });
+      }
+    }).fail(function (xhr) {
+      var msg = (xhr.responseJSON && xhr.responseJSON.message) || '加载失败';
+      $('#tpPoolBody').html('<tr><td colspan="6" class="empty-state">' + escHtml(msg) + '</td></tr>');
+    });
+  }
+
   function loadPool() {
     $.getJSON('/api/stock/pool', function (list) {
       var $pool = $('#stockList').empty();
@@ -657,6 +829,11 @@
         openPoolStock(codes[0]);
         selectSingleStock(codes[0], { silent: true });
       }
+      // 侧栏目标池计数
+      $.getJSON('/api/stock/trade-pool').done(function (data) {
+        var n = data && data.count != null ? data.count : ((data && data.items) || []).length;
+        $('#sidePoolCount').text(String(n || 0));
+      });
     });
   }
 
@@ -1463,7 +1640,7 @@
     { id: 'backtest', group: 'stock', title: '回测要点', src: '/docs/backtest.html?v=20260719-menu' }
   ];
   var knowledgeHtmlCache = {};
-  var HOME_SRC = '/docs/home.html?v=20260719-menu-rename';
+  var HOME_SRC = '/docs/home.html?v=20260719-tradepool-single';
   var homePanelReady = false;
   var pendingHomeLead = null;
   var docsPdfBusy = false;
@@ -1483,20 +1660,151 @@
   }
 
   /**
-   * 将指定 group（stock|app）下全部知识文档合并导出 PDF
+   * 在页面内隔离宿主中渲染一段 HTML（同文档，避免 iframe 截图错乱）。
+   * @returns {{ el: HTMLElement, destroy: Function }}
+   */
+  function mountPdfBlock(innerHtml) {
+    var host = document.getElementById('pdfExportHost');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'pdfExportHost';
+      document.body.appendChild(host);
+    }
+    host.className = 'pdf-export-host-active';
+    host.innerHTML = '';
+    var root = document.createElement('div');
+    root.className = 'pdf-export-root pdf-export-isolate';
+    root.innerHTML = innerHtml;
+    host.appendChild(root);
+    return {
+      el: root,
+      destroy: function () {
+        try { host.innerHTML = ''; host.className = ''; } catch (e) {}
+      }
+    };
+  }
+
+  /** 创建空 jsPDF（先占一页，内容写完后删掉） */
+  function createBlankJsPdf() {
+    var holder = document.createElement('div');
+    holder.setAttribute('data-pdf-dummy', '1');
+    holder.style.cssText = 'position:fixed;left:0;top:0;width:48px;height:24px;padding:4px;background:#fff;color:#fff;z-index:-1;font-size:10px;';
+    holder.textContent = '.';
+    document.body.appendChild(holder);
+    return Promise.resolve(
+      html2pdf().set({
+        margin: 0,
+        image: { type: 'jpeg', quality: 0.2 },
+        html2canvas: { scale: 1, backgroundColor: '#ffffff', logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      }).from(holder).toPdf().get('pdf')
+    ).then(function (pdf) {
+      try { document.body.removeChild(holder); } catch (e) {}
+      return pdf;
+    }, function (err) {
+      try { document.body.removeChild(holder); } catch (e2) {}
+      throw err;
+    });
+  }
+
+  /**
+   * 将一张长 canvas 按 A4 内容区切片，逐页 addImage（每片单独画，避免负偏移叠图）。
+   */
+  function appendCanvasAsNewPages(pdf, canvas, marginMm) {
+    if (!pdf || !canvas || !canvas.width || !canvas.height) return;
+    var margin = marginMm == null ? 12 : marginMm;
+    var pdfW = pdf.internal.pageSize.getWidth();
+    var pdfH = pdf.internal.pageSize.getHeight();
+    var contentW = pdfW - margin * 2;
+    var contentH = pdfH - margin * 2;
+    if (contentW <= 0 || contentH <= 0) return;
+
+    var pxPageH = Math.max(1, Math.floor(canvas.width * contentH / contentW));
+    var y = 0;
+    while (y < canvas.height) {
+      var sliceH = Math.min(pxPageH, canvas.height - y);
+      if (sliceH < 2) break;
+
+      var slice = document.createElement('canvas');
+      slice.width = canvas.width;
+      slice.height = sliceH;
+      var ctx = slice.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, slice.width, slice.height);
+      ctx.drawImage(canvas, 0, y, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+
+      var data = slice.toDataURL('image/jpeg', 0.95);
+      var drawH = contentW * sliceH / canvas.width;
+      pdf.addPage();
+      pdf.addImage(data, 'JPEG', margin, margin, contentW, drawH);
+      y += sliceH;
+    }
+  }
+
+  function captureElementCanvas(el) {
+    return Promise.resolve(
+      html2pdf().set({
+        html2canvas: {
+          scale: 1.25,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff',
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth: 800,
+          allowTaint: true
+        }
+      }).from(el).toCanvas().get('canvas')
+    );
+  }
+
+  /**
+   * 按段：挂载 → 截图 → 切片写入 PDF。彻底避开 html2pdf 多段 from/addPage 叠页错乱。
+   */
+  function exportPdfBlocksSequential(blocks, filename) {
+    return createBlankJsPdf().then(function (pdf) {
+      var i = 0;
+      function step() {
+        if (i >= blocks.length) {
+          try {
+            // 删掉占位首页
+            if (typeof pdf.deletePage === 'function' && pdf.internal.getNumberOfPages() > 1) {
+              pdf.deletePage(1);
+            }
+          } catch (e) {}
+          pdf.save(filename);
+          var host = document.getElementById('pdfExportHost');
+          if (host) { host.innerHTML = ''; host.className = ''; }
+          return Promise.resolve();
+        }
+        var html = blocks[i++];
+        var mounted = mountPdfBlock(html);
+        // 强制布局
+        void mounted.el.offsetHeight;
+        return captureElementCanvas(mounted.el).then(function (canvas) {
+          mounted.destroy();
+          appendCanvasAsNewPages(pdf, canvas, 12);
+          return step();
+        }, function (err) {
+          mounted.destroy();
+          throw err;
+        });
+      }
+      return step();
+    });
+  }
+
+  /**
+   * 将指定 group（stock|app）下全部知识文档合并导出 PDF。
+   * 走服务端 iText（与 zulin/zsw-utils 同路线），不再用浏览器 html2pdf。
    */
   function downloadDocsPdf(group, $btn) {
     if (docsPdfBusy) {
       toast('正在生成 PDF，请稍候…', 'info');
       return;
     }
-    if (typeof html2pdf === 'undefined') {
-      toast('PDF 组件未加载，请刷新页面后重试', 'err');
-      return;
-    }
-    var topics = knowledgeTopics.filter(function (t) { return t.group === group; });
-    if (!topics.length) {
-      toast('没有可导出的文档', 'err');
+    if (group !== 'stock' && group !== 'app') {
+      toast('无效的文档分组', 'err');
       return;
     }
     var packTitle = group === 'app' ? '应用说明' : '量化知识';
@@ -1506,25 +1814,8 @@
     if ($btn && $btn.length) {
       $btn.addClass('is-loading').prop('disabled', true).text('正在生成 PDF…');
     }
-    toast('正在汇总「' + packTitle + '」文档并生成 PDF…', 'info');
+    toast('正在由服务端生成「' + packTitle + '」PDF…', 'info');
 
-    var collected = [];
-    var chain = $.Deferred().resolve().promise();
-    topics.forEach(function (t) {
-      chain = chain.then(function () {
-        return fetchTopicHtml(t).then(function (html) {
-          collected.push({ topic: t, html: html });
-        });
-      });
-    });
-
-    function finishOk() {
-      toast('已下载：' + filename, 'ok');
-    }
-    function finishErr(err) {
-      console.error(err);
-      toast('PDF 生成失败，请重试', 'err');
-    }
     function finishAlways() {
       docsPdfBusy = false;
       if ($btn && $btn.length) {
@@ -1533,49 +1824,57 @@
       }
     }
 
-    chain.then(function () {
-      var now = new Date();
-      var stamp = now.getFullYear() + '-' + pad2(now.getMonth() + 1) + '-' + pad2(now.getDate()) +
-        ' ' + pad2(now.getHours()) + ':' + pad2(now.getMinutes());
-      var $root = $('<div class="pdf-export-root"/>');
-      $root.append(
-        '<div class="pdf-export-cover">' +
-        '<h1>Quant Stock · ' + packTitle + '</h1>' +
-        '<p class="pdf-meta">共 ' + collected.length + ' 篇 · 导出时间 ' + stamp + '</p>' +
-        '</div>'
-      );
-      collected.forEach(function (p, i) {
-        var $sec = $('<section class="pdf-export-section"/>');
-        $sec.append($('<h2/>').text((i + 1) + '. ' + p.topic.title));
-        var clean = String(p.html || '').replace(/<!--[\s\S]*?-->/g, '');
-        $sec.append($('<div class="pdf-export-body"/>').html(clean));
-        $root.append($sec);
-      });
-      $root.css({
-        position: 'fixed',
-        left: '-12000px',
-        top: '0',
-        zIndex: '-1',
-        pointerEvents: 'none'
-      });
-      $('body').append($root);
+    var headers = {};
+    try {
+      var k = localStorage.getItem('quant-api-key');
+      if (k) headers['X-API-Key'] = k;
+    } catch (e) {}
+    fetch('/api/docs/pdf/' + encodeURIComponent(group), {
+      method: 'GET',
+      credentials: 'same-origin',
+      headers: headers
+    })
+      .then(function (res) {
+        if (!res.ok) {
+          return res.text().then(function (t) {
+            throw new Error(t || ('HTTP ' + res.status));
+          });
+        }
+        return res.blob();
+      })
+      .then(function (blob) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function () {
+          try { document.body.removeChild(a); } catch (e) {}
+          try { URL.revokeObjectURL(url); } catch (e2) {}
+        }, 0);
+        toast('已下载：' + filename, 'ok');
+      })
+      .catch(function (err) {
+        console.error(err);
+        toast('PDF 生成失败：' + (err && err.message ? err.message : '请重试'), 'err');
+      })
+      .then(finishAlways, finishAlways);
+  }
 
-      var opt = {
-        margin: [10, 10, 12, 10],
-        filename: filename,
-        image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'legacy'] }
-      };
+  /** 去掉注释与不适于进 PDF 的控件 */
+  function sanitizeDocHtmlForPdf(html) {
+    var s = String(html || '').replace(/<!--[\s\S]*?-->/g, '');
+    s = s.replace(/<button\b[\s\S]*?<\/button>/gi, '');
+    return s.trim();
+  }
 
-      return Promise.resolve(html2pdf().set(opt).from($root[0]).save()).then(function () {
-        $root.remove();
-      }, function (err) {
-        $root.remove();
-        throw err || new Error('PDF 生成失败');
-      });
-    }).then(finishOk, finishErr).then(finishAlways, finishAlways);
+  /** 按 h4 切段；长文切开以免单次 canvas 过高 */
+  function splitHtmlByH4(html) {
+    var s = String(html || '').trim();
+    if (!s || s.length < 4000) return [s];
+    var parts = s.split(/(?=<h4\b)/i).filter(function (p) { return $.trim(p); });
+    return parts.length > 1 ? parts : [s];
   }
 
   function loadHomePanel(done) {
@@ -1641,9 +1940,172 @@
   }
 
   function hideAllWorkspaceViews() {
-    $('#viewHome, #viewNavIntro, #viewPool, #viewSingle, #viewPortfolio').prop('hidden', true);
+    $('#viewHome, #viewNavIntro, #viewPool, #viewSingle, #viewPortfolio, #viewTradePool, #viewDbTable, #viewSchedule, #viewAcctFunds, #viewAcctPositions, #viewAcctOrders').prop('hidden', true);
     $('body').removeClass('home-theme-peek');
     $('#btnExpandHome').prop('hidden', true);
+  }
+
+  var lastAccountPanel = 'funds';
+
+  function setAccountMenuActive(panel) {
+    $('#accountMenu li').removeClass('active');
+    if (panel) {
+      $('#accountMenu li[data-account-panel="' + panel + '"]').addClass('active');
+    }
+  }
+
+  function showTradePool() {
+    lastWorkspaceMode = 'tradepool';
+    $('body').removeClass('mode-doc');
+    $('#knowledgePanel').prop('hidden', true);
+    $('.side-nav-menu li').removeClass('active');
+    hideAllWorkspaceViews();
+    setSideNavOpen('tradepoolBody');
+    $('#viewTradePool').prop('hidden', false);
+    loadTradePoolManage();
+    resizeCharts();
+  }
+
+  function showAccountPanel(panel) {
+    panel = panel || lastAccountPanel || 'funds';
+    if (panel !== 'funds' && panel !== 'positions' && panel !== 'orders') {
+      panel = 'funds';
+    }
+    lastAccountPanel = panel;
+    lastWorkspaceMode = 'account';
+    $('body').removeClass('mode-doc');
+    $('#knowledgePanel').prop('hidden', true);
+    $('.side-nav-menu li').removeClass('active');
+    hideAllWorkspaceViews();
+    setSideNavOpen('accountBody');
+    setAccountMenuActive(panel);
+    if (panel === 'positions') {
+      $('#viewAcctPositions').prop('hidden', false);
+    } else if (panel === 'orders') {
+      $('#viewAcctOrders').prop('hidden', false);
+    } else {
+      $('#viewAcctFunds').prop('hidden', false);
+    }
+    loadAccountOverview();
+    resizeCharts();
+  }
+
+  function pnlClass(v) {
+    var n = Number(v);
+    if (!isFinite(n) || n === 0) return '';
+    return n > 0 ? 'pnl-pos' : 'pnl-neg';
+  }
+
+  function sideLabel(side) {
+    if (side === 'BUY') return '买';
+    if (side === 'SELL') return '卖';
+    return side || '—';
+  }
+
+  function orderStatusLabel(st) {
+    var map = {
+      PENDING: '待报', SUBMITTED: '已报', PARTIAL: '部成',
+      FILLED: '已成', CANCELLED: '已撤', REJECTED: '拒单'
+    };
+    return map[st] || st || '—';
+  }
+
+  function renderAccountFunds(data) {
+    data = data || {};
+    $('#acctModeBadge').text(data.source || data.mode || 'LOCAL_SIM');
+    if (data.hint) $('#acctFundsHint').text(data.hint);
+    $('#acctFundsAsOf').text(data.asOf ? ('更新：' + data.asOf) : '');
+    $('#acctEquity').text(num(data.equity));
+    $('#acctCash').text(num(data.cash));
+    $('#acctPosMv').text('持仓市值 ' + num(data.positionMv));
+    $('#acctTotalReturn').attr('class', 'sub ' + pnlClass(data.totalReturn))
+      .text('累计收益 ' + pctFine(data.totalReturn));
+    $('#acctDayPnl').attr('class', 'value ' + pnlClass(data.dayPnl)).text(num(data.dayPnl));
+    $('#acctDayPnlPct').attr('class', 'value ' + pnlClass(data.dayPnlPct)).text(pctFine(data.dayPnlPct));
+    $('#acctInit').text(formatCapitalCn(data.initCapital) + ' / ' + num(data.initCapital));
+    $('#acctDrawdown').text(pct(data.drawdown));
+    $('#acctPeak').text(num(data.peakEquity));
+    $('#acctPrevClose').text(num(data.prevCloseEquity));
+    $('#acctHalted').text(data.halted ? '是（禁开）' : '否');
+    $('#acctAllowOpen').text(data.allowNewOpen ? '是' : '否');
+    $('#acctPosScale').text(data.positionScale == null ? '—' : num(data.positionScale, 2) + '×');
+    $('#acctLossStreak').text(data.consecutiveLosses == null ? '—' : String(data.consecutiveLosses));
+  }
+
+  function renderAccountPositions(items) {
+    items = items || [];
+    $('#acctPosBadge').text(String(items.length));
+    $('#sidePosCount').text(String(items.length));
+    var $body = $('#acctPosBody').empty();
+    if (!items.length) {
+      $body.html('<tr><td colspan="10" class="empty-state">暂无持仓</td></tr>');
+      $('#acctPosHint').text('无持仓');
+      return;
+    }
+    items.forEach(function (it) {
+      $body.append(
+        '<tr>'
+        + '<td><b>' + escHtml(it.code) + '</b></td>'
+        + '<td>' + escHtml(it.name || '') + '</td>'
+        + '<td class="mono">' + escHtml(String(it.volume == null ? '—' : it.volume)) + '</td>'
+        + '<td class="mono">' + escHtml(num(it.avgCost)) + '</td>'
+        + '<td class="mono">' + escHtml(num(it.lastPrice)) + '</td>'
+        + '<td class="mono">' + escHtml(num(it.marketValue)) + '</td>'
+        + '<td class="mono ' + pnlClass(it.unrealizedPnl) + '">' + escHtml(num(it.unrealizedPnl)) + '</td>'
+        + '<td class="mono ' + pnlClass(it.unrealizedPnlPct) + '">' + escHtml(pctFine(it.unrealizedPnlPct)) + '</td>'
+        + '<td class="mono">' + escHtml(num(it.stopPrice)) + '</td>'
+        + '<td class="mono">' + escHtml(it.lastBuyDate || '—') + '</td>'
+        + '</tr>'
+      );
+    });
+    $('#acctPosHint').text('共 ' + items.length + ' 只');
+  }
+
+  function renderAccountOrders(items) {
+    items = items || [];
+    $('#acctOrderBadge').text(String(items.length));
+    $('#sideOrderCount').text(String(items.length));
+    var $body = $('#acctOrderBody').empty();
+    if (!items.length) {
+      $body.html('<tr><td colspan="8" class="empty-state">暂无委托</td></tr>');
+      $('#acctOrderHint').text('无委托');
+      return;
+    }
+    // 新单在前
+    var rows = items.slice().reverse();
+    rows.forEach(function (it) {
+      $body.append(
+        '<tr>'
+        + '<td class="mono">' + escHtml(it.orderId || it.clientOrderId || '—') + '</td>'
+        + '<td><b>' + escHtml(it.code) + '</b></td>'
+        + '<td>' + escHtml(it.name || '') + '</td>'
+        + '<td>' + escHtml(sideLabel(it.side)) + '</td>'
+        + '<td class="mono">' + escHtml(num(it.price)) + '</td>'
+        + '<td class="mono">' + escHtml(String(it.volume == null ? '—' : it.volume)) + '</td>'
+        + '<td class="mono">' + escHtml(num(it.amount)) + '</td>'
+        + '<td>' + escHtml(orderStatusLabel(it.status)) + '</td>'
+        + '</tr>'
+      );
+    });
+    $('#acctOrderHint').text('共 ' + rows.length + ' 笔');
+  }
+
+  function loadAccountOverview() {
+    $.getJSON('/api/account')
+      .done(function (data) {
+        renderAccountFunds(data);
+        renderAccountPositions(data.positions || []);
+        renderAccountOrders(data.orders || []);
+        if (data.positionCount != null) $('#sidePosCount').text(String(data.positionCount));
+        if (data.orderCount != null) $('#sideOrderCount').text(String(data.orderCount));
+      })
+      .fail(function (xhr) {
+        var msg = (xhr && xhr.responseJSON && xhr.responseJSON.message) || '账户概览加载失败';
+        $('#acctFundsHint').text(msg);
+        $('#acctPosHint').text(msg);
+        $('#acctOrderHint').text(msg);
+        toast(msg, 'err');
+      });
   }
 
   var navIntroCache = {};
@@ -1712,8 +2174,8 @@
   }
 
   /**
-   * @param {string} mode pool|single|portfolio
-   * @param {{expandNav?: boolean}} [options] expandNav 默认 true；为 false 时只切主区、不强制展开一级菜单
+   * @param {string} mode pool|single|portfolio|tradepool|dbtables|schedule|account
+   * @param {{expandNav?: boolean, panel?: string, table?: string}} [options]
    */
   function showMode(mode, options) {
     options = options || {};
@@ -1735,12 +2197,358 @@
       if (expandNav) setSideNavOpen('portfolioBody');
       syncPortfolioCodes();
       loadPortfolioHistory();
+    } else if (lastWorkspaceMode === 'tradepool') {
+      showTradePool();
+      return;
+    } else if (lastWorkspaceMode === 'account') {
+      showAccountPanel(options.panel || lastAccountPanel || 'funds');
+      return;
+    } else if (lastWorkspaceMode === 'dbtables') {
+      if (expandNav) setSideNavOpen('dbtablesBody');
+      showDbTable(options.table || dbTableState.name || '');
+      return;
+    } else if (lastWorkspaceMode === 'schedule') {
+      $('#viewSchedule').prop('hidden', false);
+      if (expandNav) setSideNavOpen('scheduleBody');
+      loadScheduleJobs();
     } else {
       lastWorkspaceMode = 'pool';
       $('#viewPool').prop('hidden', false);
       if (expandNav) setSideNavOpen('poolBody');
     }
     resizeCharts();
+  }
+
+  var dbTableState = { name: '', page: 1, size: 20, pages: 0, total: 0 };
+
+  function loadDbTablesMenu() {
+    var $menu = $('#dbtablesMenu').empty();
+    $.getJSON('/api/db/tables').done(function (data) {
+      var tables = (data && data.tables) || [];
+      if (!tables.length) {
+        $menu.append($('<li class="hint"/>').text('暂无表白名单'));
+        return;
+      }
+      tables.forEach(function (t) {
+        var countTxt = t.rowCount != null ? String(t.rowCount) : '—';
+        var $li = $('<li role="button" tabindex="0"/>')
+          .attr('data-table', t.name)
+          .html(
+            '<span class="db-tbl-title">' + escHtml(t.title || t.name)
+            + ' <span class="trade-pool-count">' + escHtml(countTxt) + '</span></span>'
+            + '<span class="db-tbl-name">' + escHtml(t.name) + '</span>'
+          );
+        if (t.exists === false) {
+          $li.css('opacity', '0.55').attr('title', '表可能尚未创建');
+        }
+        $menu.append($li);
+      });
+      if (dbTableState.name) {
+        $('#dbtablesMenu li[data-table="' + dbTableState.name + '"]').addClass('active');
+      }
+    }).fail(function () {
+      $menu.append($('<li class="hint"/>').text('加载表列表失败'));
+    });
+  }
+
+  function showDbTable(tableName) {
+    lastWorkspaceMode = 'dbtables';
+    $('body').removeClass('mode-doc');
+    $('#knowledgePanel').prop('hidden', true);
+    $('.side-nav-menu li').removeClass('active');
+    hideAllWorkspaceViews();
+    setSideNavOpen('dbtablesBody');
+    $('#viewDbTable').prop('hidden', false);
+
+    if (!tableName) {
+      $('#dbTableTitle').text('库表浏览');
+      $('#dbTableHint').text('请从左侧选择一张表');
+      $('#dbTableSummary').text('');
+      clearDbTableMeta();
+      $('#dbTableHead').html('<tr><th>请选择左侧表</th></tr>');
+      $('#dbTableBody').html('<tr><td class="empty-state">暂无数据</td></tr>');
+      updateDbPager(0, 1, 20, 0);
+      resizeCharts();
+      return;
+    }
+
+    dbTableState.name = tableName;
+    dbTableState.page = 1;
+    dbTableState.size = parseInt($('#dbTablePageSize').val(), 10) || 20;
+    $('#dbtablesMenu li[data-table="' + tableName + '"]').addClass('active');
+    loadDbTablePage();
+    resizeCharts();
+  }
+
+  function loadDbTablePage() {
+    var name = dbTableState.name;
+    if (!name) return;
+    var page = dbTableState.page || 1;
+    var size = dbTableState.size || 20;
+    $('#dbTableBody').html('<tr><td class="empty-state" colspan="99">加载中…</td></tr>');
+    $.getJSON('/api/db/tables/' + encodeURIComponent(name), { page: page, size: size })
+      .done(function (data) {
+        dbTableState.page = data.page || page;
+        dbTableState.size = data.size || size;
+        dbTableState.pages = data.pages || 0;
+        dbTableState.total = data.total || 0;
+        $('#dbTableTitle').text((data.title || name) + ' · ' + name);
+        $('#dbTableHint').text('只读分页浏览 · 表结构见下方字段中文说明');
+        renderDbTableMeta(data);
+        $('#dbTableSummary').text('共 ' + dbTableState.total + ' 行 · 第 ' + dbTableState.page + ' / ' + Math.max(1, dbTableState.pages) + ' 页');
+        var cols = normalizeDbColumns(data.columns || []);
+        if (!cols.length) {
+          $('#dbTableHead').html('<tr><th>—</th></tr>');
+          $('#dbTableBody').html('<tr><td class="empty-state">表无列或为空</td></tr>');
+        } else {
+          var head = '<tr>' + cols.map(function (c) {
+            var tip = c.comment ? (c.name + ' · ' + c.comment) : c.name;
+            return '<th class="db-col-th" title="' + escHtml(tip) + '">'
+              + '<span class="db-col-label">' + escHtml(c.label || c.comment || c.name) + '</span>'
+              + '<span class="db-col-name">' + escHtml(c.name) + '</span>'
+              + '</th>';
+          }).join('') + '</tr>';
+          $('#dbTableHead').html(head);
+          var rows = data.rows || [];
+          if (!rows.length) {
+            $('#dbTableBody').html('<tr><td class="empty-state" colspan="' + cols.length + '">本页无数据</td></tr>');
+          } else {
+            var html = rows.map(function (row) {
+              return '<tr>' + cols.map(function (c) {
+                var v = row[c.name];
+                if (v == null) return '<td class="db-cell-null">NULL</td>';
+                return '<td title="' + escHtml(String(v)) + '">' + escHtml(String(v)) + '</td>';
+              }).join('') + '</tr>';
+            }).join('');
+            $('#dbTableBody').html(html);
+          }
+        }
+        updateDbPager(dbTableState.total, dbTableState.page, dbTableState.size, dbTableState.pages);
+        $('#dbPageJump').val(dbTableState.page);
+        $('#dbTablePageSize').val(String(dbTableState.size));
+      })
+      .fail(function (xhr) {
+        var msg = (xhr.responseJSON && xhr.responseJSON.message) || '加载失败';
+        $('#dbTableTitle').text(name);
+        $('#dbTableHint').text(msg);
+        clearDbTableMeta();
+        $('#dbTableHead').html('<tr><th>错误</th></tr>');
+        $('#dbTableBody').html('<tr><td class="empty-state">' + escHtml(msg) + '</td></tr>');
+        updateDbPager(0, 1, dbTableState.size, 0);
+      });
+  }
+
+  function setDbMetaExpanded(open) {
+    open = !!open;
+    $('#dbTableMeta').toggleClass('is-open', open);
+    $('#dbMetaDetail').prop('hidden', !open);
+    $('#btnDbMetaToggle').attr('aria-expanded', open ? 'true' : 'false');
+  }
+
+  function renderDbTableMeta(data) {
+    data = data || {};
+    var module = data.module || '—';
+    var purpose = data.purpose || '—';
+    $('#dbMetaModule').text(module);
+    $('#dbMetaPurpose').text(purpose);
+    $('#dbMetaSource').text(data.source || '—');
+    $('#dbMetaUsage').text(data.usage || '—');
+    $('#dbMetaOrder').text(data.orderBy || '—');
+    // 一行简略：模块 · 功能说明（超出省略）
+    $('#dbMetaSummary').text(module + ' · ' + purpose);
+    $('#dbTableMeta').prop('hidden', false);
+    setDbMetaExpanded(false);
+  }
+
+  function clearDbTableMeta() {
+    $('#dbTableMeta').prop('hidden', true);
+    setDbMetaExpanded(false);
+    $('#dbMetaSummary').text('—');
+    $('#dbMetaModule, #dbMetaPurpose, #dbMetaSource, #dbMetaUsage, #dbMetaOrder').text('—');
+  }
+
+  function updateDbPager(total, page, size, pages) {
+    pages = pages || 0;
+    $('#dbPageInfo').text('第 ' + page + ' / ' + Math.max(1, pages) + ' 页（共 ' + total + ' 行）');
+    $('#btnDbPrev').prop('disabled', page <= 1);
+    $('#btnDbNext').prop('disabled', pages <= 0 || page >= pages);
+  }
+
+  /** 兼容 columns: string[] 或 {name,comment,label}[] */
+  function normalizeDbColumns(raw) {
+    if (!raw || !raw.length) return [];
+    return raw.map(function (c) {
+      if (typeof c === 'string') {
+        return { name: c, comment: '', label: c };
+      }
+      var name = c.name || c.column || '';
+      var comment = c.comment || '';
+      var label = c.label || comment || name;
+      return { name: name, comment: comment, label: label };
+    });
+  }
+
+  function escHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  var scheduleJobsByCode = {};
+  var SCHEDULE_COLSPAN = 8;
+
+  function loadScheduleJobs() {
+    var $body = $('#scheduleJobBody');
+    $body.html('<tr><td colspan="8" class="empty-state">加载中…</td></tr>');
+    $.getJSON('/api/schedule').done(function (data) {
+      var masterOn = !!data.enabled;
+      $('#scheduleMasterHint').text(masterOn
+        ? '总闸已开 · 已注册 ' + (data.registeredCount || 0) + ' 个触发器'
+        : '总闸 quant.schedule.enabled=false（改 yml 后需重启）');
+      var baseHint = data.hint || '';
+      $('#scheduleHint').text(baseHint + (baseHint ? ' · ' : '') + '点击行空白处展开任务详细介绍');
+      var jobs = data.jobs || [];
+      scheduleJobsByCode = {};
+      if (!jobs.length) {
+        $body.html('<tr><td colspan="8" class="empty-state">暂无任务（需 quant.db-enabled=true）</td></tr>');
+        return;
+      }
+      var rows = jobs.map(function (j) {
+        scheduleJobsByCode[j.jobCode] = j;
+        var triggerVal = (j.triggerType || '').toUpperCase() === 'FIXED_RATE'
+          ? (j.intervalMs != null ? String(j.intervalMs) : '')
+          : (j.cronExpr || '');
+        var impl = j.implemented ? '' : ' <span class="schedule-badge schedule-badge--todo">未实现</span>';
+        var eff = j.effective
+          ? '<span class="schedule-ok">调度中</span>'
+          : (j.enabled ? '<span class="schedule-warn">未生效</span>' : '<span class="schedule-off">关闭</span>');
+        return '<tr class="sch-job-row" data-code="' + escHtml(j.jobCode) + '" style="cursor:pointer;" title="点击空白处查看详细介绍">'
+          + '<td><label class="schedule-switch"><input type="checkbox" class="sch-enabled" '
+          + (j.enabled ? 'checked' : '') + '/><span></span></label></td>'
+          + '<td><div class="schedule-name">' + escHtml(j.jobName) + impl + '</div>'
+          + '<div class="schedule-code">' + escHtml(j.jobCode) + '</div></td>'
+          + '<td><select class="sch-type">'
+          + '<option value="CRON"' + ((j.triggerType || '').toUpperCase() === 'CRON' ? ' selected' : '') + '>CRON</option>'
+          + '<option value="FIXED_RATE"' + ((j.triggerType || '').toUpperCase() === 'FIXED_RATE' ? ' selected' : '') + '>FIXED_RATE</option>'
+          + '</select></td>'
+          + '<td><input class="sch-trigger" type="text" value="' + escHtml(triggerVal) + '" '
+          + 'placeholder="cron 或毫秒"/></td>'
+          + '<td>' + eff + '</td>'
+          + '<td class="mono">' + escHtml(j.lastRunAt || '—') + '</td>'
+          + '<td><input class="sch-remark" type="text" value="' + escHtml(j.remark || '') + '"/></td>'
+          + '<td class="schedule-actions">'
+          + '<button type="button" class="secondary sch-save">保存</button> '
+          + '<button type="button" class="secondary sch-run">执行一次</button>'
+          + '</td></tr>';
+      });
+      $body.html(rows.join(''));
+    }).fail(function (xhr) {
+      var msg = (xhr.responseJSON && xhr.responseJSON.message) || xhr.statusText || '加载失败';
+      $body.html('<tr><td colspan="8" class="empty-state">' + escHtml(msg) + '</td></tr>');
+    });
+  }
+
+  function collapseScheduleJobDetail() {
+    var $tb = $('#scheduleJobBody');
+    $tb.find('tr.sch-job-row').removeClass('active').removeAttr('data-expanded');
+    $tb.find('tr.sch-detail-row').remove();
+  }
+
+  function ensureScheduleDetailRow($tr) {
+    var code = String($tr.attr('data-code') || '');
+    var $next = $tr.next('tr.sch-detail-row');
+    if ($next.length && String($next.attr('data-for-code') || '') === code) {
+      return $next.find('.sch-detail-panel');
+    }
+    $tr.closest('tbody').find('tr.sch-detail-row').remove();
+    var $row = $('<tr class="sch-detail-row"/>').attr('data-for-code', code);
+    var $cell = $('<td class="sch-detail-cell"/>').attr('colspan', SCHEDULE_COLSPAN);
+    var $panel = $('<div class="sch-detail-panel knowledge-body"/>');
+    $cell.append($panel);
+    $row.append($cell);
+    $tr.after($row);
+    try {
+      $row[0].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    } catch (e) {}
+    return $panel;
+  }
+
+  function renderScheduleJobDetail(job, $panel) {
+    job = job || {};
+    var d = job.detail || {};
+    $panel.empty();
+    var $head = $('<div class="analysis-detail-head"/>');
+    $head.append($('<span/>').html(
+      '<b>任务说明</b> · ' + escHtml(job.jobName || '') + ' <code>' + escHtml(job.jobCode || '') + '</code>'
+      + (job.implemented ? '' : ' <span class="schedule-badge schedule-badge--todo">未实现</span>')
+    ));
+    var $collapse = $('<button type="button" class="secondary analysis-collapse-btn"/>').text('收起');
+    $collapse.on('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      collapseScheduleJobDetail();
+    });
+    $head.append($collapse);
+    $panel.append($head);
+
+    function row(tag, text) {
+      $panel.append(
+        $('<p class="sch-detail-line"/>').html(
+          '<span class="db-meta-tag">' + escHtml(tag) + '</span> '
+          + '<span>' + escHtml(text == null || text === '' ? '—' : String(text)) + '</span>'
+        )
+      );
+    }
+    row('功能', d.purpose);
+    row('范围', d.scope);
+    row('触发', d.triggerHint);
+    row('落库', d.writes);
+    row('说明', d.notes);
+    if (job.remark) {
+      row('备注', job.remark);
+    }
+    var trig = (job.triggerType || '').toUpperCase() === 'FIXED_RATE'
+      ? ('FIXED_RATE · ' + (job.intervalMs != null ? job.intervalMs + ' ms' : '—'))
+      : ('CRON · ' + (job.cronExpr || '—'));
+    row('当前配置', (job.enabled ? '启用' : '关闭') + ' · ' + trig
+      + ' · 最近执行 ' + (job.lastRunAt || '—'));
+  }
+
+  function showScheduleJobDetail($tr) {
+    var code = String($tr.attr('data-code') || '');
+    var job = scheduleJobsByCode[code];
+    var $panel = ensureScheduleDetailRow($tr);
+    if (!job) {
+      $panel.html('<p class="hint">未找到任务详情，请刷新列表</p>');
+      return;
+    }
+    renderScheduleJobDetail(job, $panel);
+  }
+
+  function schedulePayloadFromRow($tr) {
+    var type = ($tr.find('.sch-type').val() || 'CRON').toUpperCase();
+    var trigger = $.trim($tr.find('.sch-trigger').val() || '');
+    var body = {
+      enabled: $tr.find('.sch-enabled').prop('checked'),
+      triggerType: type,
+      remark: $tr.find('.sch-remark').val() || ''
+    };
+    if (type === 'FIXED_RATE') {
+      var ms = parseInt(trigger, 10);
+      if (!ms || ms < 1000) {
+        toast('FIXED_RATE 间隔至少 1000ms', 'err');
+        return null;
+      }
+      body.intervalMs = ms;
+      body.cronExpr = '';
+    } else {
+      if (!trigger) {
+        toast('请填写 cron 表达式', 'err');
+        return null;
+      }
+      body.cronExpr = trigger;
+    }
+    return body;
   }
 
   function showDocMode(menuBodyId) {
@@ -1799,7 +2607,7 @@
     var introSrc = $btn.attr('data-intro');
     var introTitle = $btn.attr('data-intro-title') || $btn.clone().children().remove().end().text().trim();
     if (introSrc) {
-      showNavIntro({ bodyId: bodyId, title: introTitle, src: introSrc + (introSrc.indexOf('?') >= 0 ? '&' : '?') + 'v=20260719-menu-rename' });
+      showNavIntro({ bodyId: bodyId, title: introTitle, src: introSrc + (introSrc.indexOf('?') >= 0 ? '&' : '?') + 'v=20260719-tradepool-single' });
       return;
     }
     // 无介绍配置时回退到原工作台
@@ -1808,7 +2616,206 @@
 
   $('#viewNavIntro').on('click', '[data-enter-mode]', function () {
     var mode = $(this).attr('data-enter-mode');
-    if (mode) showMode(mode);
+    if (!mode) return;
+    if (mode === 'account') {
+      showMode('account', { panel: $(this).attr('data-account-panel') || 'funds' });
+      return;
+    }
+    showMode(mode);
+  });
+
+  $('#btnEnterSchedule').on('click', function () {
+    showMode('schedule');
+  });
+
+  $('#btnEnterTradePool').on('click', function () {
+    showMode('tradepool');
+  });
+
+  $('#accountMenu').on('click', 'li', function () {
+    showAccountPanel($(this).attr('data-account-panel'));
+  });
+
+  $('#accountMenu').on('keydown', 'li', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      $(this).trigger('click');
+    }
+  });
+
+  $('#btnAcctRefreshFunds, #btnAcctRefreshPos, #btnAcctRefreshOrders').on('click', function () {
+    loadAccountOverview();
+  });
+
+  $('#dbtablesMenu').on('click', 'li[data-table]', function () {
+    showDbTable($(this).attr('data-table'));
+  });
+
+  $('#dbtablesMenu').on('keydown', 'li[data-table]', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      $(this).trigger('click');
+    }
+  });
+
+  $('#btnDbMetaToggle').on('click', function () {
+    setDbMetaExpanded(!$('#dbTableMeta').hasClass('is-open'));
+  });
+
+  $('#btnDbTableRefresh').on('click', function () {
+    if (dbTableState.name) {
+      loadDbTablePage();
+      loadDbTablesMenu();
+    } else {
+      loadDbTablesMenu();
+      toast('已刷新表列表', 'ok');
+    }
+  });
+
+  $('#dbTablePageSize').on('change', function () {
+    dbTableState.size = parseInt($(this).val(), 10) || 20;
+    dbTableState.page = 1;
+    if (dbTableState.name) loadDbTablePage();
+  });
+
+  $('#btnDbPrev').on('click', function () {
+    if (dbTableState.page > 1) {
+      dbTableState.page -= 1;
+      loadDbTablePage();
+    }
+  });
+
+  $('#btnDbNext').on('click', function () {
+    if (dbTableState.pages && dbTableState.page < dbTableState.pages) {
+      dbTableState.page += 1;
+      loadDbTablePage();
+    }
+  });
+
+  $('#btnDbJump').on('click', function () {
+    var p = parseInt($('#dbPageJump').val(), 10);
+    if (!p || p < 1) p = 1;
+    if (dbTableState.pages && p > dbTableState.pages) p = dbTableState.pages;
+    dbTableState.page = p;
+    if (dbTableState.name) loadDbTablePage();
+  });
+
+  $('#btnTpRefresh').on('click', function () {
+    loadTradePoolManage();
+  });
+
+  $('#btnTpRebuild').on('click', function () {
+    var $btn = $(this);
+    $btn.prop('disabled', true).text('扫描中…');
+    $.post('/api/stock/trade-pool/rebuild').done(function (res) {
+      toast('目标池已更新：' + (res.selected != null ? res.selected : 0)
+        + ' 只（全市场 ' + (res.universe || 0) + '）', 'ok');
+      loadTradePoolManage();
+    }).fail(function (xhr) {
+      toast((xhr.responseJSON && xhr.responseJSON.message) || '扫描失败', 'err');
+    }).always(function () {
+      $btn.prop('disabled', false).text('扫描更新');
+    });
+  });
+
+  $('#tpPoolBody').on('click', 'tr.tp-pool-row', function (e) {
+    if ($(e.target).closest('input, button, a, label').length) return;
+    var $tr = $(this);
+    var expanded = $tr.hasClass('active') || $tr.attr('data-expanded') === '1';
+    if (expanded) {
+      collapseTpPoolAnalysis();
+      return;
+    }
+    collapseTpPoolAnalysis();
+    $tr.addClass('active').attr('data-expanded', '1');
+    showTpPoolAnalysis($tr);
+  });
+
+  $('#tpPoolBody').on('click', '.tp-remove', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    var code = $(this).attr('data-code');
+    if (!code) return;
+    if (!window.confirm('将 ' + code + ' 移出目标池？\n（不停仓、不卖出持仓）')) {
+      return;
+    }
+    $.post('/api/stock/trade-pool/' + encodeURIComponent(code) + '/remove').done(function () {
+      toast('已移出目标池 ' + code + '（未卖出）', 'ok');
+      loadTradePoolManage();
+    }).fail(function (xhr) {
+      toast((xhr.responseJSON && xhr.responseJSON.message) || '移出失败', 'err');
+    });
+  });
+
+  $('#btnScheduleRefresh').on('click', function () {
+    loadScheduleJobs();
+  });
+
+  $('#btnScheduleReload').on('click', function () {
+    $.post('/api/schedule/reload').done(function () {
+      toast('已重载调度', 'ok');
+      loadScheduleJobs();
+    }).fail(function (xhr) {
+      toast((xhr.responseJSON && xhr.responseJSON.message) || '重载失败', 'err');
+    });
+  });
+
+  $('#scheduleJobBody').on('click', 'tr.sch-job-row', function (e) {
+    if ($(e.target).closest('input, select, button, a, label, textarea').length) return;
+    var $tr = $(this);
+    var expanded = $tr.hasClass('active') || $tr.attr('data-expanded') === '1';
+    if (expanded) {
+      collapseScheduleJobDetail();
+      return;
+    }
+    collapseScheduleJobDetail();
+    $tr.addClass('active').attr('data-expanded', '1');
+    showScheduleJobDetail($tr);
+  });
+
+  $('#scheduleJobBody').on('change', '.sch-enabled', function () {
+    var $tr = $(this).closest('tr');
+    var code = $tr.attr('data-code');
+    var enabled = $(this).prop('checked');
+    $.ajax({
+      url: '/api/schedule/jobs/' + encodeURIComponent(code) + '/toggle?enabled=' + enabled,
+      method: 'POST'
+    }).done(function () {
+      toast((enabled ? '已启用 ' : '已停用 ') + code, 'ok');
+      loadScheduleJobs();
+    }).fail(function (xhr) {
+      toast((xhr.responseJSON && (xhr.responseJSON.message || xhr.responseJSON.error)) || '切换失败', 'err');
+      loadScheduleJobs();
+    });
+  });
+
+  $('#scheduleJobBody').on('click', '.sch-save', function () {
+    var $tr = $(this).closest('tr');
+    var code = $tr.attr('data-code');
+    var body = schedulePayloadFromRow($tr);
+    if (!body) return;
+    $.ajax({
+      url: '/api/schedule/jobs/' + encodeURIComponent(code),
+      method: 'PUT',
+      contentType: 'application/json',
+      data: JSON.stringify(body)
+    }).done(function () {
+      toast('已保存 ' + code, 'ok');
+      loadScheduleJobs();
+    }).fail(function (xhr) {
+      var msg = (xhr.responseJSON && (xhr.responseJSON.message || xhr.responseJSON.error)) || '保存失败';
+      toast(msg, 'err');
+    });
+  });
+
+  $('#scheduleJobBody').on('click', '.sch-run', function () {
+    var code = $(this).closest('tr').attr('data-code');
+    $.post('/api/schedule/jobs/' + encodeURIComponent(code) + '/run').done(function () {
+      toast('已触发 ' + code, 'ok');
+      loadScheduleJobs();
+    }).fail(function (xhr) {
+      toast((xhr.responseJSON && xhr.responseJSON.message) || '执行失败', 'err');
+    });
   });
 
   $('#viewNavIntro').on('click', '[data-download-docs]', function () {
@@ -1841,7 +2848,7 @@
     toast('已收起菜单，回到初始化页', 'ok');
   });
 
-  $('.side-nav-menu').on('click', 'li', function () {
+  $('#stockKnowledgeMenu, #appRelatedMenu').on('click', 'li', function () {
     openKnowledge($(this).data('id'));
   });
 
@@ -1922,6 +2929,7 @@
   initTheme();
   loadSummary();
   loadPool();
+  loadDbTablesMenu();
   showHome();
   bindCapitalHint($('#initCapital'), $('#initCapitalHint'));
   bindCapitalHint($('#pfInitCapital'), $('#pfInitCapitalHint'));

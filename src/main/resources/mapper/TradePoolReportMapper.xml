@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.stock.mapper.TradePoolReportMapper">
+
+    <resultMap id="ReportMap" type="com.quant.stock.pool.dto.TradePoolReportDO">
+        <id column="id" property="id"/>
+        <result column="symbol" property="symbol"/>
+        <result column="name" property="name"/>
+        <result column="score" property="score"/>
+        <result column="reason" property="reason"/>
+        <result column="summary" property="summary"/>
+        <result column="analysis_json" property="analysisJson"/>
+        <result column="batch_id" property="batchId"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO trade_pool_report
+        (symbol, name, score, reason, summary, analysis_json, batch_id, created_at)
+        VALUES
+        (#{symbol}, #{name}, #{score}, #{reason}, #{summary}, #{analysisJson}, #{batchId}, NOW())
+    </insert>
+
+    <select id="selectById" resultMap="ReportMap">
+        SELECT id, symbol, name, score, reason, summary, analysis_json, batch_id, created_at
+        FROM trade_pool_report
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+    <select id="selectLatestBySymbol" resultMap="ReportMap">
+        SELECT id, symbol, name, score, reason, summary, analysis_json, batch_id, created_at
+        FROM trade_pool_report
+        WHERE symbol = #{symbol}
+        ORDER BY created_at DESC
+        LIMIT 1
+    </select>
+</mapper>

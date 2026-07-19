@@ -27,6 +27,7 @@ public class ConfigController {
         m.put("rateLimitPerMinute", props.getRateLimitPerMinute());
         m.put("historyDir", props.getHistoryDir());
         m.put("feeRate", props.getFeeRate());
+        m.put("scheduleEnabled", props.getSchedule() != null && props.getSchedule().isEnabled());
         return m;
     }
 }

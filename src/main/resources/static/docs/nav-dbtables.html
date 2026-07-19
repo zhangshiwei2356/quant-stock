@@ -1,0 +1,21 @@
+<!-- 一级菜单介绍：库表浏览 -->
+<p class="nav-intro-lead">查看本应用管理使用的 <strong>MySQL</strong> 表（与 <code>schema.sql</code> 白名单一致），支持<strong>只读分页</strong>浏览数据。</p>
+<div class="nav-intro-grid">
+  <section class="nav-intro-card">
+    <h4><span class="nav-intro-card-tag">说明</span>能做什么</h4>
+    <ul class="nav-intro-list">
+      <li>左侧每个子菜单对应一张业务表</li>
+      <li>右侧分页查看行数据（默认按主键倒序）</li>
+      <li>长文本字段会截断显示，避免撑爆页面</li>
+    </ul>
+  </section>
+  <section class="nav-intro-card nav-intro-card--steps">
+    <h4><span class="nav-intro-card-tag">步骤</span>怎么开始</h4>
+    <ol class="nav-intro-steps">
+      <li>确认已开启 <code>quant.db-enabled=true</code></li>
+      <li>左侧点选表名进入浏览页</li>
+      <li>用底部分页切换页码 / 每页条数</li>
+    </ol>
+  </section>
+</div>
+<p class="nav-intro-hint">仅白名单内表可查，不支持任意 SQL。再点一次「库表浏览」可收起并回初始化页。</p>

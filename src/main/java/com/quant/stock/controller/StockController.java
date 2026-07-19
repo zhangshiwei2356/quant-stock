@@ -11,8 +11,10 @@ import com.quant.stock.market.BarPeriod;
 import com.quant.stock.market.JsonBarDataStore;
 import com.quant.stock.market.MarketDataService;
 import com.quant.stock.market.dto.BarDTO;
+import com.quant.stock.pool.TradePoolService;
 import com.quant.stock.strategy.IndicatorSignalUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -41,9 +43,20 @@ public class StockController {
     private final BackTestHistoryStore backTestHistoryStore;
     private final BackTestAnalysisStore backTestAnalysisStore;
     private final JsonBarDataStore jsonBarDataStore;
+    private final ObjectProvider<TradePoolService> tradePoolServiceProvider;
 
+    /**
+     * 浏览/回测用股票列表：优先全市场 stock_basic，其次 json 种子，最后 yml stock-codes。
+     */
     @GetMapping("/stock/pool")
     public List<Map<String, String>> stockPool() {
+        TradePoolService poolSvc = tradePoolServiceProvider.getIfAvailable();
+        if (poolSvc != null) {
+            List<Map<String, String>> universe = poolSvc.listUniverse();
+            if (universe != null && !universe.isEmpty()) {
+                return universe;
+            }
+        }
         if (jsonBarDataStore.available()) {
             return jsonBarDataStore.getStocks();
         }

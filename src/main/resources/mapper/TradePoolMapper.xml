@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.stock.mapper.TradePoolMapper">
+
+    <resultMap id="PoolMap" type="com.quant.stock.pool.dto.TradePoolDO">
+        <id column="id" property="id"/>
+        <result column="symbol" property="symbol"/>
+        <result column="name" property="name"/>
+        <result column="status" property="status"/>
+        <result column="score" property="score"/>
+        <result column="reason" property="reason"/>
+        <result column="source" property="source"/>
+        <result column="report_id" property="reportId"/>
+        <result column="entered_at" property="enteredAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="cols">
+        id, symbol, name, status, score, reason, source, report_id, entered_at, updated_at
+    </sql>
+
+    <select id="selectActive" resultMap="PoolMap">
+        SELECT <include refid="cols"/>
+        FROM trade_pool
+        WHERE status = 1
+        ORDER BY score DESC, symbol ASC
+    </select>
+
+    <select id="selectAll" resultMap="PoolMap">
+        SELECT <include refid="cols"/>
+        FROM trade_pool
+        ORDER BY status DESC, score DESC, symbol ASC
+    </select>
+
+    <select id="countActive" resultType="int">
+        SELECT COUNT(1) FROM trade_pool WHERE status = 1
+    </select>
+
+    <select id="selectBySymbol" resultMap="PoolMap">
+        SELECT <include refid="cols"/>
+        FROM trade_pool
+        WHERE symbol = #{symbol}
+        LIMIT 1
+    </select>
+
+    <update id="deactivateAll">
+        UPDATE trade_pool SET status = 0
+    </update>
+
+    <update id="deactivateBySymbol">
+        UPDATE trade_pool SET status = 0, updated_at = CURRENT_TIMESTAMP
+        WHERE symbol = #{symbol}
+    </update>
+
+    <insert id="upsert">
+        INSERT INTO trade_pool (symbol, name, status, score, reason, source, report_id, entered_at)
+        VALUES (#{symbol}, #{name}, #{status}, #{score}, #{reason}, #{source}, #{reportId}, NOW())
+        ON DUPLICATE KEY UPDATE
+            name = VALUES(name),
+            status = VALUES(status),
+            score = VALUES(score),
+            reason = VALUES(reason),
+            source = VALUES(source),
+            report_id = VALUES(report_id),
+            entered_at = CASE WHEN VALUES(status) = 1 THEN NOW() ELSE entered_at END,
+            updated_at = CURRENT_TIMESTAMP
+    </insert>
+</mapper>

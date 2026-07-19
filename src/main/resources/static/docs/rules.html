@@ -137,7 +137,12 @@
 
 <h4>十一、实盘分钟扫描（定时任务，模拟现金）</h4>
 <ul>
-  <li>交易时段约每分钟扫描（工作日 9–11、13–15 点）；模拟初始现金默认 100000</li>
+  <li><b>默认各任务关闭</b>：配置在 MySQL <code>sys_schedule_job</code>（种子 enabled=0）；页面「定时任务」可启停/改 cron，立即重载</li>
+  <li>总闸 <code>quant.schedule.enabled</code>（默认 true）：为 false 时不注册任何触发器；目录见 <code>GET /api/schedule</code></li>
+  <li><b>唯一目标池</b>：全市场经 <code>pool-rebuild</code> 或 <code>after-market-batch-scan</code> 盘后扫描自动覆盖 <code>trade_pool</code>；无需人工确认；扫描无入选时清空池</li>
+  <li><code>pool-rebuild</code> 与 <code>after-market-batch-scan</code> 启用<strong>其一</strong>即可</li>
+  <li>页面「交易目标池」可手动移出标的（<strong>移出≠卖出</strong>，不停仓）</li>
+  <li>交易时段约每分钟扫描目标池内活跃标的（工作日 9–11、13–15 点）；模拟初始现金默认 100000</li>
   <li>规则意图对齐回测：金叉/金字塔/死叉、止损/trail、账户风控、09:45 撮合、跌停强平等</li>
   <li><b>已知差异</b>：
     <ul>

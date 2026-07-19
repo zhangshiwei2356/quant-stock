@@ -30,7 +30,7 @@ management:
         include: health,info
 
 quant:
-  stock-codes: 600036,000001,300059
+  stock-codes: 600036,000001,300059,601318,000858
   max-single-position: 0.3
   max-total-position: 0.8
   fee-rate: 0.0003
@@ -38,6 +38,12 @@ quant:
   base-atr: 0.05
   atr-min-threshold: 0.001
   batch-pool-size: 10
+  # 交易候选池上限；实盘分钟扫描只打池内，不扫全市场
+  trade-pool-max: 30
+  # 目标池多因子：最低综合分；上市满 N 天；均成交额下限（元，0=关闭；生产可设 50000000）
+  pool-score-min: 45
+  pool-min-list-days: 60
+  pool-min-avg-amount20: 0
   # db：优先读 MySQL market_daily / market_minute；启动空库时从 classpath JSON 导入
   market-mode: db
   mock-bar-days: 15
@@ -89,6 +95,10 @@ quant:
   vol-mid-threshold: 5000000
   impact-coeff: 0.1
   next-bar-open-fill: true
+
+  # ---- 定时任务总闸；各任务以 MySQL sys_schedule_job 为准（种子默认全关，页面可启停/改 cron）----
+  schedule:
+    enabled: true
 
   # ---- 安全与运维 ----
   api-key: ${QUANT_API_KEY:}

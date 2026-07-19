@@ -7,6 +7,7 @@ import com.quant.stock.config.QuantProperties;
 import com.quant.stock.market.BarStorageService;
 import com.quant.stock.market.MarketDataService;
 import com.quant.stock.market.dto.BarDTO;
+import com.quant.stock.pool.TradePoolService;
 import com.quant.stock.risk.LimitBoardHelper;
 import com.quant.stock.risk.LiveAccountRiskState;
 import com.quant.stock.risk.OpenFilterService;
@@ -20,7 +21,6 @@ import com.quant.stock.util.PositionAmountUtil;
 import com.quant.stock.util.RedisLockUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
@@ -29,14 +29,18 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 定时任务：行情扫描+策略、订单同步、收盘清算。
- * 实盘路径已对齐单股回测核心：次日有效撮合挂单、开仓过滤、TradeCostModel、
- * T+1 分档止损、金字塔、账户熔断更新。
+ * 实盘策略任务实现：行情扫描+策略、订单同步、收盘清算。
+ * 分钟扫描目标为 {@link TradePoolService} 活跃候选池，不扫全市场。
+ * 调度由 {@link DynamicScheduleService} 按 MySQL {@code sys_schedule_job} 动态触发。
  */
 @Slf4j
 @Component
@@ -59,6 +63,9 @@ public class StrategyTask {
 
     @Autowired(required = false)
     private BarStorageService barStorageService;
+
+    @Autowired(required = false)
+    private TradePoolService tradePoolService;
 
     private volatile BigDecimal simCash = new BigDecimal("100000");
     private final Map<String, LiveBook> books = new ConcurrentHashMap<String, LiveBook>();
@@ -90,15 +97,20 @@ public class StrategyTask {
     @PostConstruct
     public void init() {
         accountRiskState.reset(simCash);
+        log.info("StrategyTask 已就绪（调度由 DynamicScheduleService / sys_schedule_job 控制）");
     }
 
-    @Scheduled(cron = "0 */1 9-11,13-15 * * MON-FRI")
     public void scanAndTrade() {
         if (!redisLockUtil.tryLock("strategy-scan", 50)) {
             return;
         }
         try {
-            for (String code : quantProperties.stockCodeList()) {
+            List<String> targets = resolveLiveScanCodes();
+            if (targets.isEmpty()) {
+                log.warn("目标池为空，跳过分钟扫描（请先执行盘后扫描写入目标池）");
+                return;
+            }
+            for (String code : targets) {
                 List<BarDTO> bars = marketDataService.loadMinuteBars(code);
                 if (bars == null || bars.size() < 65) {
                     continue;
@@ -325,12 +337,15 @@ public class StrategyTask {
         log.info("策略卖出: {} {}@{} x{} fee={} pnl={}", code, order.getOrderId(), deal, vol, fee, pnl);
     }
 
-    @Scheduled(fixedRate = 10000)
     public void syncOrders() {
         tradeGatewayService.syncOrderStatus();
     }
 
-    @Scheduled(cron = "0 30 15 * * MON-FRI")
+    /**
+     * 收盘清算与 K 线聚合。
+     * <p>
+     * TODO(api): 真实行情拉取（与 market-collect 同源）；当前 fetch 为 db/mock 回退。
+     */
     public void settleAfterClose() {
         BigDecimal closeEquity = markEquity(null);
         accountRiskState.onDayClose(closeEquity);
@@ -340,10 +355,11 @@ public class StrategyTask {
             log.info("未启用数据库(quant.db-enabled=false)，跳过K线聚合落库");
             return;
         }
+        // TODO(api): 接入真实行情后再做可靠增量拉取与聚合
         LocalDate today = LocalDate.now();
         LocalDateTime dayStart = LocalDateTime.of(today.minusDays(5), LocalTime.of(9, 30));
         LocalDateTime dayEnd = LocalDateTime.of(today, LocalTime.of(15, 0));
-        for (String code : quantProperties.stockCodeList()) {
+        for (String code : resolveSettleCodes()) {
             try {
                 marketDataService.fetchAndPersist1Min(code);
                 barStorageService.aggregateAllPeriods(code, dayStart, dayEnd);
@@ -354,10 +370,107 @@ public class StrategyTask {
         log.info("收盘清算/多周期聚合完成");
     }
 
-    @Scheduled(cron = "0 0 16 * * MON-FRI")
+    /**
+     * 盘后扫描：覆盖唯一目标池（与 pool-rebuild 同类；调度侧启用其一即可）。
+     */
     public void afterMarketBatchScan() {
-        log.info("盘后批量扫描触发");
-        batchStockBackTestService.scanAll();
+        log.info("盘后入池扫描触发（覆盖唯一目标池）");
+        if (tradePoolService != null) {
+            tradePoolService.rebuildFromUniverse();
+        } else {
+            log.warn("TradePoolService 不可用，回退批量扫描 stock-codes");
+            batchStockBackTestService.scanAll();
+        }
+    }
+
+    /** 实盘分钟扫描：仅活跃交易候选池 */
+    private List<String> resolveLiveScanCodes() {
+        if (tradePoolService != null) {
+            return tradePoolService.listActiveCodes();
+        }
+        return quantProperties.stockCodeList();
+    }
+
+    /** 收盘聚合：候选池 ∪ 当前持仓 */
+    private List<String> resolveSettleCodes() {
+        Set<String> codes = new LinkedHashSet<String>();
+        if (tradePoolService != null) {
+            codes.addAll(tradePoolService.listActiveCodes());
+        }
+        Map<String, Integer> pos = tradeGatewayService.queryPositions();
+        if (pos != null) {
+            codes.addAll(pos.keySet());
+        }
+        if (codes.isEmpty()) {
+            codes.addAll(quantProperties.stockCodeList());
+        }
+        return new ArrayList<String>(codes);
+    }
+
+    /** 模拟现金（实盘扫描账本） */
+    public BigDecimal getSimCash() {
+        return simCash;
+    }
+
+    /** 现金 + 持仓市值 */
+    public BigDecimal getMarkEquity() {
+        return markEquity(null);
+    }
+
+    public BigDecimal getPositionMarketValue() {
+        return calcPositionMv();
+    }
+
+    /**
+     * 当前持仓明细（优先策略账本成本/止损；数量以网关持仓为准）。
+     */
+    public List<Map<String, Object>> listLivePositionViews() {
+        List<Map<String, Object>> list = new ArrayList<Map<String, Object>>();
+        Map<String, Integer> gateway = tradeGatewayService.queryPositions();
+        Set<String> codes = new LinkedHashSet<String>();
+        if (gateway != null) {
+            codes.addAll(gateway.keySet());
+        }
+        codes.addAll(books.keySet());
+        for (String code : codes) {
+            int gwVol = gateway == null || gateway.get(code) == null ? 0 : gateway.get(code);
+            LiveBook book = books.get(code);
+            int bookVol = book != null && book.pos != null ? book.pos.getShares() : 0;
+            int vol = Math.max(gwVol, bookVol);
+            if (vol <= 0) {
+                continue;
+            }
+            BigDecimal last = lastClose(code, null);
+            BigDecimal avg = book != null && book.pos != null ? book.pos.getAvgCost() : BigDecimal.ZERO;
+            BigDecimal stop = book != null && book.pos != null ? book.pos.getStopPrice() : BigDecimal.ZERO;
+            BigDecimal highest = book != null && book.pos != null ? book.pos.getHighestSinceEntry() : BigDecimal.ZERO;
+            BigDecimal mv = last.multiply(BigDecimal.valueOf(vol));
+            BigDecimal pnl = BigDecimal.ZERO;
+            BigDecimal pnlPct = BigDecimal.ZERO;
+            if (avg != null && avg.compareTo(BigDecimal.ZERO) > 0) {
+                pnl = last.subtract(avg).multiply(BigDecimal.valueOf(vol));
+                pnlPct = last.subtract(avg).divide(avg, 6, RoundingMode.HALF_UP);
+            }
+            Map<String, Object> row = new LinkedHashMap<String, Object>();
+            row.put("code", code);
+            row.put("volume", vol);
+            row.put("gatewayVolume", gwVol);
+            row.put("bookVolume", bookVol);
+            row.put("avgCost", avg);
+            row.put("lastPrice", last);
+            row.put("marketValue", mv);
+            row.put("unrealizedPnl", pnl);
+            row.put("unrealizedPnlPct", pnlPct);
+            row.put("stopPrice", stop);
+            row.put("highestSinceEntry", highest);
+            row.put("lastBuyDate", book != null && book.pos != null && book.pos.getLastBuyDate() != null
+                    ? book.pos.getLastBuyDate().toString() : null);
+            row.put("pyramidStage", book == null ? 0 : book.pyramidStage);
+            row.put("pendingBuy", book != null && book.pendingBuyVol != null && book.pendingBuyVol > 0);
+            row.put("pendingSell", book != null && book.pendingSell);
+            list.add(row);
+        }
+        return list;
     }
 
     private BigDecimal markEquity(BigDecimal fallbackPrice) {

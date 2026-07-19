@@ -31,6 +31,7 @@ public final class IndicatorSignalUtil {
 
     public static class IndicatorBundle {
         public final double[] ma5;
+        public final double[] ma10;
         public final double[] ma20;
         public final double[] ma60;
         public final double[] rsi14;
@@ -47,6 +48,7 @@ public final class IndicatorSignalUtil {
         public IndicatorBundle(int size) {
             this.size = size;
             this.ma5 = new double[size];
+            this.ma10 = new double[size];
             this.ma20 = new double[size];
             this.ma60 = new double[size];
             this.rsi14 = new double[size];
@@ -110,6 +112,7 @@ public final class IndicatorSignalUtil {
         ClosePriceIndicator closeInd = new ClosePriceIndicator(series);
         VolumeIndicator volInd = new VolumeIndicator(series);
         SMAIndicator ma5 = new SMAIndicator(closeInd, 5);
+        SMAIndicator ma10 = new SMAIndicator(closeInd, 10);
         SMAIndicator ma20 = new SMAIndicator(closeInd, 20);
         SMAIndicator ma60 = new SMAIndicator(closeInd, 60);
         SMAIndicator volMa20 = new SMAIndicator(volInd, 20);
@@ -124,6 +127,7 @@ public final class IndicatorSignalUtil {
             bundle.low[i] = bar.getLow().doubleValue();
             bundle.volume[i] = bar.getVolume() == null ? 0 : bar.getVolume().doubleValue();
             bundle.ma5[i] = i >= 4 ? ma5.getValue(i).doubleValue() : Double.NaN;
+            bundle.ma10[i] = i >= 9 ? ma10.getValue(i).doubleValue() : Double.NaN;
             bundle.ma20[i] = i >= 19 ? ma20.getValue(i).doubleValue() : Double.NaN;
             bundle.ma60[i] = i >= 59 ? ma60.getValue(i).doubleValue() : Double.NaN;
             bundle.rsi14[i] = i >= 14 ? rsi.getValue(i).doubleValue() : Double.NaN;
@@ -166,6 +170,7 @@ public final class IndicatorSignalUtil {
         IndicatorBundle b = precompute(bars);
         int end = b.size - 1;
         map.put("ma5", bd(b.ma5[end]));
+        map.put("ma10", bd(b.ma10[end]));
         map.put("ma20", bd(b.ma20[end]));
         map.put("ma60", bd(b.ma60[end]));
         map.put("rsi14", bd(b.rsi14[end]));
@@ -173,6 +178,10 @@ public final class IndicatorSignalUtil {
         map.put("adx14", bd(b.adx14[end]));
         map.put("volMa20", bd(b.volMa20[end]));
         map.put("close", bd(b.close[end]));
+        // MA60 近 5 日斜率：当前 MA60 相对 5 根前
+        if (end >= 64 && !Double.isNaN(b.ma60[end]) && !Double.isNaN(b.ma60[end - 5])) {
+            map.put("ma60Prev5", bd(b.ma60[end - 5]));
+        }
 
         BarSeries series = toSeries("ind", bars);
         ClosePriceIndicator close = new ClosePriceIndicator(series);

@@ -23,6 +23,20 @@ public class QuantProperties {
     private BigDecimal baseAtr = new BigDecimal("0.05");
     private BigDecimal atrMinThreshold = new BigDecimal("0.001");
     private int batchPoolSize = 10;
+    /** 交易候选池最大容量（入池扫描截断） */
+    private int tradePoolMax = 30;
+    /**
+     * 目标池多因子入选最低分（0~100）。
+     * 趋势+动量+波动+流动性综合分低于此值不入池。
+     */
+    private BigDecimal poolScoreMin = new BigDecimal("45");
+    /** 粗筛：上市满 N 天（排除次新）；0 表示不启用 */
+    private int poolMinListDays = 60;
+    /**
+     * 粗筛：近 20 日均成交额下限（元）；0 表示不启用。
+     * 生产建议 50000000（5000 万）；本地 mock 默认关闭以免池被滤空。
+     */
+    private long poolMinAvgAmount20 = 0L;
     private String marketMode = "json";
     private int mockBarDays = 30;
     private boolean dbEnabled = false;
@@ -100,6 +114,26 @@ public class QuantProperties {
 
     /** 回测历史目录（相对工作目录或绝对路径） */
     private String historyDir = "data/backtest";
+
+    /**
+     * 定时任务总闸。各任务启停与 cron 以 MySQL {@code sys_schedule_job} 为准（页面可改）。
+     * enabled=false 时不注册任何触发器，库表仍可编辑。
+     */
+    private Schedule schedule = new Schedule();
+
+    @Data
+    public static class Schedule {
+        /** 总闸；false 时 DynamicScheduleService 不注册触发器 */
+        private boolean enabled = true;
+        /** @deprecated 已废弃，改用库表 sys_schedule_job */
+        private boolean scanAndTrade = true;
+        /** @deprecated 已废弃，改用库表 sys_schedule_job */
+        private boolean syncOrders = true;
+        /** @deprecated 已废弃，改用库表 sys_schedule_job */
+        private boolean settleAfterClose = true;
+        /** @deprecated 已废弃，改用库表 sys_schedule_job */
+        private boolean afterMarketBatchScan = true;
+    }
 
     public List<String> stockCodeList() {
         if (stockCodes == null || stockCodes.trim().isEmpty()) {

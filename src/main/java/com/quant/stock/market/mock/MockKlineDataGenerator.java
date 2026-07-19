@@ -1,6 +1,8 @@
 package com.quant.stock.market.mock;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
+import com.alibaba.fastjson2.JSONObject;
 import com.alibaba.fastjson2.JSONWriter;
 import com.quant.stock.market.BarAggregateUtil;
 import com.quant.stock.market.BarPeriod;
@@ -19,15 +21,20 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 /**
- * 离线生成三只股票近一年分层K线 JSON。
- * 运行：在项目根目录执行
- * mvn -q exec:java -Dexec.mainClass=com.quant.stock.market.mock.MockKlineDataGenerator
+ * 离线生成模拟股票近一年分层K线 JSON。
+ * <pre>
+ * mvn -q -DskipTests compile exec:java -Dexec.mainClass=com.quant.stock.market.mock.MockKlineDataGenerator
+ * mvn -q -DskipTests compile exec:java -Dexec.mainClass=com.quant.stock.market.mock.MockKlineDataGenerator -Dexec.args="only=601318,000858"
+ * </pre>
  */
 public class MockKlineDataGenerator {
 
@@ -38,30 +45,30 @@ public class MockKlineDataGenerator {
     private static final String[][] STOCKS = {
             {"600036", "招商银行", "35.00"},
             {"000001", "平安银行", "11.50"},
-            {"300059", "东方财富", "18.80"}
+            {"300059", "东方财富", "18.80"},
+            {"601318", "中国平安", "45.00"},
+            {"000858", "五粮液", "128.00"}
     };
 
     public static void main(String[] args) throws Exception {
         Path outDir = resolveOutDir(args);
         Files.createDirectories(outDir);
+        Set<String> only = parseOnly(args);
         System.out.println("输出目录: " + outDir.toAbsolutePath());
+        if (!only.isEmpty()) {
+            System.out.println("仅生成: " + only);
+        }
 
-        Map<String, Object> meta = new LinkedHashMap<String, Object>();
-        meta.put("description", "三只股票近一年模拟K线（原始1分钟 + 预聚合多周期）");
-        meta.put("start", START.toString());
-        meta.put("end", END.toString());
-        meta.put("generatedAt", LocalDateTime.now().format(FMT));
-        List<Map<String, String>> stockMeta = new ArrayList<Map<String, String>>();
+        List<Map<String, String>> stockMeta = loadOrInitStockMeta(outDir);
 
         for (String[] s : STOCKS) {
             String code = s[0];
+            if (!only.isEmpty() && !only.contains(code)) {
+                continue;
+            }
             String name = s[1];
             BigDecimal base = new BigDecimal(s[2]);
-            Map<String, String> sm = new LinkedHashMap<String, String>();
-            sm.put("code", code);
-            sm.put("name", name);
-            sm.put("basePrice", base.toPlainString());
-            stockMeta.add(sm);
+            upsertStockMeta(stockMeta, code, name, base.toPlainString());
 
             System.out.println("生成 " + code + " " + name + " ...");
             List<BarDTO> min1 = generateYear1Min(code, base);
@@ -78,20 +85,84 @@ public class MockKlineDataGenerator {
             }
         }
 
+        Map<String, Object> meta = new LinkedHashMap<String, Object>();
+        meta.put("description", "五只股票近一年模拟K线（原始1分钟 + 预聚合多周期）");
+        meta.put("start", START.toString());
+        meta.put("end", END.toString());
+        meta.put("generatedAt", LocalDateTime.now().format(FMT));
         meta.put("stocks", stockMeta);
         meta.put("periods", new String[]{
                 "MIN_1", "MIN_5", "MIN_15", "MIN_30", "MIN_60", "DAY", "WEEK", "MONTH"
         });
-        meta.put("note", "字段采用紧凑数组 [t,o,h,l,c,v]，启动时由 JsonBarDataStore 加载");
+        meta.put("note", "字段采用紧凑数组 [t,o,h,l,c,v]；MySQL 导入用 DAY + MIN_5");
         Files.write(outDir.resolve("meta.json"),
                 JSON.toJSONBytes(meta, JSONWriter.Feature.PrettyFormat));
 
-        System.out.println("全部完成");
+        System.out.println("全部完成，stocks=" + stockMeta.size());
+    }
+
+    private static Set<String> parseOnly(String[] args) {
+        Set<String> only = new HashSet<String>();
+        if (args == null) {
+            return only;
+        }
+        for (String a : args) {
+            if (a == null) {
+                continue;
+            }
+            if (a.startsWith("only=")) {
+                only.addAll(Arrays.asList(a.substring(5).split(",")));
+            }
+        }
+        only.remove("");
+        return only;
+    }
+
+    private static List<Map<String, String>> loadOrInitStockMeta(Path outDir) throws IOException {
+        Path metaPath = outDir.resolve("meta.json");
+        List<Map<String, String>> list = new ArrayList<Map<String, String>>();
+        if (Files.isRegularFile(metaPath)) {
+            JSONObject old = JSON.parseObject(new String(Files.readAllBytes(metaPath), StandardCharsets.UTF_8));
+            JSONArray arr = old.getJSONArray("stocks");
+            if (arr != null) {
+                for (int i = 0; i < arr.size(); i++) {
+                    JSONObject s = arr.getJSONObject(i);
+                    Map<String, String> m = new LinkedHashMap<String, String>();
+                    m.put("code", s.getString("code"));
+                    m.put("name", s.getString("name"));
+                    m.put("basePrice", s.getString("basePrice"));
+                    list.add(m);
+                }
+            }
+        }
+        for (String[] s : STOCKS) {
+            upsertStockMeta(list, s[0], s[1], s[2]);
+        }
+        return list;
+    }
+
+    private static void upsertStockMeta(List<Map<String, String>> list, String code, String name, String base) {
+        for (Map<String, String> m : list) {
+            if (code.equals(m.get("code"))) {
+                m.put("name", name);
+                m.put("basePrice", base);
+                return;
+            }
+        }
+        Map<String, String> sm = new LinkedHashMap<String, String>();
+        sm.put("code", code);
+        sm.put("name", name);
+        sm.put("basePrice", base);
+        list.add(sm);
     }
 
     private static Path resolveOutDir(String[] args) {
-        if (args != null && args.length > 0) {
-            return Paths.get(args[0]);
+        if (args != null) {
+            for (String a : args) {
+                if (a != null && a.startsWith("out=")) {
+                    return Paths.get(a.substring(4));
+                }
+            }
         }
         Path p = Paths.get("src/main/resources/data/kline");
         if (Files.isDirectory(Paths.get("src/main/resources"))) {
@@ -120,12 +191,9 @@ public class MockKlineDataGenerator {
             });
         }
         file.put("bars", rows);
-        Path target = stockDir.resolve(period.name() + ".json");
-        // 紧凑写入减小体积
-        Files.write(target, JSON.toJSONBytes(file));
+        Files.write(stockDir.resolve(period.name() + ".json"), JSON.toJSONBytes(file));
     }
 
-    /** 近一年交易日 1 分钟K（含趋势波段，便于金叉死叉演示） */
     public static List<BarDTO> generateYear1Min(String code, BigDecimal basePrice) {
         List<BarDTO> bars = new ArrayList<BarDTO>(60000);
         Random random = new Random(code.hashCode() * 31L + 20260718L);
@@ -136,10 +204,15 @@ public class MockKlineDataGenerator {
         while (!day.isAfter(END)) {
             DayOfWeek dow = day.getDayOfWeek();
             if (dow != DayOfWeek.SATURDAY && dow != DayOfWeek.SUNDAY) {
-                // 中期趋势 + 季节波动，保证 MA 交叉
                 double trend = Math.sin(dayIndex / 18.0) * 0.004
                         + Math.sin(dayIndex / 55.0) * 0.002
                         + (random.nextDouble() - 0.5) * 0.0008;
+                // 五粮液偏多头尾段，便于演示金叉推荐；平安偏震荡
+                if ("000858".equals(code)) {
+                    trend += 0.0012;
+                } else if ("601318".equals(code)) {
+                    trend -= 0.0003;
+                }
                 bars.addAll(session(code, day, LocalTime.of(9, 30), 120, price, random, trend));
                 price = bars.get(bars.size() - 1).getClose();
                 bars.addAll(session(code, day, LocalTime.of(13, 0), 120, price, random, trend));

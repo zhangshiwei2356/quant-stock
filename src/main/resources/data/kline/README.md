@@ -18,10 +18,13 @@
 | 600036 | 招商银行 |
 | 000001 | 平安银行 |
 | 300059 | 东方财富 |
+| 601318 | 中国平安 |
+| 000858 | 五粮液 |
 
 ## 重新导入
 
-清空后重启即可：
+- 启动时：若某代码在库中尚无日线/分钟，会**增量导入**该代码（不必清空全库）。
+- 清空后重启可全量重导：
 
 ```sql
 TRUNCATE market_daily;
@@ -30,8 +33,10 @@ TRUNCATE factor_daily;
 TRUNCATE stock_basic;
 ```
 
-或重新生成 JSON 种子：
+重新生成 JSON 种子：
 
 ```bash
-mvn -q compile exec:java -Dexec.mainClass=com.quant.stock.market.mock.MockKlineDataGenerator
+mvn -q -DskipTests compile exec:java -Dexec.mainClass=com.quant.stock.market.mock.MockKlineDataGenerator
+# 仅新增两只
+mvn -q -DskipTests compile exec:java -Dexec.mainClass=com.quant.stock.market.mock.MockKlineDataGenerator -Dexec.args="only=601318,000858"
 ```

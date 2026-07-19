@@ -9,7 +9,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -87,8 +90,24 @@ public class TradeGatewayService {
         return orders.get(orderId);
     }
 
+    /** 内存委托列表（按 orderId 倒序，最近在前） */
+    public List<OrderDTO> listOrders() {
+        List<OrderDTO> list = new ArrayList<OrderDTO>(orders.values());
+        Collections.sort(list, new Comparator<OrderDTO>() {
+            @Override
+            public int compare(OrderDTO a, OrderDTO b) {
+                String ia = a == null || a.getOrderId() == null ? "" : a.getOrderId();
+                String ib = b == null || b.getOrderId() == null ? "" : b.getOrderId();
+                return ib.compareTo(ia);
+            }
+        });
+        return list;
+    }
+
     /**
-     * sdk 模式：将 SUBMITTED 推进为 FILLED（持仓已在下单时记入本地账本；真实环境应查券商对账）。
+     * sdk 模式：将 SUBMITTED 推进为 FILLED（持仓已在下单时记入本地账本）。
+     * <p>
+     * TODO(api): 对接券商委托查询 / 成交回报，按真实状态推进；当前仅为本地桩。
      */
     public void syncOrderStatus() {
         int advanced = 0;

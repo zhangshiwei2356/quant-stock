@@ -73,6 +73,34 @@ mvn spring-boot:run
 | GET `/api/portfolio/history` | 组合回测历史 |
 | DELETE `/api/portfolio/history` | 清除全部组合回测记录 |
 | GET `/api/portfolio/analysis?id=` | 按组合历史 id 取对应分析 |
+| GET `/api/stock/universe` | 全市场列表（`stock_basic`） |
+| GET `/api/stock/trade-pool` | 唯一目标池总览 |
+| GET `/api/stock/trade-pool/final` | 兼容别名，同 `trade-pool` |
+| GET `/api/stock/trade-pool/{code}/analysis` | 单只入选分析报告（行展开） |
+| GET `/api/stock/trade-pool/report/{id}` | 按报告 id 读入选分析 |
+| POST `/api/stock/trade-pool/rebuild` | 扫描全市场 → 覆盖唯一目标池 |
+| POST `/api/stock/trade-pool/analyze` | 打分 + 覆盖目标池 + Markdown 报告 |
+| POST `/api/stock/trade-pool/{code}/remove` | 移出目标池（不停仓/不卖出） |
+| GET `/api/schedule` | 定时任务状态与列表（读 MySQL `sys_schedule_job`） |
+| GET `/api/schedule/jobs` | 任务列表 |
+| PUT `/api/schedule/jobs/{code}` | 更新启停 / cron / 间隔 |
+| POST `/api/schedule/jobs/{code}/toggle` | 切换启用 |
+| POST `/api/schedule/jobs/{code}/run` | 立即执行一次 |
+| POST `/api/schedule/reload` | 按库表重载调度 |
+
+## 定时任务（库表管理，种子默认全关）
+
+- 表：`sys_schedule_job`（见 `mapper/schema.sql`；启动时自动建表+种子）
+- 页面：侧栏「定时任务」可启停、改 cron/固定间隔、执行一次
+- 总闸：`quant.schedule.enabled`（默认 **true**）；为 false 时不注册触发器，库表仍可编辑
+- **唯一目标池**：盘后 `pool-rebuild` / `after-market-batch-scan` 扫描后自动覆盖 `trade_pool`；无需人工确认；扫描无入选时清空池
+- **入池打分**：多因子综合分（均线趋势 / MA60 斜率 / ADX / 动量排名 / ATR / 流动性），默认 ≥45 分且具备多头雏形才入选；回测收益率仅作参考
+- 配置：`quant.pool-score-min`、`pool-min-list-days`、`pool-min-avg-amount20`（生产可开 5000 万成交额过滤）
+- `pool-rebuild` 与 `after-market-batch-scan` **启用其一即可**；`scan-and-trade` 只扫目标池内活跃标的
+- 页面「交易目标池」可手动扫描更新或移出（**移出≠卖出**）
+- 行情浏览：全市场（`stock_basic`）
+- 已实现：`scan-and-trade` / `pool-rebuild` / `after-market-batch-scan`
+- 未实现（页面标「未实现」，待外部 API）：`settle-after-close` / `sync-orders` / `market-collect` / `position-pnl-sync` / `data-validate`
 
 ## 策略与风控（已实现）
 
@@ -89,7 +117,7 @@ mvn spring-boot:run
   - 跌停卖出连续 3 日失败 → 跌停价×0.99 强平
 - 成本：佣金、卖出印花税、分级滑点、冲击成本
 - 组合回测：日K、共享资金池；已对齐单股核心（次日开盘、成本、开仓过滤、金字塔、ATR/trail、账户熔断、T+1 分档、分股回撤）
-- 实盘 `StrategyTask`：分钟扫描已对齐挂单撮合 / 开仓过滤 / 成本 / 金字塔 / 止损 / 账户熔断更新（模拟账户）
+- 实盘 `StrategyTask`：分钟扫描已对齐挂单撮合 / 开仓过滤 / 成本 / 金字塔 / 止损 / 账户熔断更新（模拟账户）；由 `DynamicScheduleService` + `sys_schedule_job` 调度，**种子默认关**
 - 市值：`quant.float-shares-yi.<code>` 可配流通股本（亿股）；`market-cap-filter-enabled` 可关
 - 涨跌停：`LimitBoardHelper`（主板 10% / 创业板·科创板 20%，含封板判定）
 - 回测历史落盘：由 `quant.history-dir` 配置（默认 `data/backtest/*.json`，已 gitignore）
