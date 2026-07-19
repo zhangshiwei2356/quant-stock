@@ -1,24 +1,24 @@
 <!-- 一级菜单介绍：交易目标池 -->
-<p class="nav-intro-lead">管理量化交易的<strong>唯一目标池</strong>：盘后扫描自动覆盖入池标的；人工可移出；持仓不因移出而卖出。</p>
+<p class="nav-intro-lead">管理量化交易的<strong>唯一目标池</strong>。二级菜单「池内标的」查看当前可买名单；盘后扫描自动覆盖；人工可移出（移出≠卖出）。</p>
 <div class="nav-intro-grid">
   <section class="nav-intro-card">
-    <h4><span class="nav-intro-card-tag">链路</span>怎么工作</h4>
+    <h4><span class="nav-intro-card-tag">二级</span>菜单说明</h4>
     <ul class="nav-intro-list">
-      <li><strong>扫描更新</strong>：粗筛后按多因子综合分（趋势/动量/波动/流动性）取 TopN 覆盖唯一目标池</li>
-      <li><strong>实盘扫描</strong>：分钟任务只分析本池标的</li>
-      <li><strong>移出</strong>：仅退出目标池，不停仓、不卖出</li>
+      <li><strong>池内标的</strong>：当前生效的可买名单（含综合分、入池原因）</li>
+      <li><strong>扫描更新</strong>：在列表页工具栏；多因子打分后覆盖本池</li>
+      <li><strong>移出</strong>：仅退出名单，不停仓、不卖出</li>
     </ul>
   </section>
   <section class="nav-intro-card nav-intro-card--steps">
     <h4><span class="nav-intro-card-tag">步骤</span>建议流程</h4>
     <ol class="nav-intro-steps">
-      <li>进入目标池，点「扫描更新」或开启定时 <code>pool-rebuild</code></li>
-      <li>核对行内分析报告；不需要的标的点「移出」</li>
+      <li>点「池内标的」进入列表，或开启定时 <code>pool-rebuild</code></li>
+      <li>在列表页点「扫描更新」；核对行内分析，不需要的点「移出」</li>
       <li>开启 <code>scan-and-trade</code> 对池内标的做分钟扫描</li>
     </ol>
   </section>
 </div>
 <div class="nav-intro-cta">
-  <button type="button" class="nav-intro-btn" data-enter-mode="tradepool">进入交易目标池</button>
+  <button type="button" class="nav-intro-btn" data-enter-mode="tradepool">进入池内标的</button>
 </div>
 <p class="nav-intro-hint">再点一次「交易目标池」可收起并回初始化页。</p>

@@ -17,7 +17,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css?v=20260719-tradepool-single"/>
+  <link rel="stylesheet" href="/css/style.css?v=20260720-tp-submenu"/>
   <script src="/js/jquery.min.js"></script>
   <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/echarts.min.js"></script>
@@ -80,9 +80,12 @@
             <span class="chevron">▸</span>
           </button>
           <div id="tradepoolBody" class="side-nav-body">
-            <p class="hint">唯一目标池；扫描自动覆盖 · 当前
-              <span class="trade-pool-count" id="sidePoolCount">0</span> 只</p>
-            <button type="button" id="btnEnterTradePool" class="secondary" style="width:100%;margin-top:6px;">进入目标池</button>
+            <p class="hint">盘后扫描自动覆盖；二级进入池内列表</p>
+            <ul id="tradepoolMenu" class="side-nav-menu">
+              <li data-tp-panel="pool" role="button" tabindex="0">
+                池内标的 <span class="trade-pool-count" id="sidePoolCount">0</span>
+              </li>
+            </ul>
           </div>
         </div>
 
@@ -406,8 +409,8 @@
     <!-- 交易目标池（唯一活跃池） -->
     <div id="viewTradePool" class="workspace-view" hidden>
       <section class="panel">
-        <h3>交易目标池 <span id="tpPoolBadge" class="trade-pool-count">0</span></h3>
-        <p class="hint">盘后扫描自动覆盖本池；实盘分钟扫描只分析池内标的。行内「移出」仅退出目标池，不停仓、不卖出。点击一行展开分析报告。</p>
+        <h3>池内标的 <span id="tpPoolBadge" class="trade-pool-count">0</span></h3>
+        <p class="hint">当前生效的可买名单（盘后扫描自动覆盖）。实盘分钟扫描只盯本列表；「移出」仅退出池，不停仓、不卖出。点击一行展开分析。</p>
         <div class="toolbar" style="margin-top:8px;">
           <button type="button" id="btnTpRebuild">扫描更新</button>
           <button type="button" id="btnTpRefresh" class="secondary">刷新</button>
@@ -741,6 +744,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260720-server-pdf"></script>
+<script src="/js/stock-chart.js?v=20260720-tp-submenu"></script>
 </body>
 </html>

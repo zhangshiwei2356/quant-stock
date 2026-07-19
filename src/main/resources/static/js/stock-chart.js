@@ -1954,6 +1954,11 @@
     }
   }
 
+  function setTradePoolMenuActive() {
+    $('#tradepoolMenu li').removeClass('active');
+    $('#tradepoolMenu li[data-tp-panel="pool"]').addClass('active');
+  }
+
   function showTradePool() {
     lastWorkspaceMode = 'tradepool';
     $('body').removeClass('mode-doc');
@@ -1961,6 +1966,7 @@
     $('.side-nav-menu li').removeClass('active');
     hideAllWorkspaceViews();
     setSideNavOpen('tradepoolBody');
+    setTradePoolMenuActive();
     $('#viewTradePool').prop('hidden', false);
     loadTradePoolManage();
     resizeCharts();
@@ -2628,8 +2634,15 @@
     showMode('schedule');
   });
 
-  $('#btnEnterTradePool').on('click', function () {
+  $('#tradepoolMenu').on('click', 'li', function () {
     showMode('tradepool');
+  });
+
+  $('#tradepoolMenu').on('keydown', 'li', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      $(this).trigger('click');
+    }
   });
 
   $('#accountMenu').on('click', 'li', function () {
