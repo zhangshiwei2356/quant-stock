@@ -5,16 +5,17 @@
     <h4><span class="nav-intro-card-tag">二级</span>菜单说明</h4>
     <ul class="nav-intro-list">
       <li><strong>当前池</strong>：当前生效的可买名单（综合分、入池原因）</li>
-      <li><strong>扫描历史</strong>：按 batch_id 查看历次扫描入选报告</li>
-      <li><strong>扫描更新</strong>：覆盖本池并展示漏斗；可下载 Markdown 报告</li>
+      <li><strong>扫描历史</strong>：按批次查看历次入选；也可在此手动「扫描更新」</li>
+      <li><strong>扫描更新</strong>：全市场扫描并覆盖当前池，写入新批次；可下载 Markdown 报告</li>
+      <li><strong>刷新列表</strong>：只重载页面数据，不发起扫描</li>
     </ul>
   </section>
   <section class="nav-intro-card nav-intro-card--steps">
     <h4><span class="nav-intro-card-tag">步骤</span>建议流程</h4>
     <ol class="nav-intro-steps">
-      <li>点「当前池」或开启定时 <code>pool-rebuild</code></li>
-      <li>在列表点「扫描更新」；不需要的点「移出」</li>
-      <li>在「扫描历史」核对某日批次入选名单</li>
+      <li>在「当前池」或「扫描历史」点「扫描更新」，或开启定时 <code>pool-rebuild</code></li>
+      <li>不需要的标的在当前池点「移出」（移出≠卖出）</li>
+      <li>在「扫描历史」核对某批次入选名单</li>
     </ol>
   </section>
 </div>

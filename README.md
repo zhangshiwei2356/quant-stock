@@ -36,7 +36,7 @@ mvn spring-boot:run
 - 回测时间：**默认留空 = 全量 K 线**；单股 / 组合回测均可填写起止时间截取
 - 初始资金默认：**100000**
 - 进入应用先显示**初始化页**；侧栏一级菜单互斥展开进入功能，再点同一菜单可全部收起并回到初始化页
-- 侧栏一级菜单（工作台）：**行情浏览** → **个股回测** → **组合回测** → **目标池**（当前池 / 扫描历史）→ **账户概览** → **运维中心**（任务管理 / 数据健康 / 运行参数）→ **数据表**；说明：**量化知识** / **应用说明**；知识阅读时隐藏工作台
+- 侧栏一级菜单（工作台）：**行情浏览** → **个股回测**（回测工作台 / 批量扫描 / 回测历史）→ **组合回测**（回测工作台 / 回测历史）→ **目标池**（当前池 / 扫描历史）→ **账户概览** → **运维中心**（任务管理 / 数据健康 / 运行参数）→ **数据表**；说明：**量化知识** / **应用说明**；知识阅读时隐藏工作台
 - 说明文档为独立 HTML 片段：`src/main/resources/static/docs/*.html`，由工作台 `stock.html` 知识面板按需加载（非多页 SPA）
 - 初始化欢迎页单独维护：`static/docs/home.html`，载入 `#viewHome`
 - 各一级菜单介绍页：`static/docs/nav-*.html`，展开菜单时载入 `#viewNavIntro`（点二级项再进工作台/文档）
@@ -100,7 +100,8 @@ mvn spring-boot:run
 - 页面「目标池」可手动扫描更新或移出（**移出≠卖出**）
 - 行情浏览：全市场（`stock_basic`）
 - 已实现：`scan-and-trade` / `pool-rebuild` / `after-market-batch-scan`
-- 未实现（页面标「未实现」，待外部 API）：`settle-after-close` / `sync-orders` / `market-collect` / `position-pnl-sync` / `data-validate`
+- 页面标「未实现」（缺外部 API；其中本地日结/数据健康仍可用）：`settle-after-close` / `data-validate` / `sync-orders` / `market-collect` / `position-pnl-sync`
+- 能力与待办对照见「应用说明 → 待办清单」；宽睿 Quant360 OES/MDS 资料对照见「应用说明 → 宽睿文档梳理」
 
 ## 策略与风控（已实现）
 
@@ -160,5 +161,6 @@ mvn spring-boot:run
 2. 页面「应用说明 → 系统概述」（`static/docs/app.html`）
 3. 规则变更时同步「应用说明 → 交易规则」（`static/docs/rules.html`）
 4. 能力/待办落地时同步「应用说明 → 待办清单」（`static/docs/memo.html`）
+5. 宽睿/外部柜台资料变更时同步「应用说明 → 宽睿文档梳理」（`static/docs/kuangrui.html`）
 
 规则见 `.cursor/rules/sync-readme.mdc`、`.cursor/rules/sync-memo.mdc`。

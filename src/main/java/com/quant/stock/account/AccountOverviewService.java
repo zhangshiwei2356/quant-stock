@@ -57,7 +57,7 @@ public class AccountOverviewService {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.put("mode", quantProperties.getTradeMode());
         m.put("source", "LOCAL_SIM");
-        m.put("hint", "本地模拟账本（非券商柜台）。成交/持仓/现金已落库，重启可恢复；券商对账见应用待办。");
+        m.put("hint", "本地模拟账本（非券商柜台）。成交/持仓/现金已落库，重启可恢复；券商对账见待办清单。");
         m.put("asOf", LocalDateTime.now().toString());
         m.put("dbEnabled", quantProperties.isDbEnabled());
         m.put("cash", cash);

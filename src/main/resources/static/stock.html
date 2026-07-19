@@ -81,8 +81,12 @@
             <span class="chevron">▸</span>
           </button>
           <div id="singleBody" class="side-nav-body">
-            <p class="hint">工作台内搜索选股后回测；支持代码/名称模糊匹配</p>
-            <button type="button" id="btnEnterSingle" class="secondary" style="width:100%;margin-top:6px;">进入个股回测</button>
+            <p class="hint">二级：回测工作台 / 批量扫描 / 回测历史</p>
+            <ul id="singleMenu" class="side-nav-menu">
+              <li data-single-panel="workspace" role="button" tabindex="0">回测工作台</li>
+              <li data-single-panel="batch" role="button" tabindex="0">批量扫描</li>
+              <li data-single-panel="history" role="button" tabindex="0">回测历史</li>
+            </ul>
           </div>
         </div>
 
@@ -94,8 +98,11 @@
             <span class="chevron">▸</span>
           </button>
           <div id="portfolioBody" class="side-nav-body">
-            <p class="hint">工作台内搜索多选成分股；共享资金池日K回测</p>
-            <button type="button" id="btnEnterPortfolio" class="secondary" style="width:100%;margin-top:6px;">进入组合回测</button>
+            <p class="hint">二级：回测工作台 / 回测历史</p>
+            <ul id="portfolioMenu" class="side-nav-menu">
+              <li data-portfolio-panel="workspace" role="button" tabindex="0">回测工作台</li>
+              <li data-portfolio-panel="history" role="button" tabindex="0">回测历史</li>
+            </ul>
           </div>
         </div>
 
@@ -284,8 +291,8 @@
 
     <!-- 个股回测 -->
     <div id="viewSingle" class="workspace-view" hidden>
-      <section class="panel">
-        <h3>选股 <span class="trade-pool-count" id="singleUniverseCount">0</span></h3>
+      <section class="panel" id="singlePanelWorkspace">
+        <h3>回测标的 <span class="trade-pool-count" id="singleUniverseCount">0</span></h3>
         <p class="hint">输入代码或名称模糊筛选；点击选定回测标的。</p>
         <div class="stock-picker" id="singleStockPicker">
           <div class="stock-picker-bar">
@@ -301,16 +308,16 @@
           </div>
           <span class="selected-stock-tag">当前标的</span>
         </div>
-        <h3>个股回测参数</h3>
+        <h3>回测参数</h3>
         <div class="toolbar">
           <label class="field">股票代码
             <input id="stockCode" type="text" placeholder="600036" readonly/>
           </label>
           <label class="field">K线周期
             <select id="barPeriod">
-              <option value="DAY" selected>日K DAY</option>
-              <option value="WEEK">周K WEEK</option>
-              <option value="MONTH">月K MONTH</option>
+              <option value="DAY" selected>日K</option>
+              <option value="WEEK">周K</option>
+              <option value="MONTH">月K</option>
               <option value="MIN_60">60分钟</option>
               <option value="MIN_30">30分钟</option>
               <option value="MIN_15">15分钟</option>
@@ -335,22 +342,22 @@
         <div class="metrics" id="btMetrics" style="margin-top:8px;"></div>
         <div class="metrics" id="singleKlineMeta" style="margin-top:6px;"></div>
       </section>
-      <section class="charts">
+      <section class="charts" id="singlePanelCharts">
         <div class="panel">
-          <h3>基础K线 · MA / BOLL / RSI（含买卖点）</h3>
+          <h3>K线与指标</h3>
           <div id="singleBaseChart" class="chart-box"></div>
         </div>
         <div class="panel">
-          <h3>回测信号图（含买卖点）</h3>
+          <h3>买卖信号</h3>
           <div id="signalChart" class="chart-box"></div>
         </div>
       </section>
       <section class="panel" id="singleEquityPanel" hidden>
-        <h3>单股权益曲线</h3>
+        <h3>权益曲线</h3>
         <div id="singleEquityChart" class="chart-box" style="height:280px;"></div>
       </section>
       <section class="panel" id="singleTradePanel" hidden>
-        <h3>成交明细与收益</h3>
+        <h3>成交明细</h3>
         <div id="tradeSummary" class="result-board" hidden></div>
         <h4 class="result-table-title">成交流水</h4>
         <div class="table-wrap" style="max-height:320px;">
@@ -374,14 +381,28 @@
           </table>
         </div>
       </section>
-      <section class="panel">
-        <h3>个股回测历史
+      <section class="panel" id="singlePanelBars">
+        <h3>K线明细</h3>
+        <p class="hint" style="margin:0 0 8px;">当前回测区间末尾若干根。</p>
+        <div class="table-wrap" style="max-height:240px;">
+          <table>
+            <thead>
+            <tr>
+              <th>时间</th><th>开</th><th>高</th><th>低</th><th>收</th><th>量</th>
+            </tr>
+            </thead>
+            <tbody id="singleBarTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+      <section class="panel" id="singlePanelHistory">
+        <h3>回测历史
           <label style="margin-left:12px;font-weight:400;color:var(--muted);font-size:12px;">
             <input type="checkbox" id="chkAllSingleHistory"/> 全部历史
           </label>
           <button type="button" id="btnClearSingleHistory" class="danger" style="margin-left:12px;padding:4px 10px;font-size:12px;">清除该股记录</button>
         </h3>
-        <p class="hint" style="margin:4px 0 8px;">落盘 <code>data/backtest/single-backtest-records.json</code> + 对应分析（同一 id）。勾选「全部历史」可跨股查看；清除仍只清当前选中股。</p>
+        <p class="hint" style="margin:4px 0 8px;">落盘记录与对应分析（同一 id）。勾选「全部历史」可跨股查看；清除仍只清当前选中股。</p>
         <div class="table-wrap history-table-wrap">
           <table>
             <thead>
@@ -409,25 +430,13 @@
           </table>
         </div>
       </section>
-      <section class="panel">
-        <h3>K线明细（当前回测区间末尾）</h3>
-        <div class="table-wrap" style="max-height:240px;">
-          <table>
-            <thead>
-            <tr>
-              <th>时间</th><th>开</th><th>高</th><th>低</th><th>收</th><th>量</th>
-            </tr>
-            </thead>
-            <tbody id="singleBarTableBody"></tbody>
-          </table>
-        </div>
-      </section>
-      <section class="panel">
-        <h3>批量扫描结果
+      <section class="panel" id="singlePanelBatch">
+        <h3>批量扫描
           <label style="margin-left:12px;font-weight:400;color:var(--muted);font-size:12px;">
             <input type="checkbox" id="onlyCanBuy"/> 仅可买入
           </label>
         </h3>
+        <p class="hint" style="margin:0 0 8px;">对股票池批量跑回测摘要；可在上方「回测参数」区点击「批量扫描」执行。</p>
         <div class="table-wrap">
           <table>
             <thead>
@@ -448,9 +457,13 @@
         <h3>当前池 <span id="tpPoolBadge" class="trade-pool-count">0</span></h3>
         <p class="hint">当前生效的可买名单（盘后扫描自动覆盖）。实盘分钟扫描只盯本列表；「移出」仅退出池，不停仓、不卖出。点击一行展开分析。</p>
         <div class="toolbar" style="margin-top:8px;">
-          <button type="button" id="btnTpRebuild">扫描更新</button>
-          <button type="button" id="btnTpRefresh" class="secondary">刷新</button>
-          <a id="tpReportLink" class="secondary" href="#" hidden style="display:inline-block;padding:6px 12px;text-decoration:none;">下载 Markdown 报告</a>
+          <button type="button" id="btnTpRebuild"
+                  title="立即全市场扫描并覆盖当前目标池（写入新批次，可生成 Markdown 报告）">扫描更新</button>
+          <button type="button" id="btnTpRefresh" class="secondary"
+                  title="仅重新加载当前池名单，不发起扫描">刷新列表</button>
+          <a id="tpReportLink" class="secondary" href="#" hidden
+             title="下载最近一次扫描更新生成的 Markdown 报告"
+             style="display:inline-block;padding:6px 12px;text-decoration:none;">下载报告</a>
           <span class="field-hint" id="tpPoolHint"></span>
         </div>
         <div id="tpFunnel" class="result-board" style="margin-top:12px;" hidden>
@@ -485,9 +498,12 @@
     <div id="viewTpHistory" class="workspace-view" hidden>
       <section class="panel">
         <h3>扫描历史</h3>
-        <p class="hint" id="tpHistHint">按 batch_id 查看历次扫描入选报告；点批次展开明细。</p>
+        <p class="hint" id="tpHistHint">查看历次扫描批次与入选明细。可在此手动「扫描更新」生成新批次；「刷新列表」只重新拉取历史，不扫描。</p>
         <div class="toolbar" style="margin-top:8px;">
-          <button type="button" id="btnTpHistRefresh" class="secondary">刷新</button>
+          <button type="button" id="btnTpHistRebuild"
+                  title="立即全市场扫描并覆盖当前目标池，同时写入本页可查看的新批次">扫描更新</button>
+          <button type="button" id="btnTpHistRefresh" class="secondary"
+                  title="仅重新加载下方批次列表，不发起扫描、不改动目标池">刷新列表</button>
           <span class="field-hint" id="tpHistMeta"></span>
         </div>
         <div class="table-wrap" style="margin-top:12px;max-height:none;">
@@ -822,8 +838,8 @@
 
     <!-- 组合回测 -->
     <div id="viewPortfolio" class="workspace-view" hidden>
-      <section class="panel">
-        <h3>成分股 <span class="trade-pool-count" id="pfUniverseCount">0</span></h3>
+      <section class="panel" id="pfPanelWorkspace">
+        <h3>组合成分 <span class="trade-pool-count" id="pfUniverseCount">0</span></h3>
         <p class="hint">搜索后点击切换勾选；下方标签可移除。建议至少 2 只。</p>
         <div class="stock-picker" id="pfStockPicker">
           <div class="stock-picker-bar">
@@ -839,9 +855,7 @@
           <div class="pf-chips" id="pfChips"></div>
         </div>
         <input id="portfolioCodes" type="hidden"/>
-      </section>
-      <section class="panel">
-        <h3>组合回测参数</h3>
+        <h3 style="margin-top:16px;">回测参数</h3>
         <div class="toolbar">
           <label class="field">回测开始
             <input id="backStart" type="text" placeholder="yyyy-MM-dd HH:mm:ss（可空）"/>
@@ -859,11 +873,11 @@
         <div class="metrics" id="pfMetrics" style="margin-top:8px;"></div>
       </section>
       <section class="panel" id="pfEquityPanel" hidden>
-        <h3>组合权益曲线</h3>
+        <h3>权益曲线</h3>
         <div id="equityChart" class="chart-box" style="height:280px;"></div>
       </section>
       <section class="panel" id="pfTradePanel" hidden>
-        <h3>成交明细与收益</h3>
+        <h3>成交明细</h3>
         <div id="pfTradeSummary" class="result-board" hidden></div>
         <h4 class="result-table-title">成交流水</h4>
         <div class="table-wrap" style="max-height:360px;">
@@ -912,11 +926,11 @@
           </table>
         </div>
       </section>
-      <section class="panel">
-        <h3>组合回测历史
+      <section class="panel" id="pfPanelHistory">
+        <h3>回测历史
           <button type="button" id="btnClearPortfolioHistory" class="danger" style="margin-left:12px;padding:4px 10px;font-size:12px;">清除全部记录</button>
         </h3>
-        <p class="hint" style="margin:4px 0 8px;">落盘 <code>portfolio-backtest-records.json</code> + 对应分析（同一 id）。点击一行在<strong>该行下方</strong>展开分析，再点同一行或「收起」折叠；清除会同时删除分析。</p>
+        <p class="hint" style="margin:4px 0 8px;">落盘记录与对应分析（同一 id）。点击一行在<strong>该行下方</strong>展开分析，再点同一行或「收起」折叠；清除会同时删除分析。</p>
         <div class="table-wrap history-table-wrap">
           <table>
             <thead>
@@ -946,6 +960,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260720-health-time"></script>
+<script src="/js/stock-chart.js?v=20260720-tp-tips"></script>
 </body>
 </html>

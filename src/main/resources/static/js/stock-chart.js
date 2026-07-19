@@ -1686,12 +1686,14 @@
   }
 
   function runBatch() {
+    focusSinglePanel('batch');
     $('#batchBody').html('<tr><td colspan="12" class="empty-state">扫描中...</td></tr>');
     withLoading($('#btnBatch'), $.getJSON('/api/batch/scanAllStock')
       .done(function (rows) {
         batchCache = rows || [];
         renderBatch(batchCache);
         toast('批量扫描完成 · ' + batchCache.length + ' 只', 'ok');
+        focusSinglePanel('batch');
       })
       .fail(function () {
         $('#batchBody').html('<tr><td colspan="12" class="empty-state">扫描失败</td></tr>');
@@ -1700,6 +1702,7 @@
   }
 
   function runPortfolio() {
+    focusPortfolioPanel('workspace');
     syncPortfolioCodes();
     var codes = ($('#portfolioCodes').val() || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
     if (!codes.length) {
@@ -1749,9 +1752,10 @@
   }
 
   var knowledgeTopics = [
-    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260720-nav-rename' },
+    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260720-kuangrui' },
     { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260720-nav-rename' },
-    { id: 'memo', group: 'app', title: '待办清单', src: '/docs/memo.html?v=20260720-nav-rename' },
+    { id: 'memo', group: 'app', title: '待办清单', src: '/docs/memo.html?v=20260720-kuangrui' },
+    { id: 'kuangrui', group: 'app', title: '宽睿文档梳理', src: '/docs/kuangrui.html?v=20260720-kuangrui' },
     { id: 'ashare', group: 'stock', title: 'A股基础', src: '/docs/ashare.html?v=20260720-nav-rename' },
     { id: 'session', group: 'stock', title: '交易时间', src: '/docs/session.html?v=20260720-nav-rename' },
     { id: 'kline', group: 'stock', title: 'K线', src: '/docs/kline.html?v=20260720-nav-rename' },
@@ -2087,6 +2091,59 @@
 
   var lastTpPanel = 'pool';
   var lastSchedulePanel = 'jobs';
+  var lastSinglePanel = 'workspace';
+  var lastPortfolioPanel = 'workspace';
+
+  function setSingleMenuActive(panel) {
+    $('#singleMenu li').removeClass('active');
+    if (panel) {
+      $('#singleMenu li[data-single-panel="' + panel + '"]').addClass('active');
+    }
+  }
+
+  function focusSinglePanel(panel) {
+    panel = panel || lastSinglePanel || 'workspace';
+    if (panel !== 'workspace' && panel !== 'batch' && panel !== 'history') panel = 'workspace';
+    lastSinglePanel = panel;
+    setSingleMenuActive(panel);
+    var id = panel === 'batch' ? 'singlePanelBatch'
+      : (panel === 'history' ? 'singlePanelHistory' : 'singlePanelWorkspace');
+    var el = document.getElementById(id);
+    if (el && typeof el.scrollIntoView === 'function') {
+      setTimeout(function () {
+        try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
+      }, 60);
+    }
+    if (panel === 'workspace') {
+      setTimeout(function () { $('#singleStockQ').trigger('focus'); }, 80);
+    }
+  }
+
+  function setPortfolioMenuActive(panel) {
+    $('#portfolioMenu li').removeClass('active');
+    if (panel) {
+      $('#portfolioMenu li[data-portfolio-panel="' + panel + '"]').addClass('active');
+    }
+  }
+
+  function focusPortfolioPanel(panel) {
+    panel = panel || lastPortfolioPanel || 'workspace';
+    if (panel !== 'workspace' && panel !== 'history') panel = 'workspace';
+    lastPortfolioPanel = panel;
+    setPortfolioMenuActive(panel);
+    var id = panel === 'history' ? 'pfPanelHistory' : 'pfPanelWorkspace';
+    var el = document.getElementById(id);
+    if (el && typeof el.scrollIntoView === 'function') {
+      setTimeout(function () {
+        try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
+      }, 60);
+    }
+    if (panel === 'workspace') {
+      setTimeout(function () { $('#pfStockQ').trigger('focus'); }, 80);
+    } else if (panel === 'history') {
+      loadPortfolioHistory();
+    }
+  }
 
   function setTradePoolMenuActive(panel) {
     $('#tradepoolMenu li').removeClass('active');
@@ -2533,14 +2590,14 @@
         selectSingleStock(singleCode, { silent: true });
       }
       renderStockPicker('single');
-      setTimeout(function () { $('#singleStockQ').trigger('focus'); }, 80);
+      focusSinglePanel(options.panel || lastSinglePanel || 'workspace');
     } else if (lastWorkspaceMode === 'portfolio') {
       $('#viewPortfolio').prop('hidden', false);
       if (expandNav) setSideNavOpen('portfolioBody');
       renderStockPicker('portfolio');
       syncPortfolioCodes();
       loadPortfolioHistory();
-      setTimeout(function () { $('#pfStockQ').trigger('focus'); }, 80);
+      focusPortfolioPanel(options.panel || lastPortfolioPanel || 'workspace');
     } else if (lastWorkspaceMode === 'tradepool') {
       showTradePool(options.panel || lastTpPanel || 'pool');
       return;
@@ -2952,7 +3009,7 @@
     var introSrc = $btn.attr('data-intro');
     var introTitle = $btn.attr('data-intro-title') || $btn.clone().children().remove().end().text().trim();
     if (introSrc) {
-      showNavIntro({ bodyId: bodyId, title: introTitle, src: introSrc + (introSrc.indexOf('?') >= 0 ? '&' : '?') + 'v=20260720-nav-rename' });
+      showNavIntro({ bodyId: bodyId, title: introTitle, src: introSrc + (introSrc.indexOf('?') >= 0 ? '&' : '?') + 'v=20260720-tp-tips' });
       return;
     }
     // 无介绍配置时回退到原工作台
@@ -2972,6 +3029,14 @@
     }
     if (mode === 'schedule') {
       showSchedulePanel($(this).attr('data-schedule-panel') || 'jobs');
+      return;
+    }
+    if (mode === 'single') {
+      showMode('single', { panel: $(this).attr('data-single-panel') || 'workspace' });
+      return;
+    }
+    if (mode === 'portfolio') {
+      showMode('portfolio', { panel: $(this).attr('data-portfolio-panel') || 'workspace' });
       return;
     }
     showMode(mode);
@@ -3171,7 +3236,10 @@
       });
   }
 
-  $('#btnTpHistRefresh').on('click', loadTpScanHistory);
+  $('#btnTpHistRefresh').on('click', function () {
+    loadTpScanHistory();
+    toast('已刷新扫描历史列表（未扫描）', 'info');
+  });
   $('#btnHealthRefresh').on('click', loadDataHealth);
   $('#btnParamsRefresh').on('click', loadSysParams);
 
@@ -3270,6 +3338,7 @@
 
   $('#btnTpRefresh').on('click', function () {
     loadTradePoolManage();
+    toast('已刷新当前池列表（未扫描）', 'info');
   });
 
   function renderTpFunnel(res) {
@@ -3294,21 +3363,45 @@
     }
   }
 
-  $('#btnTpRebuild').on('click', function () {
-    var $btn = $(this);
-    $btn.prop('disabled', true).text('扫描中…');
-    // analyze = 覆盖目标池 + 落盘 Markdown（含 rebuild 漏斗字段）
+  /**
+   * 手动触发目标池扫描（analyze：覆盖池 + 写批次/报告）。
+   * @param {JQuery} $btn
+   * @param {{refreshHistory?: boolean, showFunnel?: boolean}} [opts]
+   */
+  function runTradePoolScan($btn, opts) {
+    opts = opts || {};
+    var oldText = $btn && $btn.length ? $.trim($btn.text()) : '扫描更新';
+    if ($btn && $btn.length) {
+      $btn.prop('disabled', true).text('扫描中…');
+    }
+    toast('正在全市场扫描并覆盖目标池…', 'info');
     $.post('/api/stock/trade-pool/analyze').done(function (res) {
-      renderTpFunnel(res);
+      if (opts.showFunnel !== false) {
+        renderTpFunnel(res);
+      }
       toast('目标池已更新：' + (res.selected != null ? res.selected : 0)
         + ' 只 · 全市场 ' + (res.universe || 0)
-        + ' → 入选 ' + (res.selected || 0), 'ok');
+        + ' → 入选 ' + (res.selected || 0)
+        + (res.batchId ? (' · 批次 ' + res.batchId) : ''), 'ok');
       loadTradePoolManage();
+      if (opts.refreshHistory) {
+        loadTpScanHistory();
+      }
     }).fail(function (xhr) {
       toast((xhr.responseJSON && xhr.responseJSON.message) || '扫描失败', 'err');
     }).always(function () {
-      $btn.prop('disabled', false).text('扫描更新');
+      if ($btn && $btn.length) {
+        $btn.prop('disabled', false).text(oldText || '扫描更新');
+      }
     });
+  }
+
+  $('#btnTpRebuild').on('click', function () {
+    runTradePoolScan($(this), { showFunnel: true, refreshHistory: false });
+  });
+
+  $('#btnTpHistRebuild').on('click', function () {
+    runTradePoolScan($(this), { showFunnel: false, refreshHistory: true });
   });
 
   $('#chkAllSingleHistory').on('change', function () {
@@ -3459,11 +3552,33 @@
   });
 
   $('#btnEnterSingle').on('click', function () {
-    showMode('single');
+    showMode('single', { panel: 'workspace' });
+  });
+
+  $('#singleMenu').on('click', 'li', function () {
+    showMode('single', { panel: $(this).attr('data-single-panel') || 'workspace' });
+  });
+
+  $('#singleMenu').on('keydown', 'li', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      $(this).trigger('click');
+    }
   });
 
   $('#btnEnterPortfolio').on('click', function () {
-    showMode('portfolio');
+    showMode('portfolio', { panel: 'workspace' });
+  });
+
+  $('#portfolioMenu').on('click', 'li', function () {
+    showMode('portfolio', { panel: $(this).attr('data-portfolio-panel') || 'workspace' });
+  });
+
+  $('#portfolioMenu').on('keydown', 'li', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      $(this).trigger('click');
+    }
   });
 
   var poolSearchTimer = null;

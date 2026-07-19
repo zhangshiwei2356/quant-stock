@@ -59,7 +59,7 @@ public class DataHealthService {
         m.put("warnCount", warn);
         m.put("dailyStaleDays", DAILY_STALE_DAYS);
         m.put("minuteStaleHours", MINUTE_STALE_HOURS);
-        m.put("hint", "与定时任务 data-validate 同口径；外部行情对账见应用待办。");
+        m.put("hint", "与定时任务 data-validate 同口径；外部行情对账见待办清单。");
         m.put("items", items);
         return m;
     }
