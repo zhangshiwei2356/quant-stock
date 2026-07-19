@@ -2,8 +2,8 @@
  * 多主题动态背景（无第三方依赖）
  * - night / matrix：夜盘深色 + 慢速代码雨
  * - day / interact：日间浅色 + 鼠标跟随拖尾 + 点击爆炸
- * - forest / wave：背景已改由 starfield-bg.js（Three.js 星空）负责
- * - cosmos：粒子连线 + 星空流星
+ * - forest / wave：背景由 starfield-bg.js（Three.js 银河）负责，界面名「银河」
+ * - cosmos：粒子连线 + 流星 + 极光带，界面名「极光」
  * pointer-events:none，交互监听挂在 window，不挡点击。
  */
 (function (global) {
@@ -20,7 +20,7 @@
   var matrixCols = [];
   var rafId = 0;
   var running = false;
-  var theme = 'night';
+  var theme = 'day';
   var t0 = 0;
   var mouse = { x: -9999, y: -9999, active: false };
   var mouseBound = false;
@@ -119,7 +119,7 @@
         [99, 102, 241, 0.04]
       ]
     },
-    /* 青松：Canvas 侧停用，由 QuantStarfieldBg 绘制（保留 key 防误调） */
+    /* 银河：Canvas 侧停用，由 QuantStarfieldBg 绘制（保留 key 防误调） */
     forest: {
       mode: 'off',
       bg: '10, 20, 17'
@@ -181,7 +181,7 @@
     }
   }
 
-  function cfg() { return THEMES[theme] || THEMES.night; }
+  function cfg() { return THEMES[theme] || THEMES.day; }
 
   function rgba(arr, a) {
     return 'rgba(' + arr[0] + ',' + arr[1] + ',' + arr[2] + ',' + (a != null ? a : arr[3]) + ')';
@@ -1139,7 +1139,7 @@
   }
 
   function setTheme(name) {
-    if (!name || !THEMES[name]) name = 'night';
+    if (!name || !THEMES[name]) name = 'day';
     theme = name;
     if (prefersReducedMotion()) { stop(); return; }
     if (THEMES[name] && THEMES[name].mode === 'off') { stop(); return; }

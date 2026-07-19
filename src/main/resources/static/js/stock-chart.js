@@ -13,6 +13,11 @@
   var lastSingleEquity = null;
   var lastSingleKlinePayload = null;
   var poolNames = {};
+  /** 全市场标的缓存：[{code,name}]，供工作台模糊选股 */
+  var universeList = [];
+  var PICKER_LIMIT = 60;
+  /** 组合回测已选成分股代码（有序） */
+  var portfolioSelected = [];
   var poolTabs = []; // { code, period }
   var activePoolCode = '';
   var lastWorkspaceMode = 'pool';
@@ -247,7 +252,7 @@
     if (theme === 'interact' || theme === 'finance') theme = 'day';
     if (theme === 'wave') theme = 'forest';
     if (theme === 'matrix' || theme === 'aurora' || theme === 'vanta') theme = 'night';
-    if (!THEME_KEYS[theme]) theme = 'night';
+    if (!THEME_KEYS[theme]) theme = 'day';
     document.documentElement.setAttribute('data-theme', theme);
     try { localStorage.setItem('quant-theme', theme); } catch (e) {}
     $('#themeSelect').val(theme);
@@ -270,9 +275,9 @@
   }
 
   function initTheme() {
-    var theme = 'night';
+    var theme = 'day';
     try {
-      theme = localStorage.getItem('quant-theme') || document.documentElement.getAttribute('data-theme') || 'night';
+      theme = localStorage.getItem('quant-theme') || document.documentElement.getAttribute('data-theme') || 'day';
     } catch (e) {}
     applyTheme(theme);
   }
@@ -315,24 +320,58 @@
     });
   }
 
+  function isPortfolioSelected(code) {
+    return portfolioSelected.indexOf(code) >= 0;
+  }
+
+  function togglePortfolioStock(code) {
+    if (!code) return;
+    var i = portfolioSelected.indexOf(code);
+    if (i >= 0) {
+      portfolioSelected.splice(i, 1);
+    } else {
+      portfolioSelected.push(code);
+    }
+    syncPortfolioCodes();
+    renderStockPicker('portfolio');
+  }
+
+  function selectPortfolioTopN(n) {
+    portfolioSelected = universeList.slice(0, n || 3).map(function (it) { return it.code; });
+    syncPortfolioCodes();
+    renderStockPicker('portfolio');
+  }
+
+  function clearPortfolioSelection() {
+    portfolioSelected = [];
+    syncPortfolioCodes();
+    renderStockPicker('portfolio');
+  }
+
   function syncPortfolioCodes() {
-    var codes = [];
-    var names = [];
-    $('#portfolioStockList input:checked').each(function () {
-      var code = $(this).val();
-      codes.push(code);
-      names.push((poolNames[code] || code));
-    });
-    $('#portfolioCodes').val(codes.join(','));
-    var $bar = $('#pfSelectedBar');
-    if (!codes.length) {
+    portfolioSelected = portfolioSelected.filter(function (c) { return !!poolNames[c]; });
+    $('#portfolioCodes').val(portfolioSelected.join(','));
+    $('#pfSelectedCountNum').text(String(portfolioSelected.length));
+    var $bar = $('#pfChipsBar');
+    var $chips = $('#pfChips').empty();
+    if (!portfolioSelected.length) {
       $bar.addClass('empty');
-      $('#pfSelectedCount').text('未勾选股票');
-      $('#pfSelectedNames').text('请从左侧勾选组合成分股');
+      $chips.append($('<span class="pf-chips-empty"/>').text('尚未选择 · 在上方列表点击添加'));
     } else {
       $bar.removeClass('empty');
-      $('#pfSelectedCount').text(codes.length + ' 只 · ' + codes.join(' / '));
-      $('#pfSelectedNames').text(names.join('、'));
+      portfolioSelected.forEach(function (code) {
+        var name = poolNames[code] || code;
+        $chips.append(
+          $('<button type="button" class="pf-chip"/>')
+            .attr('data-code', code)
+            .attr('title', '移除 ' + code)
+            .html(
+              '<b>' + escHtml(code) + '</b>'
+              + '<span>' + escHtml(name) + '</span>'
+              + '<i aria-hidden="true">×</i>'
+            )
+        );
+      });
     }
   }
 
@@ -557,7 +596,7 @@
   function renderPoolTabs() {
     var $tabs = $('#poolTabs').empty();
     if (!poolTabs.length) {
-      $tabs.append($('<div class="empty-state"/>').text('从左侧列表点击股票开启信息（可同时打开多只）'));
+      $tabs.append($('<div class="empty-state"/>').text('在上方搜索并点击股票开启信息（可同时打开多只）'));
       $('#poolMeta').text('');
       baseChart.clear();
       $('#barTableBody').html('<tr><td colspan="6" class="empty-state">暂无K线数据</td></tr>');
@@ -584,13 +623,85 @@
   }
 
   function markPoolListOpen() {
-    $('#stockList li').removeClass('active open');
+    $('#poolStockResults li').removeClass('active open');
     poolTabs.forEach(function (tab) {
-      $('#stockList li[data-code="' + tab.code + '"]').addClass('open');
+      $('#poolStockResults li[data-code="' + tab.code + '"]').addClass('open');
     });
     if (activePoolCode) {
-      $('#stockList li[data-code="' + activePoolCode + '"]').addClass('active');
+      $('#poolStockResults li[data-code="' + activePoolCode + '"]').addClass('active');
     }
+  }
+
+  function normalizeStockQuery(q) {
+    return String(q || '').trim().toLowerCase().replace(/\s+/g, '');
+  }
+
+  /** 代码/名称模糊匹配（包含、前缀优先） */
+  function filterUniverse(q, limit) {
+    limit = limit || PICKER_LIMIT;
+    var query = normalizeStockQuery(q);
+    var list = universeList || [];
+    if (!query) {
+      return list.slice(0, limit);
+    }
+    var prefix = [];
+    var mid = [];
+    for (var i = 0; i < list.length; i++) {
+      var it = list[i];
+      var code = String(it.code || '').toLowerCase();
+      var name = String(it.name || '').toLowerCase();
+      var hit = code.indexOf(query) >= 0 || name.indexOf(query) >= 0;
+      if (!hit) continue;
+      if (code.indexOf(query) === 0 || name.indexOf(query) === 0) {
+        prefix.push(it);
+      } else {
+        mid.push(it);
+      }
+      if (prefix.length + mid.length >= limit * 2) break;
+    }
+    return prefix.concat(mid).slice(0, limit);
+  }
+
+  function renderStockPicker(mode) {
+    var isPool = mode === 'pool';
+    var isPf = mode === 'portfolio';
+    var q = isPool ? $('#poolStockQ').val() : (isPf ? $('#pfStockQ').val() : $('#singleStockQ').val());
+    var $list = isPool ? $('#poolStockResults') : (isPf ? $('#pfStockResults') : $('#singleStockResults'));
+    var $hint = isPool ? $('#poolStockMatchHint') : (isPf ? $('#pfStockMatchHint') : $('#singleStockMatchHint'));
+    var matched = filterUniverse(q, PICKER_LIMIT);
+    var total = universeList.length;
+    var query = normalizeStockQuery(q);
+    $hint.text(query
+      ? ('匹配 ' + matched.length + (matched.length >= PICKER_LIMIT ? '+' : '') + ' / 共 ' + total)
+      : ('展示前 ' + matched.length + ' / 共 ' + total + ' · 输入可筛选'));
+    $list.empty();
+    if (!matched.length) {
+      $list.append($('<li class="stock-picker-empty"/>').text(total ? '无匹配标的' : '暂无股票数据'));
+      return;
+    }
+    matched.forEach(function (it) {
+      var code = it.code;
+      var $li = $('<li role="button" tabindex="0"/>')
+        .attr('data-code', code)
+        .html(
+          '<span class="stock-picker-code">' + escHtml(code) + '</span>'
+          + '<span class="stock-picker-name">' + escHtml(it.name || '') + '</span>'
+        );
+      if (isPool) {
+        if (getPoolTab(code)) $li.addClass('open');
+        if (code === activePoolCode) $li.addClass('active');
+      } else if (isPf) {
+        if (isPortfolioSelected(code)) $li.addClass('selected');
+      } else if (code === singleCode) {
+        $li.addClass('active');
+      }
+      $list.append($li);
+    });
+  }
+
+  function refreshUniverseCounts() {
+    var n = universeList.length;
+    $('#poolUniverseCount, #singleUniverseCount, #pfUniverseCount').text(String(n));
   }
 
   function openPoolStock(code) {
@@ -798,39 +909,25 @@
 
   function loadPool() {
     $.getJSON('/api/stock/pool', function (list) {
-      var $pool = $('#stockList').empty();
-      var $single = $('#singleStockList').empty();
-      var $pf = $('#portfolioStockList').empty();
       var codes = [];
-      (list || []).forEach(function (item, i) {
+      universeList = [];
+      poolNames = {};
+      (list || []).forEach(function (item) {
         var code = typeof item === 'string' ? item : item.code;
         var name = typeof item === 'string' ? item : (item.name || item.code);
+        if (!code) return;
         poolNames[code] = name;
+        universeList.push({ code: code, name: name });
         codes.push(code);
-
-        $pool.append(
-          $('<li/>').html('<b>' + code + '</b><br/><span class="stock-name">' + name + '</span>')
-            .attr('data-code', code)
-        );
-        $single.append(
-          $('<li class="sub-menu-item"/>')
-            .attr('data-code', code)
-            .attr('role', 'button')
-            .attr('tabindex', '0')
-            .html(
-              '<div class="sub-menu-main">' +
-                '<div class="sub-menu-title"><b>' + code + '</b><span class="sub-menu-badge">当前</span></div>' +
-                '<span class="stock-name">' + name + '</span>' +
-              '</div>' +
-              '<button type="button" class="sub-menu-action" data-action="run" title="选择并回测">回测</button>'
-            )
-        );
-        var $label = $('<label class="check-item"/>');
-        var $cb = $('<input type="checkbox"/>').val(code);
-        if (i < 3) $cb.prop('checked', true);
-        $label.append($cb).append($('<span/>').html('<b>' + code + '</b> ' + name));
-        $pf.append($('<li/>').append($label));
       });
+      portfolioSelected = portfolioSelected.filter(function (c) { return !!poolNames[c]; });
+      if (!portfolioSelected.length) {
+        portfolioSelected = codes.slice(0, 3);
+      }
+      refreshUniverseCounts();
+      renderStockPicker('pool');
+      renderStockPicker('single');
+      renderStockPicker('portfolio');
       syncPortfolioCodes();
       if (codes.length) {
         openPoolStock(codes[0]);
@@ -860,8 +957,8 @@
     singlePeriods[code] = period;
     $('#barPeriod').val(period);
 
-    $('#singleStockList li').removeClass('active');
-    var $active = $('#singleStockList li[data-code="' + code + '"]').addClass('active');
+    $('#singleStockResults li').removeClass('active');
+    var $active = $('#singleStockResults li[data-code="' + code + '"]').addClass('active');
     try {
       if ($active.length && $active[0].scrollIntoView) {
         $active[0].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -870,7 +967,7 @@
 
     // 切换标的时清掉上一只的回测展示，避免串单
     if (prev && prev !== code) {
-      $('#btMetrics').html('<span class="hint">已切换至 <b>' + code + '</b>，点击「执行回测」或左侧「回测」查看结果</span>');
+      $('#btMetrics').html('<span class="hint">已切换至 <b>' + code + '</b>，点击「执行回测」查看结果</span>');
       clearTradeResult();
       clearSingleEquityChart();
       if (lastBacktestCode !== code) {
@@ -1596,7 +1693,7 @@
     syncPortfolioCodes();
     var codes = ($('#portfolioCodes').val() || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
     if (!codes.length) {
-      toast('请至少勾选一只股票', 'err');
+      toast('请至少选择一只成分股', 'err');
       return;
     }
     var body = {
@@ -1642,8 +1739,8 @@
   }
 
   var knowledgeTopics = [
-    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260720-ops-views' },
-    { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260720-todo' },
+    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260720-pf-picker' },
+    { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260720-pf-picker' },
     { id: 'memo', group: 'app', title: '应用待办', src: '/docs/memo.html?v=20260720-ops-views' },
     { id: 'ashare', group: 'stock', title: 'A股基础', src: '/docs/ashare.html?v=20260719-menu' },
     { id: 'session', group: 'stock', title: '交易时间', src: '/docs/session.html?v=20260719-menu' },
@@ -2425,11 +2522,15 @@
       if (singleCode) {
         selectSingleStock(singleCode, { silent: true });
       }
+      renderStockPicker('single');
+      setTimeout(function () { $('#singleStockQ').trigger('focus'); }, 80);
     } else if (lastWorkspaceMode === 'portfolio') {
       $('#viewPortfolio').prop('hidden', false);
       if (expandNav) setSideNavOpen('portfolioBody');
+      renderStockPicker('portfolio');
       syncPortfolioCodes();
       loadPortfolioHistory();
+      setTimeout(function () { $('#pfStockQ').trigger('focus'); }, 80);
     } else if (lastWorkspaceMode === 'tradepool') {
       showTradePool(options.panel || lastTpPanel || 'pool');
       return;
@@ -2447,6 +2548,8 @@
       lastWorkspaceMode = 'pool';
       $('#viewPool').prop('hidden', false);
       if (expandNav) setSideNavOpen('poolBody');
+      renderStockPicker('pool');
+      setTimeout(function () { $('#poolStockQ').trigger('focus'); }, 80);
     }
     resizeCharts();
   }
@@ -2839,7 +2942,7 @@
     var introSrc = $btn.attr('data-intro');
     var introTitle = $btn.attr('data-intro-title') || $btn.clone().children().remove().end().text().trim();
     if (introSrc) {
-      showNavIntro({ bodyId: bodyId, title: introTitle, src: introSrc + (introSrc.indexOf('?') >= 0 ? '&' : '?') + 'v=20260719-tradepool-single' });
+      showNavIntro({ bodyId: bodyId, title: introTitle, src: introSrc + (introSrc.indexOf('?') >= 0 ? '&' : '?') + 'v=20260720-app-pdf' });
       return;
     }
     // 无介绍配置时回退到原工作台
@@ -3328,26 +3431,72 @@
     showMode(lastWorkspaceMode || 'pool');
   });
 
-  $('#stockList').on('click', 'li', function () {
+  $('#btnEnterPool').on('click', function () {
     showMode('pool');
-    openPoolStock($(this).data('code'));
   });
 
-  $('#singleStockList').on('click', 'li', function (e) {
-    var code = $(this).data('code');
-    var $btn = $(e.target).closest('[data-action="run"]');
+  $('#btnEnterSingle').on('click', function () {
+    showMode('single');
+  });
+
+  $('#btnEnterPortfolio').on('click', function () {
+    showMode('portfolio');
+  });
+
+  var poolSearchTimer = null;
+  var singleSearchTimer = null;
+  var pfSearchTimer = null;
+
+  $('#poolStockQ').on('input', function () {
+    clearTimeout(poolSearchTimer);
+    poolSearchTimer = setTimeout(function () { renderStockPicker('pool'); }, 120);
+  });
+
+  $('#singleStockQ').on('input', function () {
+    clearTimeout(singleSearchTimer);
+    singleSearchTimer = setTimeout(function () { renderStockPicker('single'); }, 120);
+  });
+
+  $('#pfStockQ').on('input', function () {
+    clearTimeout(pfSearchTimer);
+    pfSearchTimer = setTimeout(function () { renderStockPicker('portfolio'); }, 120);
+  });
+
+  $('#poolStockResults').on('click', 'li[data-code]', function () {
+    var code = $(this).attr('data-code');
+    showMode('pool');
+    openPoolStock(code);
+    renderStockPicker('pool');
+  });
+
+  $('#singleStockResults').on('click', 'li[data-code]', function () {
+    var code = $(this).attr('data-code');
     showMode('single');
     selectSingleStock(code);
-    if ($btn.length) {
-      runBacktest();
-    }
+    renderStockPicker('single');
   });
 
-  $('#singleStockList').on('keydown', 'li', function (e) {
+  $('#pfStockResults').on('click', 'li[data-code]', function () {
+    togglePortfolioStock($(this).attr('data-code'));
+  });
+
+  $('#poolStockResults, #singleStockResults, #pfStockResults').on('keydown', 'li[data-code]', function (e) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       $(this).trigger('click');
     }
+  });
+
+  $('#pfChips').on('click', '.pf-chip', function () {
+    togglePortfolioStock($(this).attr('data-code'));
+  });
+
+  $('#btnPfPickTop3').on('click', function () {
+    selectPortfolioTopN(3);
+  });
+
+  $('#btnPfClearPick').on('click', function () {
+    clearPortfolioSelection();
   });
 
   $('#barPeriod').on('change', function () {
@@ -3358,10 +3507,6 @@
   });
   $('#singleBackStart, #singleBackEnd').on('change', function () {
     if (singleCode) loadSingleKline({ silent: true });
-  });
-
-  $('#portfolioStockList').on('change', 'input[type=checkbox]', function () {
-    syncPortfolioCodes();
   });
 
   $('#btnPoolRefresh').on('click', function () {

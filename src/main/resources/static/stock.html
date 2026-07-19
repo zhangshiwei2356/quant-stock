@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="night">
+<html lang="zh-CN" data-theme="day">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -13,15 +13,16 @@
         if (t === 'matrix' || t === 'aurora' || t === 'vanta') t = 'night';
         if (t === 'finance') t = 'day';
         var ok = { day: 1, forest: 1, night: 1, cosmos: 1 };
-        if (ok[t]) document.documentElement.setAttribute('data-theme', t);
+        // 无本地选择时默认「日间」
+        document.documentElement.setAttribute('data-theme', ok[t] ? t : 'day');
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css?v=20260720-tp-submenu"/>
+  <link rel="stylesheet" href="/css/style.css?v=20260720-pf-picker"/>
   <script src="/js/jquery.min.js"></script>
   <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/echarts.min.js"></script>
-  <script src="/js/particle-bg.js?v=20260718-day-tech"></script>
+  <script src="/js/particle-bg.js?v=20260720-theme-day"></script>
   <script src="/js/starfield-bg.js?v=20260718-milkyway"></script>
 </head>
 <body>
@@ -40,10 +41,10 @@
   <div class="header-actions">
     <label class="theme-field" for="themeSelect">主题
       <select id="themeSelect" aria-label="主题选择">
-        <option value="night">夜盘深色 · 黑客帝国</option>
-        <option value="day">日间浅色 · 科技粒子</option>
-        <option value="forest">青松深色 · 3D星空</option>
-        <option value="cosmos">星空粒子</option>
+        <option value="day" selected>日间</option>
+        <option value="night">夜盘</option>
+        <option value="forest">银河</option>
+        <option value="cosmos">极光</option>
       </select>
     </label>
   </div>
@@ -67,8 +68,8 @@
           </button>
           <div id="poolBody" class="side-nav-body">
             <p id="dataHint" class="hint"></p>
-            <p class="hint">全市场列表（浏览）；点击开启信息，可同时打开多只</p>
-            <ul id="stockList"></ul>
+            <p class="hint">工作台内搜索选股，支持代码/名称模糊匹配；可同时开多只</p>
+            <button type="button" id="btnEnterPool" class="secondary" style="width:100%;margin-top:6px;">进入行情浏览</button>
           </div>
         </div>
 
@@ -98,8 +99,8 @@
             <span class="chevron">▸</span>
           </button>
           <div id="singleBody" class="side-nav-body">
-            <p class="hint">二级菜单：点选标的；右侧可改周期与资金</p>
-            <ul id="singleStockList" class="sub-menu-list"></ul>
+            <p class="hint">工作台内搜索选股后回测；支持代码/名称模糊匹配</p>
+            <button type="button" id="btnEnterSingle" class="secondary" style="width:100%;margin-top:6px;">进入个股回测</button>
           </div>
         </div>
 
@@ -111,8 +112,8 @@
             <span class="chevron">▸</span>
           </button>
           <div id="portfolioBody" class="side-nav-body">
-            <p class="hint">勾选多只股票组成组合</p>
-            <ul id="portfolioStockList" class="check-list"></ul>
+            <p class="hint">工作台内搜索多选成分股；共享资金池日K回测</p>
+            <button type="button" id="btnEnterPortfolio" class="secondary" style="width:100%;margin-top:6px;">进入组合回测</button>
           </div>
         </div>
 
@@ -232,6 +233,17 @@
     <!-- 行情浏览：仅展示，多股信息 -->
     <div id="viewPool" class="workspace-view" hidden>
       <section class="panel">
+        <h3>选股 <span class="trade-pool-count" id="poolUniverseCount">0</span></h3>
+        <p class="hint">输入代码或名称模糊筛选；点击加入下方已开启标签（可多只）。</p>
+        <div class="stock-picker" id="poolStockPicker">
+          <div class="stock-picker-bar">
+            <input type="search" id="poolStockQ" class="stock-picker-input" placeholder="搜索：600036 / 招商 / 银行" autocomplete="off"/>
+            <span class="field-hint" id="poolStockMatchHint"></span>
+          </div>
+          <ul class="stock-picker-list" id="poolStockResults"></ul>
+        </div>
+      </section>
+      <section class="panel">
         <h3>已开启股票</h3>
         <div id="poolTabs" class="stock-tabs"></div>
         <div class="toolbar" style="margin-top:10px;">
@@ -273,10 +285,19 @@
     <!-- 个股回测 -->
     <div id="viewSingle" class="workspace-view" hidden>
       <section class="panel">
-        <div class="selected-stock-bar" id="singleSelectedBar">
+        <h3>选股 <span class="trade-pool-count" id="singleUniverseCount">0</span></h3>
+        <p class="hint">输入代码或名称模糊筛选；点击选定回测标的。</p>
+        <div class="stock-picker" id="singleStockPicker">
+          <div class="stock-picker-bar">
+            <input type="search" id="singleStockQ" class="stock-picker-input" placeholder="搜索：600036 / 招商 / 银行" autocomplete="off"/>
+            <span class="field-hint" id="singleStockMatchHint"></span>
+          </div>
+          <ul class="stock-picker-list" id="singleStockResults"></ul>
+        </div>
+        <div class="selected-stock-bar" id="singleSelectedBar" style="margin-top:12px;">
           <div>
             <div class="selected-stock-code" id="singleSelectedCode">未选择</div>
-            <div class="selected-stock-name" id="singleSelectedName">请从左侧二级菜单选择股票</div>
+            <div class="selected-stock-name" id="singleSelectedName">请在上方搜索并选择股票</div>
           </div>
           <span class="selected-stock-tag">当前标的</span>
         </div>
@@ -802,23 +823,31 @@
     <!-- 组合回测 -->
     <div id="viewPortfolio" class="workspace-view" hidden>
       <section class="panel">
-        <div class="selected-stock-bar empty" id="pfSelectedBar">
-          <div>
-            <div class="selected-stock-code" id="pfSelectedCount">未勾选股票</div>
-            <div class="selected-stock-name" id="pfSelectedNames">请从左侧勾选组合成分股</div>
+        <h3>成分股 <span class="trade-pool-count" id="pfUniverseCount">0</span></h3>
+        <p class="hint">搜索后点击切换勾选；下方标签可移除。建议至少 2 只。</p>
+        <div class="stock-picker" id="pfStockPicker">
+          <div class="stock-picker-bar">
+            <input type="search" id="pfStockQ" class="stock-picker-input" placeholder="搜索：600036 / 招商 / 银行" autocomplete="off"/>
+            <button type="button" id="btnPfPickTop3" class="secondary">选前3只</button>
+            <button type="button" id="btnPfClearPick" class="secondary">清空</button>
+            <span class="field-hint" id="pfStockMatchHint"></span>
           </div>
-          <span class="selected-stock-tag">组合成分</span>
+          <ul class="stock-picker-list stock-picker-list--multi" id="pfStockResults"></ul>
         </div>
+        <div class="pf-chips-bar" id="pfChipsBar">
+          <span class="pf-chips-label">已选 <b id="pfSelectedCountNum">0</b> 只</span>
+          <div class="pf-chips" id="pfChips"></div>
+        </div>
+        <input id="portfolioCodes" type="hidden"/>
+      </section>
+      <section class="panel">
         <h3>组合回测参数</h3>
         <div class="toolbar">
-          <label class="field">组合股票
-            <input id="portfolioCodes" type="text" style="min-width:260px" placeholder="勾选左侧股票自动填入" readonly/>
-          </label>
           <label class="field">回测开始
-            <input id="backStart" type="text" placeholder="yyyy-MM-dd HH:mm:ss"/>
+            <input id="backStart" type="text" placeholder="yyyy-MM-dd HH:mm:ss（可空）"/>
           </label>
           <label class="field">回测结束
-            <input id="backEnd" type="text" placeholder="yyyy-MM-dd HH:mm:ss"/>
+            <input id="backEnd" type="text" placeholder="yyyy-MM-dd HH:mm:ss（可空）"/>
           </label>
           <label class="field">初始资金 <span id="pfInitCapitalHint" class="field-hint">(10万)</span>
             <input id="pfInitCapital" type="number" value="100000"/>
@@ -826,7 +855,7 @@
           <button id="btnPortfolio" class="danger">执行组合回测</button>
         </div>
         <p id="backTimeHint" class="hint" style="margin:8px 0 0;"></p>
-        <p class="hint" style="margin:4px 0 0;">说明：组合引擎为<strong>日K简化模型</strong>（共享资金池）；完整 T+1/分钟撮合规则以个股回测为准。</p>
+        <p class="hint" style="margin:4px 0 0;">日K共享资金池；完整 T+1/分钟撮合以个股回测为准。</p>
         <div class="metrics" id="pfMetrics" style="margin-top:8px;"></div>
       </section>
       <section class="panel" id="pfEquityPanel" hidden>
@@ -917,6 +946,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260720-p2-polish"></script>
+<script src="/js/stock-chart.js?v=20260720-app-pdf"></script>
 </body>
 </html>
