@@ -3009,7 +3009,7 @@
     var introSrc = $btn.attr('data-intro');
     var introTitle = $btn.attr('data-intro-title') || $btn.clone().children().remove().end().text().trim();
     if (introSrc) {
-      showNavIntro({ bodyId: bodyId, title: introTitle, src: introSrc + (introSrc.indexOf('?') >= 0 ? '&' : '?') + 'v=20260720-tp-tips' });
+      showNavIntro({ bodyId: bodyId, title: introTitle, src: introSrc + (introSrc.indexOf('?') >= 0 ? '&' : '?') + 'v=20260720-pdf-fix' });
       return;
     }
     // 无介绍配置时回退到原工作台
@@ -3509,8 +3509,8 @@
     });
   });
 
-  $('#viewNavIntro').on('click', '[data-download-docs]', function () {
-    var group = $(this).attr('data-download-docs');
+  $('#viewNavIntro').on('click', '[data-download-docs], [data-docs-pdf]', function () {
+    var group = $(this).attr('data-download-docs') || $(this).attr('data-docs-pdf');
     if (group === 'stock' || group === 'app') {
       downloadDocsPdf(group, $(this));
     }
