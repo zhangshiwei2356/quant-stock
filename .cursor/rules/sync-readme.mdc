@@ -38,9 +38,11 @@ alwaysApply: true
 static/docs/app.html      → 系统概述
 static/docs/rules.html    → 交易规则
 static/docs/memo.html     → 待办清单
+static/docs/kuangrui.html → 宽睿文档梳理
+应用说明 → 项目 README → GET /api/docs/readme（实时渲染根目录 README.md）
 static/docs/home.html     → 初始化欢迎页（收起全部一级菜单时）
-stock-chart.js → knowledgeTopics → { id, title, src } 目录索引（一般无需改正文）
+stock-chart.js → knowledgeTopics → { id, title, src } 目录索引
 ```
 ## 自检
 
-完成改动前确认：用户只读 README **或** 只看页面「应用说明 → 系统概述」，都能按当前代码正确理解启动方式与核心能力；整应用路线图以「待办清单」为准。
+完成改动前确认：用户只读 README **或** 只看页面「应用说明 → 系统概述」，都能按当前代码正确理解启动方式与核心能力；完整架构图/接口表以 README（及页面「项目 README」）为准；整应用路线图以「待办清单」为准。

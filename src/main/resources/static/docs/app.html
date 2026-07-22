@@ -1,2 +1,55 @@
-<!-- 片段：由 stock.html 知识面板加载 -->
-<p><b>Quant Stock</b> 是基于 Spring Boot 2.7 + TA4J 的 A 股量化回测单体应用（非前后端分离），页面内嵌于 <code>static/</code>。</p><h4>如何启动</h4><ul><li>项目根目录执行：<code>mvn spring-boot:run</code></li><li>浏览器打开：<code>http://localhost:8080/stock.html</code></li><li>默认连接本地 MySQL（localhost:3306/quant_stock，root/123456），并执行 <code>mapper/schema.sql</code></li><li>空库启动时自动从 classpath JSON 导入日线 + 5 分钟模拟数据</li></ul><h4>行情与回测存储</h4><ul><li>股票：600036 招商银行、000001 平安银行、300059 东方财富</li><li>区间：约 2025-07-17 ~ 2026-07-17</li><li>物理表：<code>market_daily</code>（日线）、<code>market_minute</code>（5分钟）；其它周期运行时聚合</li><li>回测历史/分析：<code>bt_backtest_record</code> / <code>bt_backtest_analysis</code></li><li>种子目录：<code>src/main/resources/data/kline/</code>（仅导入用）</li></ul><h4>页面能做什么</h4><ul><li>进入应用先显示<strong>初始化页</strong>；展开左侧一级菜单进入功能，再点同一菜单可全部收起并回到初始化页</li><li><b>行情浏览</b>：工作台内搜索选股（代码/名称模糊），可同时开启多只标签切换</li><li><b>个股回测</b>：回测工作台 / 批量扫描 / 回测历史；搜索选股后回测，含K线信号与权益分析</li><li><b>组合回测</b>：回测工作台 / 回测历史；多选成分股共享资金池回测，含权益、成交与分股汇总</li><li><b>目标池</b>：当前池 / 扫描历史；盘后扫描自动覆盖唯一池；移出≠卖出</li><li><b>账户概览</b>：资金权益 / 持仓（批次·T+1）/ 委托记录 / 日结 / 风控</li><li><b>运维中心</b>：任务管理 / 数据健康 / 运行参数（表 <code>sys_schedule_job</code>，种子默认全关）</li><li><b>数据表</b>：白名单表分页只读</li><li>回测起止时间默认留空 = 全量 K 线（单股/组合均支持填写）；初始资金默认 <b>100000</b></li><li>侧栏另有<strong>量化知识</strong>（指标/涨跌停/T+1/成本/仓位/风控/撮合等）与应用说明（系统概述、交易规则、待办清单、宽睿文档梳理）；正文在 <code>static/docs/</code>，载入本面板</li><li>页头主题：默认<strong>日间</strong>；另有夜盘 / 银河 / 极光，本地记住选择</li></ul><h4>策略与风控摘要</h4><ul><li>均线金叉死叉；可配置 MA60 / 放量 / ADX / RSI 过滤</li><li>综合成本止损、移动止盈；T+1 <b>分档</b>；金字塔 50/30/20（成交后占档）</li><li>撮合双口径：日K下一根开盘；分钟K≥次日09:45；涨跌停主板10%/创科20%</li><li>单股 / 组合 / 实盘扫描均对齐上述核心规则；实盘为本地模拟账本（成交落库、重启可恢复；真券商 API 见待办清单）</li><li>细则见「应用说明 → 交易规则」</li></ul><h4>可选能力</h4><ul><li>运维中心：库表 <code>sys_schedule_job</code> + 页面管理；总闸 <code>quant.schedule.enabled</code>（默认 true）；API 见 <code>GET /api/schedule</code></li><li>安全：可选 <code>QUANT_API_KEY</code>；限流 <code>QUANT_RATE_LIMIT</code></li><li>市值股本：<code>quant.float-shares-yi.&lt;code&gt;</code></li><li>扩展：<code>KlineSdkClient</code> / <code>trade-mode=sdk</code></li></ul><p>更完整说明见仓库根目录 <code>README.md</code>。应用变更时 README 与本页须同步更新。</p>
+<!-- 片段：由 stock.html 知识面板加载 —— 系统概述 -->
+<p><b>Quant Stock</b> 是基于 Spring Boot 2.7 + TA4J 的 A 股量化回测与模拟交易<strong>单体应用</strong>（非前后端分离）。页面在 <code>static/</code>，接口在 <code>/api/**</code>，数据默认落本地 MySQL <code>quant_stock</code>。</p>
+
+<h4>如何启动</h4>
+<ul>
+  <li>项目根目录：执行 <code>mapper/schema.sql</code> 后 <code>mvn spring-boot:run</code></li>
+  <li>浏览器：<code>http://localhost:8080/stock.html</code></li>
+  <li>空库自动导入日线 + 5 分钟种子；默认 <code>market-mode=db</code>、<code>trade-mode=sim</code></li>
+</ul>
+
+<h4>架构一览</h4>
+<ul>
+  <li><b>前端</b>：<code>stock.html</code> + <code>stock-chart.js</code>；文档片段 <code>static/docs/*.html</code></li>
+  <li><b>后端包</b>：<code>market</code> 行情 · <code>strategy</code> 策略 · <code>backtest</code> 回测 · <code>pool</code> 目标池 · <code>trade</code> 下单账本 · <code>risk</code> 风控 · <code>task</code> 调度 · <code>account</code>/<code>admin</code> 账户与运维 · <code>pdf</code> 文档</li>
+  <li><b>数据</b>：行情表 + 目标池 + 模拟账本 + 回测历史 + <code>sys_schedule_job</code></li>
+  <li>完整架构图与接口表见侧栏「<b>项目 README</b>」（实时渲染仓库 <code>README.md</code>）</li>
+</ul>
+
+<h4>功能模块</h4>
+<ul>
+  <li><b>行情浏览</b>：全市场模糊选股、多周期 K 线与指标</li>
+  <li><b>个股回测</b>：回测工作台 / 批量扫描 / 回测历史</li>
+  <li><b>组合回测</b>：回测工作台 / 回测历史（共享资金池日 K）</li>
+  <li><b>目标池</b>：当前池 / 扫描历史；盘后或手动扫描覆盖唯一池；移出≠卖出</li>
+  <li><b>账户概览</b>：资金 · 持仓（T+1 批次）· 委托 · 日结 · 风控事件</li>
+  <li><b>运维中心</b>：任务管理 / 数据健康 / 运行参数（任务种子默认全关）</li>
+  <li><b>数据表</b>：白名单表分页只读</li>
+  <li><b>量化知识</b> / <b>应用说明</b>：指标与规则文档；应用说明含系统概述、项目 README、交易规则、待办、宽睿梳理；可导出 PDF</li>
+</ul>
+
+<h4>模拟数据与默认参数</h4>
+<ul>
+  <li>演示股：600036 / 000001 / 300059；约 2025-07-17 ~ 2026-07-17</li>
+  <li>物理表：<code>market_daily</code>、<code>market_minute</code>；回测：<code>bt_backtest_*</code></li>
+  <li>回测区间默认留空 = 全量 K 线；初始资金默认 <b>100000</b></li>
+  <li>页头主题默认<strong>日间</strong>（夜盘 / 银河 / 极光可切换并记住）</li>
+</ul>
+
+<h4>策略与风控摘要</h4>
+<ul>
+  <li>均线金叉死叉；可配 MA60 / 放量 / ADX / RSI</li>
+  <li>综合成本止损、移动止盈；T+1 分档；金字塔 50/30/20</li>
+  <li>撮合：日 K 下一根开盘；分钟 ≥ 次日 09:45；涨跌停主板 10% / 创科 20%</li>
+  <li>单股 / 组合 / 扫描交易对齐核心规则；实盘为<strong>本地模拟账本</strong>（真柜台见待办 / 宽睿文档）</li>
+  <li>细则：「应用说明 → 交易规则」</li>
+</ul>
+
+<h4>可选能力</h4>
+<ul>
+  <li>定时总闸 <code>quant.schedule.enabled</code>；API：<code>GET /api/schedule</code></li>
+  <li>安全：可选 <code>QUANT_API_KEY</code>；限流 <code>QUANT_RATE_LIMIT</code></li>
+  <li>扩展：<code>KlineSdkClient</code> / <code>trade-mode=sdk</code>（当前为桩）</li>
+</ul>
+
+<p>更完整说明、架构图与接口清单见「应用说明 → <b>项目 README</b>」。改动后请同步更新 README 与本页（规则 <code>sync-readme.mdc</code>）。</p>

@@ -1752,9 +1752,10 @@
   }
 
   var knowledgeTopics = [
-    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260720-kuangrui' },
+    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260722-readme' },
+    { id: 'readme', group: 'app', title: '项目 README', src: '/api/docs/readme' },
     { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260720-nav-rename' },
-    { id: 'memo', group: 'app', title: '待办清单', src: '/docs/memo.html?v=20260720-kuangrui' },
+    { id: 'memo', group: 'app', title: '待办清单', src: '/docs/memo.html?v=20260722-readme' },
     { id: 'kuangrui', group: 'app', title: '宽睿文档梳理', src: '/docs/kuangrui.html?v=20260720-kuangrui' },
     { id: 'ashare', group: 'stock', title: 'A股基础', src: '/docs/ashare.html?v=20260720-nav-rename' },
     { id: 'session', group: 'stock', title: '交易时间', src: '/docs/session.html?v=20260720-nav-rename' },
@@ -2976,6 +2977,22 @@
 
     function render(html) {
       $('#knowledgeBody').html(html || '<p>暂无内容</p>');
+      if (topic.id === 'readme') {
+        enhanceReadmeMermaid($('#knowledgeBody'));
+      }
+    }
+    // README 实时读盘，不做本地 HTML 缓存
+    if (topic.id === 'readme') {
+      $.ajax({ url: topic.src, dataType: 'html', cache: false })
+        .done(function (html) {
+          if ($('#knowledgeTitle').text() !== topic.title) return;
+          render(html);
+        })
+        .fail(function () {
+          if ($('#knowledgeTitle').text() !== topic.title) return;
+          render('<p>README 加载失败：请确认从项目根目录启动，且 <code>GET /api/docs/readme</code> 可用。</p>');
+        });
+      return;
     }
     if (knowledgeHtmlCache[topic.src]) {
       render(knowledgeHtmlCache[topic.src]);
@@ -2984,7 +3001,6 @@
     $.get(topic.src)
       .done(function (html) {
         knowledgeHtmlCache[topic.src] = html;
-        // 若用户已点开其它条目，勿覆盖
         if ($('#knowledgeTitle').text() !== topic.title) return;
         render(html);
       })
@@ -2992,6 +3008,49 @@
         if ($('#knowledgeTitle').text() !== topic.title) return;
         render('<p>文档加载失败：' + topic.src + '</p>');
       });
+  }
+
+  /** 将 README 中 ```mermaid 代码块交给 Mermaid 渲染（CDN，失败则保留源码） */
+  function enhanceReadmeMermaid($root) {
+    var $codes = $root.find('pre > code.language-mermaid');
+    if (!$codes.length) return;
+    function run() {
+      if (!window.mermaid) return;
+      try {
+        window.mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose' });
+      } catch (e0) {}
+      $codes.each(function () {
+        var src = $(this).text();
+        var $div = $('<div class="mermaid readme-mermaid"></div>').text(src);
+        $(this).closest('pre').replaceWith($div);
+      });
+      try {
+        window.mermaid.run({ nodes: $root.find('.readme-mermaid').toArray() });
+      } catch (e1) {
+        console.warn('mermaid render failed', e1);
+      }
+    }
+    if (window.mermaid) {
+      run();
+      return;
+    }
+    if (window.__quantMermaidLoading) {
+      window.__quantMermaidLoading.push(run);
+      return;
+    }
+    window.__quantMermaidLoading = [run];
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js';
+    s.onload = function () {
+      var q = window.__quantMermaidLoading || [];
+      window.__quantMermaidLoading = null;
+      for (var i = 0; i < q.length; i++) { try { q[i](); } catch (e) {} }
+    };
+    s.onerror = function () {
+      window.__quantMermaidLoading = null;
+      console.warn('mermaid CDN 加载失败，架构图将显示为源码');
+    };
+    document.head.appendChild(s);
   }
 
   $('.side-nav-toggle').on('click', function () {

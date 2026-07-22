@@ -1,6 +1,7 @@
 package com.quant.stock.controller;
 
 import com.quant.stock.pdf.DocsPdfService;
+import com.quant.stock.pdf.DocsReadmeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -17,7 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 /**
- * 文档 PDF 导出（服务端 iText，替代浏览器 html2pdf）。
+ * 文档：PDF 导出 + README 在线查看。
  */
 @RestController
 @RequestMapping("/api/docs")
@@ -25,6 +26,21 @@ import java.util.Map;
 public class DocsPdfController {
 
     private final DocsPdfService docsPdfService;
+    private final DocsReadmeService docsReadmeService;
+
+    @GetMapping(value = "/readme", produces = MediaType.TEXT_HTML_VALUE)
+    public ResponseEntity<String> readmeHtml() {
+        try {
+            String html = docsReadmeService.toHtmlFragment();
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                    .contentType(new MediaType("text", "html", StandardCharsets.UTF_8))
+                    .body(html);
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                    "README 渲染失败: " + e.getMessage());
+        }
+    }
 
     @GetMapping("/pdf/{group}")
     public ResponseEntity<byte[]> download(@PathVariable("group") String group) {

@@ -1584,6 +1584,55 @@ button.home-action {
 
 .knowledge-body .memo-todo li { margin-bottom: 6px; }
 
+/* 项目 README（Markdown → HTML） */
+.knowledge-body .readme-md {
+  max-width: 920px;
+  line-height: 1.55;
+}
+.knowledge-body .readme-md-banner {
+  margin-bottom: 14px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--accent, #2563eb);
+  background: rgba(37, 99, 235, 0.06);
+}
+.knowledge-body .readme-md h1 {
+  font-size: 1.45rem;
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border, #d0d7de);
+}
+.knowledge-body .readme-md h2 {
+  font-size: 1.2rem;
+  margin: 22px 0 10px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+.knowledge-body .readme-md h3 {
+  font-size: 1.05rem;
+  margin: 16px 0 8px;
+}
+.knowledge-body .readme-md hr {
+  border: 0;
+  border-top: 1px solid var(--border, #e5e7eb);
+  margin: 18px 0;
+}
+.knowledge-body .readme-md pre {
+  overflow-x: auto;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.06);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.knowledge-body .readme-md .readme-mermaid {
+  margin: 12px 0;
+  padding: 8px;
+  overflow-x: auto;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 6px;
+  text-align: center;
+}
+
 .history-table-wrap {
   max-height: 480px;
   overflow: auto;
