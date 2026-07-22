@@ -48,8 +48,11 @@ public class AccountOverviewService {
             dayPnl = equity.subtract(prevClose);
             dayPnlPct = dayPnl.divide(prevClose, 6, RoundingMode.HALF_UP);
         }
-        BigDecimal init = new BigDecimal("100000");
-        BigDecimal totalReturn = equity.subtract(init).divide(init, 6, RoundingMode.HALF_UP);
+        BigDecimal init = strategyTask.getSimInitCash();
+        BigDecimal totalReturn = BigDecimal.ZERO;
+        if (init.compareTo(BigDecimal.ZERO) > 0) {
+            totalReturn = equity.subtract(init).divide(init, 6, RoundingMode.HALF_UP);
+        }
 
         List<Map<String, Object>> positions = positions();
         int posCount = positions.size();
@@ -119,6 +122,7 @@ public class AccountOverviewService {
             m.put("side", o.getSide() == null ? null : o.getSide().name());
             m.put("price", o.getPrice());
             m.put("volume", o.getVolume());
+            m.put("filledVolume", o.getFilledVolume());
             m.put("status", o.getStatus() == null ? null : o.getStatus().name());
             m.put("amount", o.getPrice() != null && o.getVolume() != null
                     ? o.getPrice().multiply(BigDecimal.valueOf(o.getVolume())) : null);

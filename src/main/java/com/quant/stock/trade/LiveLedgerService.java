@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.sql.Date;
@@ -50,93 +51,129 @@ public class LiveLedgerService {
     }
 
     public void saveCash(BigDecimal cash) {
-        if (cash == null) {
-            return;
-        }
         try {
-            jdbc.update(
-                    "INSERT INTO system_config(config_key, config_value, type, description) VALUES (?,?,1,?) "
-                            + "ON DUPLICATE KEY UPDATE config_value=VALUES(config_value), updated_at=CURRENT_TIMESTAMP",
-                    CASH_KEY, cash.toPlainString(), "本地模拟现金余额");
+            doSaveCash(cash);
         } catch (Exception e) {
             log.warn("保存模拟现金失败: {}", e.getMessage());
         }
     }
 
     public void upsertOrder(OrderDTO order, LocalDate signalDate, BigDecimal fee) {
-        if (order == null || order.getOrderId() == null) {
-            return;
-        }
         try {
-            LocalDate day = signalDate == null ? LocalDate.now() : signalDate;
-            int orderType = order.getSide() == OrderDTO.Side.SELL ? 4 : 1;
-            int status = mapStatus(order.getStatus());
-            int vol = order.getVolume() == null ? 0 : order.getVolume();
-            int filled = order.getStatus() == OrderDTO.Status.FILLED
-                    || order.getStatus() == OrderDTO.Status.SUBMITTED ? vol : 0;
-            jdbc.update(
-                    "INSERT INTO trade_orders(order_id, account_id, symbol, signal_date, execution_date, order_type, "
-                            + "stage, price, volume, filled_volume, filled_price, fee, status) "
-                            + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) "
-                            + "ON DUPLICATE KEY UPDATE filled_volume=VALUES(filled_volume), filled_price=VALUES(filled_price), "
-                            + "fee=VALUES(fee), status=VALUES(status), execution_date=VALUES(execution_date), "
-                            + "updated_at=CURRENT_TIMESTAMP",
-                    order.getOrderId(),
-                    ACCOUNT_ID,
-                    order.getStockCode(),
-                    Date.valueOf(day),
-                    filled > 0 ? Date.valueOf(day) : null,
-                    orderType,
-                    0,
-                    order.getPrice(),
-                    vol,
-                    filled,
-                    filled > 0 ? order.getPrice() : null,
-                    fee,
-                    status);
+            doUpsertOrder(order, signalDate, fee);
         } catch (Exception e) {
-            log.warn("保存委托失败 {}: {}", order.getOrderId(), e.getMessage());
+            log.warn("保存委托失败 {}: {}", order == null ? null : order.getOrderId(), e.getMessage());
         }
     }
 
     public void upsertPosition(String symbol, PositionState pos) {
+        try {
+            doUpsertPosition(symbol, pos);
+        } catch (Exception e) {
+            log.warn("保存持仓失败 {}: {}", symbol, e.getMessage());
+        }
+    }
+
+    /**
+     * 一笔成交对应的现金 + 委托 + 持仓原子落库。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void persistTradeState(BigDecimal cash, OrderDTO order, LocalDate signalDate, BigDecimal fee,
+                                  String symbol, PositionState pos) {
+        doSaveCash(cash);
+        if (order != null) {
+            doUpsertOrder(order, signalDate, fee);
+        }
+        if (symbol != null) {
+            doUpsertPosition(symbol, pos);
+        }
+    }
+
+    private void doSaveCash(BigDecimal cash) {
+        if (cash == null) {
+            return;
+        }
+        jdbc.update(
+                "INSERT INTO system_config(config_key, config_value, type, description) VALUES (?,?,1,?) "
+                        + "ON DUPLICATE KEY UPDATE config_value=VALUES(config_value), updated_at=CURRENT_TIMESTAMP",
+                CASH_KEY, cash.toPlainString(), "本地模拟现金余额");
+    }
+
+    private void doUpsertOrder(OrderDTO order, LocalDate signalDate, BigDecimal fee) {
+        if (order == null || order.getOrderId() == null) {
+            return;
+        }
+        LocalDate day = signalDate == null ? LocalDate.now() : signalDate;
+        int orderType = order.getSide() == OrderDTO.Side.SELL ? 4 : 1;
+        int status = mapStatus(order.getStatus());
+        int vol = order.getVolume() == null ? 0 : order.getVolume();
+        int filled;
+        if (order.getFilledVolume() != null) {
+            filled = Math.max(0, order.getFilledVolume());
+        } else if (order.getStatus() == OrderDTO.Status.FILLED) {
+            filled = vol;
+        } else {
+            filled = 0;
+        }
+        if (order.getStatus() == OrderDTO.Status.FILLED && filled <= 0) {
+            filled = vol;
+        }
+        jdbc.update(
+                "INSERT INTO trade_orders(order_id, account_id, symbol, signal_date, execution_date, order_type, "
+                        + "stage, price, volume, filled_volume, filled_price, fee, status) "
+                        + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) "
+                        + "ON DUPLICATE KEY UPDATE filled_volume=VALUES(filled_volume), filled_price=VALUES(filled_price), "
+                        + "fee=VALUES(fee), status=VALUES(status), execution_date=VALUES(execution_date), "
+                        + "updated_at=CURRENT_TIMESTAMP",
+                order.getOrderId(),
+                ACCOUNT_ID,
+                order.getStockCode(),
+                Date.valueOf(day),
+                filled > 0 ? Date.valueOf(day) : null,
+                orderType,
+                0,
+                order.getPrice(),
+                vol,
+                filled,
+                filled > 0 ? order.getPrice() : null,
+                fee,
+                status);
+    }
+
+    private void doUpsertPosition(String symbol, PositionState pos) {
         if (symbol == null) {
             return;
         }
-        try {
-            if (pos == null || !pos.hasPosition()) {
-                jdbc.update("DELETE FROM trade_position_lots WHERE account_id=? AND symbol=?", ACCOUNT_ID, symbol);
-                jdbc.update("DELETE FROM trade_positions WHERE account_id=? AND symbol=?", ACCOUNT_ID, symbol);
-                return;
-            }
-            LocalDate entry = pos.getLastBuyDate() == null ? LocalDate.now().minusDays(1) : pos.getLastBuyDate();
+        if (pos == null || !pos.hasPosition()) {
+            jdbc.update("DELETE FROM trade_position_lots WHERE account_id=? AND symbol=?", ACCOUNT_ID, symbol);
+            jdbc.update("DELETE FROM trade_positions WHERE account_id=? AND symbol=?", ACCOUNT_ID, symbol);
+            return;
+        }
+        LocalDate entry = pos.getLastBuyDate() == null ? LocalDate.now().minusDays(1) : pos.getLastBuyDate();
+        jdbc.update(
+                "INSERT INTO trade_positions(account_id, symbol, entry_date, current_volume, avg_cost, "
+                        + "highest_price_since_entry, stop_price, trail_price) "
+                        + "VALUES (?,?,?,?,?,?,?,?) "
+                        + "ON DUPLICATE KEY UPDATE entry_date=VALUES(entry_date), current_volume=VALUES(current_volume), "
+                        + "avg_cost=VALUES(avg_cost), highest_price_since_entry=VALUES(highest_price_since_entry), "
+                        + "stop_price=VALUES(stop_price), trail_price=VALUES(trail_price), updated_at=CURRENT_TIMESTAMP",
+                ACCOUNT_ID,
+                symbol,
+                Date.valueOf(entry),
+                pos.getShares(),
+                pos.getAvgCost(),
+                pos.getHighestSinceEntry(),
+                pos.getStopPrice(),
+                pos.getStopPrice());
+        jdbc.update("DELETE FROM trade_position_lots WHERE account_id=? AND symbol=?", ACCOUNT_ID, symbol);
+        for (PositionState.LotView lot : pos.snapshotLots()) {
             jdbc.update(
-                    "INSERT INTO trade_positions(account_id, symbol, entry_date, current_volume, avg_cost, "
-                            + "highest_price_since_entry, stop_price, trail_price) "
-                            + "VALUES (?,?,?,?,?,?,?,?) "
-                            + "ON DUPLICATE KEY UPDATE entry_date=VALUES(entry_date), current_volume=VALUES(current_volume), "
-                            + "avg_cost=VALUES(avg_cost), highest_price_since_entry=VALUES(highest_price_since_entry), "
-                            + "stop_price=VALUES(stop_price), trail_price=VALUES(trail_price), updated_at=CURRENT_TIMESTAMP",
+                    "INSERT INTO trade_position_lots(account_id, symbol, open_date, volume, cost) VALUES (?,?,?,?,?)",
                     ACCOUNT_ID,
                     symbol,
-                    Date.valueOf(entry),
-                    pos.getShares(),
-                    pos.getAvgCost(),
-                    pos.getHighestSinceEntry(),
-                    pos.getStopPrice(),
-                    pos.getStopPrice());
-            jdbc.update("DELETE FROM trade_position_lots WHERE account_id=? AND symbol=?", ACCOUNT_ID, symbol);
-            for (PositionState.LotView lot : pos.snapshotLots()) {
-                jdbc.update(
-                        "INSERT INTO trade_position_lots(account_id, symbol, open_date, volume, cost) VALUES (?,?,?,?,?)",
-                        ACCOUNT_ID,
-                        symbol,
-                        Date.valueOf(lot.openDate),
-                        lot.shares,
-                        lot.cost);
-            }
-        } catch (Exception e) {
-            log.warn("保存持仓失败 {}: {}", symbol, e.getMessage());
+                    Date.valueOf(lot.openDate),
+                    lot.shares,
+                    lot.cost);
         }
     }
 

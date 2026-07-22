@@ -19,7 +19,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 交易网关：下单幂等 + 订单状态机。
- * {@code quant.trade-mode=sim}：即时 FILLED；{@code sdk}：SUBMITTED，由 {@link #syncOrderStatus()} 推进（桩）。
+ * {@code quant.trade-mode=sim}：即时 FILLED 并改仓；
+ * {@code sdk}：SUBMITTED 不改仓，由 {@link #syncOrderStatus()} 推进 FILLED 后再改仓。
  */
 @Slf4j
 @Service
@@ -73,15 +74,85 @@ public class TradeGatewayService {
                         .build();
                 String orderId = placeOrderSdk(order);
                 order.setOrderId(orderId);
-                // 本地持仓账本即时更新；sdk 模式状态先 SUBMITTED，由 sync 确认 FILLED
-                order.setStatus(sim ? OrderDTO.Status.FILLED : OrderDTO.Status.SUBMITTED);
-                applyPosition(side, stockCode, volume);
+                if (sim) {
+                    order.setStatus(OrderDTO.Status.FILLED);
+                    order.setFilledVolume(volume);
+                    applyPosition(side, stockCode, volume);
+                } else {
+                    // sdk：已报未成，仓位待 sync 确认
+                    order.setStatus(OrderDTO.Status.SUBMITTED);
+                    order.setFilledVolume(0);
+                }
                 orders.put(orderId, order);
                 idempotentIndex.put(cid, orderId);
                 persistOrder(order, null, null);
                 return order;
             }
         });
+    }
+
+    /**
+     * 撤销未完结委托（SUBMITTED / PARTIAL）。已成交部分不回滚。
+     *
+     * @return 撤销后的委托；不可撤或不存在时返回 null
+     */
+    public OrderDTO cancelOrder(String orderId) {
+        if (orderId == null || orderId.trim().isEmpty()) {
+            return null;
+        }
+        OrderDTO order = orders.get(orderId.trim());
+        if (order == null) {
+            return null;
+        }
+        OrderDTO.Status st = order.getStatus();
+        if (st != OrderDTO.Status.SUBMITTED && st != OrderDTO.Status.PARTIAL) {
+            log.warn("不可撤单 orderId={} status={}", orderId, st);
+            return null;
+        }
+        order.setStatus(OrderDTO.Status.CANCELLED);
+        if (order.getFilledVolume() == null) {
+            order.setFilledVolume(0);
+        }
+        persistOrder(order, null, null);
+        log.info("撤单成功 orderId={} filled={}", orderId, order.getFilledVolume());
+        return order;
+    }
+
+    /**
+     * 本地部成桩：对 SUBMITTED/PARTIAL 追加成交量并改仓；满量则 FILLED。
+     *
+     * @param fillQty 本笔追加成交量（须为 100 整数倍）
+     */
+    public OrderDTO applyPartialFill(String orderId, int fillQty) {
+        if (orderId == null || fillQty < 100 || fillQty % 100 != 0) {
+            return null;
+        }
+        OrderDTO order = orders.get(orderId.trim());
+        if (order == null) {
+            return null;
+        }
+        OrderDTO.Status st = order.getStatus();
+        if (st != OrderDTO.Status.SUBMITTED && st != OrderDTO.Status.PARTIAL) {
+            return null;
+        }
+        int vol = order.getVolume() == null ? 0 : order.getVolume();
+        int filled = order.getFilledVolume() == null ? 0 : order.getFilledVolume();
+        int remain = vol - filled;
+        if (remain <= 0) {
+            order.setStatus(OrderDTO.Status.FILLED);
+            order.setFilledVolume(vol);
+            persistOrder(order, null, null);
+            return order;
+        }
+        int delta = Math.min(fillQty, remain);
+        applyPosition(order.getSide(), order.getStockCode(), delta);
+        filled += delta;
+        order.setFilledVolume(filled);
+        order.setStatus(filled >= vol ? OrderDTO.Status.FILLED : OrderDTO.Status.PARTIAL);
+        persistOrder(order, null, null);
+        log.info("部成 orderId={} +{} → filled={}/{} status={}",
+                orderId, delta, filled, vol, order.getStatus());
+        return order;
     }
 
     /** 启动恢复：用持久化持仓覆盖网关数量账本（不产生委托）。 */
@@ -106,7 +177,9 @@ public class TradeGatewayService {
     }
 
     protected String placeOrderSdk(OrderDTO order) {
-        String orderId = "SIM-" + IdUtil.fastSimpleUUID();
+        // 控制在 VARCHAR(32) 内：S + 31 位 hex
+        String u = IdUtil.fastSimpleUUID();
+        String orderId = "S" + (u.length() > 31 ? u.substring(0, 31) : u);
         log.info("模拟下单成功 orderId={} clientId={} {} {}@{} x{}",
                 orderId, order.getClientOrderId(), order.getSide(),
                 order.getStockCode(), order.getPrice(), order.getVolume());
@@ -136,24 +209,39 @@ public class TradeGatewayService {
     }
 
     /**
-     * sdk 模式：将 SUBMITTED 推进为 FILLED（持仓已在下单时记入本地账本）。
+     * sdk 模式：SUBMITTED → FILLED，改本地仓位并回写 DB。
+     *
+     * @return 本轮新成交的委托列表
      * <p>
-     * TODO(api): 对接券商委托查询 / 成交回报，按真实状态推进；当前仅为本地桩。
+     * TODO(api): 对接券商委托查询 / 成交回报；当前为本地桩。
      */
-    public void syncOrderStatus() {
-        int advanced = 0;
+    public List<OrderDTO> syncOrderStatus() {
+        List<OrderDTO> advanced = new ArrayList<OrderDTO>();
         for (OrderDTO order : orders.values()) {
-            if (order == null || order.getStatus() != OrderDTO.Status.SUBMITTED) {
+            if (order == null) {
+                continue;
+            }
+            OrderDTO.Status st = order.getStatus();
+            if (st != OrderDTO.Status.SUBMITTED && st != OrderDTO.Status.PARTIAL) {
                 continue;
             }
             order.setStatus(OrderDTO.Status.FILLED);
-            advanced++;
+            int vol = order.getVolume() == null ? 0 : order.getVolume();
+            int filled = order.getFilledVolume() == null ? 0 : order.getFilledVolume();
+            int remain = Math.max(0, vol - filled);
+            if (remain > 0) {
+                applyPosition(order.getSide(), order.getStockCode(), remain);
+            }
+            order.setFilledVolume(vol);
+            persistOrder(order, null, null);
+            advanced.add(order);
         }
-        if (advanced > 0) {
-            log.info("同步委托：推进 SUBMITTED→FILLED {} 笔", advanced);
+        if (!advanced.isEmpty()) {
+            log.info("同步委托：推进未完结→FILLED {} 笔", advanced.size());
         } else {
             log.debug("同步委托状态, 当前委托数={}", orders.size());
         }
+        return advanced;
     }
 
     private void applyPosition(OrderDTO.Side side, String stockCode, int volume) {

@@ -34,4 +34,24 @@ public class MarketMinuteDO {
                 .volume(volume == null ? BigDecimal.ZERO : BigDecimal.valueOf(volume))
                 .build();
     }
+
+    public static MarketMinuteDO fromBarDTO(BarDTO bar) {
+        if (bar == null) {
+            return null;
+        }
+        Long vol = null;
+        if (bar.getVolume() != null) {
+            vol = bar.getVolume().longValue();
+        }
+        return MarketMinuteDO.builder()
+                .symbol(bar.getCode())
+                .tradeTime(bar.getBarBegin())
+                .open(bar.getOpen())
+                .high(bar.getHigh())
+                .low(bar.getLow())
+                .close(bar.getClose())
+                .volume(vol)
+                .amount(null)
+                .build();
+    }
 }

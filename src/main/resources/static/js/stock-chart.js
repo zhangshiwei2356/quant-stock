@@ -59,6 +59,8 @@
   $.getJSON('/api/config').done(function (cfg) {
     apiKeyRequired = !!(cfg && cfg.apiKeyRequired);
     if (apiKeyRequired) ensureApiKeyHeader();
+  }).fail(function () {
+    toast('加载运行配置失败', 'err');
   });
 
   function pct(v) {
@@ -327,6 +329,8 @@
         $('#singleHint').text('回测时间默认留空=全部可用K线。格式 yyyy-MM-dd HH:mm:ss。');
         $('#backTimeHint').text('回测时间：默认留空=全部可用K线。格式 yyyy-MM-dd HH:mm:ss。');
       }
+    }).fail(function () {
+      toast('行情摘要加载失败', 'err');
     });
   }
 
@@ -914,6 +918,7 @@
     }).fail(function (xhr) {
       var msg = (xhr.responseJSON && xhr.responseJSON.message) || '加载失败';
       $('#tpPoolBody').html('<tr><td colspan="6" class="empty-state">' + escHtml(msg) + '</td></tr>');
+      toast(msg, 'err');
     });
   }
 
@@ -947,7 +952,13 @@
       $.getJSON('/api/stock/trade-pool').done(function (data) {
         var n = data && data.count != null ? data.count : ((data && data.items) || []).length;
         $('#sidePoolCount').text(String(n || 0));
+      }).fail(function (xhr) {
+        var msg = (xhr && xhr.responseJSON && xhr.responseJSON.message) || '目标池数量加载失败';
+        toast(msg, 'err');
       });
+    }).fail(function (xhr) {
+      var msg = (xhr && xhr.responseJSON && xhr.responseJSON.message) || '股票池加载失败';
+      toast(msg, 'err');
     });
   }
 
@@ -1365,6 +1376,7 @@
       })
       .fail(function () {
         $tb.html('<tr><td colspan="' + singleHistoryColSpan() + '" class="empty-state">加载历史失败</td></tr>');
+        toast('个股回测历史加载失败', 'err');
       });
   }
 
@@ -1547,6 +1559,7 @@
       })
       .fail(function () {
         $('#portfolioHistoryBody').html('<tr><td colspan="14" class="empty-state">加载历史失败</td></tr>');
+        toast('组合回测历史加载失败', 'err');
       });
   }
 
@@ -1755,7 +1768,7 @@
     { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260722-readme' },
     { id: 'readme', group: 'app', title: '项目 README', src: '/api/docs/readme' },
     { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260720-nav-rename' },
-    { id: 'memo', group: 'app', title: '待办清单', src: '/docs/memo.html?v=20260722-readme' },
+    { id: 'memo', group: 'app', title: '待办清单', src: '/docs/memo.html?v=20260722-bugfix' },
     { id: 'kuangrui', group: 'app', title: '宽睿文档梳理', src: '/docs/kuangrui.html?v=20260720-kuangrui' },
     { id: 'ashare', group: 'stock', title: 'A股基础', src: '/docs/ashare.html?v=20260720-nav-rename' },
     { id: 'session', group: 'stock', title: '交易时间', src: '/docs/session.html?v=20260720-nav-rename' },
@@ -2848,6 +2861,7 @@
     }).fail(function (xhr) {
       var msg = (xhr.responseJSON && xhr.responseJSON.message) || xhr.statusText || '加载失败';
       $body.html('<tr><td colspan="8" class="empty-state">' + escHtml(msg) + '</td></tr>');
+      toast(msg, 'err');
     });
   }
 
@@ -3560,11 +3574,18 @@
 
   $('#scheduleJobBody').on('click', '.sch-run', function () {
     var code = $(this).closest('tr').attr('data-code');
-    $.post('/api/schedule/jobs/' + encodeURIComponent(code) + '/run').done(function () {
-      toast('已触发 ' + code, 'ok');
+    var $btn = $(this);
+    $btn.prop('disabled', true);
+    $.post('/api/schedule/jobs/' + encodeURIComponent(code) + '/run').done(function (res) {
+      toast((res && res.message) ? res.message : ('已执行 ' + code), 'ok');
       loadScheduleJobs();
     }).fail(function (xhr) {
-      toast((xhr.responseJSON && xhr.responseJSON.message) || '执行失败', 'err');
+      var msg = (xhr.responseJSON && (xhr.responseJSON.message || xhr.responseJSON.error))
+        || '执行失败';
+      toast(msg, 'err');
+      loadScheduleJobs();
+    }).always(function () {
+      $btn.prop('disabled', false);
     });
   });
 

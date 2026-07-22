@@ -153,7 +153,7 @@
       <li>网关持仓与内存账本可能双路径；sdk 模式为桩实现</li>
     </ul>
   </li>
-  <li><code>trade-mode=sim</code>：下单即时成交；<code>sdk</code>：SUBMITTED 后由同步推进（桩）</li>
+  <li><code>trade-mode=sim</code>：下单即时成交并记账；<code>sdk</code>：SUBMITTED 预留资金/可卖量，由 <code>sync-orders</code> 推进 FILLED 后再落账；可 <code>POST /api/account/orders/{id}/cancel</code> 撤单或 <code>partial-fill</code> 部成</li>
   <li>本地模拟持仓/现金在成交后落库：<code>trade_positions</code> / <code>trade_position_lots</code>、<code>system_config(sim.cash)</code>；收盘写 <code>trade_cashflows</code>；启动可恢复</li>
   <li>收盘后任务：约 15:30 相关清算；16:00 可触发批量扫描日志等</li>
 </ul>

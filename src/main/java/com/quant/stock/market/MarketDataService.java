@@ -130,30 +130,50 @@ public class MarketDataService {
                 BarAggregateUtil.aggregate(minuteBars, period.getAggregatePeriod()));
     }
 
+    /**
+     * 加载分钟序列：物理真相源为 {@link BarPeriod#MIN_5}（market_minute）。
+     * 对外仍称「分钟线」，非真正 1 分钟 Tick。
+     */
     public List<BarDTO> loadMinuteBars(String code) {
-        return getKline(code, BarPeriod.MIN_1, null, null);
+        return getKline(code, BarPeriod.MIN_5, null, null);
     }
 
     public List<BarDTO> loadMinuteBars(String code, LocalDateTime start, LocalDateTime end) {
-        return getKline(code, BarPeriod.MIN_1, start, end);
+        return getKline(code, BarPeriod.MIN_5, start, end);
     }
 
     /**
-     * 拉取原始1分钟并可选落库（仅写 stock_bar_1min）
+     * 拉取分钟行情并落库到 {@code market_minute}（5 分钟物理表）。
+     * <p>
+     * 不再写入 legacy {@code stock_bar_1min}，避免把 5 分钟 bar 误存成 1 分钟。
      */
-    public List<BarDTO> fetchAndPersist1Min(String code) {
+    public List<BarDTO> fetchAndPersistMinute(String code) {
         List<BarDTO> bars = loadMinuteBarsInternal(code);
-        if (barStorageService != null && bars != null && !bars.isEmpty()) {
+        if (bars == null || bars.isEmpty()) {
+            return new ArrayList<BarDTO>();
+        }
+        if (coreMarketBarService != null) {
             try {
-                barStorageService.save1MinBars(bars);
-                log.info("1分钟K已落库 code={} size={}", code, bars.size());
+                int n = coreMarketBarService.saveMinutes(bars);
+                log.info("分钟K已落库 market_minute code={} size={} upsert≈{}", code, bars.size(), n);
             } catch (Exception e) {
-                log.warn("1分钟K落库失败 code={}: {}", code, e.getMessage());
+                log.warn("分钟K落库失败 code={}: {}", code, e.getMessage());
             }
+        } else {
+            log.debug("CoreMarketBarService 未启用，跳过 market_minute 落库 code={}", code);
         }
         return BarAggregateUtil.filterClosedBars(bars);
     }
 
+    /**
+     * @deprecated 命名易误解；请用 {@link #fetchAndPersistMinute}
+     */
+    @Deprecated
+    public List<BarDTO> fetchAndPersist1Min(String code) {
+        return fetchAndPersistMinute(code);
+    }
+
+    /** 内部加载：优先核心 5 分钟表，再 JSON/SDK/mock */
     private List<BarDTO> loadMinuteBarsInternal(String code) {
         if (coreMarketBarService != null) {
             try {
@@ -161,16 +181,23 @@ public class MarketDataService {
                 if (fromDb != null && !fromDb.isEmpty()) {
                     return fromDb;
                 }
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                log.debug("读取 market_minute 失败 code={}: {}", code, e.getMessage());
             }
         }
         if (jsonBarDataStore.available() && !"db".equalsIgnoreCase(quantProperties.getMarketMode())) {
-            List<BarDTO> fromJson = jsonBarDataStore.getBars(code, BarPeriod.MIN_1);
-            if (fromJson != null && !fromJson.isEmpty()) {
-                return fromJson;
+            // 种子 JSON 的 MIN_5；若无则尝试 MIN_1 仅作兜底展示
+            List<BarDTO> fromJson5 = jsonBarDataStore.getBars(code, BarPeriod.MIN_5);
+            if (fromJson5 != null && !fromJson5.isEmpty()) {
+                return fromJson5;
+            }
+            List<BarDTO> fromJson1 = jsonBarDataStore.getBars(code, BarPeriod.MIN_1);
+            if (fromJson1 != null && !fromJson1.isEmpty()) {
+                // 兜底：1 分钟种子聚成 5 分钟，避免误写入 market_minute
+                return BarAggregateUtil.aggregate(fromJson1, BarAggregateUtil.Period.M5);
             }
         }
-        List<BarDTO> cached = getFromCache(code, BarPeriod.MIN_1);
+        List<BarDTO> cached = getFromCache(code, BarPeriod.MIN_5);
         if (cached != null && !cached.isEmpty()) {
             return cached;
         }
@@ -184,7 +211,7 @@ public class MarketDataService {
         } else {
             bars = generateMockBars(code, quantProperties.getMockBarDays());
         }
-        putCache(code, BarPeriod.MIN_1, bars);
+        putCache(code, BarPeriod.MIN_5, bars);
         return bars;
     }
 
@@ -255,9 +282,10 @@ public class MarketDataService {
         while (generatedDays < tradingDays) {
             DayOfWeek dow = day.getDayOfWeek();
             if (dow != DayOfWeek.SATURDAY && dow != DayOfWeek.SUNDAY) {
-                bars.addAll(generateSession(code, day, LocalTime.of(9, 30), 120, price, random, generatedDays));
+                // 每根 5 分钟：上午/下午各 24 根（120 分钟）
+                bars.addAll(generateSession(code, day, LocalTime.of(9, 30), 24, price, random, generatedDays));
                 price = bars.get(bars.size() - 1).getClose();
-                bars.addAll(generateSession(code, day, LocalTime.of(13, 0), 120, price, random, generatedDays));
+                bars.addAll(generateSession(code, day, LocalTime.of(13, 0), 24, price, random, generatedDays));
                 price = bars.get(bars.size() - 1).getClose();
                 generatedDays++;
             }
@@ -266,13 +294,14 @@ public class MarketDataService {
         return bars;
     }
 
-    private List<BarDTO> generateSession(String code, LocalDate day, LocalTime start, int minutes,
+    /** 生成 step=5 分钟的会话 K（barCount 根） */
+    private List<BarDTO> generateSession(String code, LocalDate day, LocalTime start, int barCount,
                                          BigDecimal startPrice, Random random, int dayIndex) {
         List<BarDTO> list = new ArrayList<BarDTO>();
         BigDecimal price = startPrice;
         double trend = Math.sin(dayIndex / 3.0) * 0.002 + (random.nextDouble() - 0.5) * 0.0005;
-        for (int i = 0; i < minutes; i++) {
-            LocalDateTime begin = LocalDateTime.of(day, start).plusMinutes(i);
+        for (int i = 0; i < barCount; i++) {
+            LocalDateTime begin = LocalDateTime.of(day, start).plusMinutes(i * 5);
             double noise = (random.nextDouble() - 0.5) * 0.003;
             BigDecimal open = price;
             BigDecimal close = open.multiply(BigDecimal.valueOf(1 + trend + noise))
@@ -284,7 +313,7 @@ public class MarketDataService {
             if (low.compareTo(BigDecimal.ZERO) <= 0) {
                 low = close.min(open).multiply(new BigDecimal("0.999"));
             }
-            BigDecimal volume = BigDecimal.valueOf(1000 + random.nextInt(9000));
+            BigDecimal volume = BigDecimal.valueOf(5000 + random.nextInt(45000));
             list.add(BarDTO.builder()
                     .code(code)
                     .barBegin(begin)

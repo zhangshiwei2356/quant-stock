@@ -55,11 +55,20 @@ public class RiskControlService {
         if (volume <= 0 || volume % 100 != 0) {
             return false;
         }
-        if (!isTradingTime(LocalDateTime.now())) {
+        // 优先用 K 线时间（回测/盘后扫历史 bar），无则退回墙钟
+        LocalDateTime clock = null;
+        if (bars != null && index >= 0 && index < bars.size() && bars.get(index) != null) {
+            clock = bars.get(index).getBarBegin();
+        }
+        if (clock == null) {
+            clock = LocalDateTime.now();
+        }
+        if (!isTradingTime(clock)) {
             return false;
         }
+        LocalDate tradeDay = clock.toLocalDate();
         BigDecimal equity = totalCash.add(totalPositionValue);
-        if (!accountRiskState.allowNewOpen(LocalDate.now(), equity)) {
+        if (!accountRiskState.allowNewOpen(tradeDay, equity)) {
             return false;
         }
         if (bars != null && index >= 0 && !openFilterService.canOpen(stockCode, bars, index)) {
@@ -80,7 +89,25 @@ public class RiskControlService {
     }
 
     public boolean checkSell(String stockCode, int volume, Map<String, Integer> positions) {
+        return checkSell(stockCode, volume, positions, null, -1);
+    }
+
+    public boolean checkSell(String stockCode,
+                             int volume,
+                             Map<String, Integer> positions,
+                             List<BarDTO> bars,
+                             int index) {
         if (volume <= 0 || volume % 100 != 0) {
+            return false;
+        }
+        LocalDateTime clock = null;
+        if (bars != null && index >= 0 && index < bars.size() && bars.get(index) != null) {
+            clock = bars.get(index).getBarBegin();
+        }
+        if (clock == null) {
+            clock = LocalDateTime.now();
+        }
+        if (!isTradingTime(clock)) {
             return false;
         }
         int held = positions == null ? 0 : positions.getOrDefault(stockCode, 0);

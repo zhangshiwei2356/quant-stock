@@ -29,4 +29,6 @@ public class OrderDTO {
     /** 客户端幂等键 */
     private String clientOrderId;
     private Status status;
+    /** 已成交数量；SUBMITTED=0，FILLED=volume，PARTIAL=部分 */
+    private Integer filledVolume;
 }

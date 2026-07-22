@@ -2,9 +2,11 @@ package com.quant.stock.risk;
 
 import com.quant.stock.backtest.FillTimingHelper;
 import com.quant.stock.config.QuantProperties;
+import com.quant.stock.mapper.StockBasicMapper;
 import com.quant.stock.market.dto.BarDTO;
+import com.quant.stock.market.dto.StockBasicDO;
 import com.quant.stock.strategy.IndicatorSignalUtil;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -13,18 +15,29 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 开仓前置过滤：停牌/涨跌停/流动性/市值/静默时段。
  * 涨跌停相对<strong>上一交易日收盘</strong>判定（分钟序列不取相邻 bar）。
  */
 @Service
-@RequiredArgsConstructor
 public class OpenFilterService {
 
     private final QuantProperties props;
+
+    @Autowired(required = false)
+    private StockBasicMapper stockBasicMapper;
+
+    private volatile Set<String> stCodesCache;
+    private volatile long stCodesCacheAtMs;
+
+    public OpenFilterService(QuantProperties props) {
+        this.props = props;
+    }
 
     public boolean canOpen(String stockCode, List<BarDTO> bars, int index) {
         if (bars == null || index < 1 || index >= bars.size()) {
@@ -105,7 +118,7 @@ public class OpenFilterService {
         if (cur == null || prev == null) {
             return false;
         }
-        return LimitBoardHelper.isLimitUp(cur, prev.getClose(), cur.getCode());
+        return LimitBoardHelper.isLimitUp(cur, prev.getClose(), cur.getCode(), isSt(cur.getCode()));
     }
 
     /** @deprecated 请用 {@link #isLimitDownAt} */
@@ -114,7 +127,7 @@ public class OpenFilterService {
         if (cur == null || prev == null) {
             return false;
         }
-        return LimitBoardHelper.isLimitDown(cur, prev.getClose(), cur.getCode());
+        return LimitBoardHelper.isLimitDown(cur, prev.getClose(), cur.getCode(), isSt(cur.getCode()));
     }
 
     public boolean isSuspended(BarDTO cur) {
@@ -138,10 +151,41 @@ public class OpenFilterService {
         }
         String code = cur != null && StringUtils.hasText(cur.getCode())
                 ? cur.getCode() : null;
+        boolean st = isSt(code);
         if (up) {
-            return LimitBoardHelper.isLimitUp(cur, ref, code);
+            return LimitBoardHelper.isLimitUp(cur, ref, code, st);
         }
-        return LimitBoardHelper.isLimitDown(cur, ref, code);
+        return LimitBoardHelper.isLimitDown(cur, ref, code, st);
+    }
+
+    public boolean isSt(String code) {
+        if (!StringUtils.hasText(code) || stockBasicMapper == null) {
+            return false;
+        }
+        long now = System.currentTimeMillis();
+        Set<String> cache = stCodesCache;
+        if (cache == null || now - stCodesCacheAtMs > 60_000L) {
+            Set<String> next = new HashSet<String>();
+            try {
+                List<StockBasicDO> all = stockBasicMapper.selectAll();
+                if (all != null) {
+                    for (StockBasicDO b : all) {
+                        if (b != null && b.getIsSt() != null && b.getIsSt() == 1
+                                && StringUtils.hasText(b.getSymbol())) {
+                            next.add(b.getSymbol().trim());
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+                if (cache != null) {
+                    next = cache;
+                }
+            }
+            stCodesCache = next;
+            stCodesCacheAtMs = now;
+            cache = next;
+        }
+        return cache.contains(code.trim());
     }
 
     /** 流通市值（亿元）= 价格 × 流通股本（亿股） */
@@ -160,14 +204,14 @@ public class OpenFilterService {
                 return v;
             }
         }
+        if (code != null && code.startsWith("688")) {
+            return new BigDecimal("40");
+        }
         if (code != null && code.startsWith("6")) {
             return new BigDecimal("120");
         }
         if (code != null && code.startsWith("3")) {
             return new BigDecimal("80");
-        }
-        if (code != null && code.startsWith("688")) {
-            return new BigDecimal("40");
         }
         return new BigDecimal("100");
     }

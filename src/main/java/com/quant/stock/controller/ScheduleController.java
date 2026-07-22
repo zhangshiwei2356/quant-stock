@@ -79,14 +79,14 @@ public class ScheduleController {
     @PostMapping("/jobs/{jobCode}/run")
     public Map<String, Object> runOnce(@PathVariable String jobCode) {
         try {
-            requireService().runOnce(jobCode);
-            Map<String, Object> m = new LinkedHashMap<String, Object>();
-            m.put("ok", true);
-            m.put("jobCode", jobCode);
-            m.put("message", "已触发一次执行");
-            return m;
+            return requireService().runOnce(jobCode);
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        } catch (IllegalStateException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                    "执行失败: " + e.getMessage());
         }
     }
 

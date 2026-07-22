@@ -39,4 +39,24 @@ public class MarketDailyDO {
                 .volume(volume == null ? BigDecimal.ZERO : BigDecimal.valueOf(volume))
                 .build();
     }
+
+    public static MarketDailyDO fromBarDTO(BarDTO bar) {
+        if (bar == null || bar.getBarBegin() == null) {
+            return null;
+        }
+        Long vol = null;
+        if (bar.getVolume() != null) {
+            vol = bar.getVolume().longValue();
+        }
+        return MarketDailyDO.builder()
+                .symbol(bar.getCode())
+                .tradeDate(bar.getBarBegin().toLocalDate())
+                .open(bar.getOpen())
+                .high(bar.getHigh())
+                .low(bar.getLow())
+                .close(bar.getClose())
+                .volume(vol)
+                .amount(null)
+                .build();
+    }
 }

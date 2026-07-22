@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS `factor_minute` (
 -- ---------- 模块四：交易执行 ----------
 CREATE TABLE IF NOT EXISTS `trade_orders` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
-  `order_id` VARCHAR(32) NOT NULL,
+  `order_id` VARCHAR(64) NOT NULL,
   `account_id` VARCHAR(32) NOT NULL DEFAULT 'LIVE' COMMENT '账户/回测run隔离',
   `symbol` VARCHAR(10) NOT NULL,
   `signal_date` DATE NOT NULL,

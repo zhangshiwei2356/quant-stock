@@ -80,9 +80,9 @@ public final class DbTableCatalog {
                 "Mock 分钟线生成或收盘后由日线聚合/行情源拉取写入。",
                 "分钟回测、scan-and-trade 实盘分钟分析、分钟因子计算。");
         add(m, "factor_daily", "日频因子缓存", "因子", "id DESC",
-                "缓存日频技术指标（MA/RSI/ATR/ADX 等），避免每次扫描重复全量计算。",
-                "由策略/扫描流程根据 market_daily 计算后写入或更新。",
-                "加速目标池扫描与信号判定；可与实时计算互为补充。");
+                "缓存日频技术指标（MA/RSI/ATR 等）；入池粗筛可读最新行（ma5>ma20 / ma60向上 / 放量）。",
+                "MockDataImporter 导入或后续因子任务写入。",
+                "pool-rebuild 粗过滤加速；无行则放行该标的。");
         add(m, "factor_minute", "分钟因子缓存", "因子", "id DESC",
                 "缓存分钟频技术因子（如 MA5/MA20/ATR），供分钟级策略使用。",
                 "由分钟行情计算后写入。",

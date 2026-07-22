@@ -5,9 +5,11 @@ import com.alibaba.fastjson2.TypeReference;
 import com.quant.stock.backtest.BatchStockBackTestService;
 import com.quant.stock.backtest.dto.BatchScanResultDTO;
 import com.quant.stock.config.QuantProperties;
+import com.quant.stock.mapper.FactorDailyMapper;
 import com.quant.stock.mapper.StockBasicMapper;
 import com.quant.stock.mapper.TradePoolMapper;
 import com.quant.stock.mapper.TradePoolReportMapper;
+import com.quant.stock.market.dto.FactorDailyDO;
 import com.quant.stock.market.dto.StockBasicDO;
 import com.quant.stock.pool.dto.TradePoolDO;
 import com.quant.stock.pool.dto.TradePoolReportDO;
@@ -51,6 +53,7 @@ public class TradePoolService {
     private final TradePoolMapper tradePoolMapper;
     private final TradePoolReportMapper reportMapper;
     private final StockBasicMapper stockBasicMapper;
+    private final FactorDailyMapper factorDailyMapper;
     private final BatchStockBackTestService batchStockBackTestService;
     private final PoolSelectScorer poolSelectScorer;
     private final QuantProperties quantProperties;
@@ -333,7 +336,68 @@ public class TradePoolService {
             }
             out.add(code);
         }
-        return out;
+        return filterByFactorDaily(out);
+    }
+
+    /**
+     * 有 factor_daily 时做廉价趋势门：保留 ma5>ma20 或 ma60 向上或放量突破；
+     * 无因子行则放行（兼容未导入因子的标的）。
+     */
+    private List<String> filterByFactorDaily(List<String> codes) {
+        if (codes == null || codes.isEmpty()) {
+            return codes;
+        }
+        Map<String, FactorDailyDO> latest = new HashMap<String, FactorDailyDO>();
+        try {
+            // 分批避免 IN 过长
+            final int batch = 500;
+            for (int i = 0; i < codes.size(); i += batch) {
+                int to = Math.min(i + batch, codes.size());
+                List<FactorDailyDO> rows = factorDailyMapper.selectLatestBySymbols(codes.subList(i, to));
+                if (rows == null) {
+                    continue;
+                }
+                for (FactorDailyDO f : rows) {
+                    if (f != null && f.getSymbol() != null) {
+                        latest.put(f.getSymbol(), f);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("读取 factor_daily 失败，跳过因子粗筛: {}", e.getMessage());
+            return codes;
+        }
+        if (latest.isEmpty()) {
+            return codes;
+        }
+        List<String> kept = new ArrayList<String>();
+        int dropped = 0;
+        for (String code : codes) {
+            FactorDailyDO f = latest.get(code);
+            if (f == null) {
+                kept.add(code);
+                continue;
+            }
+            if (passFactorGate(f)) {
+                kept.add(code);
+            } else {
+                dropped++;
+            }
+        }
+        if (dropped > 0) {
+            log.info("factor_daily 粗筛剔除 {} 只，剩余 {}", dropped, kept.size());
+        }
+        return kept;
+    }
+
+    private static boolean passFactorGate(FactorDailyDO f) {
+        if (f.getMa5() != null && f.getMa20() != null && f.getMa5().compareTo(f.getMa20()) > 0) {
+            return true;
+        }
+        if (f.getMa60Up() != null && f.getMa60Up() == 1) {
+            return true;
+        }
+        return f.getIsVolumeBreak() != null && f.getIsVolumeBreak() == 1;
     }
 
     /** 扫描后流动性粗筛（依赖 K 线算得的均成交额近似） */

@@ -15,7 +15,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
 /**
- * 分钟K线实体（最小粒度 1 分钟）
+ * 分钟/多周期 K 线实体。物理真相源为 5 分钟；{@link #getBarEnd()} 默认 +5 分钟。
  */
 @Data
 @Builder
@@ -34,12 +34,12 @@ public class BarDTO {
     private BigDecimal close;
     private BigDecimal volume;
 
-    /** 1分钟K结束时间 */
+    /** 5 分钟 K 结束时间（与 market_minute 物理粒度一致） */
     public LocalDateTime getBarEnd() {
         if (barBegin == null) {
             return null;
         }
-        return barBegin.plusMinutes(1);
+        return barBegin.plusMinutes(5);
     }
 
     /** 当前系统时间是否已超过K线结束时间（完整闭合） */
@@ -52,7 +52,7 @@ public class BarDTO {
     public Bar toTa4jBar() {
         ZonedDateTime endTime = ZonedDateTime.of(getBarEnd(), ZoneId.systemDefault());
         return new BaseBar(
-                Duration.ofMinutes(1),
+                Duration.ofMinutes(5),
                 endTime,
                 open,
                 high,

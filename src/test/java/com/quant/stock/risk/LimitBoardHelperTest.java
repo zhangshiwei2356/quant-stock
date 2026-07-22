@@ -13,6 +13,7 @@ class LimitBoardHelperTest {
         assertEquals(0, new BigDecimal("0.10").compareTo(LimitBoardHelper.limitPct("600036")));
         assertEquals(0, new BigDecimal("0.20").compareTo(LimitBoardHelper.limitPct("300059")));
         assertEquals(0, new BigDecimal("0.20").compareTo(LimitBoardHelper.limitPct("688001")));
+        assertEquals(0, new BigDecimal("0.05").compareTo(LimitBoardHelper.limitPct("600036", true)));
     }
 
     @Test

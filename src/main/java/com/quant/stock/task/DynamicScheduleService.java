@@ -150,6 +150,9 @@ public class DynamicScheduleService implements ApplicationRunner {
         validateTrigger(merged);
 
         scheduleJobMapper.updateByCode(patch);
+        if (req.getEnabled() != null && Boolean.TRUE.equals(req.getEnabled())) {
+            disablePeerPoolJob(jobCode);
+        }
         reloadAll();
         return toView(requireJob(jobCode), quantProperties.getSchedule().isEnabled());
     }
@@ -163,13 +166,44 @@ public class DynamicScheduleService implements ApplicationRunner {
             next = (existing.getEnabled() != null && existing.getEnabled() == 1) ? 0 : 1;
         }
         scheduleJobMapper.updateEnabled(jobCode, next);
+        if (next == 1) {
+            disablePeerPoolJob(jobCode);
+        }
         reloadAll();
         return toView(requireJob(jobCode), quantProperties.getSchedule().isEnabled());
     }
 
-    public void runOnce(String jobCode) {
+    /** pool-rebuild 与 after-market-batch-scan 互斥：启用其一则关闭另一 */
+    private void disablePeerPoolJob(String jobCode) {
+        String peer = null;
+        if ("pool-rebuild".equals(jobCode)) {
+            peer = "after-market-batch-scan";
+        } else if ("after-market-batch-scan".equals(jobCode)) {
+            peer = "pool-rebuild";
+        }
+        if (peer == null) {
+            return;
+        }
+        try {
+            ScheduleJobDO other = scheduleJobMapper.selectByCode(peer);
+            if (other != null && other.getEnabled() != null && other.getEnabled() == 1) {
+                scheduleJobMapper.updateEnabled(peer, 0);
+                log.info("入池任务互斥：启用 {} 已自动关闭 {}", jobCode, peer);
+            }
+        } catch (Exception e) {
+            log.debug("入池互斥检查跳过: {}", e.getMessage());
+        }
+    }
+
+    public Map<String, Object> runOnce(String jobCode) {
         requireJob(jobCode);
-        invoke(jobCode);
+        invoke(jobCode, true);
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        m.put("ok", true);
+        m.put("jobCode", jobCode);
+        m.put("message", "执行完成");
+        m.put("lastRunAt", LocalDateTime.now().toString());
+        return m;
     }
 
     private void validateTrigger(ScheduleJobDO job) {
@@ -198,7 +232,7 @@ public class DynamicScheduleService implements ApplicationRunner {
         Runnable runnable = new Runnable() {
             @Override
             public void run() {
-                invoke(code);
+                invoke(code, false);
             }
         };
         String type = job.getTriggerType() == null ? "CRON" : job.getTriggerType().trim().toUpperCase();
@@ -217,7 +251,10 @@ public class DynamicScheduleService implements ApplicationRunner {
                 "FIXED_RATE".equals(type) ? ("intervalMs=" + job.getIntervalMs()) : job.getCronExpr());
     }
 
-    private void invoke(String jobCode) {
+    /**
+     * @param failLoud 手动「执行一次」为 true：异常向上抛；定时触发为 false：只打日志
+     */
+    private void invoke(String jobCode, boolean failLoud) {
         try {
             switch (jobCode) {
                 case "scan-and-trade":
@@ -246,11 +283,27 @@ public class DynamicScheduleService implements ApplicationRunner {
                     break;
                 default:
                     log.warn("未知定时任务编码: {}", jobCode);
+                    if (failLoud) {
+                        throw new IllegalArgumentException("未知定时任务编码: " + jobCode);
+                    }
                     return;
             }
             scheduleJobMapper.updateLastRunAt(jobCode, LocalDateTime.now());
+        } catch (IllegalArgumentException e) {
+            log.error("定时任务执行失败 {}: {}", jobCode, e.getMessage());
+            if (failLoud) {
+                throw e;
+            }
+        } catch (IllegalStateException e) {
+            log.error("定时任务执行失败 {}: {}", jobCode, e.getMessage());
+            if (failLoud) {
+                throw e;
+            }
         } catch (Exception e) {
             log.error("定时任务执行失败 {}: {}", jobCode, e.getMessage(), e);
+            if (failLoud) {
+                throw new IllegalStateException("任务执行失败: " + e.getMessage(), e);
+            }
         }
     }
 
@@ -317,14 +370,14 @@ public class DynamicScheduleService implements ApplicationRunner {
                 "未实现：待接入真实行情 API（本地仅有骨架）");
         seed("scan-and-trade", "实盘分钟扫描交易", "CRON",
                 "0 */1 9-11,13-15 * * MON-FRI", null, 1, "工作日交易时段每分钟扫描（模拟账本）");
-        seed("sync-orders", "订单状态同步", "FIXED_RATE", null, 10000L, 0,
-                "未实现：待接入券商委托查询 API（当前仅本地桩）");
+        seed("sync-orders", "订单状态同步", "FIXED_RATE", null, 10000L, 1,
+                "本地桩：SUBMITTED→FILLED 并改仓/回写；真券商对账待 API");
         seed("position-pnl-sync", "持仓盈亏同步", "CRON",
-                "0 */1 9-15 * * MON-FRI", null, 0,
-                "未实现：待接入券商持仓/成本 API（本地仅有骨架）");
+                "0 */1 9-15 * * MON-FRI", null, 1,
+                "本地成本+市值浮盈已可用；券商持仓对账待 API");
         seed("settle-after-close", "收盘清算与K线聚合", "CRON",
-                "0 30 15 * * MON-FRI", null, 0,
-                "未实现：待接入真实行情 API（账户清算本地可用，拉取/聚合依赖行情源）");
+                "0 30 15 * * MON-FRI", null, 1,
+                "本地权益日结 + K 线聚合；真实行情增量仍依赖 market-collect/外部 API");
         seed("pool-rebuild", "全市场入池扫描", "CRON",
                 "0 10 15 * * MON-FRI", null, 1,
                 "全市场扫描筛选可入选标的，覆盖唯一目标池；与 after-market-batch-scan 启用其一即可");
@@ -332,18 +385,18 @@ public class DynamicScheduleService implements ApplicationRunner {
                 "0 0 16 * * MON-FRI", null, 1,
                 "工作日 16:00 再次覆盖唯一目标池；与 pool-rebuild 启用其一即可");
         seed("data-validate", "数据校验", "CRON",
-                "0 0 17 * * MON-FRI", null, 0,
-                "未实现：待接入外部行情对账 API（本地仅有骨架）");
+                "0 0 17 * * MON-FRI", null, 1,
+                "本地空表/滞后检查已可用；与外部行情抽样对账待 API");
         // 纠正旧库标记（不改 enabled）
         syncJobMeta("market-collect", 0, "未实现：待接入真实行情 API（本地仅有骨架）");
-        syncJobMeta("position-pnl-sync", 0, "未实现：待接入券商持仓/成本 API（本地仅有骨架）");
-        syncJobMeta("data-validate", 0, "未实现：待接入外部行情对账 API（本地仅有骨架）");
+        syncJobMeta("position-pnl-sync", 1, "本地成本+市值浮盈已可用；券商持仓对账待 API");
+        syncJobMeta("data-validate", 1, "本地空表/滞后检查已可用；与外部行情抽样对账待 API");
         syncJobMeta("scan-and-trade", 1, "仅扫描唯一目标池（trade_pool status=1）");
-        syncJobMeta("sync-orders", 0, "未实现：待接入券商委托查询 API（当前仅本地桩）");
-        syncJobMeta("settle-after-close", 0,
-                "未实现：待接入真实行情 API（账户清算本地可用，拉取/聚合依赖行情源）");
-        syncJobMeta("pool-rebuild", 1, "全市场扫描覆盖唯一目标池；与 after-market-batch-scan 启用其一即可");
-        syncJobMeta("after-market-batch-scan", 1, "工作日 16:00 覆盖唯一目标池；与 pool-rebuild 启用其一即可");
+        syncJobMeta("sync-orders", 1, "本地桩：SUBMITTED→FILLED 并改仓/回写；真券商对账待 API");
+        syncJobMeta("settle-after-close", 1,
+                "本地权益日结 + K 线聚合；真实行情增量仍依赖 market-collect/外部 API");
+        syncJobMeta("pool-rebuild", 1, "全市场扫描覆盖唯一目标池；与 after-market-batch-scan 互斥（启用其一自动关另一）");
+        syncJobMeta("after-market-batch-scan", 1, "工作日 16:00 覆盖唯一目标池；与 pool-rebuild 互斥（启用其一自动关另一）");
     }
 
     private void syncJobMeta(String code, int implemented, String remark) {

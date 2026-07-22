@@ -146,36 +146,45 @@ public class BackTestEngine {
                                 "相对昨收判定跌停，本日挂单暂缓；连续" + LIMIT_DOWN_FORCE_DAYS + "日失败后强平", rd);
                     }
                 } else {
-                    int vol = pos.getShares();
-                    BigDecimal fillBase = open;
-                    if (force && limitDown) {
-                        BigDecimal prevClose = openFilterService.prevTradingDayClose(closedBars, i);
-                        fillBase = approxLimitDownPrice(prevClose, bar)
-                                .multiply(new BigDecimal("0.99"))
-                                .setScale(2, RoundingMode.HALF_UP);
+                    int sellable = (pos.sellableShares(tradeDay) / 100) * 100;
+                    if (sellable >= 100) {
+                        int vol = sellable;
+                        boolean fullExit = sellable >= pos.getShares();
+                        BigDecimal fillBase = open;
+                        if (force && limitDown) {
+                            BigDecimal prevClose = openFilterService.prevTradingDayClose(closedBars, i);
+                            fillBase = approxLimitDownPrice(prevClose, bar)
+                                    .multiply(new BigDecimal("0.99"))
+                                    .setScale(2, RoundingMode.HALF_UP);
+                        }
+                        String sellWhy = pendingSellReason == null ? "挂单卖出" : pendingSellReason;
+                        if (force && limitDown) {
+                            sellWhy = sellWhy + "（跌停连续失败达" + LIMIT_DOWN_FORCE_DAYS + "日，按跌停价×0.99强平）";
+                        }
+                        if (!fullExit) {
+                            sellWhy = sellWhy + "（T+1仅卖可卖旧仓）";
+                        }
+                        SellOutcome so = executeSell(stockCode, bar, closedBars, i, cash, pos, fillBase, vol, fullExit,
+                                commissionRate, trades, sellMarks);
+                        cash = so.cash;
+                        if (fullExit) {
+                            closedRound++;
+                            if (so.win) {
+                                winTrades++;
+                            }
+                            accountRiskState.onClosedRound(so.win, tradeDay);
+                            pyramidStage = 0;
+                            targetFullVol = 0;
+                            pendingSell = false;
+                            pendingSellReason = null;
+                            pendingSellSignalDay = null;
+                            limitDownFailDays = 0;
+                            lastLimitDownFailDay = null;
+                        }
+                        logLastTrade(analysis, trades, sellWhy + "；次日有效开盘撮合");
+                        equity = markEquity(cash, pos, close);
+                        posScale = accountRiskState.positionScale(equity);
                     }
-                    String sellWhy = pendingSellReason == null ? "挂单卖出" : pendingSellReason;
-                    if (force && limitDown) {
-                        sellWhy = sellWhy + "（跌停连续失败达" + LIMIT_DOWN_FORCE_DAYS + "日，按跌停价×0.99强平）";
-                    }
-                    SellOutcome so = executeSell(stockCode, bar, closedBars, i, cash, pos, fillBase, vol, true,
-                            commissionRate, trades, sellMarks);
-                    cash = so.cash;
-                    closedRound++;
-                    if (so.win) {
-                        winTrades++;
-                    }
-                    accountRiskState.onClosedRound(so.win, tradeDay);
-                    logLastTrade(analysis, trades, sellWhy + "；次日有效开盘撮合");
-                    pyramidStage = 0;
-                    targetFullVol = 0;
-                    pendingSell = false;
-                    pendingSellReason = null;
-                    pendingSellSignalDay = null;
-                    limitDownFailDays = 0;
-                    lastLimitDownFailDay = null;
-                    equity = markEquity(cash, pos, close);
-                    posScale = accountRiskState.positionScale(equity);
                 }
             }
 
@@ -427,21 +436,30 @@ public class BackTestEngine {
                     }
                 }
                 if (pendingSell && pos.hasPosition()) {
-                    int vol = pos.getShares();
-                    String sellWhy = pendingSellReason == null ? "挂单卖出" : pendingSellReason;
-                    SellOutcome so = executeSell(stockCode, bar, closedBars, i, cash, pos, close, vol, true,
-                            commissionRate, trades, sellMarks);
-                    cash = so.cash;
-                    closedRound++;
-                    if (so.win) {
-                        winTrades++;
+                    int sellable = (pos.sellableShares(tradeDay) / 100) * 100;
+                    if (sellable >= 100) {
+                        int vol = sellable;
+                        boolean fullExit = sellable >= pos.getShares();
+                        String sellWhy = pendingSellReason == null ? "挂单卖出" : pendingSellReason;
+                        if (!fullExit) {
+                            sellWhy = sellWhy + "（T+1仅卖可卖旧仓）";
+                        }
+                        SellOutcome so = executeSell(stockCode, bar, closedBars, i, cash, pos, close, vol, fullExit,
+                                commissionRate, trades, sellMarks);
+                        cash = so.cash;
+                        if (fullExit) {
+                            closedRound++;
+                            if (so.win) {
+                                winTrades++;
+                            }
+                            accountRiskState.onClosedRound(so.win, tradeDay);
+                            pyramidStage = 0;
+                            targetFullVol = 0;
+                            pendingSell = false;
+                            pendingSellSignalDay = null;
+                        }
+                        logLastTrade(analysis, trades, sellWhy + "；当根收盘撮合");
                     }
-                    accountRiskState.onClosedRound(so.win, tradeDay);
-                    logLastTrade(analysis, trades, sellWhy + "；当根收盘撮合");
-                    pyramidStage = 0;
-                    targetFullVol = 0;
-                    pendingSell = false;
-                    pendingSellSignalDay = null;
                 }
             }
 

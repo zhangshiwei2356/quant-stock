@@ -22,4 +22,19 @@
             volume_ma20 = VALUES(volume_ma20), ma60_up = VALUES(ma60_up),
             is_volume_break = VALUES(is_volume_break)
     </insert>
+
+    <select id="selectLatestBySymbols" resultType="com.quant.stock.market.dto.FactorDailyDO">
+        SELECT f.symbol, f.trade_date AS tradeDate, f.ma5, f.ma20, f.ma60, f.rsi14, f.atr14, f.adx,
+               f.volume_ma20 AS volumeMa20, f.ma60_up AS ma60Up, f.is_volume_break AS isVolumeBreak
+        FROM factor_daily f
+        INNER JOIN (
+            SELECT symbol, MAX(trade_date) AS trade_date
+            FROM factor_daily
+            WHERE symbol IN
+            <foreach collection="symbols" item="s" open="(" separator="," close=")">
+                #{s}
+            </foreach>
+            GROUP BY symbol
+        ) t ON f.symbol = t.symbol AND f.trade_date = t.trade_date
+    </select>
 </mapper>

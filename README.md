@@ -103,7 +103,7 @@ flowchart LR
 | `task` | `sys_schedule_job` 动态调度 + `StrategyTask` |
 | `admin` | 数据健康、运行参数、表白名单浏览 |
 | `pdf` | 知识/应用说明 PDF；README Markdown→HTML |
-| `calendar` | 静态交易日历 |
+| `calendar` | 静态交易日历（按上交所公告维护节假日） |
 | `config` / `controller` / `mapper` | 配置、REST、MyBatis |
 
 ### 功能闭环（模拟实盘）
@@ -232,7 +232,7 @@ sequenceDiagram
 | `QUANT_API_KEY` / `quant.api-key` | 非空则 `/api/**` 需 `X-API-Key`（`/api/config` 等除外） |
 | `QUANT_RATE_LIMIT` / `quant.rate-limit-per-minute` | 回测/组合/批量每 IP 每分钟上限（默认 30，≤0 关闭） |
 | `quant.schedule.enabled` | 定时总闸（默认 true；各任务以库表为准） |
-| `quant.trade-mode` | `sim` 模拟 / `sdk` 桩 |
+| `quant.trade-mode` | `sim` 即时 FILLED 并记账；`sdk` 先 SUBMITTED（占资/占仓），`sync-orders` 推进 FILLED 后再落账 |
 | `quant.market-mode` | `db` / `json` / `sdk` |
 
 ---
@@ -252,6 +252,8 @@ sequenceDiagram
 | GET `/api/stock/universe` | 全市场 |
 | GET/POST `/api/stock/trade-pool*` | 目标池查询/重建/移出/报告 |
 | GET `/api/account/**` | 账户资金/持仓/委托/日结/风控 |
+| POST `/api/account/orders/{id}/cancel` | 撤销 SUBMITTED/PARTIAL |
+| POST `/api/account/orders/{id}/partial-fill?qty=` | 本地部成桩 |
 | GET/PUT/POST `/api/schedule/**` | 定时任务 |
 | GET `/api/ops/data-health` · `/params` | 数据健康 / 运行参数 |
 | GET `/api/db/tables` · `/tables/{name}` | 表白名单浏览 |
@@ -263,10 +265,13 @@ sequenceDiagram
 ## 运维中心 · 定时任务
 
 - 表：`sys_schedule_job`（启动自动建表+种子，**默认全关**）
-- **唯一目标池**：`pool-rebuild` / `after-market-batch-scan` 扫描后覆盖；无入选则清空
+- **唯一目标池**：`pool-rebuild` / `after-market-batch-scan` 扫描后覆盖；启用其一会自动关闭另一（互斥）
 - `scan-and-trade`：只扫池内活跃标的 + 本地模拟账本
-- 已实现：`scan-and-trade` / `pool-rebuild` / `after-market-batch-scan`
-- 页面标「未实现」（缺外部 API；本地日结/数据健康仍部分可用）：`settle-after-close` / `data-validate` / `sync-orders` / `market-collect` / `position-pnl-sync`
+- 已实现：`scan-and-trade` / `pool-rebuild` / `after-market-batch-scan` / `settle-after-close` / `data-validate` / `sync-orders` / `position-pnl-sync`
+  - `settle-after-close`：权益日记最近交易日；分钟落 `market_minute`，再聚日线写 `market_daily`（更大周期查询时内存聚合）
+  - `sync-orders`：本地桩将 `SUBMITTED→FILLED` 并改仓；`trade-mode=sdk` 时策略在 sync 后才落现金/批次
+  - `position-pnl-sync`：本地成本 + 最新价浮盈日志
+- 页面标「未实现」（缺外部 API）：`market-collect`
 - 对照：**应用说明 → 待办清单**；宽睿对接：**应用说明 → 宽睿文档梳理**
 
 ---
@@ -299,7 +304,8 @@ sequenceDiagram
 
 - 行情/券商 SDK 默认为 Noop；生产需接真实行情与柜台（可参考宽睿 Quant360）
 - 市值无交易所接口时依赖 `float-shares-yi` 或启发式
-- 实盘路径为模拟现金账本；复权/财报/舆情等见待办清单
+- 实盘路径为模拟现金账本；`sdk` 下单为 SUBMITTED（预留资金/可卖量），`sync-orders` 确认 FILLED 后再改现金与批次
+- 复权/财报/舆情等见待办清单
 
 ---
 

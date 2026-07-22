@@ -12,7 +12,8 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 
 /**
- * 分布式锁：优先 Redis，不可用时降级本地锁
+ * 分布式锁：优先 Redis，不可用时降级本地锁。
+ * 解锁时若当前线程持有本地锁，必须先解本地锁（避免 Redis 异常降级后永久占锁）。
  */
 @Slf4j
 @Component
@@ -42,17 +43,16 @@ public class RedisLockUtil {
 
     public void unlock(String key) {
         String lockKey = LOCK_PREFIX + key;
+        ReentrantLock local = localLocks.get(lockKey);
+        if (local != null && local.isHeldByCurrentThread()) {
+            local.unlock();
+        }
         if (stringRedisTemplate != null) {
             try {
                 stringRedisTemplate.delete(lockKey);
-                return;
             } catch (Exception e) {
                 log.debug("Redis解锁失败: {}", e.getMessage());
             }
-        }
-        ReentrantLock lock = localLocks.get(lockKey);
-        if (lock != null && lock.isHeldByCurrentThread()) {
-            lock.unlock();
         }
     }
 

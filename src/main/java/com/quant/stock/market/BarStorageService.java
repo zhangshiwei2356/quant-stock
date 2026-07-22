@@ -15,7 +15,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * K线分表存储：1min 唯一写入入口；大周期由聚合任务生成
+ * K线分表存储（legacy stock_bar_*）：仅兼容旧库读路径。
+ * 新写入真相源为 {@link CoreMarketBarService}（market_daily / market_minute）。
  */
 @Slf4j
 @Service

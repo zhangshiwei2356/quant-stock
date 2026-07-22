@@ -3,8 +3,9 @@ package com.quant.stock.task;
 import com.quant.stock.backtest.FillTimingHelper;
 import com.quant.stock.backtest.PositionState;
 import com.quant.stock.backtest.BatchStockBackTestService;
+import com.quant.stock.calendar.TradingCalendar;
 import com.quant.stock.config.QuantProperties;
-import com.quant.stock.market.BarStorageService;
+import com.quant.stock.market.CoreMarketBarService;
 import com.quant.stock.market.MarketDataService;
 import com.quant.stock.market.dto.BarDTO;
 import com.quant.stock.pool.TradePoolService;
@@ -31,7 +32,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -63,9 +63,10 @@ public class StrategyTask {
     private final PositionAmountUtil positionAmountUtil;
     private final RedisLockUtil redisLockUtil;
     private final BatchStockBackTestService batchStockBackTestService;
+    private final TradingCalendar tradingCalendar;
 
     @Autowired(required = false)
-    private BarStorageService barStorageService;
+    private CoreMarketBarService coreMarketBarService;
 
     @Autowired(required = false)
     private TradePoolService tradePoolService;
@@ -74,7 +75,13 @@ public class StrategyTask {
     private final ObjectProvider<RiskControlLogService> riskLogProvider;
 
     private volatile BigDecimal simCash = new BigDecimal("100000");
+    /** 模拟账户初始资金（用于收益率；恢复现金不改此值） */
+    private final BigDecimal simInitCash = new BigDecimal("100000");
     private final Map<String, LiveBook> books = new ConcurrentHashMap<String, LiveBook>();
+    /** sdk：已报未成的本地待入账（FILLED 后由 syncOrders 落账） */
+    private final Map<String, PendingFill> pendingFills = new ConcurrentHashMap<String, PendingFill>();
+    private volatile BigDecimal reservedCash = BigDecimal.ZERO;
+    private final Map<String, Integer> reservedSellVol = new ConcurrentHashMap<String, Integer>();
 
     public StrategyTask(QuantProperties quantProperties,
                         MarketDataService marketDataService,
@@ -87,6 +94,7 @@ public class StrategyTask {
                         PositionAmountUtil positionAmountUtil,
                         RedisLockUtil redisLockUtil,
                         BatchStockBackTestService batchStockBackTestService,
+                        TradingCalendar tradingCalendar,
                         ObjectProvider<LiveLedgerService> liveLedgerProvider,
                         ObjectProvider<RiskControlLogService> riskLogProvider) {
         this.quantProperties = quantProperties;
@@ -100,6 +108,7 @@ public class StrategyTask {
         this.positionAmountUtil = positionAmountUtil;
         this.redisLockUtil = redisLockUtil;
         this.batchStockBackTestService = batchStockBackTestService;
+        this.tradingCalendar = tradingCalendar;
         this.liveLedgerProvider = liveLedgerProvider;
         this.riskLogProvider = riskLogProvider;
     }
@@ -138,12 +147,12 @@ public class StrategyTask {
         if (ledger == null) {
             return;
         }
-        ledger.saveCash(simCash);
-        if (order != null) {
-            tradeGatewayService.persistOrder(order, tradeDay, fee);
-        }
-        if (book != null) {
-            ledger.upsertPosition(code, book.pos);
+        try {
+            ledger.persistTradeState(simCash, order, tradeDay, fee,
+                    code, book == null ? null : book.pos);
+        } catch (Exception e) {
+            log.warn("账本落库失败 code={} order={}: {}", code,
+                    order == null ? null : order.getOrderId(), e.getMessage());
         }
     }
 
@@ -271,6 +280,39 @@ public class StrategyTask {
 
     private void fillPending(String code, LiveBook book, List<BarDTO> bars, int i,
                              LocalDate tradeDay, BigDecimal open) {
+        // 先卖后买，避免同日新买批次被立刻卖掉（T+1）
+        if (book.pendingSell && book.pos.hasPosition() && book.pendingSellSignalDay != null
+                && tradeDay.isAfter(book.pendingSellSignalDay)
+                && FillTimingHelper.canFillPendingOnBar(bars, i)) {
+            int sellable = (book.pos.sellableShares(tradeDay) / 100) * 100;
+            if (sellable < 100) {
+                // 无可卖旧仓，挂单保留至次日
+            } else {
+                boolean limitDown = openFilterService.isLimitDownAt(bars, i);
+                if (limitDown) {
+                    if (book.lastLimitDownFailDay == null || !book.lastLimitDownFailDay.equals(tradeDay)) {
+                        book.limitDownFailDays++;
+                        book.lastLimitDownFailDay = tradeDay;
+                    }
+                    if (book.limitDownFailDays < LIMIT_DOWN_FORCE_DAYS) {
+                        // 跌停暂缓
+                    } else {
+                        BigDecimal prev = openFilterService.prevTradingDayClose(bars, i);
+                        BigDecimal force = LimitBoardHelper.limitDownPrice(prev, code,
+                                openFilterService.isSt(code));
+                        if (force == null) {
+                            force = open;
+                        }
+                        force = force.multiply(new BigDecimal("0.99")).setScale(2, RoundingMode.HALF_UP);
+                        boolean full = sellable >= book.pos.getShares();
+                        executeLiveSell(code, book, bars, i, force, sellable, full, tradeDay);
+                    }
+                } else {
+                    boolean full = sellable >= book.pos.getShares();
+                    executeLiveSell(code, book, bars, i, open, sellable, full, tradeDay);
+                }
+            }
+        }
         if (book.pendingBuyVol != null && book.pendingBuySignalDay != null) {
             if (tradeDay.isAfter(book.pendingBuySignalDay.plusDays(PENDING_BUY_EXPIRE_DAYS))) {
                 book.pendingBuyVol = null;
@@ -282,38 +324,19 @@ public class StrategyTask {
                 executeLiveBuy(code, book, bars, i, open, tradeDay);
             }
         }
-        if (book.pendingSell && book.pos.hasPosition() && book.pendingSellSignalDay != null
-                && tradeDay.isAfter(book.pendingSellSignalDay)
-                && FillTimingHelper.canFillPendingOnBar(bars, i)) {
-            boolean limitDown = openFilterService.isLimitDownAt(bars, i);
-            if (limitDown) {
-                if (book.lastLimitDownFailDay == null || !book.lastLimitDownFailDay.equals(tradeDay)) {
-                    book.limitDownFailDays++;
-                    book.lastLimitDownFailDay = tradeDay;
-                }
-                if (book.limitDownFailDays < LIMIT_DOWN_FORCE_DAYS) {
-                    return;
-                }
-                BigDecimal prev = openFilterService.prevTradingDayClose(bars, i);
-                BigDecimal force = LimitBoardHelper.limitDownPrice(prev, code);
-                if (force == null) {
-                    force = open;
-                }
-                force = force.multiply(new BigDecimal("0.99")).setScale(2, RoundingMode.HALF_UP);
-                executeLiveSell(code, book, bars, i, force, book.pos.getShares(), true, tradeDay);
-            } else {
-                executeLiveSell(code, book, bars, i, open, book.pos.getShares(), true, tradeDay);
-            }
-        }
     }
 
     private void fillPendingSameBar(String code, LiveBook book, List<BarDTO> bars, int i,
                                     LocalDate tradeDay, BigDecimal close) {
+        if (book.pendingSell && book.pos.hasPosition()) {
+            int sellable = (book.pos.sellableShares(tradeDay) / 100) * 100;
+            if (sellable >= 100) {
+                boolean full = sellable >= book.pos.getShares();
+                executeLiveSell(code, book, bars, i, close, sellable, full, tradeDay);
+            }
+        }
         if (book.pendingBuyVol != null && book.pendingBuyVol >= 100) {
             executeLiveBuy(code, book, bars, i, close, tradeDay);
-        }
-        if (book.pendingSell && book.pos.hasPosition()) {
-            executeLiveSell(code, book, bars, i, close, book.pos.getShares(), true, tradeDay);
         }
     }
 
@@ -332,30 +355,27 @@ public class StrategyTask {
         BigDecimal fee = tradeCostModel.buyFee(amount);
         BigDecimal equity = markEquity(bars.get(i).getClose());
         BigDecimal posMv = calcPositionMv();
+        BigDecimal freeCash = availableCash();
         Map<String, Integer> gatewayPos = tradeGatewayService.queryPositions();
-        if (!riskControlService.checkBuy(code, deal, vol, simCash, posMv, gatewayPos, bars, i)) {
+        if (!riskControlService.checkBuy(code, deal, vol, freeCash, posMv, gatewayPos, bars, i)) {
             return;
         }
-        if (amount.add(fee).compareTo(simCash) > 0) {
+        if (amount.add(fee).compareTo(freeCash) > 0) {
             return;
         }
         OrderDTO order = tradeGatewayService.placeOrder(code, OrderDTO.Side.BUY, deal, vol);
         if (order == null || order.getStatus() == OrderDTO.Status.REJECTED) {
             return;
         }
-        // sdk 模式可能 SUBMITTED，仍先扣减模拟资金（与回测一致的演示语义）
-        if (order.getStatus() == OrderDTO.Status.FILLED || order.getStatus() == OrderDTO.Status.SUBMITTED) {
-            simCash = simCash.subtract(amount).subtract(fee);
-            book.pos.addBuy(vol, deal, fee, tradeDay);
-            book.pos.raiseStopByCost(atrAt(IndicatorSignalUtil.precompute(bars), i), equity,
-                    quantProperties.getAtrStopMultiplier(), quantProperties.getHardStopCapitalPct());
-            if (pyramid) {
-                book.pyramidStage++;
-            } else {
-                book.pyramidStage = Math.max(book.pyramidStage, 1);
-            }
-            persistBook(code, book, order, tradeDay, fee);
-            log.info("策略买入: {} {}@{} x{} fee={}", code, order.getOrderId(), deal, vol, fee);
+        BigDecimal atr = atrAt(IndicatorSignalUtil.precompute(bars), i);
+        PendingFill pending = PendingFill.buy(code, vol, deal, amount, fee, tradeDay, pyramid, atr, equity);
+        if (order.getStatus() == OrderDTO.Status.FILLED) {
+            applyBuyFill(book, order, pending);
+        } else if (order.getStatus() == OrderDTO.Status.SUBMITTED) {
+            reserveBuy(pending);
+            pendingFills.put(order.getOrderId(), pending);
+            persistOrderOnly(order, tradeDay, fee);
+            log.info("策略买入已报(待同步成交): {} {}@{} x{}", code, order.getOrderId(), deal, vol);
         }
     }
 
@@ -365,7 +385,10 @@ public class StrategyTask {
         if (vol < 100 || !book.pos.hasPosition()) {
             return;
         }
-        if (!riskControlService.checkSell(code, vol, tradeGatewayService.queryPositions())) {
+        int freeShares = book.pos.getShares() - reservedSellVol.getOrDefault(code, 0);
+        Map<String, Integer> sellablePos = new java.util.HashMap<String, Integer>();
+        sellablePos.put(code, freeShares);
+        if (!riskControlService.checkSell(code, vol, sellablePos, bars, i)) {
             return;
         }
         BigDecimal avg = book.pos.getAvgCost();
@@ -377,33 +400,237 @@ public class StrategyTask {
         if (order == null || order.getStatus() == OrderDTO.Status.REJECTED) {
             return;
         }
-        simCash = simCash.add(amount).subtract(fee);
-        if (clearAll || vol >= book.pos.getShares()) {
-            book.pos.clear();
-            book.pyramidStage = 0;
-            book.targetFullVol = 0;
-        } else {
-            book.pos.removeShares(vol);
+        PendingFill pending = PendingFill.sell(code, vol, deal, amount, fee, tradeDay, clearAll, avg, pnl);
+        if (order.getStatus() == OrderDTO.Status.FILLED) {
+            applySellFill(book, order, pending);
+        } else if (order.getStatus() == OrderDTO.Status.SUBMITTED) {
+            reserveSell(pending);
+            pendingFills.put(order.getOrderId(), pending);
+            persistOrderOnly(order, tradeDay, fee);
+            log.info("策略卖出已报(待同步成交): {} {}@{} x{}", code, order.getOrderId(), deal, vol);
         }
-        book.pendingSell = false;
-        book.pendingSellSignalDay = null;
-        book.limitDownFailDays = 0;
-        book.lastLimitDownFailDay = null;
-        accountRiskState.onClosedRound(pnl.compareTo(BigDecimal.ZERO) > 0, tradeDay);
-        persistBook(code, book, order, tradeDay, fee);
-        log.info("策略卖出: {} {}@{} x{} fee={} pnl={}", code, order.getOrderId(), deal, vol, fee, pnl);
     }
 
     public void syncOrders() {
-        tradeGatewayService.syncOrderStatus();
+        List<OrderDTO> filled = tradeGatewayService.syncOrderStatus();
+        for (OrderDTO order : filled) {
+            if (order == null || order.getOrderId() == null) {
+                continue;
+            }
+            PendingFill pending = pendingFills.remove(order.getOrderId());
+            if (pending == null) {
+                log.warn("同步成交无本地待入账上下文 orderId={}", order.getOrderId());
+                continue;
+            }
+            LiveBook book = books.computeIfAbsent(pending.code, k -> new LiveBook());
+            int remain = pending.remainingVol;
+            if (remain > 0) {
+                if (pending.side == OrderDTO.Side.BUY) {
+                    applyBuyFillSlice(book, order, pending, remain);
+                } else {
+                    applySellFillSlice(book, order, pending, remain);
+                }
+            }
+        }
     }
 
     /**
-     * 收盘清算与 K 线聚合。
+     * 撤销 sdk 已报委托：释放预留资金/可卖量，委托置 CANCELLED。
+     * 仅在网关撤单成功后才释放预留，避免失败时丢上下文。
+     */
+    public OrderDTO cancelOrder(String orderId) {
+        if (orderId == null || orderId.trim().isEmpty()) {
+            return null;
+        }
+        String id = orderId.trim();
+        OrderDTO order = tradeGatewayService.cancelOrder(id);
+        if (order == null) {
+            log.warn("策略撤单失败（不存在或不可撤） orderId={}", id);
+            return null;
+        }
+        PendingFill pending = pendingFills.remove(id);
+        if (pending != null) {
+            if (pending.side == OrderDTO.Side.BUY) {
+                releaseBuyReserveQty(pending, pending.remainingVol);
+            } else {
+                releaseSellReserveQty(pending, pending.remainingVol);
+            }
+            pending.remainingVol = 0;
+        }
+        persistOrderOnly(order, pending == null ? LocalDate.now() : pending.tradeDay, null);
+        log.info("策略撤单: {}", id);
+        return order;
+    }
+
+    /**
+     * 本地部成：网关改仓 + 策略按比例入账；余量仍挂在 pending。
+     */
+    public OrderDTO applyPartialFill(String orderId, int fillQty) {
+        if (orderId == null || fillQty < 100) {
+            return null;
+        }
+        String id = orderId.trim();
+        PendingFill pending = pendingFills.get(id);
+        OrderDTO order = tradeGatewayService.applyPartialFill(id, fillQty);
+        if (order == null) {
+            return null;
+        }
+        if (pending == null) {
+            log.warn("部成无本地待入账上下文（可能重启后丢失） orderId={} filled={}",
+                    id, order.getFilledVolume());
+            return order;
+        }
+        int filledNow = order.getFilledVolume() == null ? 0 : order.getFilledVolume();
+        int already = pending.vol - pending.remainingVol;
+        int delta = filledNow - already;
+        if (delta < 100) {
+            return order;
+        }
+        delta = Math.min(delta, pending.remainingVol);
+        LiveBook book = books.computeIfAbsent(pending.code, k -> new LiveBook());
+        if (pending.side == OrderDTO.Side.BUY) {
+            applyBuyFillSlice(book, order, pending, delta);
+        } else {
+            applySellFillSlice(book, order, pending, delta);
+        }
+        if (pending.remainingVol <= 0 || order.getStatus() == OrderDTO.Status.FILLED) {
+            pendingFills.remove(id);
+        }
+        return order;
+    }
+
+    private BigDecimal availableCash() {
+        BigDecimal r = reservedCash == null ? BigDecimal.ZERO : reservedCash;
+        return simCash.subtract(r);
+    }
+
+    private void reserveBuy(PendingFill p) {
+        reservedCash = reservedCash.add(p.amount).add(p.fee);
+    }
+
+    private void releaseBuyReserveQty(PendingFill p, int qty) {
+        if (qty <= 0 || p.vol <= 0) {
+            return;
+        }
+        BigDecimal sliceAmt = p.deal.multiply(BigDecimal.valueOf(qty));
+        BigDecimal sliceFee = p.fee.multiply(BigDecimal.valueOf(qty))
+                .divide(BigDecimal.valueOf(p.vol), 2, RoundingMode.HALF_UP);
+        reservedCash = reservedCash.subtract(sliceAmt).subtract(sliceFee);
+        if (reservedCash.compareTo(BigDecimal.ZERO) < 0) {
+            reservedCash = BigDecimal.ZERO;
+        }
+    }
+
+    private void reserveSell(PendingFill p) {
+        reservedSellVol.merge(p.code, p.vol, new java.util.function.BiFunction<Integer, Integer, Integer>() {
+            @Override
+            public Integer apply(Integer a, Integer b) {
+                return a + b;
+            }
+        });
+    }
+
+    private void releaseSellReserveQty(PendingFill p, int qty) {
+        if (qty <= 0) {
+            return;
+        }
+        Integer cur = reservedSellVol.get(p.code);
+        if (cur == null) {
+            return;
+        }
+        int next = cur - qty;
+        if (next <= 0) {
+            reservedSellVol.remove(p.code);
+        } else {
+            reservedSellVol.put(p.code, next);
+        }
+    }
+
+    private void applyBuyFill(LiveBook book, OrderDTO order, PendingFill p) {
+        applyBuyFillSlice(book, order, p, p.remainingVol > 0 ? p.remainingVol : p.vol);
+    }
+
+    private void applyBuyFillSlice(LiveBook book, OrderDTO order, PendingFill p, int qty) {
+        qty = Math.min(qty, p.remainingVol > 0 ? p.remainingVol : p.vol);
+        if (qty < 100) {
+            return;
+        }
+        releaseBuyReserveQty(p, qty);
+        BigDecimal sliceAmt = p.deal.multiply(BigDecimal.valueOf(qty));
+        BigDecimal sliceFee = p.fee.multiply(BigDecimal.valueOf(qty))
+                .divide(BigDecimal.valueOf(p.vol), 2, RoundingMode.HALF_UP);
+        simCash = simCash.subtract(sliceAmt).subtract(sliceFee);
+        book.pos.addBuy(qty, p.deal, sliceFee, p.tradeDay);
+        book.pos.raiseStopByCost(p.atr, p.equity,
+                quantProperties.getAtrStopMultiplier(), quantProperties.getHardStopCapitalPct());
+        if (p.pyramid && p.remainingVol == p.vol) {
+            book.pyramidStage++;
+        } else if (!p.pyramid) {
+            book.pyramidStage = Math.max(book.pyramidStage, 1);
+        }
+        p.remainingVol -= qty;
+        persistBook(p.code, book, order, p.tradeDay, sliceFee);
+        log.info("策略买入: {} {}@{} x{} fee={}", p.code, order.getOrderId(), p.deal, qty, sliceFee);
+    }
+
+    private void applySellFill(LiveBook book, OrderDTO order, PendingFill p) {
+        applySellFillSlice(book, order, p, p.remainingVol > 0 ? p.remainingVol : p.vol);
+    }
+
+    private void applySellFillSlice(LiveBook book, OrderDTO order, PendingFill p, int qty) {
+        qty = Math.min(qty, p.remainingVol > 0 ? p.remainingVol : p.vol);
+        if (qty < 100) {
+            return;
+        }
+        releaseSellReserveQty(p, qty);
+        BigDecimal sliceAmt = p.deal.multiply(BigDecimal.valueOf(qty));
+        BigDecimal sliceFee = p.fee.multiply(BigDecimal.valueOf(qty))
+                .divide(BigDecimal.valueOf(p.vol), 2, RoundingMode.HALF_UP);
+        BigDecimal slicePnl = p.deal.subtract(p.avg).multiply(BigDecimal.valueOf(qty)).subtract(sliceFee);
+        simCash = simCash.add(sliceAmt).subtract(sliceFee);
+        boolean clear = p.clearAll && qty >= book.pos.getShares();
+        if (clear || qty >= book.pos.getShares()) {
+            book.pos.clear();
+            book.pyramidStage = 0;
+            book.targetFullVol = 0;
+            book.pendingSell = false;
+            book.pendingSellSignalDay = null;
+            book.limitDownFailDays = 0;
+            book.lastLimitDownFailDay = null;
+            accountRiskState.onClosedRound(slicePnl.compareTo(BigDecimal.ZERO) > 0, p.tradeDay);
+        } else {
+            book.pos.removeShares(qty);
+            book.pendingSell = true;
+            if (book.pendingSellSignalDay == null) {
+                book.pendingSellSignalDay = p.tradeDay;
+            }
+        }
+        p.remainingVol -= qty;
+        persistBook(p.code, book, order, p.tradeDay, sliceFee);
+        log.info("策略卖出: {} {}@{} x{} fee={} pnl={}",
+                p.code, order.getOrderId(), p.deal, qty, sliceFee, slicePnl);
+    }
+
+    private void persistOrderOnly(OrderDTO order, LocalDate tradeDay, BigDecimal fee) {
+        LiveLedgerService ledger = liveLedgerProvider.getIfAvailable();
+        if (ledger == null || order == null) {
+            return;
+        }
+        try {
+            ledger.upsertOrder(order, tradeDay, fee);
+        } catch (Exception e) {
+            log.warn("委托落库失败 order={}: {}", order.getOrderId(), e.getMessage());
+        }
+    }
+
+    /**
+     * 收盘清算与 K 线落库：权益日结 + 分钟写入 market_minute + 聚合成日线 market_daily。
+     * 更大周期由查询时内存聚合，不再写 legacy stock_bar_*。
      * <p>
      * TODO(api): 真实行情拉取（与 market-collect 同源）；当前 fetch 为 db/mock 回退。
      */
     public void settleAfterClose() {
+        LocalDate tradeDay = tradingCalendar.lastTradingDayOnOrBefore(LocalDate.now());
         BigDecimal closeEquity = markEquity(null);
         BigDecimal posMv = calcPositionMv();
         BigDecimal prev = accountRiskState.getPrevCloseEquity();
@@ -415,7 +642,7 @@ public class StrategyTask {
         if (ledger != null) {
             ledger.saveCash(simCash);
             ledger.upsertDailyCashflow(
-                    LocalDate.now(),
+                    tradeDay,
                     simCash,
                     posMv,
                     closeEquity,
@@ -425,37 +652,42 @@ public class StrategyTask {
                     accountRiskState.drawdown(closeEquity),
                     accountRiskState.getConsecutiveLosses());
         }
-        log.info("收盘清算开始, 模拟现金={}, 权益={}, 持仓={}",
-                simCash, closeEquity, tradeGatewayService.queryPositions());
-        if (barStorageService == null) {
-            log.info("未启用数据库(quant.db-enabled=false)，跳过K线聚合落库");
+        log.info("收盘清算开始 tradeDay={}, 模拟现金={}, 权益={}, 持仓={}",
+                tradeDay, simCash, closeEquity, tradeGatewayService.queryPositions());
+        if (coreMarketBarService == null) {
+            log.info("未启用核心行情表(quant.db-enabled=false)，跳过分钟/日线落库");
             return;
         }
-        // TODO(api): 接入真实行情后再做可靠增量拉取与聚合
-        LocalDate today = LocalDate.now();
-        LocalDateTime dayStart = LocalDateTime.of(today.minusDays(5), LocalTime.of(9, 30));
-        LocalDateTime dayEnd = LocalDateTime.of(today, LocalTime.of(15, 0));
+        // TODO(api): 接入真实行情后再做可靠增量拉取
         for (String code : resolveSettleCodes()) {
             try {
-                marketDataService.fetchAndPersist1Min(code);
-                barStorageService.aggregateAllPeriods(code, dayStart, dayEnd);
+                marketDataService.fetchAndPersistMinute(code);
+                coreMarketBarService.upsertDailyFromMinutes(code, tradeDay);
             } catch (Exception e) {
-                log.warn("收盘聚合失败 code={}: {}", code, e.getMessage());
+                log.warn("收盘落库失败 code={}: {}", code, e.getMessage());
             }
         }
-        log.info("收盘清算/多周期聚合完成");
+        log.info("收盘清算/日线聚合完成 tradeDay={}", tradeDay);
     }
 
     /**
-     * 盘后扫描：覆盖唯一目标池（与 pool-rebuild 同类；调度侧启用其一即可）。
+     * 盘后扫描：覆盖唯一目标池（与 pool-rebuild 共用锁，避免并发覆盖）。
      */
     public void afterMarketBatchScan() {
         log.info("盘后入池扫描触发（覆盖唯一目标池）");
-        if (tradePoolService != null) {
-            tradePoolService.rebuildFromUniverse();
-        } else {
+        if (tradePoolService == null) {
             log.warn("TradePoolService 不可用，回退批量扫描 stock-codes");
             batchStockBackTestService.scanAll();
+            return;
+        }
+        // 与 ScheduleJobHandlers.poolRebuild 同锁键
+        if (!redisLockUtil.tryLock("job:pool-rebuild", 600)) {
+            throw new IllegalStateException("目标池重建忙，请稍后重试");
+        }
+        try {
+            tradePoolService.rebuildFromUniverse();
+        } finally {
+            redisLockUtil.unlock("job:pool-rebuild");
         }
     }
 
@@ -486,6 +718,10 @@ public class StrategyTask {
     /** 模拟现金（实盘扫描账本） */
     public BigDecimal getSimCash() {
         return simCash;
+    }
+
+    public BigDecimal getSimInitCash() {
+        return simInitCash;
     }
 
     /** 现金 + 持仓市值 */
@@ -626,5 +862,55 @@ public class StrategyTask {
         int targetFullVol;
         int limitDownFailDays;
         LocalDate lastLimitDownFailDay;
+    }
+
+    /** sdk 已报未成：同步成交后入账所需上下文 */
+    private static final class PendingFill {
+        final OrderDTO.Side side;
+        final String code;
+        final int vol;
+        final BigDecimal deal;
+        final BigDecimal amount;
+        final BigDecimal fee;
+        final LocalDate tradeDay;
+        final boolean pyramid;
+        final BigDecimal atr;
+        final BigDecimal equity;
+        final boolean clearAll;
+        final BigDecimal avg;
+        final BigDecimal pnl;
+        /** 尚未入账的剩余量 */
+        int remainingVol;
+
+        private PendingFill(OrderDTO.Side side, String code, int vol, BigDecimal deal, BigDecimal amount,
+                            BigDecimal fee, LocalDate tradeDay, boolean pyramid, BigDecimal atr,
+                            BigDecimal equity, boolean clearAll, BigDecimal avg, BigDecimal pnl) {
+            this.side = side;
+            this.code = code;
+            this.vol = vol;
+            this.deal = deal;
+            this.amount = amount;
+            this.fee = fee;
+            this.tradeDay = tradeDay;
+            this.pyramid = pyramid;
+            this.atr = atr == null ? BigDecimal.ZERO : atr;
+            this.equity = equity == null ? BigDecimal.ZERO : equity;
+            this.clearAll = clearAll;
+            this.avg = avg == null ? BigDecimal.ZERO : avg;
+            this.pnl = pnl == null ? BigDecimal.ZERO : pnl;
+            this.remainingVol = vol;
+        }
+
+        static PendingFill buy(String code, int vol, BigDecimal deal, BigDecimal amount, BigDecimal fee,
+                               LocalDate tradeDay, boolean pyramid, BigDecimal atr, BigDecimal equity) {
+            return new PendingFill(OrderDTO.Side.BUY, code, vol, deal, amount, fee, tradeDay,
+                    pyramid, atr, equity, false, null, null);
+        }
+
+        static PendingFill sell(String code, int vol, BigDecimal deal, BigDecimal amount, BigDecimal fee,
+                                LocalDate tradeDay, boolean clearAll, BigDecimal avg, BigDecimal pnl) {
+            return new PendingFill(OrderDTO.Side.SELL, code, vol, deal, amount, fee, tradeDay,
+                    false, null, null, clearAll, avg, pnl);
+        }
     }
 }

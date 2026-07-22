@@ -47,19 +47,29 @@ public class TradeCostModel {
 
     public BigDecimal buyFee(BigDecimal amount, BigDecimal feeRate) {
         BigDecimal rate = feeRate == null ? props.getFeeRate() : feeRate;
-        return amount.multiply(rate).setScale(2, RoundingMode.HALF_UP);
+        return commissionWithFloor(amount, rate).setScale(2, RoundingMode.HALF_UP);
     }
 
-    /** 卖出：佣金 + 印花税 */
+    /** 卖出：佣金（含最低 5 元）+ 印花税 */
     public BigDecimal sellFee(BigDecimal amount) {
         return sellFee(amount, props.getFeeRate());
     }
 
     public BigDecimal sellFee(BigDecimal amount, BigDecimal feeRate) {
         BigDecimal rate = feeRate == null ? props.getFeeRate() : feeRate;
-        BigDecimal commission = amount.multiply(rate);
+        BigDecimal commission = commissionWithFloor(amount, rate);
         BigDecimal stamp = amount.multiply(props.getStampTaxRate());
         return commission.add(stamp).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /** A 股常见最低佣金 5 元 */
+    private BigDecimal commissionWithFloor(BigDecimal amount, BigDecimal rate) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal commission = amount.multiply(rate == null ? BigDecimal.ZERO : rate);
+        BigDecimal floor = new BigDecimal("5");
+        return commission.compareTo(floor) < 0 ? floor : commission;
     }
 
     private BigDecimal impactRate(List<BarDTO> bars, int index, int volume) {

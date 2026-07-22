@@ -126,27 +126,29 @@ public class PortfolioBackTestEngine {
                 if (book.pendingSell && book.pos.hasPosition() && book.pendingSellSignalDay != null
                         && tradeDay.isAfter(book.pendingSellSignalDay)
                         && FillTimingHelper.canFillPendingOnBar(bars, idx)) {
-                    boolean limitDown = openFilterService.isLimitDownAt(bars, idx);
-                    if (limitDown && book.limitDownFailDays < LIMIT_DOWN_FORCE_DAYS) {
-                        if (book.lastLimitDownFailDay == null || !book.lastLimitDownFailDay.equals(tradeDay)) {
-                            book.limitDownFailDays++;
-                            book.lastLimitDownFailDay = tradeDay;
-                        }
-                        if (book.limitDownFailDays < LIMIT_DOWN_FORCE_DAYS) {
-                            // skip fill
-                        } else {
-                            BigDecimal prev = openFilterService.prevTradingDayClose(bars, idx);
-                            BigDecimal force = LimitBoardHelper.limitDownPrice(prev, code);
-                            if (force == null) {
-                                force = open;
+                    int sellable = (book.pos.sellableShares(tradeDay) / 100) * 100;
+                    if (sellable >= 100) {
+                        boolean full = sellable >= book.pos.getShares();
+                        boolean limitDown = openFilterService.isLimitDownAt(bars, idx);
+                        if (limitDown && book.limitDownFailDays < LIMIT_DOWN_FORCE_DAYS) {
+                            if (book.lastLimitDownFailDay == null || !book.lastLimitDownFailDay.equals(tradeDay)) {
+                                book.limitDownFailDays++;
+                                book.lastLimitDownFailDay = tradeDay;
                             }
-                            force = force.multiply(new BigDecimal("0.99")).setScale(2, RoundingMode.HALF_UP);
-                            cash = doSell(code, book, bars, idx, cash, force, book.pos.getShares(), true,
+                            if (book.limitDownFailDays >= LIMIT_DOWN_FORCE_DAYS) {
+                                BigDecimal prev = openFilterService.prevTradingDayClose(bars, idx);
+                                BigDecimal force = LimitBoardHelper.limitDownPrice(prev, code);
+                                if (force == null) {
+                                    force = open;
+                                }
+                                force = force.multiply(new BigDecimal("0.99")).setScale(2, RoundingMode.HALF_UP);
+                                cash = doSell(code, book, bars, idx, cash, force, sellable, full,
+                                        commissionRate, trades, tradeDay, accountRisk);
+                            }
+                        } else if (!limitDown) {
+                            cash = doSell(code, book, bars, idx, cash, open, sellable, full,
                                     commissionRate, trades, tradeDay, accountRisk);
                         }
-                    } else if (!limitDown) {
-                        cash = doSell(code, book, bars, idx, cash, open, book.pos.getShares(), true,
-                                commissionRate, trades, tradeDay, accountRisk);
                     }
                 }
 
@@ -404,13 +406,17 @@ public class PortfolioBackTestEngine {
                 book.winRounds++;
             }
             risk.onClosedRound(pnl.compareTo(BigDecimal.ZERO) > 0, tradeDay);
+            book.pendingSell = false;
+            book.pendingSellSignalDay = null;
+            book.limitDownFailDays = 0;
+            book.lastLimitDownFailDay = null;
         } else {
             book.pos.removeShares(vol);
+            book.pendingSell = true;
+            if (book.pendingSellSignalDay == null) {
+                book.pendingSellSignalDay = tradeDay;
+            }
         }
-        book.pendingSell = false;
-        book.pendingSellSignalDay = null;
-        book.limitDownFailDays = 0;
-        book.lastLimitDownFailDay = null;
         return cash;
     }
 
