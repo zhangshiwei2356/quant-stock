@@ -6,8 +6,8 @@
 |----|-----|
 | 入口页 | http://localhost:8080/stock.html |
 | 默认库 | MySQL `quant_stock`（`root` / `123456`） |
-| 行情模式 | `quant.market-mode=db`（本地表 + 空库自动导入种子） |
-| 交易模式 | `quant.trade-mode=sim`（本地模拟账本，可持久化） |
+| 行情模式 | `quant.market-mode=db`：K 线读本地 MySQL（空库自动导入种子）；可选 `json` / `sdk`（外部行情桩） |
+| 交易模式 | `quant.trade-mode=sim`：本地模拟账本，下单即时成交记账，不连券商；可选 `sdk`（SUBMITTED→`sync-orders`，当前仍为桩） |
 
 ---
 
@@ -232,8 +232,8 @@ sequenceDiagram
 | `QUANT_API_KEY` / `quant.api-key` | 非空则 `/api/**` 需 `X-API-Key`（`/api/config` 等除外） |
 | `QUANT_RATE_LIMIT` / `quant.rate-limit-per-minute` | 回测/组合/批量每 IP 每分钟上限（默认 30，≤0 关闭） |
 | `quant.schedule.enabled` | 定时总闸（默认 true；各任务以库表为准） |
-| `quant.trade-mode` | `sim` 即时 FILLED 并记账；`sdk` 先 SUBMITTED（占资/占仓），`sync-orders` 推进 FILLED 后再落账 |
-| `quant.market-mode` | `db` / `json` / `sdk` |
+| `quant.trade-mode` | `sim`（默认）本地模拟、即时 FILLED 并记账，不连柜台；`sdk` 先 SUBMITTED（占资/占仓），`sync-orders` 推进 FILLED 后再落账（当前为桩） |
+| `quant.market-mode` | `db`（默认）读本地行情表；`json` 读 classpath JSON；`sdk` 走 `KlineSdkClient`（多为桩，宽睿 MDS 未接主路径） |
 
 ---
 

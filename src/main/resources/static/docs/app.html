@@ -5,7 +5,14 @@
 <ul>
   <li>项目根目录：执行 <code>mapper/schema.sql</code> 后 <code>mvn spring-boot:run</code></li>
   <li>浏览器：<code>http://localhost:8080/stock.html</code></li>
-  <li>空库自动导入日线 + 5 分钟种子；默认 <code>market-mode=db</code>、<code>trade-mode=sim</code></li>
+  <li>空库自动导入日线 + 5 分钟种子</li>
+</ul>
+
+<h4>默认行情 / 交易模式</h4>
+<ul>
+  <li><b><code>quant.market-mode=db</code>（行情从哪来）</b>：K 线读本地 MySQL（<code>market_daily</code> / <code>market_minute</code>）；空库启动会自动灌入演示种子。可选 <code>json</code>（classpath JSON，偏开发）、<code>sdk</code>（外部行情客户端，当前多为桩；宽睿 MDS 尚未接入主路径）</li>
+  <li><b><code>quant.trade-mode=sim</code>（单怎么成交）</b>：本地模拟账本——下单即时 <code>FILLED</code> 并改现金/持仓，可持久化；<strong>不连券商柜台</strong>。可选 <code>sdk</code>：先 <code>SUBMITTED</code> 占资/占仓，由 <code>sync-orders</code> 再推进成交（当前仍为本地桩；宽睿 OES 尚未替换）</li>
+  <li>二者组合含义：默认开箱即用「库内行情 + 本地模拟成交」，可回测/扫池/纸面账户，无需宽睿或券商账号</li>
 </ul>
 
 <h4>架构一览</h4>

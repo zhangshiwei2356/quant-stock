@@ -1769,7 +1769,7 @@
   }
 
   var knowledgeTopics = [
-    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260722-readme' },
+    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260726-mode-explain' },
     { id: 'readme', group: 'app', title: '项目 README', src: '/api/docs/readme' },
     { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260726-ops-harden' },
     { id: 'memo', group: 'app', title: '能力与待办', src: '/docs/memo.html?v=20260726-ops-harden' },
