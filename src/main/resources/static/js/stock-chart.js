@@ -1771,8 +1771,8 @@
   var knowledgeTopics = [
     { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260722-readme' },
     { id: 'readme', group: 'app', title: '项目 README', src: '/api/docs/readme' },
-    { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260726-ledger-fix' },
-    { id: 'memo', group: 'app', title: '能力与待办', src: '/docs/memo.html?v=20260726-ledger-fix' },
+    { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260726-ops-harden' },
+    { id: 'memo', group: 'app', title: '能力与待办', src: '/docs/memo.html?v=20260726-ops-harden' },
     { id: 'kuangrui', group: 'app', title: '宽睿文档梳理', src: '/docs/kuangrui.html?v=20260720-kuangrui' },
     { id: 'ashare', group: 'stock', title: 'A股基础', src: '/docs/ashare.html?v=20260720-nav-rename' },
     { id: 'session', group: 'stock', title: '交易时间', src: '/docs/session.html?v=20260720-nav-rename' },
@@ -2394,11 +2394,12 @@
       '/api/account/slippage-residual',
       '/api/account/order-protect',
       '/api/account/execution-cap',
-      '/api/account/short-policy'
+      '/api/account/short-policy',
+      '/api/account/correlation'
     ];
     var keys = [
       'alerts', 'turnover', 'icDecay', 'signalDrift', 'structuralBreak',
-      'stress', 'partialFill', 'slippage', 'orderProtect', 'executionCap', 'shortPolicy'
+      'stress', 'partialFill', 'slippage', 'orderProtect', 'executionCap', 'shortPolicy', 'correlation'
     ];
     var reqs = urls.map(function (u) {
       var dfd = $.Deferred();
@@ -2468,6 +2469,14 @@
         $('#acctDashShort').text(dashText(
           bag.shortPolicy && bag.shortPolicy.mode,
           bag.shortPolicy && bag.shortPolicy.allowShort === false ? '禁空' : null
+        ));
+        $('#acctDashCorr').text(dashText(
+          bag.correlation && bag.correlation.warn ? '告警' : '正常',
+          bag.correlation && bag.correlation.maxCorrelation != null
+            ? ('max=' + bag.correlation.maxCorrelation) : null,
+          bag.correlation && bag.correlation.avgCorrelation != null
+            ? ('avg=' + bag.correlation.avgCorrelation) : null,
+          bag.correlation && bag.correlation.pairCount != null ? ('对=' + bag.correlation.pairCount) : null
         ));
         var okN = 0;
         keys.forEach(function (k) { if (bag[k] && !bag[k]._error) okN++; });
@@ -2629,7 +2638,9 @@
         .html(
           '<td><b>' + escHtml(code) + '</b></td>'
           + '<td>' + escHtml(it.name || '') + '</td>'
-          + '<td class="mono">' + escHtml(String(it.volume == null ? '—' : it.volume)) + '</td>'
+          + '<td class="mono">' + escHtml(String(it.volume == null ? '—' : it.volume))
+          + (it.ledgerDesync ? ' <span class="tag-wait" title="网关与批次数量不一致">分歧</span>' : '')
+          + '</td>'
           + '<td class="mono">' + escHtml(String(it.sellableShares == null ? '—' : it.sellableShares)) + '</td>'
           + '<td class="mono">' + escHtml(num(it.avgCost)) + '</td>'
           + '<td class="mono">' + escHtml(num(it.lastPrice)) + '</td>'
@@ -2660,7 +2671,11 @@
           .append($('<td colspan="11"/>').html(lotHtml))
       );
     });
-    $('#acctPosHint').text('共 ' + items.length + ' 只 · 点击行展开批次');
+    var desyncN = 0;
+    items.forEach(function (it) { if (it.ledgerDesync) desyncN++; });
+    $('#acctPosHint').text('共 ' + items.length + ' 只 · 数量以批次为准'
+      + (desyncN ? (' · ' + desyncN + ' 只网关分歧') : '')
+      + ' · 点击行展开批次');
   }
 
   function orderTypeLabel(t) {
@@ -2678,7 +2693,7 @@
     $('#sideOrderCount').text(String(items.length));
     var $body = $('#acctOrderBody').empty();
     if (!items.length) {
-      $body.html('<tr><td colspan="13" class="empty-state">暂无委托</td></tr>');
+      $body.html('<tr><td colspan="14" class="empty-state">暂无委托</td></tr>');
       $('#acctOrderHint').text('无委托');
       return;
     }
@@ -2688,6 +2703,16 @@
     }
     rows.forEach(function (it) {
       var filled = it.filledVolume != null ? it.filledVolume : (it.status === 'FILLED' ? it.volume : '—');
+      var st = String(it.status || '').toUpperCase();
+      var oid = it.orderId || '';
+      var open = st === 'SUBMITTED' || st === 'PARTIAL' || st === '2' || st === '3';
+      var ops = '—';
+      if (open && oid) {
+        ops = '<button type="button" class="secondary btn-order-cancel" data-id="' + escHtml(oid) + '">撤</button> '
+          + '<button type="button" class="secondary btn-order-partial" data-id="' + escHtml(oid) + '">部成</button> '
+          + '<button type="button" class="secondary btn-order-replace" data-id="' + escHtml(oid)
+          + '" data-price="' + escHtml(String(it.price == null ? '' : it.price)) + '">改价</button>';
+      }
       $body.append(
         '<tr>'
         + '<td class="mono">' + escHtml(it.orderId || it.clientOrderId || '—') + '</td>'
@@ -2703,11 +2728,20 @@
         + '<td class="mono">' + escHtml(it.signalDate || '—') + '</td>'
         + '<td class="mono">' + escHtml(it.executionDate || '—') + '</td>'
         + '<td>' + escHtml(it.source || '—') + '</td>'
+        + '<td class="acct-order-ops">' + ops + '</td>'
         + '</tr>'
       );
     });
     var src = rows[0] && rows[0].source === 'DB' ? '库表' : '内存';
     $('#acctOrderHint').text('共 ' + rows.length + ' 笔 · 来源 ' + src);
+  }
+
+  function postOrderAction(url, data) {
+    return $.ajax({
+      url: url,
+      method: 'POST',
+      data: data || {}
+    });
   }
 
   function loadAccountOverview() {
@@ -3422,8 +3456,29 @@
       });
   }
 
+  function renderReconcile(data) {
+    data = data || {};
+    $('#reconcileBlock').text(data.blockNewOpen ? '是' : '否');
+    var n = data.divergeCodeCount != null ? data.divergeCodeCount
+      : (data.divergeCodes != null ? data.divergeCodes
+        : (data.divergences ? data.divergences.length : null));
+    $('#reconcileDiverge').text(n == null ? '—' : String(n));
+    var at = data.lastRunAt || data.asOf;
+    $('#reconcileAt').text(at ? fmtDateTimeDisplay(at) : '—');
+    if (data.hint) $('#reconcileHint').text(data.hint);
+  }
+
+  function loadDataReconcile() {
+    $.getJSON('/api/ops/data-reconcile')
+      .done(renderReconcile)
+      .fail(function () {
+        $('#reconcileHint').text('对账闸加载失败');
+      });
+  }
+
   function loadDataHealth() {
     $('#healthBody').html('<tr><td colspan="7" class="empty-state">检查中…</td></tr>');
+    loadDataReconcile();
     $.getJSON('/api/ops/data-health')
       .done(function (data) {
         if (data.hint) $('#healthHint').text(data.hint);
@@ -3523,7 +3578,79 @@
     toast('已刷新扫描历史列表（未扫描）', 'info');
   });
   $('#btnHealthRefresh').on('click', loadDataHealth);
+  $('#btnReconcileRun').on('click', function () {
+    var $btn = $(this);
+    if ($btn.prop('disabled')) return;
+    $btn.prop('disabled', true).addClass('is-loading');
+    postOrderAction('/api/ops/data-reconcile/run')
+      .done(function (data) {
+        renderReconcile(data);
+        toast('对账闸已执行', 'ok');
+      })
+      .fail(function (xhr) {
+        var msg = (xhr.responseJSON && xhr.responseJSON.message) || '对账执行失败';
+        toast(msg, 'err');
+      })
+      .always(function () {
+        $btn.prop('disabled', false).removeClass('is-loading');
+      });
+  });
   $('#btnParamsRefresh').on('click', loadSysParams);
+
+  $('#acctOrderBody').on('click', '.btn-order-cancel', function () {
+    var id = $(this).attr('data-id');
+    if (!id) return;
+    var $btn = $(this);
+    $btn.prop('disabled', true).addClass('is-loading');
+    postOrderAction('/api/account/orders/' + encodeURIComponent(id) + '/cancel')
+      .done(function (r) {
+        toast((r && r.message) || '已撤单', r && r.ok === false ? 'err' : 'ok');
+        loadAccountOverview();
+      })
+      .fail(function () { toast('撤单失败', 'err'); })
+      .always(function () { $btn.prop('disabled', false).removeClass('is-loading'); });
+  });
+  $('#acctOrderBody').on('click', '.btn-order-partial', function () {
+    var id = $(this).attr('data-id');
+    if (!id) return;
+    var qtyStr = window.prompt('部成数量（100 股整数倍）', '100');
+    if (qtyStr == null) return;
+    var qty = parseInt(qtyStr, 10);
+    if (!(qty >= 100) || qty % 100 !== 0) {
+      toast('数量须为 100 整数倍', 'err');
+      return;
+    }
+    var $btn = $(this);
+    $btn.prop('disabled', true).addClass('is-loading');
+    postOrderAction('/api/account/orders/' + encodeURIComponent(id) + '/partial-fill', { qty: qty })
+      .done(function (r) {
+        toast((r && r.message) || '已部成', r && r.ok === false ? 'err' : 'ok');
+        loadAccountOverview();
+      })
+      .fail(function () { toast('部成失败', 'err'); })
+      .always(function () { $btn.prop('disabled', false).removeClass('is-loading'); });
+  });
+  $('#acctOrderBody').on('click', '.btn-order-replace', function () {
+    var id = $(this).attr('data-id');
+    var oldPx = $(this).attr('data-price') || '';
+    if (!id) return;
+    var pxStr = window.prompt('新价格（改价=撤补队尾）', oldPx);
+    if (pxStr == null) return;
+    var price = parseFloat(pxStr);
+    if (!(price > 0)) {
+      toast('价格非法', 'err');
+      return;
+    }
+    var $btn = $(this);
+    $btn.prop('disabled', true).addClass('is-loading');
+    postOrderAction('/api/account/orders/' + encodeURIComponent(id) + '/replace', { price: price })
+      .done(function (r) {
+        toast((r && r.message) || '已改价撤补', r && r.ok === false ? 'err' : 'ok');
+        loadAccountOverview();
+      })
+      .fail(function () { toast('改价失败', 'err'); })
+      .always(function () { $btn.prop('disabled', false).removeClass('is-loading'); });
+  });
 
   $('#tpHistBody').on('click', '.tp-hist-open', function (e) {
     e.preventDefault();

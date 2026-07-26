@@ -15,6 +15,7 @@ import com.quant.stock.risk.AccountRiskState;
 import com.quant.stock.risk.AtrRiskReport;
 import com.quant.stock.risk.ExitPriority;
 import com.quant.stock.risk.LimitBoardHelper;
+import com.quant.stock.risk.LimitDownForcePolicy;
 import com.quant.stock.risk.OpenFilterService;
 import com.quant.stock.risk.LimitPriceProtect;
 import com.quant.stock.risk.StopFillPrice;
@@ -51,7 +52,6 @@ import java.util.TreeSet;
 public class PortfolioBackTestEngine {
 
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final int LIMIT_DOWN_FORCE_DAYS = 3;
     private static final int PENDING_BUY_EXPIRE_DAYS = 5;
 
     private final QuantProperties props;
@@ -161,14 +161,13 @@ public class PortfolioBackTestEngine {
                             continue;
                         }
                         boolean full = vol >= book.pos.getShares();
-                        boolean force = book.limitDownFailDays >= LIMIT_DOWN_FORCE_DAYS;
                         boolean limitDown = openFilterService.isLimitDownAt(bars, idx);
-                        if (limitDown && !force) {
+                        if (LimitDownForcePolicy.deferForLimitDown(limitDown, book.limitDownFailDays)) {
                             if (book.lastLimitDownFailDay == null || !book.lastLimitDownFailDay.equals(tradeDay)) {
                                 book.limitDownFailDays++;
                                 book.lastLimitDownFailDay = tradeDay;
                             }
-                        } else {
+                        } else if (LimitDownForcePolicy.shouldSellNow(limitDown, book.limitDownFailDays)) {
                             BigDecimal fillBase = open;
                             if (limitDown) {
                                 BigDecimal prev = openFilterService.prevTradingDayClose(bars, idx);
@@ -233,8 +232,10 @@ public class PortfolioBackTestEngine {
             // Step3 halt → pending sell all
             if (accountRisk.isHalted()) {
                 for (StockBook book : books.values()) {
+                    ExitPriority cur = ExitPriority.fromReasonLabel(book.pendingSellReason);
                     if (book.pos.hasPosition()
-                            && ExitPriority.ACCOUNT_HALT.canRegisterPending(book.stoppedOutToday, book.pendingSell)) {
+                            && ExitPriority.ACCOUNT_HALT.canRegisterOrPreempt(
+                            book.stoppedOutToday, book.pendingSell, cur)) {
                         book.pendingSell = true;
                         book.pendingSellReason = ExitPriority.ACCOUNT_HALT.getLabel();
                         book.pendingSellSignalDay = tradeDay;
@@ -245,8 +246,10 @@ public class PortfolioBackTestEngine {
             // Step3b: 时间止损
             if (props.getMaxHoldTradingDays() > 0) {
                 for (StockBook book : books.values()) {
+                    ExitPriority cur = ExitPriority.fromReasonLabel(book.pendingSellReason);
                     if (book.pos.hasPosition()
-                            && ExitPriority.TIME_STOP.canRegisterPending(book.stoppedOutToday, book.pendingSell)) {
+                            && ExitPriority.TIME_STOP.canRegisterOrPreempt(
+                            book.stoppedOutToday, book.pendingSell, cur)) {
                         int held = tradingCalendar.tradingDaysAfter(book.pos.getEarliestOpenDate(), tradeDay);
                         if (held >= props.getMaxHoldTradingDays()) {
                             book.pendingSell = true;

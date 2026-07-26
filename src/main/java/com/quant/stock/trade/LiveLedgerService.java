@@ -59,8 +59,12 @@ public class LiveLedgerService {
     }
 
     public void upsertOrder(OrderDTO order, LocalDate signalDate, BigDecimal fee) {
+        upsertOrder(order, signalDate, null, fee);
+    }
+
+    public void upsertOrder(OrderDTO order, LocalDate signalDate, LocalDate executionDate, BigDecimal fee) {
         try {
-            doUpsertOrder(order, signalDate, fee);
+            doUpsertOrder(order, signalDate, executionDate, fee);
         } catch (Exception e) {
             log.warn("保存委托失败 {}: {}", order == null ? null : order.getOrderId(), e.getMessage());
         }
@@ -80,9 +84,20 @@ public class LiveLedgerService {
     @Transactional(rollbackFor = Exception.class)
     public void persistTradeState(BigDecimal cash, OrderDTO order, LocalDate signalDate, BigDecimal fee,
                                   String symbol, PositionState pos) {
+        persistTradeState(cash, order, signalDate, signalDate, fee, symbol, pos);
+    }
+
+    /**
+     * @param signalDate    策略信号日（挂单日）
+     * @param executionDate 成交日；未成交传 null
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void persistTradeState(BigDecimal cash, OrderDTO order, LocalDate signalDate,
+                                  LocalDate executionDate, BigDecimal fee,
+                                  String symbol, PositionState pos) {
         doSaveCash(cash);
         if (order != null) {
-            doUpsertOrder(order, signalDate, fee);
+            doUpsertOrder(order, signalDate, executionDate, fee);
         }
         if (symbol != null) {
             doUpsertPosition(symbol, pos);
@@ -99,11 +114,11 @@ public class LiveLedgerService {
                 CASH_KEY, cash.toPlainString(), "本地模拟现金余额");
     }
 
-    private void doUpsertOrder(OrderDTO order, LocalDate signalDate, BigDecimal fee) {
+    private void doUpsertOrder(OrderDTO order, LocalDate signalDate, LocalDate executionDate, BigDecimal fee) {
         if (order == null || order.getOrderId() == null) {
             return;
         }
-        LocalDate day = signalDate == null ? LocalDate.now() : signalDate;
+        LocalDate signal = signalDate == null ? LocalDate.now() : signalDate;
         int orderType = order.getSide() == OrderDTO.Side.SELL ? 4 : 1;
         int status = mapStatus(order.getStatus());
         int vol = order.getVolume() == null ? 0 : order.getVolume();
@@ -118,6 +133,10 @@ public class LiveLedgerService {
         if (order.getStatus() == OrderDTO.Status.FILLED && filled <= 0) {
             filled = vol;
         }
+        LocalDate exec = null;
+        if (filled > 0) {
+            exec = executionDate != null ? executionDate : LocalDate.now();
+        }
         jdbc.update(
                 "INSERT INTO trade_orders(order_id, account_id, symbol, signal_date, execution_date, order_type, "
                         + "stage, price, volume, filled_volume, filled_price, fee, status) "
@@ -128,8 +147,8 @@ public class LiveLedgerService {
                 order.getOrderId(),
                 ACCOUNT_ID,
                 order.getStockCode(),
-                Date.valueOf(day),
-                filled > 0 ? Date.valueOf(day) : null,
+                Date.valueOf(signal),
+                exec == null ? null : Date.valueOf(exec),
                 orderType,
                 0,
                 order.getPrice(),

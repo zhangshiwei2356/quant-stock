@@ -13,6 +13,7 @@ import com.quant.stock.risk.AccountRiskState;
 import com.quant.stock.risk.ExitPriority;
 import com.quant.stock.risk.AlertSeverity;
 import com.quant.stock.risk.LimitBoardHelper;
+import com.quant.stock.risk.LimitDownForcePolicy;
 import com.quant.stock.risk.LimitPriceProtect;
 import com.quant.stock.risk.LiveAccountRiskState;
 import com.quant.stock.risk.OpenFilterService;
@@ -31,6 +32,7 @@ import com.quant.stock.strategy.MaCrossStrategy;
 import com.quant.stock.trade.CapacityThrottle;
 import com.quant.stock.trade.LiveLedgerService;
 import com.quant.stock.trade.ParticipationCap;
+import com.quant.stock.trade.SimCashRestore;
 import com.quant.stock.trade.TradeCostModel;
 import com.quant.stock.trade.TradeGatewayService;
 import com.quant.stock.trade.dto.OrderDTO;
@@ -65,7 +67,6 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class StrategyTask {
 
-    private static final int LIMIT_DOWN_FORCE_DAYS = 3;
     private static final int PENDING_BUY_EXPIRE_DAYS = 5;
 
     private final QuantProperties quantProperties;
@@ -168,11 +169,7 @@ public class StrategyTask {
         if (ledger == null) {
             return;
         }
-        BigDecimal cash = ledger.loadCashOrNull();
-        // 含 0：满仓时不得回落到默认 10 万
-        if (cash != null) {
-            simCash = cash;
-        }
+        simCash = SimCashRestore.apply(ledger.loadCashOrNull(), simCash);
         Map<String, PositionState> loaded = ledger.loadPositions();
         for (Map.Entry<String, PositionState> e : loaded.entrySet()) {
             PositionState src = e.getValue();
@@ -326,13 +323,14 @@ public class StrategyTask {
         }
     }
 
-    private void persistBook(String code, LiveBook book, OrderDTO order, LocalDate tradeDay, BigDecimal fee) {
+    private void persistBook(String code, LiveBook book, OrderDTO order,
+                             LocalDate signalDate, LocalDate executionDate, BigDecimal fee) {
         LiveLedgerService ledger = liveLedgerProvider.getIfAvailable();
         if (ledger == null) {
             return;
         }
         try {
-            ledger.persistTradeState(simCash, order, tradeDay, fee,
+            ledger.persistTradeState(simCash, order, signalDate, executionDate, fee,
                     code, book == null ? null : book.pos);
         } catch (Exception e) {
             log.warn("账本落库失败 code={} order={}: {}", code,
@@ -435,15 +433,19 @@ public class StrategyTask {
                 BigDecimal singleMv = book.pos.hasPosition()
                         ? close.multiply(BigDecimal.valueOf(book.pos.getShares())) : BigDecimal.ZERO;
                 riskAlertService.checkSoftBudget(tradeDay, equity, posMvNow, code, singleMv);
+                ExitPriority curExit = ExitPriority.fromReasonLabel(book.pendingSellReason);
                 if (book.pos.hasPosition() && accountRiskState.isHalted()
-                        && ExitPriority.ACCOUNT_HALT.canRegisterPending(book.stoppedOutToday, book.pendingSell)) {
+                        && ExitPriority.ACCOUNT_HALT.canRegisterOrPreempt(
+                        book.stoppedOutToday, book.pendingSell, curExit)) {
                     book.pendingSell = true;
                     book.pendingSellReason = ExitPriority.ACCOUNT_HALT.getLabel();
                     book.pendingSellSignalDay = tradeDay;
+                    curExit = ExitPriority.ACCOUNT_HALT;
                 }
 
                 if (book.pos.hasPosition() && quantProperties.getMaxHoldTradingDays() > 0
-                        && ExitPriority.TIME_STOP.canRegisterPending(book.stoppedOutToday, book.pendingSell)) {
+                        && ExitPriority.TIME_STOP.canRegisterOrPreempt(
+                        book.stoppedOutToday, book.pendingSell, curExit)) {
                     int held = tradingCalendar.tradingDaysAfter(book.pos.getEarliestOpenDate(), tradeDay);
                     if (held >= quantProperties.getMaxHoldTradingDays()) {
                         book.pendingSell = true;
@@ -543,27 +545,24 @@ public class StrategyTask {
                 }
                 if (vol >= 100) {
                     boolean limitDown = openFilterService.isLimitDownAt(bars, i);
-                    if (limitDown) {
+                    if (LimitDownForcePolicy.deferForLimitDown(limitDown, book.limitDownFailDays)) {
                         if (book.lastLimitDownFailDay == null || !book.lastLimitDownFailDay.equals(tradeDay)) {
                             book.limitDownFailDays++;
                             book.lastLimitDownFailDay = tradeDay;
                         }
-                        if (book.limitDownFailDays < LIMIT_DOWN_FORCE_DAYS) {
-                            // 跌停暂缓
-                        } else {
+                    } else if (LimitDownForcePolicy.shouldSellNow(limitDown, book.limitDownFailDays)) {
+                        BigDecimal fillBase = open;
+                        if (limitDown) {
                             BigDecimal prev = openFilterService.prevTradingDayClose(bars, i);
                             BigDecimal force = LimitBoardHelper.limitDownPrice(prev, code,
                                     openFilterService.isSt(code));
                             if (force == null) {
                                 force = open;
                             }
-                            force = force.multiply(new BigDecimal("0.99")).setScale(2, RoundingMode.HALF_UP);
-                            boolean full = vol >= book.pos.getShares();
-                            executeLiveSell(code, book, bars, i, force, vol, full, tradeDay);
+                            fillBase = force.multiply(new BigDecimal("0.99")).setScale(2, RoundingMode.HALF_UP);
                         }
-                    } else {
                         boolean full = vol >= book.pos.getShares();
-                        executeLiveSell(code, book, bars, i, open, vol, full, tradeDay);
+                        executeLiveSell(code, book, bars, i, fillBase, vol, full, tradeDay);
                     }
                 }
             }
@@ -644,11 +643,11 @@ public class StrategyTask {
         LocalDate fillDay = signalDay == null ? tradeDay : signalDay;
         PendingFill pending = PendingFill.buy(code, vol, deal, amount, fee, fillDay, pyramid, atr, equity);
         if (order.getStatus() == OrderDTO.Status.FILLED) {
-            applyBuyFill(book, order, pending);
+            applyBuyFill(book, order, pending, tradeDay);
         } else if (order.getStatus() == OrderDTO.Status.SUBMITTED) {
             reserveBuy(pending);
             pendingFills.put(order.getOrderId(), pending);
-            persistOrderOnly(order, tradeDay, fee);
+            persistOrderOnly(order, signalDay == null ? tradeDay : signalDay, null, fee);
             log.info("策略买入已报(待同步成交): {} {}@{} x{}", code, order.getOrderId(), deal, vol);
         }
     }
@@ -680,11 +679,11 @@ public class StrategyTask {
         }
         PendingFill pending = PendingFill.sell(code, vol, deal, amount, fee, tradeDay, clearAll, avg, pnl);
         if (order.getStatus() == OrderDTO.Status.FILLED) {
-            applySellFill(book, order, pending);
+            applySellFill(book, order, pending, tradeDay);
         } else if (order.getStatus() == OrderDTO.Status.SUBMITTED) {
             reserveSell(pending);
             pendingFills.put(order.getOrderId(), pending);
-            persistOrderOnly(order, tradeDay, fee);
+            persistOrderOnly(order, tradeDay, null, fee);
             log.info("策略卖出已报(待同步成交): {} {}@{} x{}", code, order.getOrderId(), deal, vol);
         }
     }
@@ -708,10 +707,11 @@ public class StrategyTask {
                 LiveBook book = books.computeIfAbsent(pending.code, k -> new LiveBook());
                 int remain = pending.remainingVol;
                 if (remain > 0) {
+                    LocalDate execDay = LocalDate.now();
                     if (pending.side == OrderDTO.Side.BUY) {
-                        applyBuyFillSlice(book, order, pending, remain);
+                        applyBuyFillSlice(book, order, pending, remain, execDay);
                     } else {
-                        applySellFillSlice(book, order, pending, remain);
+                        applySellFillSlice(book, order, pending, remain, execDay);
                     }
                 }
             }
@@ -756,7 +756,7 @@ public class StrategyTask {
             }
             pending.remainingVol = 0;
         }
-        persistOrderOnly(order, pending == null ? LocalDate.now() : pending.tradeDay, null);
+        persistOrderOnly(order, pending == null ? LocalDate.now() : pending.tradeDay, null, null);
         persistRuntimeState();
         log.info("策略撤单: {}", id);
         return order;
@@ -812,11 +812,11 @@ public class StrategyTask {
                     oldPending == null ? BigDecimal.ZERO : oldPending.atr,
                     oldPending == null ? BigDecimal.ZERO : oldPending.equity);
             if (neu.getStatus() == OrderDTO.Status.FILLED) {
-                applyBuyFill(book, neu, pending);
+                applyBuyFill(book, neu, pending, tradeDay);
             } else if (neu.getStatus() == OrderDTO.Status.SUBMITTED) {
                 reserveBuy(pending);
                 pendingFills.put(neu.getOrderId(), pending);
-                persistOrderOnly(neu, tradeDay, fee);
+                persistOrderOnly(neu, tradeDay, null, fee);
             }
         } else {
             BigDecimal fee = tradeCostModel.sellFee(amount, null, tradeDay);
@@ -828,11 +828,11 @@ public class StrategyTask {
             PendingFill pending = PendingFill.sell(code, vol, newPrice, amount, fee, tradeDay,
                     oldPending != null && oldPending.clearAll, avg, pnl);
             if (neu.getStatus() == OrderDTO.Status.FILLED) {
-                applySellFill(book, neu, pending);
+                applySellFill(book, neu, pending, tradeDay);
             } else if (neu.getStatus() == OrderDTO.Status.SUBMITTED) {
                 reserveSell(pending);
                 pendingFills.put(neu.getOrderId(), pending);
-                persistOrderOnly(neu, tradeDay, fee);
+                persistOrderOnly(neu, tradeDay, null, fee);
             }
         }
         log.info("策略改价撤补(队尾重置): {} → {} @{} x{}", id, neu.getOrderId(), newPrice, vol);
@@ -871,10 +871,11 @@ public class StrategyTask {
             }
             delta = Math.min(delta, pending.remainingVol);
             LiveBook book = books.computeIfAbsent(pending.code, k -> new LiveBook());
+            LocalDate execDay = LocalDate.now();
             if (pending.side == OrderDTO.Side.BUY) {
-                applyBuyFillSlice(book, order, pending, delta);
+                applyBuyFillSlice(book, order, pending, delta, execDay);
             } else {
-                applySellFillSlice(book, order, pending, delta);
+                applySellFillSlice(book, order, pending, delta, execDay);
             }
             if (pending.remainingVol <= 0 || order.getStatus() == OrderDTO.Status.FILLED) {
                 pendingFills.remove(id);
@@ -933,21 +934,23 @@ public class StrategyTask {
         }
     }
 
-    private void applyBuyFill(LiveBook book, OrderDTO order, PendingFill p) {
-        applyBuyFillSlice(book, order, p, p.remainingVol > 0 ? p.remainingVol : p.vol);
+    private void applyBuyFill(LiveBook book, OrderDTO order, PendingFill p, LocalDate executionDate) {
+        applyBuyFillSlice(book, order, p, p.remainingVol > 0 ? p.remainingVol : p.vol, executionDate);
     }
 
-    private void applyBuyFillSlice(LiveBook book, OrderDTO order, PendingFill p, int qty) {
+    private void applyBuyFillSlice(LiveBook book, OrderDTO order, PendingFill p, int qty,
+                                   LocalDate executionDate) {
         qty = Math.min(qty, p.remainingVol > 0 ? p.remainingVol : p.vol);
         if (qty < 100) {
             return;
         }
+        LocalDate exec = executionDate == null ? LocalDate.now() : executionDate;
         releaseBuyReserveQty(p, qty);
         BigDecimal sliceAmt = p.deal.multiply(BigDecimal.valueOf(qty));
         BigDecimal sliceFee = p.fee.multiply(BigDecimal.valueOf(qty))
                 .divide(BigDecimal.valueOf(p.vol), 2, RoundingMode.HALF_UP);
         simCash = simCash.subtract(sliceAmt).subtract(sliceFee);
-        book.pos.addBuy(qty, p.deal, sliceFee, p.tradeDay);
+        book.pos.addBuy(qty, p.deal, sliceFee, exec);
         book.pos.raiseStopByCost(p.atr, p.equity,
                 quantProperties.getAtrStopMultiplier(), quantProperties.getHardStopCapitalPct());
         if (p.pyramid && p.remainingVol == p.vol) {
@@ -956,20 +959,23 @@ public class StrategyTask {
             book.pyramidStage = Math.max(book.pyramidStage, 1);
         }
         p.remainingVol -= qty;
-        turnoverGuardService.recordTrade(p.tradeDay, sliceAmt);
-        persistBook(p.code, book, order, p.tradeDay, sliceFee);
-        log.info("策略买入: {} {}@{} x{} fee={}", p.code, order.getOrderId(), p.deal, qty, sliceFee);
+        turnoverGuardService.recordTrade(exec, sliceAmt);
+        persistBook(p.code, book, order, p.tradeDay, exec, sliceFee);
+        log.info("策略买入: {} {}@{} x{} fee={} signal={} exec={}",
+                p.code, order.getOrderId(), p.deal, qty, sliceFee, p.tradeDay, exec);
     }
 
-    private void applySellFill(LiveBook book, OrderDTO order, PendingFill p) {
-        applySellFillSlice(book, order, p, p.remainingVol > 0 ? p.remainingVol : p.vol);
+    private void applySellFill(LiveBook book, OrderDTO order, PendingFill p, LocalDate executionDate) {
+        applySellFillSlice(book, order, p, p.remainingVol > 0 ? p.remainingVol : p.vol, executionDate);
     }
 
-    private void applySellFillSlice(LiveBook book, OrderDTO order, PendingFill p, int qty) {
+    private void applySellFillSlice(LiveBook book, OrderDTO order, PendingFill p, int qty,
+                                    LocalDate executionDate) {
         qty = Math.min(qty, p.remainingVol > 0 ? p.remainingVol : p.vol);
         if (qty < 100) {
             return;
         }
+        LocalDate exec = executionDate == null ? LocalDate.now() : executionDate;
         releaseSellReserveQty(p, qty);
         BigDecimal sliceAmt = p.deal.multiply(BigDecimal.valueOf(qty));
         BigDecimal sliceFee = p.fee.multiply(BigDecimal.valueOf(qty))
@@ -988,8 +994,8 @@ public class StrategyTask {
             book.lastLimitDownFailDay = null;
             book.stoppedOutToday = true;
             boolean win = slicePnl.compareTo(BigDecimal.ZERO) > 0;
-            accountRiskState.onClosedRound(win, p.tradeDay);
-            signalDriftMonitor.onClosedRound(win, p.tradeDay);
+            accountRiskState.onClosedRound(win, exec);
+            signalDriftMonitor.onClosedRound(win, exec);
         } else {
             book.pos.removeShares(qty);
             book.pos.raiseStopByCost(p.atr != null && p.atr.compareTo(BigDecimal.ZERO) > 0
@@ -1003,19 +1009,20 @@ public class StrategyTask {
             }
         }
         p.remainingVol -= qty;
-        turnoverGuardService.recordTrade(p.tradeDay, sliceAmt);
-        persistBook(p.code, book, order, p.tradeDay, sliceFee);
-        log.info("策略卖出: {} {}@{} x{} fee={} pnl={}",
-                p.code, order.getOrderId(), p.deal, qty, sliceFee, slicePnl);
+        turnoverGuardService.recordTrade(exec, sliceAmt);
+        persistBook(p.code, book, order, p.tradeDay, exec, sliceFee);
+        log.info("策略卖出: {} {}@{} x{} fee={} pnl={} signal={} exec={}",
+                p.code, order.getOrderId(), p.deal, qty, sliceFee, slicePnl, p.tradeDay, exec);
     }
 
-    private void persistOrderOnly(OrderDTO order, LocalDate tradeDay, BigDecimal fee) {
+    private void persistOrderOnly(OrderDTO order, LocalDate signalDate, LocalDate executionDate,
+                                  BigDecimal fee) {
         LiveLedgerService ledger = liveLedgerProvider.getIfAvailable();
         if (ledger == null || order == null) {
             return;
         }
         try {
-            ledger.upsertOrder(order, tradeDay, fee);
+            ledger.upsertOrder(order, signalDate, executionDate, fee);
         } catch (Exception e) {
             log.warn("委托落库失败 order={}: {}", order.getOrderId(), e.getMessage());
         }
@@ -1141,7 +1148,7 @@ public class StrategyTask {
     }
 
     /**
-     * 当前持仓明细（优先策略账本成本/止损；数量以网关持仓为准）。
+     * 当前持仓明细：数量优先策略批次账本；网关仅作对照，分歧打标。
      */
     public List<Map<String, Object>> listLivePositionViews() {
         List<Map<String, Object>> list = new ArrayList<Map<String, Object>>();
@@ -1155,10 +1162,12 @@ public class StrategyTask {
             int gwVol = gateway == null || gateway.get(code) == null ? 0 : gateway.get(code);
             LiveBook book = books.get(code);
             int bookVol = book != null && book.pos != null ? book.pos.getShares() : 0;
-            int vol = Math.max(gwVol, bookVol);
+            // 批次为 T+1 真相源；无账本时回退网关
+            int vol = bookVol > 0 ? bookVol : gwVol;
             if (vol <= 0) {
                 continue;
             }
+            boolean desync = bookVol > 0 && gwVol > 0 && bookVol != gwVol;
             BigDecimal last = lastClose(code, null);
             BigDecimal avg = book != null && book.pos != null ? book.pos.getAvgCost() : BigDecimal.ZERO;
             BigDecimal stop = book != null && book.pos != null ? book.pos.getStopPrice() : BigDecimal.ZERO;
@@ -1175,6 +1184,7 @@ public class StrategyTask {
             row.put("volume", vol);
             row.put("gatewayVolume", gwVol);
             row.put("bookVolume", bookVol);
+            row.put("ledgerDesync", desync);
             row.put("avgCost", avg);
             row.put("lastPrice", last);
             row.put("marketValue", mv);

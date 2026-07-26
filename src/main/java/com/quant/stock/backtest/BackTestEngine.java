@@ -10,6 +10,7 @@ import com.quant.stock.risk.AccountRiskState;
 import com.quant.stock.risk.AtrRiskReport;
 import com.quant.stock.risk.ExitPriority;
 import com.quant.stock.risk.LimitBoardHelper;
+import com.quant.stock.risk.LimitDownForcePolicy;
 import com.quant.stock.risk.OpenFilterService;
 import com.quant.stock.risk.LimitPriceProtect;
 import com.quant.stock.risk.StopFillPrice;
@@ -50,7 +51,6 @@ import java.util.Map;
 public class BackTestEngine {
 
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final int LIMIT_DOWN_FORCE_DAYS = 3;
     /** 买单挂单最长等待日历日，超时取消 */
     private static final int PENDING_BUY_EXPIRE_DAYS = 5;
 
@@ -149,17 +149,17 @@ public class BackTestEngine {
 
             if (fillWindow && pendingSell && pos.hasPosition()
                     && isPendingEffective(pendingSellSignalDay, tradeDay)) {
-                boolean force = limitDownFailDays >= LIMIT_DOWN_FORCE_DAYS;
+                boolean force = LimitDownForcePolicy.forceSell(limitDownFailDays);
                 boolean limitDown = openFilterService.isLimitDownAt(closedBars, i);
-                if (limitDown && !force) {
+                if (LimitDownForcePolicy.deferForLimitDown(limitDown, limitDownFailDays)) {
                     if (lastLimitDownFailDay == null || !lastLimitDownFailDay.equals(tradeDay)) {
                         limitDownFailDays++;
                         lastLimitDownFailDay = tradeDay;
                         Map<String, Object> rd = new LinkedHashMap<String, Object>();
                         rd.put("跌停失败天数", limitDownFailDays);
-                        rd.put("阈值", LIMIT_DOWN_FORCE_DAYS);
+                        rd.put("阈值", LimitDownForcePolicy.FORCE_DAYS);
                         analysis.reject(stockCode, bar.getBarBegin(), "跌停未能卖出",
-                                "相对昨收判定跌停，本日挂单暂缓；连续" + LIMIT_DOWN_FORCE_DAYS + "日失败后强平", rd);
+                                "相对昨收判定跌停，本日挂单暂缓；连续" + LimitDownForcePolicy.FORCE_DAYS + "日失败后强平", rd);
                     }
                 } else {
                     int sellable = (pos.sellableShares(tradeDay) / 100) * 100;
@@ -190,7 +190,8 @@ public class BackTestEngine {
                             }
                             String sellWhy = pendingSellReason == null ? "挂单卖出" : pendingSellReason;
                             if (force && limitDown) {
-                                sellWhy = sellWhy + "（跌停连续失败达" + LIMIT_DOWN_FORCE_DAYS + "日，按跌停价×0.99强平）";
+                                sellWhy = sellWhy + "（跌停连续失败达" + LimitDownForcePolicy.FORCE_DAYS
+                                        + "日，按跌停价×0.99强平）";
                             }
                             if (!fullExit && vol < sellable) {
                                 sellWhy = sellWhy + "（ADV参与率硬顶部分卖出）";
@@ -384,11 +385,13 @@ public class BackTestEngine {
             // ---- Step3: 账户风控快照 ----
             accountRiskState.onEquity(tradeDay, equity);
             posScale = resolvePosScale(accountRiskState, equity, closedBars, i);
+            ExitPriority curExit = ExitPriority.fromReasonLabel(pendingSellReason);
             if (pos.hasPosition() && accountRiskState.isHalted()) {
-                if (ExitPriority.ACCOUNT_HALT.canRegisterPending(stoppedOutToday, pendingSell)) {
+                if (ExitPriority.ACCOUNT_HALT.canRegisterOrPreempt(stoppedOutToday, pendingSell, curExit)) {
                     pendingSell = true;
                     pendingSellReason = ExitPriority.ACCOUNT_HALT.getLabel();
                     pendingSellSignalDay = tradeDay;
+                    curExit = ExitPriority.ACCOUNT_HALT;
                     Map<String, Object> rd = new LinkedHashMap<String, Object>();
                     rd.put("权益", equity.setScale(2, RoundingMode.HALF_UP));
                     rd.put("仓位系数", posScale);
@@ -399,7 +402,7 @@ public class BackTestEngine {
 
             // ---- Step3b: 最大持仓日（时间止损）----
             if (pos.hasPosition() && props.getMaxHoldTradingDays() > 0
-                    && ExitPriority.TIME_STOP.canRegisterPending(stoppedOutToday, pendingSell)) {
+                    && ExitPriority.TIME_STOP.canRegisterOrPreempt(stoppedOutToday, pendingSell, curExit)) {
                 LocalDate openDay = pos.getEarliestOpenDate();
                 int held = tradingCalendar.tradingDaysAfter(openDay, tradeDay);
                 if (held >= props.getMaxHoldTradingDays()) {

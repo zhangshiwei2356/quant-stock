@@ -29,6 +29,18 @@ class ExitPriorityTest {
     }
 
     @Test
+    void haltAndTimeStopPreemptDeathCross() {
+        assertTrue(ExitPriority.ACCOUNT_HALT.canRegisterOrPreempt(
+                false, true, ExitPriority.DEATH_CROSS));
+        assertTrue(ExitPriority.TIME_STOP.canRegisterOrPreempt(
+                false, true, ExitPriority.DEATH_CROSS));
+        assertFalse(ExitPriority.TIME_STOP.canRegisterOrPreempt(
+                false, true, ExitPriority.ACCOUNT_HALT));
+        assertFalse(ExitPriority.DEATH_CROSS.canRegisterOrPreempt(
+                false, true, ExitPriority.ACCOUNT_HALT));
+    }
+
+    @Test
     void participationBypassOnlyRiskExits() {
         assertTrue(ExitPriority.STOP_LOSS.bypassParticipationCap());
         assertTrue(ExitPriority.ACCOUNT_HALT.bypassParticipationCap());

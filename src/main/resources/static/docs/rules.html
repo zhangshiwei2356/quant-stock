@@ -203,7 +203,8 @@
       <li><code>sdk</code> 同步仍为本地桩（不看真实柜台），但重启会重建未完结委托与预留</li>
     </ul>
   </li>
-  <li>已对齐：止损后 <code>stoppedOutToday</code>；部分止损 <code>raiseStopByCost</code>；挂买拒单保留意图；ATR 无效回退 <code>baseAtr</code>；定仓用可用现金（扣预留）</li>
+  <li>已对齐：止损后 <code>stoppedOutToday</code>；部分止损 <code>raiseStopByCost</code>；挂买拒单保留意图；ATR 无效回退 <code>baseAtr</code>；定仓用可用现金（扣预留）；
+      信号日/成交日分列落库；熔断/时间止损可抢占死叉挂卖（ADV bypass）；持仓数量以批次为准</li>
   <li><code>trade-mode=sim</code>：下单即时成交并记账；<code>sdk</code>：SUBMITTED 预留资金/可卖量，由 <code>sync-orders</code> 推进 FILLED 后再落账；
       可 <code>POST /api/account/orders/{id}/cancel</code> 撤单、<code>partial-fill</code> 部成或 <code>replace</code> 改价撤补</li>
   <li>本地模拟持仓/现金在成交后落库：<code>trade_positions</code> / <code>trade_position_lots</code>、<code>system_config(sim.cash)</code>；

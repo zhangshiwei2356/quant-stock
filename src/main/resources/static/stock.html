@@ -547,6 +547,7 @@
         <p class="hint" id="healthHint">检查全市场日线/分钟覆盖与滞后（与 data-validate 同口径）。</p>
         <div class="toolbar" style="margin-top:8px;">
           <button type="button" id="btnHealthRefresh" class="secondary">刷新检查</button>
+          <button type="button" id="btnReconcileRun" class="secondary">跑对账闸</button>
           <span class="field-hint" id="healthMeta"></span>
         </div>
         <div class="result-board" id="healthBoard" style="margin-top:12px;">
@@ -557,7 +558,14 @@
               <div class="result-kv"><span class="label">正常</span><span class="value" id="healthOk">—</span></div>
               <div class="result-kv"><span class="label">告警</span><span class="value" id="healthWarn">—</span></div>
             </div>
+            <div class="result-group">
+              <div class="result-group-title">多源对账闸</div>
+              <div class="result-kv"><span class="label">阻断新开</span><span class="value" id="reconcileBlock">—</span></div>
+              <div class="result-kv"><span class="label">分歧标的</span><span class="value" id="reconcileDiverge">—</span></div>
+              <div class="result-kv"><span class="label">上次运行</span><span class="value mono" id="reconcileAt">—</span></div>
+            </div>
           </div>
+          <p class="hint" id="reconcileHint" style="margin-top:8px;">日线 vs 分钟聚合对账；外部 vendor 仍不可用。</p>
         </div>
         <div class="table-wrap" style="margin-top:12px;max-height:none;">
           <table class="tp-table">
@@ -780,7 +788,7 @@
     <div id="viewAcctOrders" class="workspace-view" hidden>
       <section class="panel">
         <h3>委托记录 <span id="acctOrderBadge" class="trade-pool-count">0</span></h3>
-        <p class="hint">优先读库 trade_orders（重启可恢复）；库空时回退内存网关。</p>
+        <p class="hint">优先读库 trade_orders（重启可恢复）；库空时回退内存网关。sdk 未完结单可撤单 / 部成 / 改价撤补（本地桩）。</p>
         <div class="toolbar" style="margin-top:8px;">
           <button type="button" id="btnAcctRefreshOrders" class="secondary">刷新</button>
           <span class="field-hint" id="acctOrderHint"></span>
@@ -790,11 +798,11 @@
             <thead>
             <tr>
               <th>订单号</th><th>代码</th><th>方向</th><th>类型</th><th>价格</th><th>数量</th><th>成交</th>
-              <th>金额</th><th>费用</th><th>状态</th><th>信号日</th><th>成交日</th><th>来源</th>
+              <th>金额</th><th>费用</th><th>状态</th><th>信号日</th><th>成交日</th><th>来源</th><th>操作</th>
             </tr>
             </thead>
             <tbody id="acctOrderBody">
-            <tr><td colspan="13" class="empty-state">暂无委托</td></tr>
+            <tr><td colspan="14" class="empty-state">暂无委托</td></tr>
             </tbody>
           </table>
         </div>
@@ -884,6 +892,7 @@
               <div class="result-kv"><span class="label">限价保护</span><span class="value" id="acctDashProtect">—</span></div>
               <div class="result-kv"><span class="label">执行降频</span><span class="value" id="acctDashExec">—</span></div>
               <div class="result-kv"><span class="label">空头策略</span><span class="value" id="acctDashShort">—</span></div>
+              <div class="result-kv"><span class="label">持仓相关</span><span class="value" id="acctDashCorr">—</span></div>
             </div>
           </div>
         </div>

@@ -281,12 +281,12 @@ INSERT IGNORE INTO `sys_schedule_job`
 (`job_code`, `job_name`, `trigger_type`, `cron_expr`, `interval_ms`, `enabled`, `implemented`, `remark`) VALUES
 ('market-collect', '行情采集', 'FIXED_RATE', NULL, 30000, 0, 0, '未实现：待接入真实行情 API（本地仅有骨架）'),
 ('scan-and-trade', '实盘分钟扫描交易', 'CRON', '0 */1 9-11,13-15 * * MON-FRI', NULL, 0, 1, '仅扫描唯一目标池（trade_pool status=1）'),
-('sync-orders', '订单状态同步', 'FIXED_RATE', NULL, 10000, 0, 0, '未实现：待接入券商委托查询 API（当前仅本地桩）'),
-('position-pnl-sync', '持仓盈亏同步', 'CRON', '0 */1 9-15 * * MON-FRI', NULL, 0, 0, '未实现：待接入券商持仓/成本 API（本地仅有骨架）'),
-('settle-after-close', '收盘清算与K线聚合', 'CRON', '0 30 15 * * MON-FRI', NULL, 0, 0, '未实现：待接入真实行情 API（账户清算本地可用，拉取/聚合依赖行情源）'),
+('sync-orders', '订单状态同步', 'FIXED_RATE', NULL, 10000, 0, 1, '本地桩：SUBMITTED→FILLED 并改仓/回写；真券商对账待 API'),
+('position-pnl-sync', '持仓盈亏同步', 'CRON', '0 */1 9-15 * * MON-FRI', NULL, 0, 1, '本地成本+市值浮盈已可用；券商持仓对账待 API'),
+('settle-after-close', '收盘清算与K线聚合', 'CRON', '0 30 15 * * MON-FRI', NULL, 0, 1, '本地权益日结 + K 线聚合；真实行情增量仍依赖 market-collect/外部 API'),
 ('pool-rebuild', '全市场入池扫描', 'CRON', '0 10 15 * * MON-FRI', NULL, 0, 1, '全市场扫描覆盖唯一目标池；与 after-market-batch-scan 启用其一即可'),
 ('after-market-batch-scan', '盘后入池扫描', 'CRON', '0 0 16 * * MON-FRI', NULL, 0, 1, '工作日 16:00 覆盖唯一目标池；与 pool-rebuild 启用其一即可'),
-('data-validate', '数据校验', 'CRON', '0 0 17 * * MON-FRI', NULL, 0, 0, '未实现：待接入外部行情对账 API（本地仅有骨架）');
+('data-validate', '数据校验', 'CRON', '0 0 17 * * MON-FRI', NULL, 0, 1, '本地空表/滞后检查已可用；与外部行情抽样对账待 API');
 
 -- ---------- ST 日切 / 行业 reclass（P0-101 / P0-121；启动亦可 ensure） ----------
 CREATE TABLE IF NOT EXISTS `st_status_hist` (
