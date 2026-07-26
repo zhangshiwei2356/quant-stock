@@ -30,6 +30,7 @@ import com.quant.stock.risk.IcDecayMonitor;
 import com.quant.stock.strategy.IndicatorSignalUtil;
 import com.quant.stock.strategy.MaCrossStrategy;
 import com.quant.stock.trade.CapacityThrottle;
+import com.quant.stock.trade.FillVolumeScale;
 import com.quant.stock.trade.LiveLedgerService;
 import com.quant.stock.trade.ParticipationCap;
 import com.quant.stock.trade.SimCashRestore;
@@ -532,7 +533,8 @@ public class StrategyTask {
         // 先卖后买，避免同日新买批次被立刻卖掉（T+1）
         if (book.pendingSell && book.pos.hasPosition() && book.pendingSellSignalDay != null
                 && tradeDay.isAfter(book.pendingSellSignalDay)
-                && FillTimingHelper.canFillPendingOnBar(bars, i)) {
+                && FillTimingHelper.canFillPendingOnBar(bars, i)
+                && !openFilterService.isSuspended(bars.get(i))) {
             int sellable = (book.pos.sellableShares(tradeDay) / 100) * 100;
             if (sellable < 100) {
                 // 无可卖旧仓，挂单保留至次日
@@ -555,7 +557,7 @@ public class StrategyTask {
                         if (limitDown) {
                             BigDecimal prev = openFilterService.prevTradingDayClose(bars, i);
                             BigDecimal force = LimitBoardHelper.limitDownPrice(prev, code,
-                                    openFilterService.isSt(code));
+                                    openFilterService.isSt(code, tradeDay));
                             if (force == null) {
                                 force = open;
                             }
@@ -582,7 +584,8 @@ public class StrategyTask {
 
     private void fillPendingSameBar(String code, LiveBook book, List<BarDTO> bars, int i,
                                     LocalDate tradeDay, BigDecimal close) {
-        if (book.pendingSell && book.pos.hasPosition()) {
+        if (book.pendingSell && book.pos.hasPosition()
+                && !openFilterService.isSuspended(bars.get(i))) {
             int sellable = (book.pos.sellableShares(tradeDay) / 100) * 100;
             if (sellable >= 100) {
                 int vol = sellable;
@@ -604,10 +607,24 @@ public class StrategyTask {
 
     private void executeLiveBuy(String code, LiveBook book, List<BarDTO> bars, int i,
                                 BigDecimal base, LocalDate tradeDay) {
-        int vol = book.pendingBuyVol == null ? 0 : book.pendingBuyVol;
+        int rawVol = book.pendingBuyVol == null ? 0 : book.pendingBuyVol;
         boolean pyramid = book.pendingBuyPyramid;
         LocalDate signalDay = book.pendingBuySignalDay;
+        if (rawVol < 100) {
+            book.pendingBuyVol = null;
+            book.pendingBuyPyramid = false;
+            book.pendingBuySignalDay = null;
+            return;
+        }
+        BigDecimal equity = markEquity(bars.get(i).getClose());
+        BigDecimal posScale = accountRiskState.positionScale(equity)
+                .multiply(stressScenarioService.positionScaleMultiplier())
+                .multiply(structuralBreakMonitor.positionScaleMultiplier())
+                .multiply(turnoverGuardService.positionScaleMultiplier(tradeDay, equity))
+                .multiply(icDecayMonitor.positionScaleMultiplier());
+        int vol = FillVolumeScale.scaleToLot(rawVol, posScale);
         if (vol < 100) {
+            // 仓位系数缩放后不足1手：取消挂单（对齐单股）
             book.pendingBuyVol = null;
             book.pendingBuyPyramid = false;
             book.pendingBuySignalDay = null;
@@ -616,11 +633,10 @@ public class StrategyTask {
         BigDecimal deal = tradeCostModel.buyPrice(base, bars, i, vol);
         if (quantProperties.isLimitPriceProtectEnabled()) {
             deal = LimitPriceProtect.clampBuy(deal, openFilterService.prevTradingDayClose(bars, i),
-                    code, openFilterService.isSt(code));
+                    code, openFilterService.isSt(code, tradeDay));
         }
         BigDecimal amount = deal.multiply(BigDecimal.valueOf(vol));
         BigDecimal fee = tradeCostModel.buyFee(amount);
-        BigDecimal equity = markEquity(bars.get(i).getClose());
         BigDecimal posMv = calcPositionMv();
         BigDecimal freeCash = availableCash();
         Map<String, Integer> gatewayPos = tradeGatewayService.queryPositions();
@@ -668,7 +684,7 @@ public class StrategyTask {
         BigDecimal deal = tradeCostModel.sellPrice(base, bars, i, vol);
         if (quantProperties.isLimitPriceProtectEnabled()) {
             deal = LimitPriceProtect.clampSell(deal, openFilterService.prevTradingDayClose(bars, i),
-                    code, openFilterService.isSt(code));
+                    code, openFilterService.isSt(code, tradeDay));
         }
         BigDecimal amount = deal.multiply(BigDecimal.valueOf(vol));
         BigDecimal fee = tradeCostModel.sellFee(amount, null, tradeDay);
@@ -688,10 +704,13 @@ public class StrategyTask {
         }
     }
 
-    public void syncOrders() {
+    /**
+     * @return false 表示锁忙未执行
+     */
+    public boolean syncOrders() {
         if (!redisLockUtil.tryLock("strategy-scan", 60)) {
             log.warn("sync-orders 锁忙，跳过本轮");
-            return;
+            return false;
         }
         try {
             List<OrderDTO> filled = tradeGatewayService.syncOrderStatus();
@@ -716,6 +735,7 @@ public class StrategyTask {
                 }
             }
             persistRuntimeState();
+            return true;
         } finally {
             redisLockUtil.unlock("strategy-scan");
         }
@@ -1033,11 +1053,13 @@ public class StrategyTask {
      * 更大周期由查询时内存聚合，不再写 legacy stock_bar_*。
      * <p>
      * TODO(api): 真实行情拉取（与 market-collect 同源）；当前 fetch 为 db/mock 回退。
+     *
+     * @return false 表示锁忙未执行
      */
-    public void settleAfterClose() {
+    public boolean settleAfterClose() {
         if (!redisLockUtil.tryLock("strategy-scan", 120)) {
             log.warn("settle-after-close 锁忙，跳过本轮");
-            return;
+            return false;
         }
         try {
             LocalDate tradeDay = tradingCalendar.lastTradingDayOnOrBefore(LocalDate.now());
@@ -1067,7 +1089,7 @@ public class StrategyTask {
                     tradeDay, simCash, closeEquity, tradeGatewayService.queryPositions());
             if (coreMarketBarService == null) {
                 log.info("未启用核心行情表(quant.db-enabled=false)，跳过分钟/日线落库");
-                return;
+                return true;
             }
             // TODO(api): 接入真实行情后再做可靠增量拉取
             for (String code : resolveSettleCodes()) {
@@ -1079,6 +1101,7 @@ public class StrategyTask {
                 }
             }
             log.info("收盘清算/日线聚合完成 tradeDay={}", tradeDay);
+            return true;
         } finally {
             redisLockUtil.unlock("strategy-scan");
         }

@@ -72,13 +72,25 @@ class RiskControlServiceBarClockTest {
         assertFalse(risk.checkSell("600036", 100, pos, bars, 1));
     }
 
+    @Test
+    void checkSellRejectsSuspendedBar() {
+        List<BarDTO> bars = new ArrayList<BarDTO>();
+        bars.add(bar(LocalDateTime.of(2026, 3, 10, 10, 0), "10.00", "0"));
+        Map<String, Integer> pos = Collections.singletonMap("600036", 100);
+        assertFalse(risk.checkSell("600036", 100, pos, bars, 0));
+    }
+
     private static BarDTO bar(LocalDateTime t, String close) {
+        return bar(t, close, "100000");
+    }
+
+    private static BarDTO bar(LocalDateTime t, String close, String volume) {
         BigDecimal c = new BigDecimal(close);
         return BarDTO.builder()
                 .code("600036")
                 .barBegin(t)
                 .open(c).high(c).low(c).close(c)
-                .volume(new BigDecimal("100000"))
+                .volume(new BigDecimal(volume))
                 .build();
     }
 }

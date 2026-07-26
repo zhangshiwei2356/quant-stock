@@ -86,8 +86,8 @@
       <code>GET /api/account/execution-cap</code></li>
   <li><b>多源/行业外部源（P0-107/121）</b>：本地日线↔分钟聚合 / 行业日志已具备；
       <code>externalVendorSource</code> / <code>externalIndustrySource</code>=<code>UNAVAILABLE</code></li>
-  <li><b>组合↔单股对齐</b>：组合回测已挂部成残量、AUM+POV、ADV断崖/结构突变×0.5、ST as-of 限价、
-      结果 <code>atrRisk</code>；实盘另有换手/IC衰减（纸面对账 <code>ENGINE_PATH</code> 维度说明）</li>
+  <li><b>组合↔单股对齐</b>：组合回测已挂部成残量、成交时仓位系数缩量、停牌拒卖、AUM+POV、ADV断崖/结构突变×0.5、
+      ST as-of 限价/跌停强平、结果 <code>atrRisk</code>；实盘另有换手/IC衰减（纸面对账 <code>ENGINE_PATH</code>）</li>
   <li><b>退役双人复核（P0-92）</b>：<code>force=true</code> 先武装 <code>forceConfirmToken</code>，
       第二人带 <code>confirmCode</code> 再恢复；冷却满可直接 resume</li>
   <li><b>风控日报（页面）</b>：账户 →「风控日报」聚合 <code>/api/account/alerts|turnover|ic-decay|signal-drift|…</code> 只读状态</li>
@@ -123,7 +123,7 @@
     主板 ±10% / 创科 ±20%；
     <b>软阈值</b>：收盘触及昨收×(1±限幅×<b>0.95</b>) 即判；
     或 OHLC 均贴齐限价 ±0.01（封板）</li>
-  <li>停牌量≤0 → 禁止开仓；持仓复牌无「首日必卖」专项规则</li>
+  <li>停牌量≤0 → 禁止开仓；挂卖/止损亦拒成（挂单保留至复牌）；持仓复牌无「首日必卖」专项规则</li>
   <li>低流动性：近20均量 &lt; <code>min-avg-volume20</code>（演示默认 <b>1000</b>）→ 不开</li>
   <li><b>模拟流通市值</b> = 现价 × 流通股本(亿股)；未配置时启发式股本：
     代码 <code>6*</code>→120、<code>3*</code>→80、<code>688*</code>→40、其它→100；
@@ -140,8 +140,9 @@
   <li>开仓过滤未过：涨跌停（含 0.95 软阈值）、停牌、流动性、市值、收盘静默等——此时<strong>挂单仍在</strong>，可稍后重试</li>
   <li>加仓时涨停或停牌（单股）；组合/实盘加仓另见差异节</li>
   <li>现金不足，或买入后突破总仓 80% → <strong>取消</strong>挂单</li>
-  <li>仓位系数缩放后不足 1 手（100股）→ 取消挂单（单股）</li>
-  <li>卖出遇跌停：累计失败，满 3 个交易日后强平</li>
+  <li>仓位系数缩放后不足 1 手（100股）→ 取消挂单（单股/组合/实盘一致）</li>
+  <li>卖出遇跌停：累计失败，满 3 个交易日后按<strong>ST as-of 跌停价</strong>×0.99 强平</li>
+  <li>卖出遇停牌（量≤0）→ 本日不成交，挂卖保留</li>
   <li>买单超过信号日+5 日历日 → 过期取消</li>
 </ul>
 
@@ -167,9 +168,9 @@
   <li><b>与单股差异</b>：
     <ul>
       <li>加仓成交也走完整 <code>canExecuteOpenFill</code>（流动性/市值/静默等），不只拦涨停/停牌</li>
-      <li>成交时<strong>不再</strong>按仓位系数二次缩量（与单股不同）；挂买成交时再查熔断/<code>allowNewOpen</code></li>
+      <li>成交股数 = 挂单股 × <b>当前仓位系数</b> 后再取整手（与单股一致）；挂买成交时再查熔断/<code>allowNewOpen</code></li>
       <li>ATR 无效回退 <code>baseAtr</code>（与单股一致）；部分止损后 <code>raiseStopByCost</code>（组合权益）</li>
-      <li>跌停强平：连续失败 ≥3 日后强制卖出（与单股/实盘一致，避免卡死）</li>
+      <li>跌停强平：连续失败 ≥3 日后按 ST as-of 跌停价×0.99 强制卖出（与单股/实盘一致）</li>
     </ul>
   </li>
   <li>熔断时：对<strong>所有仍有持仓的成分股</strong>挂清仓</li>
@@ -204,7 +205,9 @@
     </ul>
   </li>
   <li>已对齐：止损后 <code>stoppedOutToday</code>；部分止损 <code>raiseStopByCost</code>；挂买拒单保留意图；ATR 无效回退 <code>baseAtr</code>；定仓用可用现金（扣预留）；
-      信号日/成交日分列落库；熔断/时间止损可抢占死叉挂卖（ADV bypass）；持仓数量以批次为准</li>
+      信号日/成交日分列落库；熔断/时间止损可抢占死叉挂卖（ADV bypass）；持仓数量以批次为准；
+      成交时按仓位系数缩量；停牌拒卖；ST as-of 跌停强平价；
+      运维「执行一次」对 <code>scan-and-trade</code>/<code>sync-orders</code>/<code>settle-after-close</code> 锁忙均 failLoud</li>
   <li><code>trade-mode=sim</code>：下单即时成交并记账；<code>sdk</code>：SUBMITTED 预留资金/可卖量，由 <code>sync-orders</code> 推进 FILLED 后再落账；
       可 <code>POST /api/account/orders/{id}/cancel</code> 撤单、<code>partial-fill</code> 部成或 <code>replace</code> 改价撤补</li>
   <li>本地模拟持仓/现金在成交后落库：<code>trade_positions</code> / <code>trade_position_lots</code>、<code>system_config(sim.cash)</code>；
@@ -240,7 +243,8 @@
   </thead>
   <tbody>
     <tr><td>加仓成交过滤</td><td>仅涨停/停牌</td><td>完整开仓过滤</td><td>完整开仓过滤</td></tr>
-    <tr><td>成交按仓位系数缩量</td><td>是</td><td>否</td><td>挂单时已含系数</td></tr>
+    <tr><td>成交按仓位系数缩量</td><td>是</td><td>是</td><td>是</td></tr>
+    <tr><td>停牌拒卖</td><td>是</td><td>是</td><td>是（checkSell）</td></tr>
     <tr><td>ATR NaN</td><td>→ baseAtr</td><td>→ baseAtr</td><td>→ baseAtr</td></tr>
     <tr><td>stoppedOutToday</td><td>有</td><td>有</td><td>有</td></tr>
     <tr><td>部分止损后重算止损</td><td>有</td><td>有</td><td>有</td></tr>

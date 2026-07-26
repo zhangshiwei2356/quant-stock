@@ -20,6 +20,7 @@ import com.quant.stock.strategy.MaCrossStrategy;
 import com.quant.stock.risk.StressScenarioService;
 import com.quant.stock.risk.StructuralBreakMonitor;
 import com.quant.stock.trade.CapacityThrottle;
+import com.quant.stock.trade.FillVolumeScale;
 import com.quant.stock.trade.PartialFillSim;
 import com.quant.stock.trade.ParticipationCap;
 import com.quant.stock.trade.TradeCostModel;
@@ -149,6 +150,12 @@ public class BackTestEngine {
 
             if (fillWindow && pendingSell && pos.hasPosition()
                     && isPendingEffective(pendingSellSignalDay, tradeDay)) {
+                if (openFilterService.isSuspended(bar)) {
+                    Map<String, Object> rd = new LinkedHashMap<String, Object>();
+                    rd.put("成交量", bar.getVolume());
+                    analysis.reject(stockCode, bar.getBarBegin(), "卖单暂缓",
+                            "停牌或成交量≤0，挂卖保留至复牌", rd);
+                } else {
                 boolean force = LimitDownForcePolicy.forceSell(limitDownFailDays);
                 boolean limitDown = openFilterService.isLimitDownAt(closedBars, i);
                 if (LimitDownForcePolicy.deferForLimitDown(limitDown, limitDownFailDays)) {
@@ -221,6 +228,7 @@ public class BackTestEngine {
                         }
                     }
                 }
+                }
             }
 
             if (fillWindow && pendingBuyVol != null && pendingBuyVol >= 100
@@ -254,10 +262,8 @@ public class BackTestEngine {
                 }
                 if (allow) {
                     int rawVol = vol;
-                    vol = BigDecimal.valueOf(vol).multiply(posScale).intValue();
-                    vol = (vol / 100) * 100;
-                    int requestVol = vol;
-                    vol = PartialFillSim.fillVolume(vol, props.getBacktestFillRatio());
+                    int requestVol = FillVolumeScale.scaleToLot(rawVol, posScale);
+                    vol = PartialFillSim.fillVolume(requestVol, props.getBacktestFillRatio());
                     if (vol >= 100) {
                         BigDecimal deal = protectBuyDeal(stockCode, tradeCostModel.buyPrice(open, closedBars, i, vol),
                                 closedBars, i);
@@ -333,7 +339,8 @@ public class BackTestEngine {
             posScale = resolvePosScale(accountRiskState, equity, closedBars, i);
 
             // ---- Step2: 仅老仓止损（分档 T+1） ----
-            if (pos.hasPosition() && props.isStopLossEnabled() && pos.canSellStops(tradeDay)) {
+            if (pos.hasPosition() && props.isStopLossEnabled() && pos.canSellStops(tradeDay)
+                    && !openFilterService.isSuspended(bar)) {
                 pos.updateHighest(high);
                 int sellable = (pos.sellableShares(tradeDay) / 100) * 100;
                 StopFillPrice.Result stopFill = StopFillPrice.resolve(open, low, pos.getStopPrice());
@@ -685,7 +692,10 @@ public class BackTestEngine {
 
     private BigDecimal approxLimitDownPrice(BigDecimal prevClose, BarDTO cur) {
         String code = cur != null ? cur.getCode() : null;
-        BigDecimal lim = LimitBoardHelper.limitDownPrice(prevClose, code);
+        LocalDate asOf = cur != null && cur.getBarBegin() != null
+                ? cur.getBarBegin().toLocalDate() : null;
+        boolean st = code != null && asOf != null && openFilterService.isSt(code, asOf);
+        BigDecimal lim = LimitBoardHelper.limitDownPrice(prevClose, code, st);
         if (lim != null) {
             return lim;
         }

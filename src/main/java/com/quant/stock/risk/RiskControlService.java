@@ -114,6 +114,10 @@ public class RiskControlService {
         if (!isTradingTime(clock)) {
             return false;
         }
+        if (bars != null && index >= 0 && index < bars.size()
+                && openFilterService.isSuspended(bars.get(index))) {
+            return false;
+        }
         int held = positions == null ? 0 : positions.getOrDefault(stockCode, 0);
         return held >= volume;
     }

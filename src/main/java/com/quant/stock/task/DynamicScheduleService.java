@@ -267,10 +267,22 @@ public class DynamicScheduleService implements ApplicationRunner {
                     }
                     break;
                 case "sync-orders":
-                    strategyTask.syncOrders();
+                    if (!strategyTask.syncOrders()) {
+                        if (failLoud) {
+                            throw new IllegalStateException("sync-orders 锁忙，未执行");
+                        }
+                        log.warn("sync-orders 锁忙，定时触发跳过");
+                        return;
+                    }
                     break;
                 case "settle-after-close":
-                    strategyTask.settleAfterClose();
+                    if (!strategyTask.settleAfterClose()) {
+                        if (failLoud) {
+                            throw new IllegalStateException("settle-after-close 锁忙，未执行");
+                        }
+                        log.warn("settle-after-close 锁忙，定时触发跳过");
+                        return;
+                    }
                     break;
                 case "after-market-batch-scan":
                     strategyTask.afterMarketBatchScan();

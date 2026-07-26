@@ -24,6 +24,7 @@ import com.quant.stock.risk.StructuralBreakMonitor;
 import com.quant.stock.strategy.IndicatorSignalUtil;
 import com.quant.stock.strategy.MaCrossStrategy;
 import com.quant.stock.trade.CapacityThrottle;
+import com.quant.stock.trade.FillVolumeScale;
 import com.quant.stock.trade.PartialFillSim;
 import com.quant.stock.trade.ParticipationCap;
 import com.quant.stock.trade.TradeCostModel;
@@ -148,7 +149,8 @@ public class PortfolioBackTestEngine {
 
                 if (book.pendingSell && book.pos.hasPosition() && book.pendingSellSignalDay != null
                         && tradeDay.isAfter(book.pendingSellSignalDay)
-                        && FillTimingHelper.canFillPendingOnBar(bars, idx)) {
+                        && FillTimingHelper.canFillPendingOnBar(bars, idx)
+                        && !openFilterService.isSuspended(bar)) {
                     int sellable = (book.pos.sellableShares(tradeDay) / 100) * 100;
                     if (sellable >= 100) {
                         int vol = sellable;
@@ -171,7 +173,8 @@ public class PortfolioBackTestEngine {
                             BigDecimal fillBase = open;
                             if (limitDown) {
                                 BigDecimal prev = openFilterService.prevTradingDayClose(bars, idx);
-                                BigDecimal forcePx = LimitBoardHelper.limitDownPrice(prev, code);
+                                boolean st = openFilterService.isSt(code, tradeDay);
+                                BigDecimal forcePx = LimitBoardHelper.limitDownPrice(prev, code, st);
                                 if (forcePx == null) {
                                     forcePx = open;
                                 }
@@ -211,6 +214,9 @@ public class PortfolioBackTestEngine {
                         continue;
                     }
                     book.pos.updateHighest(bar.getHigh());
+                    if (openFilterService.isSuspended(bar)) {
+                        continue;
+                    }
                     int sellable = (book.pos.sellableShares(tradeDay) / 100) * 100;
                     StopFillPrice.Result stopFill = StopFillPrice.resolve(
                             bar.getOpen(), bar.getLow(), book.pos.getStopPrice());
@@ -428,13 +434,20 @@ public class PortfolioBackTestEngine {
                              BigDecimal cash, BigDecimal base, BigDecimal commissionRate,
                              List<BackTradeRecord> trades, LocalDate tradeDay, AccountRiskState risk,
                              BigDecimal portfolioEquity) {
-        int requestVol = book.pendingBuyVol == null ? 0 : book.pendingBuyVol;
+        int rawVol = book.pendingBuyVol == null ? 0 : book.pendingBuyVol;
         boolean pyramid = book.pendingBuyPyramid;
         LocalDate signalDay = book.pendingBuySignalDay;
         book.pendingBuyVol = null;
         book.pendingBuyPyramid = false;
         book.pendingBuySignalDay = null;
-        requestVol = (requestVol / 100) * 100;
+        BigDecimal equityForScale = portfolioEquity != null ? portfolioEquity
+                : cash.add(calcPosMvOne(book, bars.get(idx).getClose()));
+        BigDecimal posScale = resolvePosScale(risk, equityForScale, bars, idx);
+        int requestVol = FillVolumeScale.scaleToLot(rawVol, posScale);
+        if (requestVol < 100) {
+            // 仓位系数缩放后不足1手：取消挂单（对齐单股）
+            return cash;
+        }
         int vol = PartialFillSim.fillVolume(requestVol, props.getBacktestFillRatio());
         if (vol < 100) {
             int rem0 = PartialFillSim.remainder(requestVol, 0);

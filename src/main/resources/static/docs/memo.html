@@ -32,6 +32,7 @@
   <ol>
     <li><b>模拟账本持久化</b> — 已落地 · 成交写 <code>trade_orders</code>；持仓/批次写 <code>trade_positions</code>、<code>trade_position_lots</code>；现金写 <code>system_config(sim.cash)</code>（含 0）；另持久化风控/退役/挂单元数据；未完结委托重启重建预留；启动恢复</li>
     <li><b>本地路径正确性对齐</b> — 已落地 · 止损后禁同日死叉；部分止损抬止损；组合跌停强平不卡死；熔断禁挂买成交；挂买拒单保留；ATR→baseAtr；账本锁覆盖 scan/sync/cancel</li>
+    <li><b>成交缩量/停牌拒卖/锁忙</b> — 已落地 · 组合/实盘成交时按仓位系数缩量（同单股）；停牌量≤0 拒卖；ST as-of 跌停强平价；<code>sync-orders</code>/<code>settle-after-close</code> 手动执行锁忙 failLoud</li>
     <li><b>账本/退出/运维补强</b> — 已落地 · 信号日≠成交日落库；熔断/时间止损可抢占死叉挂单；持仓以批次为准；委托撤/部成/改价与对账闸挂 UI；schema 任务 implemented 与运行时对齐；Redis 锁 token</li>
     <li><b>收盘权益日表</b> — 已落地 · <code>settle-after-close</code> 写 <code>trade_cashflows</code>；账户概览 →「权益日结」可查看</li>
     <li><b>风控日志</b> — 已落地 · 峰值回撤熔断写入 <code>risk_control_log</code>；账户概览 →「风控事件」</li>
@@ -70,13 +71,13 @@
     <li><b>限价/执行边界声明</b> — 已落地 · <code>/api/account/order-protect</code>（无五档/L2）；
         <code>/api/account/execution-cap</code>（无 TWAP）；组合回测已对齐 AUM+POV</li>
     <li><b>对账/行业外部源声明</b> — 已落地 · vendor/申万中信=<code>UNAVAILABLE</code>；本地闸与日志仍可用</li>
-    <li><b>组合↔单股路径对齐</b> — 已落地 · 部成/压力降仓/ST as-of/<code>atrRisk</code>；纸面对账含 <code>ENGINE_PATH</code></li>
+    <li><b>组合↔单股路径对齐</b> — 已落地 · 部成/压力降仓/成交缩量/停牌拒卖/ST as-of 强平/<code>atrRisk</code>；纸面对账含 <code>ENGINE_PATH</code></li>
     <li><b>退役强制恢复双人复核</b> — 已落地 · 武装令牌 + <code>confirmCode</code>；冷却满仍可直接 resume</li>
     <li><b>账户风控日报页</b> — 已落地 · 聚合 alerts/换手/IC/漂移/突变/压力/部成/残差/边界 API</li>
     <li><b>组合回测冒烟单测</b> — 已落地 · 合成双标的；断言指纹与 <code>atrRisk</code></li>
     <li><b>文档 PDF</b> — 已落地 · 量化知识 / 应用说明介绍页一键导出（服务端 iText，<code>GET /api/docs/pdf/{stock|app}</code>）</li>
     <li><b>项目 README 在线查看</b> — 已落地 · 应用说明 →「项目 README」；<code>GET /api/docs/readme</code> 实时渲染仓库根目录 Markdown（含 Mermaid 架构图）</li>
-    <li><b>本地可调度任务</b> — 已落地 · <code>scan-and-trade</code>、<code>pool-rebuild</code>、<code>after-market-batch-scan</code>、<code>settle-after-close</code>、<code>data-validate</code>、<code>sync-orders</code>、<code>position-pnl-sync</code>；入池粗筛可读 <code>factor_daily</code>；运维「执行一次」可手动触发；失败会返回错误而非假成功</li>
+    <li><b>本地可调度任务</b> — 已落地 · <code>scan-and-trade</code>、<code>pool-rebuild</code>、<code>after-market-batch-scan</code>、<code>settle-after-close</code>、<code>data-validate</code>、<code>sync-orders</code>、<code>position-pnl-sync</code>；入池粗筛可读 <code>factor_daily</code>；运维「执行一次」可手动触发；scan/sync/settle 锁忙与业务失败均返回错误而非假成功</li>
     <li><b>宽睿资料梳理</b> — 已落地（文档）· 「应用说明 → 宽睿文档梳理」；API 代码未接入</li>
   </ol>
 </details>
