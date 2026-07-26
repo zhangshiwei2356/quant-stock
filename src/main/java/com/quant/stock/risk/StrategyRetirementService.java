@@ -163,6 +163,39 @@ public class StrategyRetirementService {
         clearForceArm();
     }
 
+    /** 落库快照（不含强制恢复令牌）。 */
+    public synchronized Map<String, String> exportState() {
+        Map<String, String> m = new LinkedHashMap<String, String>();
+        m.put("retired", String.valueOf(retired));
+        m.put("retiredOn", retiredOn == null ? "" : retiredOn.toString());
+        m.put("reason", reason == null ? "" : reason);
+        m.put("note", note == null ? "" : note);
+        return m;
+    }
+
+    /** 启动恢复退役状态。 */
+    public synchronized void importState(Map<String, String> m) {
+        if (m == null || m.isEmpty()) {
+            return;
+        }
+        retired = "true".equalsIgnoreCase(String.valueOf(m.get("retired")));
+        String on = m.get("retiredOn");
+        if (on == null || on.trim().isEmpty()) {
+            retiredOn = null;
+        } else {
+            try {
+                retiredOn = LocalDate.parse(on.trim());
+            } catch (Exception e) {
+                retiredOn = null;
+            }
+        }
+        String r = m.get("reason");
+        reason = r == null || r.trim().isEmpty() ? null : r.trim();
+        String n = m.get("note");
+        note = n == null || n.trim().isEmpty() ? null : n.trim();
+        clearForceArm();
+    }
+
     private boolean forceTokenFresh() {
         if (!StringUtils.hasText(pendingForceToken) || pendingForceAt == null) {
             return false;

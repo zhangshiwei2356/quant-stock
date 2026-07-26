@@ -24,6 +24,9 @@ public class SystemParamsService {
     static {
         Map<String, String> m = new HashMap<String, String>();
         m.put("sim.cash", "模拟账本现金余额");
+        m.put("sim.risk.state", "模拟账户风控快照（峰值/熔断/水下日）");
+        m.put("sim.retirement", "策略退役状态快照");
+        m.put("sim.books.meta", "模拟挂买/挂卖与金字塔元数据");
         SYSTEM_CONFIG_LABELS = Collections.unmodifiableMap(m);
     }
 

@@ -13,6 +13,28 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class AccountRiskStateTest {
 
     @Test
+    void exportImportPreservesHaltAndUnderwater() {
+        QuantProperties props = new QuantProperties();
+        props.setDrawdownHaltPct(new BigDecimal("0.25"));
+        props.setDrawdownDurationReduceDays(0);
+        props.setDrawdownDurationHaltDays(0);
+        AccountRiskState s = new AccountRiskState(props);
+        s.reset(new BigDecimal("100000"));
+        LocalDate d = LocalDate.of(2026, 1, 5);
+        s.onEquity(d, new BigDecimal("100000"));
+        s.onEquity(d, new BigDecimal("70000"));
+        assertTrue(s.isHalted());
+        assertEquals(AccountRiskState.HALT_DEPTH, s.getHaltReason());
+
+        AccountRiskState restored = new AccountRiskState(props);
+        restored.reset(new BigDecimal("100000"));
+        restored.importState(s.exportState());
+        assertTrue(restored.isHalted());
+        assertEquals(AccountRiskState.HALT_DEPTH, restored.getHaltReason());
+        assertEquals(0, s.getPeakEquity().compareTo(restored.getPeakEquity()));
+    }
+
+    @Test
     void dailyLossBlocksOpen() {
         QuantProperties props = new QuantProperties();
         props.setDailyLossLimitPct(new BigDecimal("0.03"));

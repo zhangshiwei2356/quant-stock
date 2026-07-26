@@ -161,25 +161,25 @@ public class PortfolioBackTestEngine {
                             continue;
                         }
                         boolean full = vol >= book.pos.getShares();
+                        boolean force = book.limitDownFailDays >= LIMIT_DOWN_FORCE_DAYS;
                         boolean limitDown = openFilterService.isLimitDownAt(bars, idx);
-                        if (limitDown && book.limitDownFailDays < LIMIT_DOWN_FORCE_DAYS) {
+                        if (limitDown && !force) {
                             if (book.lastLimitDownFailDay == null || !book.lastLimitDownFailDay.equals(tradeDay)) {
                                 book.limitDownFailDays++;
                                 book.lastLimitDownFailDay = tradeDay;
                             }
-                            if (book.limitDownFailDays >= LIMIT_DOWN_FORCE_DAYS) {
+                        } else {
+                            BigDecimal fillBase = open;
+                            if (limitDown) {
                                 BigDecimal prev = openFilterService.prevTradingDayClose(bars, idx);
-                                BigDecimal force = LimitBoardHelper.limitDownPrice(prev, code);
-                                if (force == null) {
-                                    force = open;
+                                BigDecimal forcePx = LimitBoardHelper.limitDownPrice(prev, code);
+                                if (forcePx == null) {
+                                    forcePx = open;
                                 }
-                                force = force.multiply(new BigDecimal("0.99")).setScale(2, RoundingMode.HALF_UP);
-                                cash = doSell(code, book, bars, idx, cash, force, vol, full,
-                                        commissionRate, trades, tradeDay, accountRisk);
+                                fillBase = forcePx.multiply(new BigDecimal("0.99")).setScale(2, RoundingMode.HALF_UP);
                             }
-                        } else if (!limitDown) {
-                            cash = doSell(code, book, bars, idx, cash, open, vol, full,
-                                    commissionRate, trades, tradeDay, accountRisk);
+                            cash = doSell(code, book, bars, idx, cash, fillBase, vol, full,
+                                    commissionRate, trades, tradeDay, accountRisk, equity);
                         }
                     }
                 }
@@ -187,8 +187,11 @@ public class PortfolioBackTestEngine {
                 if (book.pendingBuyVol != null && book.pendingBuySignalDay != null
                         && tradeDay.isAfter(book.pendingBuySignalDay)
                         && FillTimingHelper.canFillPendingOnBar(bars, idx)
-                        && openFilterService.canExecuteOpenFill(code, bars, idx)) {
-                    cash = doBuy(code, book, bars, idx, cash, open, commissionRate, trades, tradeDay, accountRisk);
+                        && openFilterService.canExecuteOpenFill(code, bars, idx)
+                        && accountRisk.allowNewOpen(tradeDay, equity)
+                        && resolvePosScale(accountRisk, equity, bars, idx).compareTo(BigDecimal.ZERO) > 0) {
+                    cash = doBuy(code, book, bars, idx, cash, open, commissionRate, trades, tradeDay, accountRisk,
+                            equity);
                 }
             }
 
@@ -216,8 +219,8 @@ public class PortfolioBackTestEngine {
                         BigDecimal fill = stopFill.fillBase;
                         boolean full = sellable >= book.pos.getShares();
                         cash = doSell(code, book, bars, idx, cash, fill, sellable, full,
-                                commissionRate, trades, tradeDay, accountRisk);
-                        if (full) {
+                                commissionRate, trades, tradeDay, accountRisk, equity);
+                        if (full || !book.pos.hasPosition()) {
                             book.stoppedOutToday = true;
                         }
                     }
@@ -420,7 +423,8 @@ public class PortfolioBackTestEngine {
 
     private BigDecimal doBuy(String code, StockBook book, List<BarDTO> bars, int idx,
                              BigDecimal cash, BigDecimal base, BigDecimal commissionRate,
-                             List<BackTradeRecord> trades, LocalDate tradeDay, AccountRiskState risk) {
+                             List<BackTradeRecord> trades, LocalDate tradeDay, AccountRiskState risk,
+                             BigDecimal portfolioEquity) {
         int requestVol = book.pendingBuyVol == null ? 0 : book.pendingBuyVol;
         boolean pyramid = book.pendingBuyPyramid;
         LocalDate signalDay = book.pendingBuySignalDay;
@@ -447,7 +451,8 @@ public class PortfolioBackTestEngine {
         }
         BigDecimal amount = deal.multiply(BigDecimal.valueOf(vol));
         BigDecimal fee = tradeCostModel.buyFee(amount, commissionRate);
-        BigDecimal equity = cash.add(calcPosMvOne(book, bars.get(idx).getClose()));
+        BigDecimal equity = portfolioEquity != null ? portfolioEquity
+                : cash.add(calcPosMvOne(book, bars.get(idx).getClose()));
         if (amount.add(fee).compareTo(cash) > 0) {
             // 现金不足：保留挂单重试
             book.pendingBuyVol = requestVol;
@@ -478,7 +483,7 @@ public class PortfolioBackTestEngine {
     private BigDecimal doSell(String code, StockBook book, List<BarDTO> bars, int idx,
                               BigDecimal cash, BigDecimal base, int vol, boolean clearAll,
                               BigDecimal commissionRate, List<BackTradeRecord> trades,
-                              LocalDate tradeDay, AccountRiskState risk) {
+                              LocalDate tradeDay, AccountRiskState risk, BigDecimal portfolioEquity) {
         vol = (vol / 100) * 100;
         if (vol < 100 || !book.pos.hasPosition()) {
             return cash;
@@ -514,6 +519,9 @@ public class PortfolioBackTestEngine {
             book.lastLimitDownFailDay = null;
         } else {
             book.pos.removeShares(vol);
+            BigDecimal eq = portfolioEquity != null ? portfolioEquity : cash;
+            book.pos.raiseStopByCost(atrAt(IndicatorSignalUtil.precompute(bars), idx),
+                    eq, props.getAtrStopMultiplier(), props.getHardStopCapitalPct());
             book.pendingSell = true;
             if (book.pendingSellSignalDay == null) {
                 book.pendingSellSignalDay = tradeDay;
@@ -575,9 +583,9 @@ public class PortfolioBackTestEngine {
         return last;
     }
 
-    private static BigDecimal atrAt(IndicatorSignalUtil.IndicatorBundle ind, int i) {
+    private BigDecimal atrAt(IndicatorSignalUtil.IndicatorBundle ind, int i) {
         if (ind == null || i < 0 || Double.isNaN(ind.atr14[i])) {
-            return BigDecimal.ZERO;
+            return props.getBaseAtr();
         }
         return BigDecimal.valueOf(ind.atr14[i]);
     }

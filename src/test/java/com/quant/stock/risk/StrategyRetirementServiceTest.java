@@ -43,6 +43,18 @@ class StrategyRetirementServiceTest {
     }
 
     @Test
+    void exportImportPreservesRetired() {
+        QuantProperties props = new QuantProperties();
+        StrategyRetirementService svc = new StrategyRetirementService(props, new TradingCalendar());
+        svc.retire(LocalDate.of(2026, 7, 20), "MANUAL", "persist-me");
+        StrategyRetirementService restored = new StrategyRetirementService(props, new TradingCalendar());
+        restored.importState(svc.exportState());
+        assertTrue(restored.isRetired());
+        assertFalse(restored.allowNewOpen());
+        assertEquals("MANUAL", restored.status(LocalDate.of(2026, 7, 21)).get("reason"));
+    }
+
+    @Test
     void forceResumeNeedsDualConfirm() {
         QuantProperties props = new QuantProperties();
         props.setRetirementCooldownTradingDays(20);

@@ -35,7 +35,7 @@
   <li><b>ATR调节</b> = <code>baseAtr</code>(<b>0.05</b>) ÷ 当前ATR，再夹到 <b>[0.2, 1.5]</b></li>
   <li><b>账户仓位系数</b>（峰值回撤）：&lt;15%→1.0；≥15%且&lt;25%→0.5；≥25%→0</li>
   <li>总仓：持仓市值 + 拟买入额 ≤ 总权益 × <b>80%</b></li>
-  <li><b>ATR 缺失</b>（单股引擎）：NaN 时回退为 <code>baseAtr(0.05)</code>；组合/实盘见差异节（NaN→0，通常导致不开仓）</li>
+  <li><b>ATR 缺失</b>：单股/组合/实盘 NaN 时均回退为 <code>baseAtr(0.05)</code></li>
 </ul>
 
 <h4>四、卖出何时触发</h4>
@@ -167,9 +167,9 @@
   <li><b>与单股差异</b>：
     <ul>
       <li>加仓成交也走完整 <code>canExecuteOpenFill</code>（流动性/市值/静默等），不只拦涨停/停牌</li>
-      <li>成交时<strong>不再</strong>按仓位系数二次缩量（与单股不同）</li>
-      <li>ATR NaN → 0（通常无法开仓）</li>
-      <li>部分止损后不重算止损线（单股会 <code>raiseStopByCost</code>）</li>
+      <li>成交时<strong>不再</strong>按仓位系数二次缩量（与单股不同）；挂买成交时再查熔断/<code>allowNewOpen</code></li>
+      <li>ATR 无效回退 <code>baseAtr</code>（与单股一致）；部分止损后 <code>raiseStopByCost</code>（组合权益）</li>
+      <li>跌停强平：连续失败 ≥3 日后强制卖出（与单股/实盘一致，避免卡死）</li>
     </ul>
   </li>
   <li>熔断时：对<strong>所有仍有持仓的成分股</strong>挂清仓</li>
@@ -197,16 +197,17 @@
   <li>规则意图对齐回测：金叉/金字塔/死叉、止损/trail、账户风控、09:45 撮合、跌停强平等</li>
   <li><b>已知差异</b>：
     <ul>
-      <li><code>stoppedOutToday</code> 未像回测那样在止损后置位，极端情况下同日仍可能再挂死叉</li>
-      <li>加仓成交走完整开仓过滤（同组合）</li>
-      <li>ATR NaN → 0</li>
-      <li><code>RiskControlService#checkBuy</code> 另用<strong>墙钟</strong>交易时段（含静默），并校验持仓后单票市值 ≤ 权益×30%×仓位系数</li>
-      <li>网关持仓与内存账本可能双路径；sdk 模式为桩实现</li>
+      <li>加仓成交走完整开仓过滤（同组合；单股金字塔撮合过滤更松）</li>
+      <li><code>RiskControlService#checkBuy</code> 无 K 线时退回<strong>墙钟</strong>交易时段（含静默），并校验持仓后单票市值 ≤ 权益×30%×仓位系数</li>
+      <li>网关数量账本与策略批次账本双路径；已用成交后同步与启动恢复对齐，异常时以批次为准</li>
+      <li><code>sdk</code> 同步仍为本地桩（不看真实柜台），但重启会重建未完结委托与预留</li>
     </ul>
   </li>
+  <li>已对齐：止损后 <code>stoppedOutToday</code>；部分止损 <code>raiseStopByCost</code>；挂买拒单保留意图；ATR 无效回退 <code>baseAtr</code>；定仓用可用现金（扣预留）</li>
   <li><code>trade-mode=sim</code>：下单即时成交并记账；<code>sdk</code>：SUBMITTED 预留资金/可卖量，由 <code>sync-orders</code> 推进 FILLED 后再落账；
       可 <code>POST /api/account/orders/{id}/cancel</code> 撤单、<code>partial-fill</code> 部成或 <code>replace</code> 改价撤补</li>
-  <li>本地模拟持仓/现金在成交后落库：<code>trade_positions</code> / <code>trade_position_lots</code>、<code>system_config(sim.cash)</code>；收盘写 <code>trade_cashflows</code>；启动可恢复</li>
+  <li>本地模拟持仓/现金在成交后落库：<code>trade_positions</code> / <code>trade_position_lots</code>、<code>system_config(sim.cash)</code>；
+      另持久化风控/退役/挂单元数据（<code>sim.risk.state</code> / <code>sim.retirement</code> / <code>sim.books.meta</code>）；收盘写 <code>trade_cashflows</code>；启动可恢复（含现金=0）</li>
   <li>收盘后任务：约 15:30 相关清算；16:00 可触发批量扫描日志等</li>
 </ul>
 
@@ -239,9 +240,9 @@
   <tbody>
     <tr><td>加仓成交过滤</td><td>仅涨停/停牌</td><td>完整开仓过滤</td><td>完整开仓过滤</td></tr>
     <tr><td>成交按仓位系数缩量</td><td>是</td><td>否</td><td>挂单时已含系数</td></tr>
-    <tr><td>ATR NaN</td><td>→ baseAtr 0.05</td><td>→ 0</td><td>→ 0</td></tr>
-    <tr><td>stoppedOutToday</td><td>有</td><td>有</td><td>未置位</td></tr>
-    <tr><td>部分止损后重算止损</td><td>有</td><td>无</td><td>视路径</td></tr>
+    <tr><td>ATR NaN</td><td>→ baseAtr</td><td>→ baseAtr</td><td>→ baseAtr</td></tr>
+    <tr><td>stoppedOutToday</td><td>有</td><td>有</td><td>有</td></tr>
+    <tr><td>部分止损后重算止损</td><td>有</td><td>有</td><td>有</td></tr>
     <tr><td>额外墙钟风控</td><td>无</td><td>无</td><td>RiskControlService</td></tr>
   </tbody>
 </table>

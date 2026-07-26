@@ -157,14 +157,18 @@ public class AccountController {
     @PostMapping("/retirement/retire")
     public Map<String, Object> retire(@RequestParam(defaultValue = "MANUAL") String reason,
                                       @RequestParam(required = false) String note) {
-        return strategyRetirementService.retire(LocalDate.now(), reason, note);
+        Map<String, Object> m = strategyRetirementService.retire(LocalDate.now(), reason, note);
+        strategyTask.persistPaperState();
+        return m;
     }
 
     /** 冷却满后恢复；force=true 需双人复核（先武装令牌，再带 confirmCode） */
     @PostMapping("/retirement/resume")
     public Map<String, Object> resume(@RequestParam(defaultValue = "false") boolean force,
                                       @RequestParam(required = false) String confirmCode) {
-        return strategyRetirementService.resume(LocalDate.now(), force, confirmCode);
+        Map<String, Object> m = strategyRetirementService.resume(LocalDate.now(), force, confirmCode);
+        strategyTask.persistPaperState();
+        return m;
     }
 
     /** 当前持仓两两收益相关（P0-105，只告警） */

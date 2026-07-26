@@ -258,7 +258,13 @@ public class DynamicScheduleService implements ApplicationRunner {
         try {
             switch (jobCode) {
                 case "scan-and-trade":
-                    strategyTask.scanAndTrade();
+                    if (!strategyTask.scanAndTrade()) {
+                        if (failLoud) {
+                            throw new IllegalStateException("scan-and-trade 锁忙，未执行");
+                        }
+                        log.warn("scan-and-trade 锁忙，定时触发跳过");
+                        return;
+                    }
                     break;
                 case "sync-orders":
                     strategyTask.syncOrders();

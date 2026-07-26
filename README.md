@@ -346,7 +346,7 @@ sequenceDiagram
 
 - 行情/券商 SDK 默认为 Noop；生产需接真实行情与柜台（可参考宽睿 Quant360）
 - 市值无交易所接口时依赖 `float-shares-yi` 或启发式
-- 实盘路径为模拟现金账本；`sdk` 下单为 SUBMITTED（预留资金/可卖量），`sync-orders` 确认 FILLED 后再改现金与批次
+- 实盘路径为模拟现金账本（现金=0 可恢复；风控/退役/挂单元数据落库）；`sdk` 下单为 SUBMITTED（预留资金/可卖量），`sync-orders` 确认 FILLED 后再改现金与批次；重启重建未完结委托
 - 复权/财报/舆情等见「能力与待办」
 
 ---

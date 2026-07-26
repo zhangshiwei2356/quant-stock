@@ -193,6 +193,17 @@ public class TradeGatewayService {
         }
     }
 
+    /** 启动恢复：挂入未完结委托（不改仓、不成交）。 */
+    public void restoreOpenOrder(OrderDTO order) {
+        if (order == null || order.getOrderId() == null) {
+            return;
+        }
+        orders.put(order.getOrderId(), order);
+        if (order.getClientOrderId() != null && !order.getClientOrderId().trim().isEmpty()) {
+            idempotentIndex.put(order.getClientOrderId().trim(), order.getOrderId());
+        }
+    }
+
     /** 策略成交后可补写费用与信号日 */
     public void persistOrder(OrderDTO order, LocalDate signalDate, BigDecimal fee) {
         LiveLedgerService ledger = liveLedgerProvider.getIfAvailable();

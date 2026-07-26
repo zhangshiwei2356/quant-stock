@@ -30,7 +30,8 @@
 <details class="memo-todo memo-todo--done">
   <summary><b>二、能力 · 本地已落地</b>（默认折叠 · 点击展开台账）</summary>
   <ol>
-    <li><b>模拟账本持久化</b> — 已落地 · 成交写 <code>trade_orders</code>；持仓/批次写 <code>trade_positions</code>、<code>trade_position_lots</code>；现金写 <code>system_config(sim.cash)</code>；启动恢复</li>
+    <li><b>模拟账本持久化</b> — 已落地 · 成交写 <code>trade_orders</code>；持仓/批次写 <code>trade_positions</code>、<code>trade_position_lots</code>；现金写 <code>system_config(sim.cash)</code>（含 0）；另持久化风控/退役/挂单元数据；未完结委托重启重建预留；启动恢复</li>
+    <li><b>本地路径正确性对齐</b> — 已落地 · 止损后禁同日死叉；部分止损抬止损；组合跌停强平不卡死；熔断禁挂买成交；挂买拒单保留；ATR→baseAtr；账本锁覆盖 scan/sync/cancel</li>
     <li><b>收盘权益日表</b> — 已落地 · <code>settle-after-close</code> 写 <code>trade_cashflows</code>；账户概览 →「权益日结」可查看</li>
     <li><b>风控日志</b> — 已落地 · 峰值回撤熔断写入 <code>risk_control_log</code>；账户概览 →「风控事件」</li>
     <li><b>交易日历（静态）</b> — 已落地 · 周末 + 内置法定节假日（含 2026 中秋 9/25–27、国庆 10/1–7；10/8 开市）；风控拒非交易日</li>

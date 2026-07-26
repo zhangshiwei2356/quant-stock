@@ -36,6 +36,8 @@ import com.quant.stock.trade.TradeGatewayService;
 import com.quant.stock.trade.dto.OrderDTO;
 import com.quant.stock.util.PositionAmountUtil;
 import com.quant.stock.util.RedisLockUtil;
+import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -151,8 +153,14 @@ public class StrategyTask {
     @PostConstruct
     public void init() {
         restoreLedger();
-        accountRiskState.reset(simCash);
-        log.info("StrategyTask 已就绪（调度由 DynamicScheduleService / sys_schedule_job 控制），模拟现金={}", simCash);
+        BigDecimal markEq = markEquity(null);
+        if (markEq.compareTo(BigDecimal.ZERO) <= 0) {
+            markEq = simCash;
+        }
+        accountRiskState.reset(markEq);
+        restoreRuntimeState();
+        log.info("StrategyTask 已就绪（调度由 DynamicScheduleService / sys_schedule_job 控制），模拟现金={}, 权益≈{}",
+                simCash, markEq);
     }
 
     private void restoreLedger() {
@@ -161,7 +169,8 @@ public class StrategyTask {
             return;
         }
         BigDecimal cash = ledger.loadCashOrNull();
-        if (cash != null && cash.compareTo(BigDecimal.ZERO) > 0) {
+        // 含 0：满仓时不得回落到默认 10 万
+        if (cash != null) {
             simCash = cash;
         }
         Map<String, PositionState> loaded = ledger.loadPositions();
@@ -174,7 +183,147 @@ public class StrategyTask {
                 book.pyramidStage = 1;
             }
         }
-        log.info("已从库恢复模拟账本: 现金={}, 持仓只数={}", simCash, loaded.size());
+        restoreOpenOrders(ledger);
+        log.info("已从库恢复模拟账本: 现金={}, 持仓只数={}, 未完结委托={}",
+                simCash, loaded.size(), pendingFills.size());
+    }
+
+    private void restoreOpenOrders(LiveLedgerService ledger) {
+        List<LiveLedgerService.OpenOrderRow> open = ledger.loadOpenOrders();
+        for (LiveLedgerService.OpenOrderRow row : open) {
+            if (row == null || row.order == null || row.order.getOrderId() == null) {
+                continue;
+            }
+            OrderDTO order = row.order;
+            tradeGatewayService.restoreOpenOrder(order);
+            int vol = order.getVolume() == null ? 0 : order.getVolume();
+            int filled = order.getFilledVolume() == null ? 0 : order.getFilledVolume();
+            int remain = Math.max(0, vol - filled);
+            remain = (remain / 100) * 100;
+            if (remain < 100) {
+                continue;
+            }
+            BigDecimal deal = order.getPrice() == null ? BigDecimal.ZERO : order.getPrice();
+            BigDecimal amount = deal.multiply(BigDecimal.valueOf(remain));
+            LocalDate day = row.signalDate == null ? LocalDate.now() : row.signalDate;
+            if (order.getSide() == OrderDTO.Side.BUY) {
+                BigDecimal fee = tradeCostModel.buyFee(amount);
+                PendingFill pending = PendingFill.buy(order.getStockCode(), remain, deal, amount, fee, day,
+                        false, quantProperties.getBaseAtr(), markEquity(null));
+                pendingFills.put(order.getOrderId(), pending);
+                reserveBuy(pending);
+            } else {
+                LiveBook book = books.computeIfAbsent(order.getStockCode(), k -> new LiveBook());
+                BigDecimal avg = book.pos.getAvgCost();
+                BigDecimal fee = tradeCostModel.sellFee(amount, null, day);
+                BigDecimal pnl = deal.subtract(avg).multiply(BigDecimal.valueOf(remain)).subtract(fee);
+                PendingFill pending = PendingFill.sell(order.getStockCode(), remain, deal, amount, fee, day,
+                        remain >= book.pos.getShares(), avg, pnl);
+                pendingFills.put(order.getOrderId(), pending);
+                reserveSell(pending);
+            }
+        }
+    }
+
+    private void restoreRuntimeState() {
+        LiveLedgerService ledger = liveLedgerProvider.getIfAvailable();
+        if (ledger == null) {
+            return;
+        }
+        String riskJson = ledger.loadConfigOrNull(LiveLedgerService.KEY_RISK_STATE);
+        if (riskJson != null && !riskJson.trim().isEmpty()) {
+            try {
+                JSONObject obj = JSONUtil.parseObj(riskJson);
+                Map<String, String> m = new LinkedHashMap<String, String>();
+                for (String k : obj.keySet()) {
+                    m.put(k, obj.getStr(k, ""));
+                }
+                accountRiskState.importState(m);
+            } catch (Exception e) {
+                log.warn("恢复风控状态失败: {}", e.getMessage());
+            }
+        }
+        String retJson = ledger.loadConfigOrNull(LiveLedgerService.KEY_RETIREMENT);
+        if (retJson != null && !retJson.trim().isEmpty()) {
+            try {
+                JSONObject obj = JSONUtil.parseObj(retJson);
+                Map<String, String> m = new LinkedHashMap<String, String>();
+                for (String k : obj.keySet()) {
+                    m.put(k, obj.getStr(k, ""));
+                }
+                strategyRetirementService.importState(m);
+            } catch (Exception e) {
+                log.warn("恢复退役状态失败: {}", e.getMessage());
+            }
+        }
+        String booksJson = ledger.loadConfigOrNull(LiveLedgerService.KEY_BOOKS_META);
+        if (booksJson != null && !booksJson.trim().isEmpty()) {
+            try {
+                JSONObject root = JSONUtil.parseObj(booksJson);
+                for (String code : root.keySet()) {
+                    JSONObject b = root.getJSONObject(code);
+                    if (b == null) {
+                        continue;
+                    }
+                    LiveBook book = books.computeIfAbsent(code, k -> new LiveBook());
+                    book.pyramidStage = b.getInt("pyramidStage", book.pyramidStage);
+                    book.targetFullVol = b.getInt("targetFullVol", 0);
+                    book.pendingSell = b.getBool("pendingSell", false);
+                    book.pendingSellReason = b.getStr("pendingSellReason", null);
+                    String psd = b.getStr("pendingSellSignalDay", "");
+                    book.pendingSellSignalDay = psd == null || psd.isEmpty() ? null : LocalDate.parse(psd);
+                    int pbv = b.getInt("pendingBuyVol", 0);
+                    book.pendingBuyVol = pbv >= 100 ? pbv : null;
+                    book.pendingBuyPyramid = b.getBool("pendingBuyPyramid", false);
+                    String pbd = b.getStr("pendingBuySignalDay", "");
+                    book.pendingBuySignalDay = pbd == null || pbd.isEmpty() ? null : LocalDate.parse(pbd);
+                    book.limitDownFailDays = b.getInt("limitDownFailDays", 0);
+                }
+            } catch (Exception e) {
+                log.warn("恢复挂单/金字塔元数据失败: {}", e.getMessage());
+            }
+        }
+    }
+
+    /** 账户页手动退役/恢复等变更后落库。 */
+    public void persistPaperState() {
+        persistRuntimeState();
+    }
+
+    private void persistRuntimeState() {
+        LiveLedgerService ledger = liveLedgerProvider.getIfAvailable();
+        if (ledger == null) {
+            return;
+        }
+        try {
+            ledger.saveConfig(LiveLedgerService.KEY_RISK_STATE,
+                    JSONUtil.toJsonStr(accountRiskState.exportState()), "模拟账户风控快照");
+            ledger.saveConfig(LiveLedgerService.KEY_RETIREMENT,
+                    JSONUtil.toJsonStr(strategyRetirementService.exportState()), "策略退役快照");
+            Map<String, Object> meta = new LinkedHashMap<String, Object>();
+            for (Map.Entry<String, LiveBook> e : books.entrySet()) {
+                LiveBook book = e.getValue();
+                if (book == null) {
+                    continue;
+                }
+                Map<String, Object> b = new LinkedHashMap<String, Object>();
+                b.put("pyramidStage", book.pyramidStage);
+                b.put("targetFullVol", book.targetFullVol);
+                b.put("pendingSell", book.pendingSell);
+                b.put("pendingSellReason", book.pendingSellReason);
+                b.put("pendingSellSignalDay", book.pendingSellSignalDay == null ? ""
+                        : book.pendingSellSignalDay.toString());
+                b.put("pendingBuyVol", book.pendingBuyVol == null ? 0 : book.pendingBuyVol);
+                b.put("pendingBuyPyramid", book.pendingBuyPyramid);
+                b.put("pendingBuySignalDay", book.pendingBuySignalDay == null ? ""
+                        : book.pendingBuySignalDay.toString());
+                b.put("limitDownFailDays", book.limitDownFailDays);
+                meta.put(e.getKey(), b);
+            }
+            ledger.saveConfig(LiveLedgerService.KEY_BOOKS_META, JSONUtil.toJsonStr(meta), "模拟挂单与金字塔元数据");
+        } catch (Exception e) {
+            log.warn("落库运行时状态失败: {}", e.getMessage());
+        }
     }
 
     private void persistBook(String code, LiveBook book, OrderDTO order, LocalDate tradeDay, BigDecimal fee) {
@@ -191,15 +340,19 @@ public class StrategyTask {
         }
     }
 
-    public void scanAndTrade() {
-        if (!redisLockUtil.tryLock("strategy-scan", 50)) {
-            return;
+    /**
+     * @return false 表示锁忙未执行
+     */
+    public boolean scanAndTrade() {
+        if (!redisLockUtil.tryLock("strategy-scan", 120)) {
+            log.warn("scan-and-trade 锁忙，跳过本轮");
+            return false;
         }
         try {
             List<String> targets = resolveLiveScanCodes();
             if (targets.isEmpty()) {
                 log.warn("目标池为空，跳过分钟扫描（请先执行盘后扫描写入目标池）");
-                return;
+                return true;
             }
             for (String code : targets) {
                 List<BarDTO> bars = marketDataService.loadMinuteBars(code);
@@ -218,6 +371,7 @@ public class StrategyTask {
                 if (book.lastTradeDay == null || !book.lastTradeDay.equals(tradeDay)) {
                     book.lastTradeDay = tradeDay;
                     book.pos.clearAddedToday();
+                    book.stoppedOutToday = false;
                 }
 
                 // Step1: 撮合挂单
@@ -233,6 +387,14 @@ public class StrategyTask {
                         if (stopFill.triggered()) {
                             boolean full = sellable >= book.pos.getShares();
                             executeLiveSell(code, book, bars, i, stopFill.fillBase, sellable, full, tradeDay);
+                            if (full || !book.pos.hasPosition()) {
+                                book.stoppedOutToday = true;
+                            } else {
+                                BigDecimal atr = atrAt(ind, i);
+                                book.pos.raiseStopByCost(atr, markEquity(close),
+                                        quantProperties.getAtrStopMultiplier(),
+                                        quantProperties.getHardStopCapitalPct());
+                            }
                         }
                     }
                 } else if (book.pos.hasPosition()) {
@@ -274,14 +436,14 @@ public class StrategyTask {
                         ? close.multiply(BigDecimal.valueOf(book.pos.getShares())) : BigDecimal.ZERO;
                 riskAlertService.checkSoftBudget(tradeDay, equity, posMvNow, code, singleMv);
                 if (book.pos.hasPosition() && accountRiskState.isHalted()
-                        && ExitPriority.ACCOUNT_HALT.canRegisterPending(false, book.pendingSell)) {
+                        && ExitPriority.ACCOUNT_HALT.canRegisterPending(book.stoppedOutToday, book.pendingSell)) {
                     book.pendingSell = true;
                     book.pendingSellReason = ExitPriority.ACCOUNT_HALT.getLabel();
                     book.pendingSellSignalDay = tradeDay;
                 }
 
                 if (book.pos.hasPosition() && quantProperties.getMaxHoldTradingDays() > 0
-                        && ExitPriority.TIME_STOP.canRegisterPending(false, book.pendingSell)) {
+                        && ExitPriority.TIME_STOP.canRegisterPending(book.stoppedOutToday, book.pendingSell)) {
                     int held = tradingCalendar.tradingDaysAfter(book.pos.getEarliestOpenDate(), tradeDay);
                     if (held >= quantProperties.getMaxHoldTradingDays()) {
                         book.pendingSell = true;
@@ -293,7 +455,6 @@ public class StrategyTask {
                 // Step4: 信号挂单
                 boolean buySignal = maCrossStrategy.isBuySignalAt(ind, i);
                 boolean sellSignal = ind.isMaCrossDown(i);
-                boolean stoppedOutToday = false;
 
                 if (!book.pos.hasPosition() && buySignal && !book.pendingSell && book.pendingBuyVol == null
                         && strategyRetirementService.allowNewOpen()
@@ -304,7 +465,7 @@ public class StrategyTask {
                         && openFilterService.canOpen(code, bars, i)) {
                     BigDecimal atr = atrAt(ind, i);
                     if (atr.compareTo(quantProperties.getAtrMinThreshold()) > 0) {
-                        book.targetFullVol = positionAmountUtil.calcBuyVolume(simCash, close, atr, posScale);
+                        book.targetFullVol = positionAmountUtil.calcBuyVolume(availableCash(), close, atr, posScale);
                         long advBuy = IndicatorSignalUtil.avgVolume(bars, i, 20);
                         long barVol = barVolume(bars, i);
                         book.targetFullVol = capParticipation(book.targetFullVol, advBuy, equity, barVol);
@@ -342,7 +503,7 @@ public class StrategyTask {
                 }
 
                 if (book.pos.hasPosition() && sellSignal
-                        && ExitPriority.DEATH_CROSS.canRegisterPending(stoppedOutToday, book.pendingSell)) {
+                        && ExitPriority.DEATH_CROSS.canRegisterPending(book.stoppedOutToday, book.pendingSell)) {
                     book.pendingSell = true;
                     book.pendingSellReason = ExitPriority.DEATH_CROSS.getLabel();
                     book.pendingSellSignalDay = tradeDay;
@@ -357,6 +518,8 @@ public class StrategyTask {
                     book.pos.raiseTrailingStop(atrAt(ind, i), quantProperties.getTrailingAtrMultiplier());
                 }
             }
+            persistRuntimeState();
+            return true;
         } finally {
             redisLockUtil.unlock("strategy-scan");
         }
@@ -444,10 +607,11 @@ public class StrategyTask {
                                 BigDecimal base, LocalDate tradeDay) {
         int vol = book.pendingBuyVol == null ? 0 : book.pendingBuyVol;
         boolean pyramid = book.pendingBuyPyramid;
-        book.pendingBuyVol = null;
-        book.pendingBuyPyramid = false;
-        book.pendingBuySignalDay = null;
+        LocalDate signalDay = book.pendingBuySignalDay;
         if (vol < 100) {
+            book.pendingBuyVol = null;
+            book.pendingBuyPyramid = false;
+            book.pendingBuySignalDay = null;
             return;
         }
         BigDecimal deal = tradeCostModel.buyPrice(base, bars, i, vol);
@@ -462,6 +626,7 @@ public class StrategyTask {
         BigDecimal freeCash = availableCash();
         Map<String, Integer> gatewayPos = tradeGatewayService.queryPositions();
         if (!riskControlService.checkBuy(code, deal, vol, freeCash, posMv, gatewayPos, bars, i)) {
+            // 保留挂买，下一根再试（勿静默丢信号）
             return;
         }
         if (amount.add(fee).compareTo(freeCash) > 0) {
@@ -471,8 +636,13 @@ public class StrategyTask {
         if (order == null || order.getStatus() == OrderDTO.Status.REJECTED) {
             return;
         }
+        // 下单成功后再清挂买意图
+        book.pendingBuyVol = null;
+        book.pendingBuyPyramid = false;
+        book.pendingBuySignalDay = null;
         BigDecimal atr = atrAt(IndicatorSignalUtil.precompute(bars), i);
-        PendingFill pending = PendingFill.buy(code, vol, deal, amount, fee, tradeDay, pyramid, atr, equity);
+        LocalDate fillDay = signalDay == null ? tradeDay : signalDay;
+        PendingFill pending = PendingFill.buy(code, vol, deal, amount, fee, fillDay, pyramid, atr, equity);
         if (order.getStatus() == OrderDTO.Status.FILLED) {
             applyBuyFill(book, order, pending);
         } else if (order.getStatus() == OrderDTO.Status.SUBMITTED) {
@@ -520,25 +690,34 @@ public class StrategyTask {
     }
 
     public void syncOrders() {
-        List<OrderDTO> filled = tradeGatewayService.syncOrderStatus();
-        for (OrderDTO order : filled) {
-            if (order == null || order.getOrderId() == null) {
-                continue;
-            }
-            PendingFill pending = pendingFills.remove(order.getOrderId());
-            if (pending == null) {
-                log.warn("同步成交无本地待入账上下文 orderId={}", order.getOrderId());
-                continue;
-            }
-            LiveBook book = books.computeIfAbsent(pending.code, k -> new LiveBook());
-            int remain = pending.remainingVol;
-            if (remain > 0) {
-                if (pending.side == OrderDTO.Side.BUY) {
-                    applyBuyFillSlice(book, order, pending, remain);
-                } else {
-                    applySellFillSlice(book, order, pending, remain);
+        if (!redisLockUtil.tryLock("strategy-scan", 60)) {
+            log.warn("sync-orders 锁忙，跳过本轮");
+            return;
+        }
+        try {
+            List<OrderDTO> filled = tradeGatewayService.syncOrderStatus();
+            for (OrderDTO order : filled) {
+                if (order == null || order.getOrderId() == null) {
+                    continue;
+                }
+                PendingFill pending = pendingFills.remove(order.getOrderId());
+                if (pending == null) {
+                    log.warn("同步成交无本地待入账上下文 orderId={}", order.getOrderId());
+                    continue;
+                }
+                LiveBook book = books.computeIfAbsent(pending.code, k -> new LiveBook());
+                int remain = pending.remainingVol;
+                if (remain > 0) {
+                    if (pending.side == OrderDTO.Side.BUY) {
+                        applyBuyFillSlice(book, order, pending, remain);
+                    } else {
+                        applySellFillSlice(book, order, pending, remain);
+                    }
                 }
             }
+            persistRuntimeState();
+        } finally {
+            redisLockUtil.unlock("strategy-scan");
         }
     }
 
@@ -547,6 +726,18 @@ public class StrategyTask {
      * 仅在网关撤单成功后才释放预留，避免失败时丢上下文。
      */
     public OrderDTO cancelOrder(String orderId) {
+        if (!redisLockUtil.tryLock("strategy-scan", 60)) {
+            log.warn("cancelOrder 锁忙 orderId={}", orderId);
+            return null;
+        }
+        try {
+            return cancelOrderUnlocked(orderId);
+        } finally {
+            redisLockUtil.unlock("strategy-scan");
+        }
+    }
+
+    private OrderDTO cancelOrderUnlocked(String orderId) {
         if (orderId == null || orderId.trim().isEmpty()) {
             return null;
         }
@@ -566,6 +757,7 @@ public class StrategyTask {
             pending.remainingVol = 0;
         }
         persistOrderOnly(order, pending == null ? LocalDate.now() : pending.tradeDay, null);
+        persistRuntimeState();
         log.info("策略撤单: {}", id);
         return order;
     }
@@ -577,9 +769,21 @@ public class StrategyTask {
         if (orderId == null || orderId.trim().isEmpty() || newPrice == null) {
             return null;
         }
+        if (!redisLockUtil.tryLock("strategy-scan", 60)) {
+            log.warn("replaceOrder 锁忙 orderId={}", orderId);
+            return null;
+        }
+        try {
+            return replaceOrderUnlocked(orderId, newPrice, newVolume);
+        } finally {
+            redisLockUtil.unlock("strategy-scan");
+        }
+    }
+
+    private OrderDTO replaceOrderUnlocked(String orderId, BigDecimal newPrice, Integer newVolume) {
         String id = orderId.trim();
         PendingFill oldPending = pendingFills.get(id);
-        OrderDTO cancelled = cancelOrder(id);
+        OrderDTO cancelled = cancelOrderUnlocked(id);
         if (cancelled == null) {
             return null;
         }
@@ -632,6 +836,7 @@ public class StrategyTask {
             }
         }
         log.info("策略改价撤补(队尾重置): {} → {} @{} x{}", id, neu.getOrderId(), newPrice, vol);
+        persistRuntimeState();
         return neu;
     }
 
@@ -642,34 +847,43 @@ public class StrategyTask {
         if (orderId == null || fillQty < 100) {
             return null;
         }
-        String id = orderId.trim();
-        PendingFill pending = pendingFills.get(id);
-        OrderDTO order = tradeGatewayService.applyPartialFill(id, fillQty);
-        if (order == null) {
+        if (!redisLockUtil.tryLock("strategy-scan", 60)) {
+            log.warn("partial-fill 锁忙 orderId={}", orderId);
             return null;
         }
-        if (pending == null) {
-            log.warn("部成无本地待入账上下文（可能重启后丢失） orderId={} filled={}",
-                    id, order.getFilledVolume());
+        try {
+            String id = orderId.trim();
+            PendingFill pending = pendingFills.get(id);
+            OrderDTO order = tradeGatewayService.applyPartialFill(id, fillQty);
+            if (order == null) {
+                return null;
+            }
+            if (pending == null) {
+                log.warn("部成无本地待入账上下文（可能重启后丢失） orderId={} filled={}",
+                        id, order.getFilledVolume());
+                return order;
+            }
+            int filledNow = order.getFilledVolume() == null ? 0 : order.getFilledVolume();
+            int already = pending.vol - pending.remainingVol;
+            int delta = filledNow - already;
+            if (delta < 100) {
+                return order;
+            }
+            delta = Math.min(delta, pending.remainingVol);
+            LiveBook book = books.computeIfAbsent(pending.code, k -> new LiveBook());
+            if (pending.side == OrderDTO.Side.BUY) {
+                applyBuyFillSlice(book, order, pending, delta);
+            } else {
+                applySellFillSlice(book, order, pending, delta);
+            }
+            if (pending.remainingVol <= 0 || order.getStatus() == OrderDTO.Status.FILLED) {
+                pendingFills.remove(id);
+            }
+            persistRuntimeState();
             return order;
+        } finally {
+            redisLockUtil.unlock("strategy-scan");
         }
-        int filledNow = order.getFilledVolume() == null ? 0 : order.getFilledVolume();
-        int already = pending.vol - pending.remainingVol;
-        int delta = filledNow - already;
-        if (delta < 100) {
-            return order;
-        }
-        delta = Math.min(delta, pending.remainingVol);
-        LiveBook book = books.computeIfAbsent(pending.code, k -> new LiveBook());
-        if (pending.side == OrderDTO.Side.BUY) {
-            applyBuyFillSlice(book, order, pending, delta);
-        } else {
-            applySellFillSlice(book, order, pending, delta);
-        }
-        if (pending.remainingVol <= 0 || order.getStatus() == OrderDTO.Status.FILLED) {
-            pendingFills.remove(id);
-        }
-        return order;
     }
 
     private BigDecimal availableCash() {
@@ -772,11 +986,17 @@ public class StrategyTask {
             book.pendingSellSignalDay = null;
             book.limitDownFailDays = 0;
             book.lastLimitDownFailDay = null;
+            book.stoppedOutToday = true;
             boolean win = slicePnl.compareTo(BigDecimal.ZERO) > 0;
             accountRiskState.onClosedRound(win, p.tradeDay);
             signalDriftMonitor.onClosedRound(win, p.tradeDay);
         } else {
             book.pos.removeShares(qty);
+            book.pos.raiseStopByCost(p.atr != null && p.atr.compareTo(BigDecimal.ZERO) > 0
+                            ? p.atr : quantProperties.getBaseAtr(),
+                    p.equity != null && p.equity.compareTo(BigDecimal.ZERO) > 0
+                            ? p.equity : markEquity(null),
+                    quantProperties.getAtrStopMultiplier(), quantProperties.getHardStopCapitalPct());
             book.pendingSell = true;
             if (book.pendingSellSignalDay == null) {
                 book.pendingSellSignalDay = p.tradeDay;
@@ -808,44 +1028,53 @@ public class StrategyTask {
      * TODO(api): 真实行情拉取（与 market-collect 同源）；当前 fetch 为 db/mock 回退。
      */
     public void settleAfterClose() {
-        LocalDate tradeDay = tradingCalendar.lastTradingDayOnOrBefore(LocalDate.now());
-        BigDecimal closeEquity = markEquity(null);
-        BigDecimal posMv = calcPositionMv();
-        BigDecimal prev = accountRiskState.getPrevCloseEquity();
-        BigDecimal dailyPnl = prev == null ? BigDecimal.ZERO : closeEquity.subtract(prev);
-        BigDecimal dailyPnlRate = prev != null && prev.compareTo(BigDecimal.ZERO) > 0
-                ? dailyPnl.divide(prev, 6, RoundingMode.HALF_UP) : BigDecimal.ZERO;
-        accountRiskState.onDayClose(closeEquity);
-        LiveLedgerService ledger = liveLedgerProvider.getIfAvailable();
-        if (ledger != null) {
-            ledger.saveCash(simCash);
-            ledger.upsertDailyCashflow(
-                    tradeDay,
-                    simCash,
-                    posMv,
-                    closeEquity,
-                    accountRiskState.getPeakEquity(),
-                    dailyPnl,
-                    dailyPnlRate,
-                    accountRiskState.drawdown(closeEquity),
-                    accountRiskState.getConsecutiveLosses());
-        }
-        log.info("收盘清算开始 tradeDay={}, 模拟现金={}, 权益={}, 持仓={}",
-                tradeDay, simCash, closeEquity, tradeGatewayService.queryPositions());
-        if (coreMarketBarService == null) {
-            log.info("未启用核心行情表(quant.db-enabled=false)，跳过分钟/日线落库");
+        if (!redisLockUtil.tryLock("strategy-scan", 120)) {
+            log.warn("settle-after-close 锁忙，跳过本轮");
             return;
         }
-        // TODO(api): 接入真实行情后再做可靠增量拉取
-        for (String code : resolveSettleCodes()) {
-            try {
-                marketDataService.fetchAndPersistMinute(code);
-                coreMarketBarService.upsertDailyFromMinutes(code, tradeDay);
-            } catch (Exception e) {
-                log.warn("收盘落库失败 code={}: {}", code, e.getMessage());
+        try {
+            LocalDate tradeDay = tradingCalendar.lastTradingDayOnOrBefore(LocalDate.now());
+            BigDecimal closeEquity = markEquity(null);
+            BigDecimal posMv = calcPositionMv();
+            BigDecimal prev = accountRiskState.getPrevCloseEquity();
+            BigDecimal dailyPnl = prev == null ? BigDecimal.ZERO : closeEquity.subtract(prev);
+            BigDecimal dailyPnlRate = prev != null && prev.compareTo(BigDecimal.ZERO) > 0
+                    ? dailyPnl.divide(prev, 6, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+            accountRiskState.onDayClose(closeEquity);
+            LiveLedgerService ledger = liveLedgerProvider.getIfAvailable();
+            if (ledger != null) {
+                ledger.saveCash(simCash);
+                ledger.upsertDailyCashflow(
+                        tradeDay,
+                        simCash,
+                        posMv,
+                        closeEquity,
+                        accountRiskState.getPeakEquity(),
+                        dailyPnl,
+                        dailyPnlRate,
+                        accountRiskState.drawdown(closeEquity),
+                        accountRiskState.getConsecutiveLosses());
             }
+            persistRuntimeState();
+            log.info("收盘清算开始 tradeDay={}, 模拟现金={}, 权益={}, 持仓={}",
+                    tradeDay, simCash, closeEquity, tradeGatewayService.queryPositions());
+            if (coreMarketBarService == null) {
+                log.info("未启用核心行情表(quant.db-enabled=false)，跳过分钟/日线落库");
+                return;
+            }
+            // TODO(api): 接入真实行情后再做可靠增量拉取
+            for (String code : resolveSettleCodes()) {
+                try {
+                    marketDataService.fetchAndPersistMinute(code);
+                    coreMarketBarService.upsertDailyFromMinutes(code, tradeDay);
+                } catch (Exception e) {
+                    log.warn("收盘落库失败 code={}: {}", code, e.getMessage());
+                }
+            }
+            log.info("收盘清算/日线聚合完成 tradeDay={}", tradeDay);
+        } finally {
+            redisLockUtil.unlock("strategy-scan");
         }
-        log.info("收盘清算/日线聚合完成 tradeDay={}", tradeDay);
     }
 
     /**
@@ -1035,9 +1264,9 @@ public class StrategyTask {
         return fallback == null ? BigDecimal.ZERO : fallback;
     }
 
-    private static BigDecimal atrAt(IndicatorSignalUtil.IndicatorBundle ind, int i) {
+    private BigDecimal atrAt(IndicatorSignalUtil.IndicatorBundle ind, int i) {
         if (ind == null || i < 0 || Double.isNaN(ind.atr14[i])) {
-            return BigDecimal.ZERO;
+            return quantProperties.getBaseAtr();
         }
         return BigDecimal.valueOf(ind.atr14[i]);
     }
@@ -1055,6 +1284,7 @@ public class StrategyTask {
         int targetFullVol;
         int limitDownFailDays;
         LocalDate lastLimitDownFailDay;
+        boolean stoppedOutToday;
     }
 
     /** sdk 已报未成：同步成交后入账所需上下文 */

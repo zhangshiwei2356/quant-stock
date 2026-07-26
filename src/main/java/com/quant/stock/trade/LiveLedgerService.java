@@ -250,6 +250,87 @@ public class LiveLedgerService {
         }
     }
 
+    public static final String KEY_RISK_STATE = "sim.risk.state";
+    public static final String KEY_RETIREMENT = "sim.retirement";
+    public static final String KEY_BOOKS_META = "sim.books.meta";
+
+    public void saveConfig(String key, String value, String description) {
+        if (key == null || key.trim().isEmpty()) {
+            return;
+        }
+        try {
+            jdbc.update(
+                    "INSERT INTO system_config(config_key, config_value, type, description) VALUES (?,?,1,?) "
+                            + "ON DUPLICATE KEY UPDATE config_value=VALUES(config_value), updated_at=CURRENT_TIMESTAMP",
+                    key.trim(), value == null ? "" : value,
+                    description == null ? key : description);
+        } catch (Exception e) {
+            log.warn("保存配置失败 {}: {}", key, e.getMessage());
+        }
+    }
+
+    public String loadConfigOrNull(String key) {
+        if (key == null) {
+            return null;
+        }
+        try {
+            List<String> rows = jdbc.query(
+                    "SELECT config_value FROM system_config WHERE config_key=?",
+                    (rs, i) -> rs.getString(1),
+                    key);
+            if (rows.isEmpty()) {
+                return null;
+            }
+            return rows.get(0);
+        } catch (Exception e) {
+            log.warn("读取配置失败 {}: {}", key, e.getMessage());
+            return null;
+        }
+    }
+
+    /** 未完结委托（SUBMITTED=2 / PARTIAL=3），用于重启重建网关与预留。 */
+    public List<OpenOrderRow> loadOpenOrders() {
+        List<OpenOrderRow> list = new ArrayList<OpenOrderRow>();
+        try {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT order_id, symbol, order_type, price, volume, filled_volume, fee, status, signal_date "
+                            + "FROM trade_orders WHERE account_id=? AND status IN (2,3) ORDER BY id ASC",
+                    ACCOUNT_ID);
+            for (Map<String, Object> r : rows) {
+                OrderDTO.Side side = ((Number) r.get("order_type")).intValue() == 4
+                        ? OrderDTO.Side.SELL : OrderDTO.Side.BUY;
+                int st = ((Number) r.get("status")).intValue();
+                OrderDTO.Status status = st == 3 ? OrderDTO.Status.PARTIAL : OrderDTO.Status.SUBMITTED;
+                int vol = ((Number) r.get("volume")).intValue();
+                int filled = r.get("filled_volume") == null ? 0 : ((Number) r.get("filled_volume")).intValue();
+                OrderDTO o = OrderDTO.builder()
+                        .orderId(String.valueOf(r.get("order_id")))
+                        .stockCode(String.valueOf(r.get("symbol")))
+                        .side(side)
+                        .price(toBd(r.get("price")))
+                        .volume(vol)
+                        .filledVolume(filled)
+                        .status(status)
+                        .clientOrderId("RESTORE-" + r.get("order_id"))
+                        .build();
+                OpenOrderRow row = new OpenOrderRow();
+                row.order = o;
+                row.signalDate = toDate(r.get("signal_date"));
+                row.fee = toBd(r.get("fee"));
+                list.add(row);
+            }
+        } catch (Exception e) {
+            log.warn("加载未完结委托失败: {}", e.getMessage());
+        }
+        return list;
+    }
+
+    public static final class OpenOrderRow {
+        public OrderDTO order;
+        public LocalDate signalDate;
+        public BigDecimal fee;
+    }
+
     private static int mapStatus(OrderDTO.Status status) {
         if (status == null) {
             return 1;

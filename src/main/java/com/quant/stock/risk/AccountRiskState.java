@@ -6,6 +6,8 @@ import lombok.Getter;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -78,6 +80,86 @@ public class AccountRiskState {
         lastUnderwaterCountDay.set(null);
         halted = false;
         haltReason = null;
+    }
+
+    /** 导出可落库状态（重启恢复）。 */
+    public Map<String, String> exportState() {
+        Map<String, String> m = new LinkedHashMap<String, String>();
+        m.put("peakEquity", getPeakEquity().toPlainString());
+        m.put("prevCloseEquity", getPrevCloseEquity().toPlainString());
+        BigDecimal ds = dayStartEquity.get();
+        m.put("dayStartEquity", ds == null ? "0" : ds.toPlainString());
+        LocalDate d = day.get();
+        m.put("day", d == null ? "" : d.toString());
+        m.put("consecutiveLosses", String.valueOf(consecutiveLosses.get()));
+        LocalDate block = blockOpenThrough.get();
+        m.put("blockOpenThrough", block == null ? "" : block.toString());
+        m.put("underwaterTradingDays", String.valueOf(underwaterTradingDays.get()));
+        LocalDate uw = lastUnderwaterCountDay.get();
+        m.put("lastUnderwaterCountDay", uw == null ? "" : uw.toString());
+        m.put("halted", String.valueOf(halted));
+        m.put("haltReason", haltReason == null ? "" : haltReason);
+        return m;
+    }
+
+    /** 从落库快照恢复；缺字段时安全跳过。 */
+    public void importState(Map<String, String> m) {
+        if (m == null || m.isEmpty()) {
+            return;
+        }
+        BigDecimal peak = parseBd(m.get("peakEquity"));
+        if (peak != null) {
+            peakEquity.set(peak);
+        }
+        BigDecimal prev = parseBd(m.get("prevCloseEquity"));
+        if (prev != null) {
+            prevCloseEquity.set(prev);
+        }
+        BigDecimal ds = parseBd(m.get("dayStartEquity"));
+        if (ds != null) {
+            dayStartEquity.set(ds);
+        }
+        day.set(parseDate(m.get("day")));
+        consecutiveLosses.set(parseInt(m.get("consecutiveLosses"), 0));
+        blockOpenThrough.set(parseDate(m.get("blockOpenThrough")));
+        underwaterTradingDays.set(parseInt(m.get("underwaterTradingDays"), 0));
+        lastUnderwaterCountDay.set(parseDate(m.get("lastUnderwaterCountDay")));
+        halted = "true".equalsIgnoreCase(String.valueOf(m.get("halted")));
+        String hr = m.get("haltReason");
+        haltReason = hr == null || hr.trim().isEmpty() ? null : hr.trim();
+    }
+
+    private static BigDecimal parseBd(String s) {
+        if (s == null || s.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return new BigDecimal(s.trim());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static LocalDate parseDate(String s) {
+        if (s == null || s.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(s.trim());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static int parseInt(String s, int def) {
+        if (s == null || s.trim().isEmpty()) {
+            return def;
+        }
+        try {
+            return Integer.parseInt(s.trim());
+        } catch (Exception e) {
+            return def;
+        }
     }
 
     /**
