@@ -1773,7 +1773,7 @@
     { id: 'readme', group: 'app', title: '项目 README', src: '/api/docs/readme' },
     { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260726-ops-harden' },
     { id: 'memo', group: 'app', title: '能力与待办', src: '/docs/memo.html?v=20260726-ops-harden' },
-    { id: 'kuangrui', group: 'app', title: '宽睿文档梳理', src: '/docs/kuangrui.html?v=20260720-kuangrui' },
+    { id: 'kuangrui', group: 'app', title: '宽睿文档梳理', src: '/docs/kuangrui.html?v=20260726-kuangrui-plan' },
     { id: 'ashare', group: 'stock', title: 'A股基础', src: '/docs/ashare.html?v=20260720-nav-rename' },
     { id: 'session', group: 'stock', title: '交易时间', src: '/docs/session.html?v=20260720-nav-rename' },
     { id: 'kline', group: 'stock', title: 'K线', src: '/docs/kline.html?v=20260720-nav-rename' },

@@ -1,5 +1,12 @@
 <!-- 片段：由 stock.html 知识面板加载 —— 宽睿文档梳理（Quant360 OES/MDS） -->
-<p>本页梳理本地资料包 <code>D:\宽睿-交易系统简称OES&nbsp;&nbsp;&nbsp;行情系统简称MDS</code> 中的 <b>Quant360 Swordfish</b> Java API（<code>OESAPI-JAVA-v0.17.6.4-20220705</code>），并与本应用当前能力对照。资料仅作对接参考，<strong>代码尚未接入</strong>。</p>
+<p>
+  本页梳理本地资料包 <code>D:\宽睿-交易系统简称OES&nbsp;&nbsp;&nbsp;行情系统简称MDS</code>
+  中的 <b>Quant360 Swordfish</b> Java API（<code>OESAPI-JAVA-v0.17.6.4-20220705</code> / 手册 V0.17.6），
+  分开归纳<strong>文档</strong>与<strong>Demo 代码</strong>，并给出<strong>接入计划</strong>。
+  厂商：上海宽睿；产品 <b>OES</b>（交易）/ <b>MDS</b>（行情）。
+  <strong>业务代码尚未接入</strong>；默认仍用本地 <code>sim</code> + <code>db</code>。
+</p>
+<p class="hint" style="margin-top:0">更新：2026-07-26 · 分析+计划已落页；动手改代码前以本页阶段表为准。</p>
 
 <div class="memo-todo">
   <h4 style="margin-top:0">一、资料包结构</h4>
@@ -7,85 +14,161 @@
     <thead><tr><th>路径/文件</th><th>说明</th></tr></thead>
     <tbody>
       <tr><td><code>OESAPI-JAVA-v0.17.6.4-20220705/</code></td><td>解压后的 Java API 工具包（JDK ≥ 1.7）</td></tr>
-      <tr><td><code>all/</code></td><td>OES+MDS 合一包：<code>quant360-all-api-0.17.6.4.jar</code>、demo、config、doc</td></tr>
-      <tr><td><code>mds/</code></td><td>行情专用：<code>quant360-mds-api-0.17.6.4.jar</code> + <code>MdsExample</code> / <code>MdsUdpExample</code></td></tr>
-      <tr><td><code>oes/</code></td><td>交易专用：<code>quant360-oes-api-0.17.6.4.jar</code> + <code>OesExample</code></td></tr>
+      <tr><td><code>all/</code></td><td>OES+MDS 合一：<code>quant360-all-api-0.17.6.4.jar</code>、demo、config、javadoc、tester</td></tr>
+      <tr><td><code>mds/</code></td><td>行情专用 jar + <code>MdsExample</code> / <code>MdsUdpExample</code></td></tr>
+      <tr><td><code>oes/</code></td><td>交易专用 jar + <code>OesExample</code></td></tr>
       <tr><td><code>*API使用手册V0.17.6.docx</code></td><td>OES / MDS 官方使用手册</td></tr>
-      <tr><td><code>*_api_config.json</code></td><td>通道地址、超时、心跳、<code>clEnvId</code> 等；对接时改主备地址</td></tr>
-      <tr><td><code>bin/</code> API-Tester</td><td>接口调用与压测脚本（需连真实/仿真环境）</td></tr>
-      <tr><td>根目录 <code>Quant360 …接口开发指导手册.doc</code></td><td>Quant360 总册（与 API 包配套）</td></tr>
+      <tr><td>上级 <code>Quant360 …接口开发指导手册.doc</code></td><td>Quant360 总册</td></tr>
+      <tr><td><code>*_api_config.json</code></td><td>通道地址、心跳、缓冲、<code>clEnvId</code>、加密；对接时改主备地址</td></tr>
+      <tr><td><code>bin/</code> API-Tester</td><td>接口调用与压测（需仿真/真实环境）</td></tr>
+      <tr><td><code>lib/</code></td><td>fastjson / logback / lz4 / slf4j（接入时评估 fastjson 安全债）</td></tr>
     </tbody>
   </table>
-  <p class="hint" style="margin:8px 0 0;">厂商：上海宽睿信息科技；产品名 Swordfish <b>OES</b>（Order Execution System）/ <b>MDS</b>（Market Data Service）。</p>
 </div>
 
 <div class="memo-todo">
-  <h4>二、MDS 行情系统能力</h4>
-  <p>入口类：<code>MdsClient</code>（TCP）/ <code>MdsUdpClient</code>（组播）；回调 <code>MdsCallBack</code> / <code>MdsUdpCallBack</code>。</p>
+  <h4>二、文档分析（手册要点）</h4>
+  <h5 style="margin:8px 0 4px;">2.1 协议共性</h5>
+  <ul>
+    <li>TCP Socket + 二进制报文（MDS 另有 UDP 组播）</li>
+    <li><b>价格/金额</b>：整型，精确到元后四位，<code>1 元 = 10000</code></li>
+    <li>登录：<code>ClientLogonReq/Rsp</code>；<code>clEnvId</code>∈[0~99]；密码 <code>encryptType</code> 须与柜台一致</li>
+    <li>配置改 JSON，勿把 Demo 样例 IP/账号写进仓库</li>
+  </ul>
+  <h5 style="margin:8px 0 4px;">2.2 MDS 行情手册</h5>
+  <p>入口：<code>MdsClient</code>（TCP）/ <code>MdsUdpClient</code>（组播）；回调 <code>MdsCallBack</code> / <code>MdsUdpCallBack</code>。定位是<strong>实时行情</strong>，不是历史 K 线库。</p>
   <table>
     <thead><tr><th>能力</th><th>典型接口 / 回调</th><th>对本应用价值</th></tr></thead>
     <tbody>
-      <tr><td>行情订阅推送</td><td><code>subscribeMarketData</code> → L1 股票/指数/期权快照</td><td>实盘扫描、盘中价</td></tr>
-      <tr><td>Level2</td><td><code>onMktL2StockSnapshot*</code>、<code>onMktL2Trade</code>、<code>onMktL2Order</code>、最优档等</td><td>深度/逐笔；资金流可自算近似</td></tr>
+      <tr><td>行情订阅</td><td><code>subscribeMarketData</code> → L1 股票/指数/期权</td><td>实盘扫描、盘中价</td></tr>
+      <tr><td>Level2</td><td>L2 快照/增量/逐笔委托成交、最优档等</td><td>深度；资金流可自算近似（后置）</td></tr>
       <tr><td>快照查询</td><td><code>qryMktDataSnapshot</code> / <code>qrySnapshotList</code></td><td>补洞、启动拉全量</td></tr>
-      <tr><td>证券实时状态</td><td><code>qrySecurityStatus</code> / <code>onSecurityStatus</code></td><td>停复牌、状态过滤</td></tr>
-      <tr><td>交易时段状态</td><td><code>qryTrdSessionStatus</code> / <code>onTrdSessionStatus</code></td><td>开市/休市/集合竞价</td></tr>
-      <tr><td>证券静态信息</td><td><code>qryStockStaticInfo</code> / <code>List</code>（含涨跌停价、停牌标识等）</td><td>替换启发式市值/涨跌停</td></tr>
-      <tr><td>期权静态</td><td><code>qryOptionStaticInfo*</code></td><td>本应用 A 股现货策略暂不需要</td></tr>
-      <tr><td>UDP 组播</td><td><code>MdsUdpClient</code></td><td>低延迟；部署与权限要求更高</td></tr>
+      <tr><td>证券实时状态</td><td><code>qrySecurityStatus</code> / <code>onSecurityStatus</code></td><td>停复牌硬过滤</td></tr>
+      <tr><td>交易时段</td><td><code>qryTrdSessionStatus</code> / <code>onTrdSessionStatus</code></td><td>开市/休市/集合竞价</td></tr>
+      <tr><td>证券静态信息</td><td><code>qryStockStaticInfo</code> / <code>List</code>（涨跌停、停牌、股本等）</td><td>替换启发式市值/涨跌停</td></tr>
+      <tr><td>UDP 组播</td><td><code>MdsUdpClient</code></td><td>低延迟；部署门槛高，第一刀不做</td></tr>
     </tbody>
   </table>
-  <p><b>MDS 通常不直接提供</b>：历史日线/分钟 K 线落库、复权因子、PE/ROE 财报、新闻舆情。回测用历史 K 线仍需另源或本地库。</p>
-</div>
-
-<div class="memo-todo">
-  <h4>三、OES 交易系统能力</h4>
-  <p>入口类：<code>OesClient</code>；通道分工：委托 <code>OesOrdChannel</code>、回报 <code>OesRptChannel</code>、查询 <code>OesQueryChannel</code>；回调 <code>OesCallBack.onOrd</code> / <code>onRpt</code>。</p>
+  <p><b>MDS 不覆盖</b>：多年历史日/分钟 K、复权因子、财报、舆情。回测仍靠本地库或其他源。</p>
+  <h5 style="margin:8px 0 4px;">2.3 OES 交易手册</h5>
+  <p>入口：<code>OesClient</code>；三通道：委托 / 回报 / 查询；回调 <code>onOrd</code> / <code>onRpt</code> / <code>onDisConn</code>。本应用只规划<strong>现货</strong>。</p>
   <table>
     <thead><tr><th>能力</th><th>典型接口</th><th>对本应用价值</th></tr></thead>
     <tbody>
-      <tr><td>下单 / 批量下单</td><td><code>sendOrdReq</code> / <code>sendBatchOrdsReq</code></td><td>替换 <code>trade-mode=sdk</code> 桩</td></tr>
-      <tr><td>撤单</td><td><code>sendOrdCancelReq</code></td><td>本应用尚无真实撤单链路</td></tr>
-      <tr><td>回报同步</td><td><code>initRptSync</code> / <code>sendRptSync</code> + 委托/成交确认</td><td>真实成交推进订单状态</td></tr>
-      <tr><td>查委托 / 成交</td><td><code>queryOrder</code> / <code>queryTrade</code></td><td>对接 <code>sync-orders</code></td></tr>
-      <tr><td>查资金 / 持仓</td><td><code>queryCashAsset</code> / <code>queryStkHolding</code></td><td>对接 <code>position-pnl-sync</code></td></tr>
-      <tr><td>客户总览 / 柜台资金</td><td><code>queryClientOverview</code> / <code>queryCounterCash</code></td><td>账户与柜台对齐</td></tr>
-      <tr><td>佣金费率</td><td><code>queryCommissionRate</code></td><td>替换本地固定费率假设</td></tr>
-      <tr><td>现货产品信息</td><td><code>queryStock</code>（含停牌、风险等级等）</td><td>硬过滤补充</td></tr>
-      <tr><td>交易日 / 市场状态</td><td><code>queryTradingDay</code> / <code>queryMarketState</code></td><td>替代静态节假日表一部分</td></tr>
-      <tr><td>银证转账</td><td><code>sendCashTrsfReq</code> + 流水查询</td><td>资金出入金（真仓运维）</td></tr>
-      <tr><td>两融 / 期权 / ETF / 新股中签</td><td>大量 <code>Crd*</code> / <code>Opt*</code> / <code>Etf*</code> / <code>LotWinning</code></td><td>超出当前现货模拟范围，可不接</td></tr>
+      <tr><td>下单 / 批量 / 撤单</td><td><code>sendOrdReq</code> / <code>sendBatchOrdsReq</code> / <code>sendOrdCancelReq</code></td><td>替换 <code>trade-mode=sdk</code> 桩</td></tr>
+      <tr><td>回报同步</td><td><code>sendRptSync</code>（手册有 <code>initRptSync</code> 演进）</td><td><b>登录后必做</b>；超时易断连</td></tr>
+      <tr><td>查委托 / 成交</td><td><code>queryOrder</code> / <code>queryTrade</code></td><td>真柜台版 <code>sync-orders</code></td></tr>
+      <tr><td>查资金 / 持仓</td><td><code>queryCashAsset</code> / <code>queryStkHolding</code></td><td>真 <code>position-pnl-sync</code></td></tr>
+      <tr><td>总览 / 柜台资金</td><td><code>queryClientOverview</code> / <code>queryCounterCash</code></td><td>纸面对账</td></tr>
+      <tr><td>佣金 / 产品 / 交易日</td><td><code>queryCommissionRate</code> / <code>queryStock</code> / <code>queryTradingDay</code> 等</td><td>费率与过滤增强</td></tr>
+      <tr><td>两融 / 期权 / ETF / 银证</td><td>大量扩展接口</td><td>超出现货金叉范围，暂缓</td></tr>
     </tbody>
   </table>
+  <p class="hint" style="margin:0">文档难点在运维契约（换算、回报同步时限、环境号、加密、重连），不是缺接口名。</p>
 </div>
 
 <div class="memo-todo">
-  <h4>四、与本应用对照（缺什么）</h4>
+  <h4>三、Demo 代码分析</h4>
+  <ul>
+    <li><code>Main</code>：交互选 oes / MDS(TCP|UDP)；测试账号写死 <code>customer1</code>/<code>123456</code>；默认现货</li>
+    <li><code>OesExample</code> 推荐顺序：创建code>OesClientImpl</code> → <code>initCallBack</code> → <code>start(logon)</code> → 用 <code>lastInMsgSeq</code> 初始化流水 → <b><code>sendRptSync</code></b> → 再查账户/下单。样例价 <code>ordPrice=300000</code> 即 <b>30 元</b></li>
+    <li><code>MdsExample</code>：登录 → <code>subscribeMarketData</code> → L1/L2 回调 + 静态/状态/时段查询</li>
+    <li><code>MdsUdpExample</code>：组播收流；第一刀用 TCP L1，UDP/L2 后置</li>
+    <li>回调注释要求：生产用 RingBuffer + 工作线程，勿阻塞 API 线程</li>
+    <li>工程形态：本地 jar + <code>lib</code>，非 Maven 中央坐标；含 API-Tester</li>
+  </ul>
+</div>
+
+<div class="memo-todo">
+  <h4>四、与本应用对照</h4>
   <table>
-    <thead><tr><th>本应用模块</th><th>现状</th><th>宽睿可补</th><th>仍缺（非宽睿或未覆盖）</th></tr></thead>
+    <thead><tr><th>本应用模块</th><th>现状</th><th>宽睿可补</th><th>仍缺</th></tr></thead>
     <tbody>
-      <tr><td><code>market-collect</code> / 行情</td><td>db/mock 骨架</td><td>MDS 订阅+快照→落库分钟/日线（需自聚合成 K）</td><td>历史全市场回测 K、复权</td></tr>
-      <tr><td><code>TradeGatewayService</code></td><td>sim 即时成交；sdk 状态桩</td><td>OES 下单/撤单/回报</td><td>本地风控与柜台拒单映射</td></tr>
-      <tr><td><code>sync-orders</code></td><td>未实现</td><td><code>queryOrder</code>/<code>queryTrade</code>+回报</td><td>—</td></tr>
-      <tr><td><code>position-pnl-sync</code></td><td>未实现</td><td><code>queryCashAsset</code>/<code>queryStkHolding</code></td><td>—</td></tr>
-      <tr><td>停复牌 / ST</td><td>名称粗滤、量≤0</td><td>MDS 证券状态 + 静态信息；OES <code>queryStock</code></td><td>权威 ST/退市名单（可部分覆盖）</td></tr>
-      <tr><td>交易日历</td><td>静态节假日</td><td><code>queryTradingDay</code> / 时段状态</td><td>多年历史调休补班表</td></tr>
-      <tr><td>涨跌停价</td><td>规则估算</td><td>MDS 静态上下限价</td><td>—</td></tr>
-      <tr><td>佣金成本</td><td>配置近似</td><td><code>queryCommissionRate</code></td><td>—</td></tr>
-      <tr><td>复权 / 资金流 / 财报 / 舆情</td><td>未落地</td><td>L2 可近似资金流；其余基本不覆盖</td><td>需其他数据源</td></tr>
+      <tr><td><code>market-collect</code></td><td>骨架 / mock</td><td>MDS 订阅+快照→自聚合落库</td><td>历史全市场回测 K、复权</td></tr>
+      <tr><td><code>TradeGatewayService</code></td><td>sim 即时；sdk 本地桩</td><td>OES 下单/撤单/回报</td><td>本地风控↔柜台拒单映射</td></tr>
+      <tr><td><code>sync-orders</code></td><td><b>本地桩已实现</b>（假推进 FILLED）</td><td><code>queryOrder</code>/<code>queryTrade</code>+回报</td><td>真环境账号与通道</td></tr>
+      <tr><td><code>position-pnl-sync</code></td><td>本地/桩</td><td><code>queryCashAsset</code>/<code>queryStkHolding</code></td><td>同上</td></tr>
+      <tr><td>停复牌 / 涨跌停 / 股本</td><td>量≤0、规则估算、启发式</td><td>MDS 静态+状态；OES <code>queryStock</code></td><td>权威 ST 日切可并存本地表</td></tr>
+      <tr><td>交易日历 / 佣金</td><td>静态节假日 / 配置近似</td><td><code>queryTradingDay</code> / <code>queryCommissionRate</code></td><td>多年调休历史</td></tr>
+      <tr><td>复权 / 财报 / 舆情</td><td>未落地</td><td>基本不覆盖（L2 仅可近似资金流）</td><td>其他数据源</td></tr>
     </tbody>
   </table>
-  <p style="margin:0"><b>建议接入顺序</b>：① MDS 快照/订阅打通 <code>market-collect</code> → ② OES 下单+回报替换 sdk 桩 → ③ 委托/持仓对账任务 → ④ 静态信息与交易日增强过滤。两融/期权/ETF 暂缓。</p>
+</div>
+
+<div class="memo-todo memo-todo--focus">
+  <h4>五、接入计划（已定稿 · 业务代码未开工）</h4>
+  <p class="hint" style="margin-top:0">原则：不静默改金叉；默认 <code>sim</code>+<code>db</code>；宽睿独立开关默认关；先仿真、先只读、再报单；每阶段可验收可回滚。</p>
+  <table>
+    <thead><tr><th>阶段</th><th>目标</th><th>要点</th><th>Done 标准</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>0. 环境</b></td>
+        <td>能登录</td>
+        <td>账号/地址/<code>clEnvId</code>/加密；用包内 Demo/Tester 验证</td>
+        <td>OES+MDS 仿真登录成功（可不改本仓库）</td>
+      </tr>
+      <tr>
+        <td><b>1. MDS L1</b></td>
+        <td>真行情进库</td>
+        <td>TCP 订阅目标池；价÷10000；写 <code>market_minute</code>→聚合日线；回调异步</td>
+        <td><code>market-collect</code> 有增量；关开关行为不变</td>
+      </tr>
+      <tr>
+        <td><b>2. OES 只读</b></td>
+        <td>先对账</td>
+        <td>登录 + <code>sendRptSync</code> + 查资金/持仓/委托/成交</td>
+        <td>账户/纸面对账可见柜台数据</td>
+      </tr>
+      <tr>
+        <td><b>3. OES 报撤</b></td>
+        <td>替换 sdk 桩</td>
+        <td>限价报单/撤单；<code>onRpt</code> 推进 FILLED；报单总闸默认关</td>
+        <td>仿真买/卖/撤闭环；重启与预留不回退</td>
+      </tr>
+      <tr>
+        <td><b>4. 增强</b></td>
+        <td>少启发式</td>
+        <td>静态涨跌停/停牌/股本；交易日；佣金费率</td>
+        <td>可开关回退</td>
+      </tr>
+      <tr>
+        <td><b>5. 后置</b></td>
+        <td>可选</td>
+        <td>L2/UDP、批量、银证；两融/期权/ETF 不进主路径</td>
+        <td>—</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 style="margin:12px 0 4px;">开关草案（仅设计，未落地）</h5>
+  <pre style="margin:0;white-space:pre-wrap;font-size:12px;">quant.kuangrui.enabled=false
+quant.kuangrui.mds.enabled=false
+quant.kuangrui.oes.enabled=false
+quant.kuangrui.oes.order-enabled=false
+quant.kuangrui.config-dir=…   # 外部目录，含密钥，不入库</pre>
+  <h5 style="margin:12px 0 4px;">建议排期（有仿真账号后）</h5>
+  <ul>
+    <li>M0 环境 0.5–1 天 → M1 MDS L1 落库 3–5 天 → M2 OES 只读 2–3 天</li>
+    <li>M3 OES 报撤+回报 5–8 天 → M4 静态/日历/佣金 2–4 天</li>
+    <li>无仿真账号：计划停在阶段 0，业务继续本地模拟</li>
+  </ul>
+  <h5 style="margin:12px 0 4px;">明确不做</h5>
+  <ul>
+    <li>用 MDS 替代全历史回测库；复权/财报/舆情（另源）</li>
+    <li>一上来 UDP+L2+两融；静默改金叉/金字塔规则</li>
+  </ul>
 </div>
 
 <div class="memo-todo">
-  <h4>五、对接前置条件（非代码能补）</h4>
+  <h4>六、对接前置条件（非代码能补）</h4>
   <ol>
-    <li>券商/宽睿侧开通 OES、MDS 账号与通道地址（配置见 <code>*_api_config.json</code>）</li>
-    <li>将 <code>quant360-*-api-*.jar</code> 及依赖纳入本工程（或私服）；注意与 Spring Boot / Netty 版本兼容</li>
-    <li>实现长连接生命周期：登录、心跳、断线重连、回报续订（demo 可参考 <code>OesExample</code> / <code>MdsExample</code>）</li>
-    <li>明确环境：仿真 vs 生产；<code>clEnvId</code>、密码加密方式与柜台一致</li>
+    <li>券商/宽睿侧开通 OES、MDS 账号与通道地址</li>
+    <li>将 <code>quant360-*-api-*.jar</code> 及依赖纳入工程（或私服）；评估与 Spring Boot 兼容及 fastjson</li>
+    <li>长连接：登录、心跳、断线重连、回报续订（参考 <code>OesExample</code> / <code>MdsExample</code>）</li>
+    <li>明确仿真 vs 生产；<code>clEnvId</code>、密码加密与柜台一致</li>
   </ol>
 </div>
 
-<p>缺口清单已同步写入「应用说明 → 能力与待办」。资料版本升级后请重扫本页与待办状态。</p>
+<p>
+  缺口清单见「应用说明 → <b>能力与待办</b>」。
+  资料版本升级或阶段开工后，请同步更新本页与待办状态。
+</p>

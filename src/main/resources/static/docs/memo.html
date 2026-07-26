@@ -24,7 +24,8 @@
     <li><b>新闻舆情 / 另类数据</b> — 未落地 · 宽睿不覆盖</li>
     <li><b>两融 / 期权 / ETF 申赎 / 新股中签</b> — 未规划 · OES 有完整接口族，当前现货模拟策略范围外</li>
   </ol>
-  <p style="margin:0"><b>一句总结</b>：本地模拟闭环已可跑；对接宽睿时优先 <strong>MDS 行情 → OES 下单回报 → 委托/持仓对账</strong>；复权/财报/舆情仍要其他数据源。</p>
+  <p style="margin:0"><b>一句总结</b>：本地模拟闭环已可跑；对接宽睿按「宽睿文档梳理」阶段表：
+    <strong>环境 → MDS L1 落库 → OES 只读对账 → OES 报撤回报 → 静态/费率</strong>；复权/财报/舆情仍要其他数据源。业务代码尚未开工。</p>
 </div>
 
 <details class="memo-todo memo-todo--done">
@@ -78,7 +79,7 @@
     <li><b>文档 PDF</b> — 已落地 · 量化知识 / 应用说明介绍页一键导出（服务端 iText，<code>GET /api/docs/pdf/{stock|app}</code>）</li>
     <li><b>项目 README 在线查看</b> — 已落地 · 应用说明 →「项目 README」；<code>GET /api/docs/readme</code> 实时渲染仓库根目录 Markdown（含 Mermaid 架构图）</li>
     <li><b>本地可调度任务</b> — 已落地 · <code>scan-and-trade</code>、<code>pool-rebuild</code>、<code>after-market-batch-scan</code>、<code>settle-after-close</code>、<code>data-validate</code>、<code>sync-orders</code>、<code>position-pnl-sync</code>；入池粗筛可读 <code>factor_daily</code>；运维「执行一次」可手动触发；scan/sync/settle 锁忙与业务失败均返回错误而非假成功</li>
-    <li><b>宽睿资料梳理</b> — 已落地（文档）· 「应用说明 → 宽睿文档梳理」；API 代码未接入</li>
+    <li><b>宽睿资料梳理</b> — 已落地（文档）· 「应用说明 → 宽睿文档梳理」含文档/Demo 分析与分阶段接入计划；API 业务代码未接入</li>
   </ol>
 </details>
 
