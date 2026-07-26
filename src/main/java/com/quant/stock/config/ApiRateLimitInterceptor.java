@@ -13,7 +13,14 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 对回测/组合/批量等重接口做每 IP 滑动窗口限流。
+ * HTTP 重接口滑动窗口限流拦截器。
+ * <p>
+ * 职责：在 {@link WebMvcConfig} 注册的路径上，按「客户端 IP + 请求 URI」统计 60 秒内请求次数。
+ * </p>
+ * <p>
+ * 关键约束：上限来自 {@link QuantProperties#getRateLimitPerMinute()}，≤0 表示关闭限流；
+ * 超限时返回 HTTP 429 与 JSON 错误体，不进入 Controller。
+ * </p>
  */
 @Component
 @RequiredArgsConstructor
@@ -22,6 +29,14 @@ public class ApiRateLimitInterceptor implements HandlerInterceptor {
     private final QuantProperties props;
     private final Map<String, Deque<Long>> windows = new ConcurrentHashMap<String, Deque<Long>>();
 
+    /**
+     * 请求进入 Controller 前执行限流判定。
+     *
+     * @param request  当前 HTTP 请求（用于 IP 与 URI）
+     * @param response 超限时写入 429 与 JSON 消息
+     * @param handler  处理器（未使用）
+     * @return {@code true} 放行；{@code false} 已写响应并中断链路
+     */
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
             throws Exception {
@@ -49,6 +64,7 @@ public class ApiRateLimitInterceptor implements HandlerInterceptor {
         return true;
     }
 
+    /** 优先取 {@code X-Forwarded-For} 首段，否则 {@code getRemoteAddr()}。 */
     private static String clientIp(HttpServletRequest request) {
         String xff = request.getHeader("X-Forwarded-For");
         if (xff != null && !xff.trim().isEmpty()) {

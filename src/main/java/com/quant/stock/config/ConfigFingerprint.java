@@ -9,24 +9,50 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * 研究可复现：对策略相关 quant.* 配置做稳定哈希（P0-93）。
- * 格式：{@code v1:<16位hex>}，仅覆盖影响回测成交/仓位/风控的键。
+ * 研究可复现：对策略相关 {@code quant.*} 配置做稳定哈希（P0-93）。
+ * <p>
+ * 职责：把影响回测成交、仓位与风控的关键配置规范化为固定键序文本，再截取 SHA-256 前 16 个十六进制字符。
+ * </p>
+ * <p>
+ * 关键约束：输出格式 {@code v1:<16位hex>}；{@link #canonical(QuantProperties, String, BigDecimal)} 键序稳定，便于单测与对照实验。
+ * </p>
  */
 public final class ConfigFingerprint {
 
     private ConfigFingerprint() {
     }
 
+    /**
+     * 使用默认策略 id {@code MaCrossStrategy} 与配置内 {@link QuantProperties#getFeeRate()} 计算指纹。
+     *
+     * @param props 量化配置，可为 null（见 {@link #canonical} 行为）
+     * @return {@code v1:} 前缀的 16 位十六进制摘要
+     */
     public static String of(QuantProperties props) {
         return of(props, "MaCrossStrategy", null);
     }
 
+    /**
+     * 按指定策略 id 与可选费率覆盖计算配置指纹。
+     *
+     * @param props            量化配置
+     * @param strategyId       写入规范文本的策略标识
+     * @param feeRateOverride  非 null 时替代 props 中的 feeRate 参与哈希
+     * @return {@code v1:} 前缀的 16 位十六进制摘要
+     */
     public static String of(QuantProperties props, String strategyId, BigDecimal feeRateOverride) {
         String canonical = canonical(props, strategyId, feeRateOverride);
         return "v1:" + sha256Hex16(canonical);
     }
 
-    /** 可测的规范文本（换行分隔 key=value，键已按插入序固定）。 */
+    /**
+     * 生成用于哈希的规范配置文本（不含摘要前缀后的 hex）。
+     *
+     * @param p                 量化配置；null 时仅输出策略 id 行
+     * @param strategyId        策略标识
+     * @param feeRateOverride   非 null 时覆盖 props 中的费率
+     * @return {@code v1\\n} 开头、每行 {@code key=value} 的稳定字符串
+     */
     public static String canonical(QuantProperties p, String strategyId, BigDecimal feeRateOverride) {
         if (p == null) {
             return "v1\nstrategy=" + nullSafe(strategyId) + "\n";
@@ -105,6 +131,7 @@ public final class ConfigFingerprint {
         return sb.toString();
     }
 
+    /** SHA-256 取前 8 字节转 hex；异常时返回 16 个 {@code 0} 避免中断调用方。 */
     private static String sha256Hex16(String text) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");

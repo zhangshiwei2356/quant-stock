@@ -11,17 +11,36 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * 应用级量化配置绑定（前缀 {@code quant}）。
+ * <p>
+ * 职责：集中承载策略过滤、止损/仓位、账户熔断、撮合成本、目标池粗筛、API 安全与调度总闸等可调参数，
+ * 供引擎、风控、数据层与 Web 层注入使用。
+ * </p>
+ * <p>
+ * 关键约束：默认值面向本地演示；生产环境需显式配置库连接、API Key、限流与风控阈值。
+ * 调度 cron 与单任务开关以 MySQL {@code sys_schedule_job} 为准，{@link Schedule} 仅保留总闸与兼容字段。
+ * </p>
+ */
 @Data
 @ConfigurationProperties(prefix = "quant")
 public class QuantProperties {
 
+    /** 默认关注标的，逗号分隔代码列表 */
     private String stockCodes = "600036,000001,300059";
+    /** 单票最大仓位占权益比例 */
     private BigDecimal maxSinglePosition = new BigDecimal("0.3");
+    /** 组合总仓位占权益硬顶 */
     private BigDecimal maxTotalPosition = new BigDecimal("0.8");
+    /** 单边佣金/手续费率（买卖共用基准） */
     private BigDecimal feeRate = new BigDecimal("0.0003");
+    /** 基础滑点（与分级滑点并存时的简化项） */
     private BigDecimal slipPoint = new BigDecimal("0.001");
+    /** ATR 计算基准比例（策略内部缩放） */
     private BigDecimal baseAtr = new BigDecimal("0.05");
+    /** ATR 低于此阈值时视为波动过小 */
     private BigDecimal atrMinThreshold = new BigDecimal("0.001");
+    /** 批量扫描线程池大小（与 {@link ThreadPoolConfig} 一致） */
     private int batchPoolSize = 10;
     /** 交易候选池最大容量（入池扫描截断） */
     private int tradePoolMax = 30;
@@ -37,25 +56,36 @@ public class QuantProperties {
      * 生产建议 50000000（5000 万）；本地 mock 默认关闭以免池被滤空。
      */
     private long poolMinAvgAmount20 = 0L;
+    /** 行情数据源模式：如 {@code json}、库表等 */
     private String marketMode = "json";
+    /** mock/JSON 模式下生成的 K 线天数 */
     private int mockBarDays = 30;
+    /** 是否启用 MySQL 与 MyBatis（false 时走 classpath 模拟数据） */
     private boolean dbEnabled = false;
 
     /** 策略过滤 */
     private boolean trendFilterEnabled = true;
+    /** 趋势均线周期（日） */
     private int trendMaPeriod = 60;
     private boolean volumeFilterEnabled = true;
+    /** 放量确认：当日量 / 均量 下限 */
     private BigDecimal volumeConfirmRatio = new BigDecimal("1.2");
     private boolean adxFilterEnabled = true;
+    /** ADX 趋势强度下限 */
     private BigDecimal adxMin = new BigDecimal("25");
+    /** ADX 低于此值视为震荡，配合过滤 */
     private BigDecimal adxChopMax = new BigDecimal("20");
+    /** 买入时 RSI 上限 */
     private BigDecimal rsiBuyMax = new BigDecimal("60");
 
     /** 止损止盈 */
     private boolean stopLossEnabled = true;
+    /** ATR 倍数止损距离 */
     private BigDecimal atrStopMultiplier = new BigDecimal("2.0");
+    /** 硬止损：相对权益的最大亏损比例 */
     private BigDecimal hardStopCapitalPct = new BigDecimal("0.02");
     private boolean trailingStopEnabled = true;
+    /** 移动止损 ATR 倍数 */
     private BigDecimal trailingAtrMultiplier = new BigDecimal("1.5");
     /**
      * 最大持仓交易日（开仓日后计；P0-114）。到期挂时间止损清仓。
@@ -123,18 +153,26 @@ public class QuantProperties {
 
     /** 信号漂移监控（P0-90） */
     private boolean signalDriftEnabled = true;
+    /** 漂移统计回看轮数 */
     private int driftLookbackRounds = 20;
+    /** 漂移告警最低胜率 */
     private BigDecimal driftMinWinRate = new BigDecimal("0.35");
+    /** IC 漂移回看交易日 */
     private int driftIcLookbackDays = 60;
+    /** 漂移 IC 下限 */
     private BigDecimal driftMinIc = new BigDecimal("0.02");
+    /** 连续多少轮确认后视为漂移成立 */
     private int driftConfirmRounds = 3;
     /** 漂移确认后是否自动退役；默认 false（只 CRITICAL 告警） */
     private boolean autoRetireOnSignalDrift = false;
 
     /** 多源对账闸（P0-107）：日线 vs 分钟聚合 */
     private boolean dataReconcileGateEnabled = true;
+    /** 对账分歧时是否阻断交易（默认仅告警） */
     private boolean dataReconcileBlockOnDiverge = false;
+    /** 对账允许的最大收盘价相对偏差 */
     private BigDecimal dataReconcileMaxCloseDiffPct = new BigDecimal("0.02");
+    /** 对账抽样天数 */
     private int dataReconcileSampleDays = 5;
 
     /**
@@ -149,8 +187,11 @@ public class QuantProperties {
 
     /** 结构突变（P0-120） */
     private boolean structuralBreakEnabled = true;
+    /** 结构突变检测窗口长度（bar） */
     private int structuralBreakWindow = 20;
+    /** 结构突变统计量阈值 */
     private BigDecimal structuralBreakThreshold = new BigDecimal("2.0");
+    /** 连续满足条件的 bar 数才确认突变 */
     private int structuralBreakConfirmBars = 2;
 
     /**
@@ -166,9 +207,11 @@ public class QuantProperties {
 
     /** IC 衰减监控（P0-125） */
     private boolean icDecayEnabled = true;
+    /** IC 衰减回看长度 */
     private int icDecayLookback = 40;
     /** 半衰期低于此交易日数则告警降仓；0=不按半衰期判 */
     private int icDecayMinHalfLifeBars = 5;
+    /** IC 信息比率下限 */
     private BigDecimal icDecayMinIr = new BigDecimal("0.10");
 
     /**
@@ -176,8 +219,9 @@ public class QuantProperties {
      */
     private String experimentSeed = "";
 
-    /** 开仓静默时段（分钟，相对交易时段） */
+    /** 开仓静默：开盘时段禁新开 */
     private boolean quietOpenEnabled = true;
+    /** 开仓静默：收盘时段禁新开 */
     private boolean quietCloseEnabled = true;
 
     /** 流动性/市值门槛（模拟） */
@@ -231,6 +275,12 @@ public class QuantProperties {
      */
     private Schedule schedule = new Schedule();
 
+    /**
+     * 定时任务相关 YAML 片段（总闸与废弃布尔项）。
+     * <p>
+     * 关键约束：实际 cron 与启停以库表 {@code sys_schedule_job} 为准；{@code enabled=false} 时不注册任何 Spring 触发器。
+     * </p>
+     */
     @Data
     public static class Schedule {
         /** 总闸；false 时 DynamicScheduleService 不注册触发器 */
@@ -245,6 +295,11 @@ public class QuantProperties {
         private boolean afterMarketBatchScan = true;
     }
 
+    /**
+     * 将 {@link #stockCodes} 解析为去空白、去空的代码列表。
+     *
+     * @return 不可变语义上的新列表；配置为空或仅空白时返回空列表（非 null）
+     */
     public List<String> stockCodeList() {
         if (stockCodes == null || stockCodes.trim().isEmpty()) {
             return new ArrayList<String>();
