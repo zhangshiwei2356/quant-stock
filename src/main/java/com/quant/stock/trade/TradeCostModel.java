@@ -19,6 +19,9 @@ public class TradeCostModel {
 
     private final QuantProperties props;
 
+    /**
+     * 按近 20 日均量档位选取滑点率（大/中/小盘）。
+     */
     public BigDecimal slipRate(List<BarDTO> bars, int index) {
         long avgVol = avgVolume(bars, index, 20);
         if (avgVol >= props.getVolLargeThreshold()) {
@@ -30,22 +33,32 @@ public class TradeCostModel {
         return props.getSlipSmall();
     }
 
+    /**
+     * 买入成交价：基准价 × (1 + 滑点 + 冲击成本)。
+     */
     public BigDecimal buyPrice(BigDecimal base, List<BarDTO> bars, int index, int volume) {
         BigDecimal slip = slipRate(bars, index);
         BigDecimal impact = impactRate(bars, index, volume);
         return base.multiply(BigDecimal.ONE.add(slip).add(impact)).setScale(2, RoundingMode.HALF_UP);
     }
 
+    /**
+     * 卖出成交价：基准价 × (1 - 滑点 - 冲击成本)。
+     */
     public BigDecimal sellPrice(BigDecimal base, List<BarDTO> bars, int index, int volume) {
         BigDecimal slip = slipRate(bars, index);
         BigDecimal impact = impactRate(bars, index, volume);
         return base.multiply(BigDecimal.ONE.subtract(slip).subtract(impact)).setScale(2, RoundingMode.HALF_UP);
     }
 
+    /** 买入佣金（默认费率，含最低 5 元）。 */
     public BigDecimal buyFee(BigDecimal amount) {
         return buyFee(amount, props.getFeeRate());
     }
 
+    /**
+     * 买入佣金（指定费率，含最低 5 元）。
+     */
     public BigDecimal buyFee(BigDecimal amount, BigDecimal feeRate) {
         BigDecimal rate = feeRate == null ? props.getFeeRate() : feeRate;
         return commissionWithFloor(amount, rate).setScale(2, RoundingMode.HALF_UP);
@@ -56,6 +69,9 @@ public class TradeCostModel {
         return sellFee(amount, props.getFeeRate(), null);
     }
 
+    /**
+     * 卖出佣金（指定费率，无成交日则印花税走配置）。
+     */
     public BigDecimal sellFee(BigDecimal amount, BigDecimal feeRate) {
         return sellFee(amount, feeRate, null);
     }

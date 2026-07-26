@@ -36,6 +36,13 @@ public final class PartialFillSim {
         return Math.max(0, Math.min(filled, req));
     }
 
+    /**
+     * 计算本 bar 未成交余量（整手）；不足 1 手返回 0。
+     *
+     * @param requestVol 原始拟成交股数
+     * @param filledVol  本 bar 已成交股数
+     * @return 可继续挂单的剩余整手股数
+     */
     public static int remainder(int requestVol, int filledVol) {
         int rem = ((requestVol / 100) * 100) - ((filledVol / 100) * 100);
         return rem >= 100 ? rem : 0;

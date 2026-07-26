@@ -29,6 +29,9 @@ public final class IndicatorSignalUtil {
     private IndicatorSignalUtil() {
     }
 
+    /**
+     * 预计算指标数组容器，供回测/实盘按索引 O(1) 读取。
+     */
     public static class IndicatorBundle {
         public final double[] ma5;
         public final double[] ma10;
@@ -62,6 +65,7 @@ public final class IndicatorSignalUtil {
             this.low = new double[size];
         }
 
+        /** MA5 上穿 MA20（当根发生交叉） */
         public boolean isMaCrossUp(int i) {
             if (i < 20) {
                 return false;
@@ -69,6 +73,7 @@ public final class IndicatorSignalUtil {
             return ma5[i] > ma20[i] && !(ma5[i - 1] > ma20[i - 1]);
         }
 
+        /** MA5 下穿 MA20（当根发生死叉） */
         public boolean isMaCrossDown(int i) {
             if (i < 20) {
                 return false;
@@ -84,6 +89,7 @@ public final class IndicatorSignalUtil {
             return ma60[i] >= ma60[i - 1];
         }
 
+        /** 量能确认：当根成交量大于 volMa20 × ratio */
         public boolean isVolumeConfirm(int i, double ratio) {
             if (i < 20 || Double.isNaN(volMa20[i]) || volMa20[i] <= 0) {
                 return false;
@@ -91,6 +97,7 @@ public final class IndicatorSignalUtil {
             return volume[i] > volMa20[i] * ratio;
         }
 
+        /** ADX 处于可交易区间：高于 chopMax 且不低于 adxMin */
         public boolean isAdxTradable(int i, double adxMin, double chopMax) {
             if (i < 28 || Double.isNaN(adx14[i])) {
                 return false;
@@ -102,6 +109,7 @@ public final class IndicatorSignalUtil {
         }
     }
 
+    /** 对整段 K 线预计算 MA/RSI/ATR/ADX/量能等指标数组。 */
     public static IndicatorBundle precompute(List<BarDTO> bars) {
         int n = bars == null ? 0 : bars.size();
         IndicatorBundle bundle = new IndicatorBundle(n);
@@ -138,6 +146,9 @@ public final class IndicatorSignalUtil {
         return bundle;
     }
 
+    /**
+     * 计算 index 向前 n 根（含当根）的简单平均成交量。
+     */
     public static long avgVolume(List<BarDTO> bars, int index, int n) {
         if (bars == null || index < 0) {
             return 0L;
@@ -154,6 +165,7 @@ public final class IndicatorSignalUtil {
         return cnt == 0 ? 0L : sum / cnt;
     }
 
+    /** 将 BarDTO 列表转为 TA4J BarSeries。 */
     public static BarSeries toSeries(String name, List<BarDTO> bars) {
         BarSeries series = new BaseBarSeries(name);
         for (BarDTO bar : bars) {
@@ -162,6 +174,7 @@ public final class IndicatorSignalUtil {
         return series;
     }
 
+    /** 取最后一根 bar 的主要指标与布林带（供 API/页面展示）。 */
     public static Map<String, BigDecimal> calcLatestIndicators(List<BarDTO> bars) {
         Map<String, BigDecimal> map = new HashMap<String, BigDecimal>();
         if (bars == null || bars.size() < 20) {
@@ -195,6 +208,7 @@ public final class IndicatorSignalUtil {
         return map;
     }
 
+    /** 最后一根 bar 是否 MA 金叉。 */
     public static boolean isMaCrossUp(List<BarDTO> bars) {
         if (bars == null || bars.size() < 21) {
             return false;
@@ -202,6 +216,7 @@ public final class IndicatorSignalUtil {
         return precompute(bars).isMaCrossUp(bars.size() - 1);
     }
 
+    /** 最后一根 bar 是否 MA 死叉。 */
     public static boolean isMaCrossDown(List<BarDTO> bars) {
         if (bars == null || bars.size() < 21) {
             return false;
@@ -209,16 +224,21 @@ public final class IndicatorSignalUtil {
         return precompute(bars).isMaCrossDown(bars.size() - 1);
     }
 
+    /** 最后一根 bar 的 RSI(14)。 */
     public static BigDecimal rsi14(List<BarDTO> bars) {
         Map<String, BigDecimal> m = calcLatestIndicators(bars);
         return m.getOrDefault("rsi14", BigDecimal.ZERO);
     }
 
+    /** 最后一根 bar 的 ATR(14)。 */
     public static BigDecimal atr14(List<BarDTO> bars) {
         Map<String, BigDecimal> m = calcLatestIndicators(bars);
         return m.getOrDefault("atr14", BigDecimal.ZERO);
     }
 
+    /**
+     * 图表用指标序列（ma5/ma20/布林/RSI），与 K 线等长。
+     */
     public static Map<String, double[]> calcSeriesForChart(List<BarDTO> bars) {
         Map<String, double[]> result = new HashMap<String, double[]>();
         int n = bars == null ? 0 : bars.size();

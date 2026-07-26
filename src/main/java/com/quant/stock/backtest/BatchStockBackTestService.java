@@ -46,10 +46,12 @@ public class BatchStockBackTestService {
         this.batchScanExecutor = batchScanExecutor;
     }
 
+    /** 扫描配置股票池（默认 quant.stock-codes） */
     public List<BatchScanResultDTO> scanAll() {
         return scan(quantProperties.stockCodeList());
     }
 
+    /** 并发扫描指定代码列表 */
     public List<BatchScanResultDTO> scan(List<String> codes) {
         if (codes == null || codes.isEmpty()) {
             return new ArrayList<BatchScanResultDTO>();

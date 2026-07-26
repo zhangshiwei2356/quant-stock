@@ -9,11 +9,17 @@ import java.util.Map;
  */
 public final class ScheduleJobGuide {
 
+    /** 运维页展示用：单条预置任务的说明块。 */
     public static final class Detail {
+        /** 任务目的 */
         private final String purpose;
+        /** 作用范围（标的/账户等） */
         private final String scope;
+        /** 触发时机提示 */
         private final String triggerHint;
+        /** 会写入的数据 */
         private final String writes;
+        /** 补充说明与边界 */
         private final String notes;
 
         public Detail(String purpose, String scope, String triggerHint, String writes, String notes) {
@@ -44,6 +50,7 @@ public final class ScheduleJobGuide {
             return notes;
         }
 
+        /** 转为 JSON 友好的键值结构。 */
         public Map<String, Object> toMap() {
             Map<String, Object> m = new LinkedHashMap<String, Object>();
             m.put("purpose", purpose);
@@ -121,6 +128,7 @@ public final class ScheduleJobGuide {
     private ScheduleJobGuide() {
     }
 
+    /** 按任务编码取预置说明；未收录返回 null。 */
     public static Detail get(String jobCode) {
         if (jobCode == null) {
             return null;
@@ -128,6 +136,7 @@ public final class ScheduleJobGuide {
         return GUIDE.get(jobCode.trim());
     }
 
+    /** 转为前端/接口用的说明 Map；未知编码返回通用占位文案。 */
     public static Map<String, Object> toViewMap(String jobCode) {
         Detail d = get(jobCode);
         if (d == null) {

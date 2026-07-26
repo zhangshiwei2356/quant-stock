@@ -20,6 +20,7 @@ public final class AtrRiskReport {
     private AtrRiskReport() {
     }
 
+    /** 从回测配置与分析日志生成 ATR 风控契约快照。 */
     public static Map<String, Object> from(QuantProperties p, DecisionAnalysisLog analysis) {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         if (p == null) {

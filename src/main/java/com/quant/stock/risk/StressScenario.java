@@ -20,14 +20,17 @@ public enum StressScenario {
         this.action = action;
     }
 
+    /** 展示标题 */
     public String getTitle() {
         return title;
     }
 
+    /** 情景说明 */
     public String getDescription() {
         return description;
     }
 
+    /** 预设动作：SCALE_HALF / ALERT / KILL_OPEN 等 */
     public String getAction() {
         return action;
     }

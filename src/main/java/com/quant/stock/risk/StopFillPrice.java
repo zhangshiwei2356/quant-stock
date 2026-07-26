@@ -12,6 +12,7 @@ import java.math.BigDecimal;
  */
 public final class StopFillPrice {
 
+    /** 止损触发与成交基准价判定模式 */
     public enum Mode {
         /** 未触及 */
         NONE,
@@ -21,8 +22,11 @@ public final class StopFillPrice {
         INTRADAY_TOUCH
     }
 
+    /** 止损价解析结果 */
     public static final class Result {
+        /** 触发模式 */
         public final Mode mode;
+        /** 未套滑点前的成交基准价 */
         public final BigDecimal fillBase;
 
         public Result(Mode mode, BigDecimal fillBase) {
@@ -30,6 +34,7 @@ public final class StopFillPrice {
             this.fillBase = fillBase;
         }
 
+        /** 是否已触发止损（含跳空与盘中触及） */
         public boolean triggered() {
             return mode != Mode.NONE && fillBase != null;
         }
@@ -38,6 +43,13 @@ public final class StopFillPrice {
     private StopFillPrice() {
     }
 
+    /**
+     * 根据开高低与止损价判定是否触发及成交基准价。
+     *
+     * @param open  开盘价
+     * @param low   最低价
+     * @param stop  有效止损价
+     */
     public static Result resolve(BigDecimal open, BigDecimal low, BigDecimal stop) {
         if (stop == null || stop.compareTo(BigDecimal.ZERO) <= 0 || low == null) {
             return new Result(Mode.NONE, null);

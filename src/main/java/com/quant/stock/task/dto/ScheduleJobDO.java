@@ -7,12 +7,16 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
+/**
+ * 定时任务库表实体，对应 {@code sys_schedule_job}。
+ */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class ScheduleJobDO {
     private Long id;
+    /** 任务唯一编码（如 scan-and-trade） */
     private String jobCode;
     private String jobName;
     /** CRON / FIXED_RATE */

@@ -34,18 +34,22 @@ public class PositionState {
     private BigDecimal highestSinceEntry = BigDecimal.ZERO;
     private boolean addedToday;
 
+    /** 当前持仓股数 */
     public int getShares() {
         return shares;
     }
 
+    /** 是否持有仓位 */
     public boolean hasPosition() {
         return shares > 0;
     }
 
+    /** 加权平均成本（含买入佣金） */
     public BigDecimal getAvgCost() {
         return avgCost;
     }
 
+    /** 最近一次买入日 */
     public LocalDate getLastBuyDate() {
         return lastBuyDate;
     }
@@ -62,10 +66,12 @@ public class PositionState {
         return highestSinceEntry;
     }
 
+    /** 当日是否已有买入（T+1 与金字塔用） */
     public boolean isAddedToday() {
         return addedToday;
     }
 
+    /** 跨日重置 addedToday 标记 */
     public void clearAddedToday() {
         this.addedToday = false;
     }
@@ -103,6 +109,7 @@ public class PositionState {
         return sellableShares(today) > 0;
     }
 
+    /** 更新持仓以来最高价（移动止盈用） */
     public void updateHighest(BigDecimal high) {
         if (high == null || shares <= 0) {
             return;
@@ -179,6 +186,7 @@ public class PositionState {
         return removedCost;
     }
 
+    /** 清仓并重置止损/最高价状态 */
     public void clear() {
         lots.clear();
         shares = 0;
@@ -242,10 +250,13 @@ public class PositionState {
                 ? avgCost : highest;
     }
 
-    /** 持仓批次只读视图 */
+    /** 持仓批次只读视图（落库 T+1 分档） */
     public static final class LotView {
+        /** 开仓日 */
         public final LocalDate openDate;
+        /** 该档股数 */
         public final int shares;
+        /** 该档累计成本 */
         public final BigDecimal cost;
 
         public LotView(LocalDate openDate, int shares, BigDecimal cost) {

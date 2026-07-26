@@ -30,6 +30,7 @@ public class TurnoverGuardService {
         this.riskAlertService = riskAlertService;
     }
 
+    /** 累计当日买卖成交额 */
     public void recordTrade(LocalDate day, BigDecimal amount) {
         if (day == null || amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             return;
@@ -42,6 +43,7 @@ public class TurnoverGuardService {
         }
     }
 
+    /** 当日成交额/权益 */
     public BigDecimal dayTurnoverRatio(LocalDate day, BigDecimal equity) {
         if (day == null || equity == null || equity.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
@@ -50,6 +52,7 @@ public class TurnoverGuardService {
         return n.divide(equity, 6, RoundingMode.HALF_UP);
     }
 
+    /** 硬顶禁新开 */
     public boolean allowNewOpen(LocalDate day, BigDecimal equity) {
         if (!props.isTurnoverGuardEnabled()) {
             return true;
@@ -80,6 +83,7 @@ public class TurnoverGuardService {
         return r.compareTo(soft) >= 0 ? new BigDecimal("0.5") : BigDecimal.ONE;
     }
 
+    /** 评估软顶并可能发出 WARN，返回仓位乘数 */
     public BigDecimal evaluateAndScale(LocalDate day, BigDecimal equity) {
         BigDecimal mul = positionScaleMultiplier(day, equity);
         if (mul.compareTo(BigDecimal.ONE) < 0) {
@@ -90,6 +94,7 @@ public class TurnoverGuardService {
         return mul;
     }
 
+    /** 换手Guard 状态快照 */
     public Map<String, Object> status(BigDecimal equity) {
         LocalDate day = lastDay.get() == null ? LocalDate.now() : lastDay.get();
         BigDecimal r = dayTurnoverRatio(day, equity);
@@ -113,6 +118,7 @@ public class TurnoverGuardService {
         return m;
     }
 
+    /** 单测清空日累计 */
     public void clearForTests() {
         dayNotional.clear();
         lastDay.set(null);

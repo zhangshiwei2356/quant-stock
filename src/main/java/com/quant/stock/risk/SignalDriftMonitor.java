@@ -41,6 +41,7 @@ public class SignalDriftMonitor {
         this.strategyRetirementService = strategyRetirementService;
     }
 
+    /** 记录一笔完整回合结果，更新滚动胜率 */
     public void onClosedRound(boolean win, LocalDate tradeDay) {
         if (!props.isSignalDriftEnabled()) {
             return;
@@ -108,6 +109,7 @@ public class SignalDriftMonitor {
         return ic;
     }
 
+    /** 运维/接口状态快照 */
     public Map<String, Object> status() {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.put("enabled", props.isSignalDriftEnabled());
@@ -130,6 +132,7 @@ public class SignalDriftMonitor {
         return m;
     }
 
+    /** 单测重置 */
     public void clearForTests() {
         recentWins.clear();
         belowThresholdStreak = 0;

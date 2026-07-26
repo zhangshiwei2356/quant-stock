@@ -36,6 +36,7 @@ public class BackTestAnalysisStore {
     @Autowired(required = false)
     private BacktestAnalysisMapper backtestAnalysisMapper;
 
+    /** 持久化单股分析记录 */
     public BackTestAnalysisRecord appendSingle(String id, String savedAt,
                                                String period, String backStart, String backEnd,
                                                BackTestResult result) {
@@ -63,6 +64,7 @@ public class BackTestAnalysisStore {
         return rec;
     }
 
+    /** 持久化组合分析记录 */
     public BackTestAnalysisRecord appendPortfolio(String id, String savedAt,
                                                   BackTestQueryDTO query, PortfolioResultDTO result) {
         if (result == null || !StringUtils.hasText(id)) {
@@ -91,14 +93,17 @@ public class BackTestAnalysisStore {
         return rec;
     }
 
+    /** 按 recordId 读取单股分析 */
     public BackTestAnalysisRecord getSingleById(String id) {
         return getById(id);
     }
 
+    /** 按 recordId 读取组合分析 */
     public BackTestAnalysisRecord getPortfolioById(String id) {
         return getById(id);
     }
 
+    /** 列出单股分析历史 */
     public List<BackTestAnalysisRecord> listSingle(String stockCode) {
         if (backtestAnalysisMapper == null) {
             return Collections.emptyList();
@@ -112,6 +117,7 @@ public class BackTestAnalysisStore {
         return out;
     }
 
+    /** 列出组合分析历史 */
     public List<BackTestAnalysisRecord> listPortfolio() {
         if (backtestAnalysisMapper == null) {
             return Collections.emptyList();
@@ -124,6 +130,7 @@ public class BackTestAnalysisStore {
         return out;
     }
 
+    /** 删除指定标的的单股分析 */
     public int clearSingleByCode(String stockCode) {
         if (backtestAnalysisMapper == null || !StringUtils.hasText(stockCode)) {
             return 0;
@@ -131,6 +138,7 @@ public class BackTestAnalysisStore {
         return backtestAnalysisMapper.deleteSingleByCode(stockCode.trim());
     }
 
+    /** 清空全部组合分析 */
     public int clearAllPortfolio() {
         if (backtestAnalysisMapper == null) {
             return 0;

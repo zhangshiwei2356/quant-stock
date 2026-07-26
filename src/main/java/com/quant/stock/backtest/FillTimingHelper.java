@@ -12,6 +12,7 @@ import java.util.List;
  */
 public final class FillTimingHelper {
 
+    /** 分钟序列有效撮合起始时刻（09:45） */
     public static final LocalTime EFFECTIVE_OPEN = LocalTime.of(9, 45);
 
     private FillTimingHelper() {

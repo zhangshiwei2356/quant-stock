@@ -18,6 +18,7 @@ import java.util.List;
 @AllArgsConstructor
 public class BackTestAnalysisRecord {
 
+    /** 与回测历史对齐的记录 ID */
     private String id;
     private String savedAt;
     /** SINGLE / PORTFOLIO */

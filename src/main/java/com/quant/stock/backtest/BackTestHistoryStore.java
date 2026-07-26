@@ -51,6 +51,7 @@ public class BackTestHistoryStore {
         this.jdbcProvider = jdbcProvider;
     }
 
+    /** 启动时补齐 bt_backtest_record 可选列 */
     @PostConstruct
     public void ensureSchema() {
         JdbcTemplate jdbc = jdbcProvider.getIfAvailable();
@@ -62,6 +63,7 @@ public class BackTestHistoryStore {
                         + "COMMENT '策略配置指纹 P0-93' AFTER `stock_results_json`");
     }
 
+    /** 持久化单股回测结果并返回历史视图 */
     public SingleBacktestHistoryRecord appendSingle(String period, String backStart, String backEnd,
                                                     BackTestResult result) {
         if (result == null) {
@@ -97,6 +99,7 @@ public class BackTestHistoryStore {
         return rec;
     }
 
+    /** 持久化组合回测结果 */
     public PortfolioBacktestHistoryRecord appendPortfolio(BackTestQueryDTO query, PortfolioResultDTO result) {
         if (result == null) {
             return null;
@@ -135,6 +138,7 @@ public class BackTestHistoryStore {
         return rec;
     }
 
+    /** 按标的过滤单股历史（空则全部） */
     public List<SingleBacktestHistoryRecord> listSingle(String stockCode) {
         if (backtestRecordMapper == null) {
             return Collections.emptyList();
@@ -148,6 +152,7 @@ public class BackTestHistoryStore {
         return out;
     }
 
+    /** 列出全部组合回测历史 */
     public List<PortfolioBacktestHistoryRecord> listPortfolio() {
         if (backtestRecordMapper == null) {
             return Collections.emptyList();
@@ -160,6 +165,7 @@ public class BackTestHistoryStore {
         return out;
     }
 
+    /** 删除指定标的的单股历史条数 */
     public int clearSingleByCode(String stockCode) {
         if (backtestRecordMapper == null || !StringUtils.hasText(stockCode)) {
             return 0;
@@ -167,6 +173,7 @@ public class BackTestHistoryStore {
         return backtestRecordMapper.deleteSingleByCode(stockCode.trim());
     }
 
+    /** 清空全部组合回测历史 */
     public int clearAllPortfolio() {
         if (backtestRecordMapper == null) {
             return 0;

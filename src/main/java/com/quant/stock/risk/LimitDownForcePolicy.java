@@ -5,6 +5,7 @@ package com.quant.stock.risk;
  */
 public final class LimitDownForcePolicy {
 
+    /** 连续跌停挂卖失败达到该天数则强制卖出 */
     public static final int FORCE_DAYS = 3;
 
     private LimitDownForcePolicy() {

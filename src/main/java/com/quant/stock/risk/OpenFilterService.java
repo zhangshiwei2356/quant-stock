@@ -76,6 +76,7 @@ public class OpenFilterService {
         };
     }
 
+    /** 当前 bar 是否满足全部开仓过滤条件 */
     public boolean canOpen(String stockCode, List<BarDTO> bars, int index) {
         if (bars == null || index < 1 || index >= bars.size()) {
             return false;
@@ -105,6 +106,7 @@ public class OpenFilterService {
         return mktCapYi.compareTo(props.getMinMarketCapYi()) >= 0;
     }
 
+    /** 挂单撮合时点通过且满足开仓过滤 */
     public boolean canExecuteOpenFill(String stockCode, List<BarDTO> bars, int index) {
         if (!FillTimingHelper.canFillPendingOnBar(bars, index)) {
             return false;
@@ -112,6 +114,7 @@ public class OpenFilterService {
         return canOpen(stockCode, bars, index);
     }
 
+    /** 是否处于开盘或收盘静默时段（不可新开） */
     public boolean isQuietPeriod(LocalDateTime t) {
         if (t == null) {
             return false;
@@ -127,6 +130,7 @@ public class OpenFilterService {
                 && !time.isAfter(LocalTime.of(15, 0));
     }
 
+    /** 相对当前 bar 的上一交易日收盘价（分钟序列跨日回溯） */
     public BigDecimal prevTradingDayClose(List<BarDTO> bars, int index) {
         if (bars == null || index <= 0 || index >= bars.size() || bars.get(index) == null
                 || bars.get(index).getBarBegin() == null) {
@@ -145,10 +149,12 @@ public class OpenFilterService {
         return null;
     }
 
+    /** 当前 bar 是否涨停（相对昨收） */
     public boolean isLimitUpAt(List<BarDTO> bars, int index) {
         return isLimitMove(bars, index, true);
     }
 
+    /** 当前 bar 是否跌停（相对昨收） */
     public boolean isLimitDownAt(List<BarDTO> bars, int index) {
         return isLimitMove(bars, index, false);
     }
@@ -171,6 +177,7 @@ public class OpenFilterService {
         return LimitBoardHelper.isLimitDown(cur, prev.getClose(), cur.getCode(), isSt(cur.getCode()));
     }
 
+    /** 无量视为停牌 */
     public boolean isSuspended(BarDTO cur) {
         return cur == null || cur.getVolume() == null || cur.getVolume().compareTo(BigDecimal.ZERO) <= 0;
     }
@@ -201,6 +208,7 @@ public class OpenFilterService {
         return LimitBoardHelper.isLimitDown(cur, ref, code, st);
     }
 
+    /** 是否 ST（as-of 为当前日期） */
     public boolean isSt(String code) {
         return isSt(code, LocalDate.now());
     }

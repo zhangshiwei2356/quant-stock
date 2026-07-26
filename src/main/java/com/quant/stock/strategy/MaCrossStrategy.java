@@ -19,11 +19,18 @@ public class MaCrossStrategy extends BaseStrategy {
 
     private final QuantProperties quantProperties;
 
+    /** 策略标识：均线金叉。 */
     @Override
     public String name() {
         return "MA_CROSS_FILTERED";
     }
 
+    /**
+     * 在已收盘 K 线上计算金叉/死叉及可选过滤后的买卖信号。
+     *
+     * @param stockCode  标的代码
+     * @param closedBars 按时间升序的已收盘 bar
+     */
     @Override
     public TradeSignal calcSignal(String stockCode, List<BarDTO> closedBars) {
         if (closedBars == null || closedBars.size() < 65) {
@@ -79,6 +86,9 @@ public class MaCrossStrategy extends BaseStrategy {
                 .build();
     }
 
+    /**
+     * 金叉买入被过滤时的原因；通过则返回 null。
+     */
     public String rejectReason(IndicatorSignalUtil.IndicatorBundle ind, int i) {
         if (quantProperties.isTrendFilterEnabled() && !ind.isTrendUp(i)) {
             return "大周期MA60未向上";
@@ -106,6 +116,9 @@ public class MaCrossStrategy extends BaseStrategy {
         return null;
     }
 
+    /**
+     * 指定 bar 是否为「过滤通过」的金叉买入信号。
+     */
     public boolean isBuySignalAt(IndicatorSignalUtil.IndicatorBundle ind, int i) {
         if (!ind.isMaCrossUp(i)) {
             return false;

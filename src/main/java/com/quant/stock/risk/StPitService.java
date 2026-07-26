@@ -36,6 +36,7 @@ public class StPitService {
         this.stockBasicMapperProvider = stockBasicMapperProvider;
     }
 
+    /** 启动时建表并从 stock_basic 种子化 ST 历史 */
     @PostConstruct
     public void init() {
         ensureTable();
@@ -62,6 +63,7 @@ public class StPitService {
         return snapshotIsSt(code.trim());
     }
 
+    /** 运维/对账用：ST 开仓过滤开关、日切表行数、数据源优先级与财报时钟边界。 */
     public Map<String, Object> status() {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.put("stOpenFilterEnabled", props.isStOpenFilterEnabled());
@@ -72,6 +74,7 @@ public class StPitService {
         return m;
     }
 
+    /** 财报/静默期时钟能力说明（本地未接数据源时固定不可用）。 */
     public Map<String, Object> earningsClockStatus() {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.put("available", false);
@@ -95,6 +98,7 @@ public class StPitService {
         return m;
     }
 
+    /** 查询最近 ST 日切记录 */
     public List<Map<String, Object>> recent(int limit) {
         int lim = Math.max(1, Math.min(limit, 200));
         try {

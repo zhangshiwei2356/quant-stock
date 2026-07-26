@@ -7,6 +7,7 @@ import lombok.Data;
  */
 @Data
 public class ScheduleJobUpdateRequest {
+    /** 显示名称 */
     private String jobName;
     /** CRON / FIXED_RATE */
     private String triggerType;

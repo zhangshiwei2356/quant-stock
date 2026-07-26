@@ -20,7 +20,9 @@ public class AnalysisEvent {
     /** SIGNAL_BUY / SIGNAL_SELL / SIGNAL_PYRAMID / FILL_BUY / FILL_SELL / STOP / REJECT / EXPIRE / RISK */
     private String type;
     private String time;
+    /** 标的代码 */
     private String stockCode;
+    /** 事件标题（如「买入成交」） */
     private String title;
     /** 人类可读原因说明 */
     private String reason;

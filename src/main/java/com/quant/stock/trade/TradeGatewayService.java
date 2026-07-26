@@ -42,10 +42,18 @@ public class TradeGatewayService {
         this.liveLedgerProvider = liveLedgerProvider;
     }
 
+    /**
+     * 下单（自动生成客户端幂等键）。
+     */
     public OrderDTO placeOrder(String stockCode, OrderDTO.Side side, BigDecimal price, int volume) {
         return placeOrder(stockCode, side, price, volume, null);
     }
 
+    /**
+     * 下单：Redis 锁 + 客户端幂等；sim 即时 FILLED，sdk 为 SUBMITTED。
+     *
+     * @param clientOrderId 幂等键；空则自动生成
+     */
     public OrderDTO placeOrder(String stockCode, OrderDTO.Side side, BigDecimal price, int volume,
                                String clientOrderId) {
         final String cid = clientOrderId == null || clientOrderId.trim().isEmpty()
@@ -213,6 +221,9 @@ public class TradeGatewayService {
         ledger.upsertOrder(order, signalDate, fee);
     }
 
+    /**
+     * 模拟/桩：生成委托号并记录日志；子类可对接真实 SDK。
+     */
     protected String placeOrderSdk(OrderDTO order) {
         // 控制在 VARCHAR(32) 内：S + 31 位 hex
         String u = IdUtil.fastSimpleUUID();
@@ -223,10 +234,12 @@ public class TradeGatewayService {
         return orderId;
     }
 
+    /** 网关内存持仓快照（只读）。 */
     public Map<String, Integer> queryPositions() {
         return Collections.unmodifiableMap(positions);
     }
 
+    /** 按委托号查询内存委托。 */
     public OrderDTO queryOrder(String orderId) {
         return orders.get(orderId);
     }

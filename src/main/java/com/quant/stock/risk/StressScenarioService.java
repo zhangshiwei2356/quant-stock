@@ -37,6 +37,7 @@ public class StressScenarioService {
         this.riskAlertService = riskAlertService;
     }
 
+    /** 压力情景导致的仓位乘数（ADV 断崖时为 0.5） */
     public BigDecimal positionScaleMultiplier() {
         if (!props.isStressScenarioEnabled()) {
             return BigDecimal.ONE;
@@ -82,6 +83,7 @@ public class StressScenarioService {
         }
     }
 
+    /** 标记组合相关尖峰（只告警） */
     public void markCorrelationSpike(boolean spike, LocalDate day, BigDecimal avgCorr) {
         correlationSpike = spike;
         if (spike) {
@@ -90,6 +92,7 @@ public class StressScenarioService {
         }
     }
 
+    /** 预注册情景目录与各情景激活状态 */
     public Map<String, Object> catalogAndStatus() {
         List<Map<String, Object>> catalog = new ArrayList<Map<String, Object>>();
         for (StressScenario s : StressScenario.values()) {
@@ -112,6 +115,7 @@ public class StressScenarioService {
         return m;
     }
 
+    /** ADV20/ADV60 低于比例阈视为断崖 */
     public static boolean isAdvCliff(List<BarDTO> bars, int index, BigDecimal cliffRatio) {
         if (cliffRatio == null || cliffRatio.compareTo(BigDecimal.ZERO) <= 0) {
             return false;
@@ -129,6 +133,7 @@ public class StressScenarioService {
         return ratio.compareTo(cliffRatio) < 0;
     }
 
+    /** 单测清空情景缓存 */
     public void clearForTests() {
         advCliffByCode.clear();
         limitLockByCode.clear();

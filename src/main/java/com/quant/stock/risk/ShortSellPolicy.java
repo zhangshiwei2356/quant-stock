@@ -17,11 +17,12 @@ public final class ShortSellPolicy {
         return false;
     }
 
+    /** 运维/接口用空头策略状态快照。 */
     public static Map<String, Object> status() {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.put("allowShort", allowShort());
         m.put("mode", "LONG_ONLY");
-        m.put("hint", "禁融券/空头腿；卖出≤持仓；两融接口族不在范围");
+        m.put("hint", "仅多头现货；禁融券/空头；卖出≤持仓；两融接口不在范围");
         return m;
     }
 }

@@ -37,6 +37,7 @@ public class BackTestTradeStats {
     /** 总盈亏 = 期末资产 − 初始资金 */
     private BigDecimal totalPnl;
 
+    /** 从成交流水汇总买卖统计与总盈亏 */
     public static BackTestTradeStats from(List<BackTradeRecord> trades,
                                           BigDecimal initCapital,
                                           BigDecimal finalAsset) {

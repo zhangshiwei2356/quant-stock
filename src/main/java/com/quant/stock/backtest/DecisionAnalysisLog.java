@@ -33,51 +33,61 @@ public class DecisionAnalysisLog {
     private int expire;
     private boolean truncated;
 
+    /** 记录金叉挂买单信号 */
     public void signalBuy(String code, LocalDateTime t, String reason, Map<String, Object> data) {
         signalBuy++;
         add("SIGNAL_BUY", code, t, "金叉挂买单", reason, data);
     }
 
+    /** 记录金字塔加仓挂单 */
     public void signalPyramid(String code, LocalDateTime t, String reason, Map<String, Object> data) {
         signalPyramid++;
         add("SIGNAL_PYRAMID", code, t, "金字塔加仓挂单", reason, data);
     }
 
+    /** 记录卖出信号挂单 */
     public void signalSell(String code, LocalDateTime t, String reason, Map<String, Object> data) {
         signalSell++;
         add("SIGNAL_SELL", code, t, "卖出信号挂单", reason, data);
     }
 
+    /** 记录买入成交 */
     public void fillBuy(String code, LocalDateTime t, String reason, Map<String, Object> data) {
         fillBuy++;
         add("FILL_BUY", code, t, "买入成交", reason, data);
     }
 
+    /** 记录卖出成交 */
     public void fillSell(String code, LocalDateTime t, String reason, Map<String, Object> data) {
         fillSell++;
         add("FILL_SELL", code, t, "卖出成交", reason, data);
     }
 
+    /** 记录止损/移动止盈 */
     public void stop(String code, LocalDateTime t, String reason, Map<String, Object> data) {
         stop++;
         add("STOP", code, t, "止损/移动止盈", reason, data);
     }
 
+    /** 记录拒单或未成交原因 */
     public void reject(String code, LocalDateTime t, String title, String reason, Map<String, Object> data) {
         reject++;
         add("REJECT", code, t, title == null ? "未成交/拒绝" : title, reason, data);
     }
 
+    /** 记录挂单过期 */
     public void expire(String code, LocalDateTime t, String reason, Map<String, Object> data) {
         expire++;
         add("EXPIRE", code, t, "挂单过期", reason, data);
     }
 
+    /** 记录账户级风控动作 */
     public void risk(String code, LocalDateTime t, String reason, Map<String, Object> data) {
         risk++;
         add("RISK", code, t, "账户风控", reason, data);
     }
 
+    /** 已收集的事件列表（只读视图） */
     public List<AnalysisEvent> events() {
         return events;
     }
@@ -87,6 +97,7 @@ public class DecisionAnalysisLog {
         return stop;
     }
 
+    /** 人类可读计数摘要 */
     public String summary() {
         String base = String.format(
                 "信号买%d/卖%d/加仓%d · 成交买%d/卖%d · 止损%d · 拒绝%d · 过期%d · 风控%d",
@@ -122,6 +133,7 @@ public class DecisionAnalysisLog {
         return log;
     }
 
+    /** 构造指标与资金快照，写入分析事件的 data 字段 */
     public static Map<String, Object> indSnapshot(IndicatorSignalUtil.IndicatorBundle ind, int i,
                                                   BigDecimal close, BigDecimal cash, BigDecimal equity,
                                                   BigDecimal posScale, BigDecimal atr) {
@@ -164,6 +176,7 @@ public class DecisionAnalysisLog {
         return m;
     }
 
+    /** 双精度指标值四舍五入为 BigDecimal，非法值返回 null */
     public static Object round(double v) {
         if (Double.isNaN(v) || Double.isInfinite(v)) {
             return null;

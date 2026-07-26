@@ -25,7 +25,9 @@ import java.util.Map;
 public class LiveLedgerService {
 
     private static final Logger log = LoggerFactory.getLogger(LiveLedgerService.class);
+    /** 本地模拟账户标识 */
     public static final String ACCOUNT_ID = "LIVE";
+    /** system_config 中模拟现金键名 */
     public static final String CASH_KEY = "sim.cash";
 
     private final JdbcTemplate jdbc;
@@ -34,6 +36,9 @@ public class LiveLedgerService {
         this.jdbc = jdbc;
     }
 
+    /**
+     * 从库读取模拟现金；无记录或空值返回 null（由调用方决定是否用默认值）。
+     */
     public BigDecimal loadCashOrNull() {
         try {
             List<String> rows = jdbc.query(
@@ -50,6 +55,7 @@ public class LiveLedgerService {
         }
     }
 
+    /** 写入模拟现金至 system_config；失败仅打日志。 */
     public void saveCash(BigDecimal cash) {
         try {
             doSaveCash(cash);
@@ -58,10 +64,18 @@ public class LiveLedgerService {
         }
     }
 
+    /**
+     * upsert 委托；成交日默认等于信号日。
+     */
     public void upsertOrder(OrderDTO order, LocalDate signalDate, BigDecimal fee) {
         upsertOrder(order, signalDate, null, fee);
     }
 
+    /**
+     * upsert 委托行（含信号日、成交日、费用）。
+     *
+     * @param executionDate 实际成交日；未成交传 null
+     */
     public void upsertOrder(OrderDTO order, LocalDate signalDate, LocalDate executionDate, BigDecimal fee) {
         try {
             doUpsertOrder(order, signalDate, executionDate, fee);
@@ -70,6 +84,7 @@ public class LiveLedgerService {
         }
     }
 
+    /** 覆盖写入单标的持仓汇总与批次明细；空仓则删除对应行。 */
     public void upsertPosition(String symbol, PositionState pos) {
         try {
             doUpsertPosition(symbol, pos);
@@ -196,6 +211,7 @@ public class LiveLedgerService {
         }
     }
 
+    /** 从库加载当前有仓标的及批次快照。 */
     public Map<String, PositionState> loadPositions() {
         Map<String, PositionState> map = new HashMap<String, PositionState>();
         try {
@@ -269,10 +285,12 @@ public class LiveLedgerService {
         }
     }
 
+    /** 风控/退役/挂单元数据等通用配置键 */
     public static final String KEY_RISK_STATE = "sim.risk.state";
     public static final String KEY_RETIREMENT = "sim.retirement";
     public static final String KEY_BOOKS_META = "sim.books.meta";
 
+    /** 写入或更新 system_config 键值。 */
     public void saveConfig(String key, String value, String description) {
         if (key == null || key.trim().isEmpty()) {
             return;
@@ -288,6 +306,7 @@ public class LiveLedgerService {
         }
     }
 
+    /** 读取配置值；无键返回 null。 */
     public String loadConfigOrNull(String key) {
         if (key == null) {
             return null;
@@ -344,6 +363,7 @@ public class LiveLedgerService {
         return list;
     }
 
+    /** 重启恢复用：未完结委托一行（委托 + 信号日 + 已计费用）。 */
     public static final class OpenOrderRow {
         public OrderDTO order;
         public LocalDate signalDate;

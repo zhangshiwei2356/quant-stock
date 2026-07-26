@@ -16,8 +16,12 @@ public final class PortfolioCorrelationMonitor {
     }
 
     /**
-     * @param closeByCode 代码 → 按时间升序收盘价（至少 lookback+1 点更佳）
-     * @param lookback    收益窗口长度（交易日数）
+     * 计算组合持仓两两相关并判断是否超过告警阈。
+     *
+     * @param closeByCode   代码 → 按时间升序收盘价（至少 lookback+1 点更佳）
+     * @param lookback      收益窗口长度（交易日数）
+     * @param warnThreshold 平均相关告警阈；空则默认 0.75
+     * @return 含 avgCorrelation、maxCorrelation、warn、pairs 等键的摘要 Map
      */
     public static Map<String, Object> report(Map<String, List<BigDecimal>> closeByCode,
                                              int lookback,

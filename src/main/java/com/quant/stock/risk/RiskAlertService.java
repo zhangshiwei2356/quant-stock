@@ -77,6 +77,7 @@ public class RiskAlertService {
         return true;
     }
 
+    /** 最近告警列表（最新在前） */
     public List<Map<String, Object>> recent(int limit) {
         int lim = Math.max(1, Math.min(limit <= 0 ? 50 : limit, RING_MAX));
         List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
@@ -87,6 +88,7 @@ public class RiskAlertService {
         return out;
     }
 
+    /** 软预算阈值与最近告警快照 */
     public Map<String, Object> snapshot() {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.put("cooldownWarnMinutes", props.getAlertCooldownWarnMinutes());
@@ -123,6 +125,7 @@ public class RiskAlertService {
         }
     }
 
+    /** 单测清空冷却与环形缓冲 */
     public void clearForTests() {
         lastEmit.clear();
         recent.clear();

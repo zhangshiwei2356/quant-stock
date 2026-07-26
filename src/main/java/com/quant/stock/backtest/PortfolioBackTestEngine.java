@@ -63,6 +63,9 @@ public class PortfolioBackTestEngine {
     private final MaCrossStrategy maCrossStrategy;
     private final TradingCalendar tradingCalendar;
 
+    /**
+     * 组合回测：拉取多标的日 K、对齐时间轴、共享资金池撮合。
+     */
     public PortfolioResultDTO run(BackTestQueryDTO query) {
         BigDecimal initCapitalPreview = query == null || query.getInitCapital() == null
                 ? new BigDecimal("100000") : query.getInitCapital();

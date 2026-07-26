@@ -36,6 +36,7 @@ public class PortfolioBacktestHistoryRecord {
     /** 策略相关配置指纹（P0-93） */
     private String configFingerprint;
 
+    /** 由组合回测结果构建历史记录 */
     public static PortfolioBacktestHistoryRecord fromResult(String id, String savedAt,
                                                             BackTestQueryDTO query,
                                                             PortfolioResultDTO result) {

@@ -25,10 +25,12 @@ public enum ExitPriority {
         this.label = label;
     }
 
+    /** 数值越大优先级越高 */
     public int getRank() {
         return rank;
     }
 
+    /** 人类可读退出原因前缀（与挂单 reason 对齐） */
     public String getLabel() {
         return label;
     }
@@ -71,6 +73,7 @@ public enum ExitPriority {
         return this == STOP_LOSS || this == ACCOUNT_HALT || this == TIME_STOP;
     }
 
+    /** 按挂卖 reason 文案前缀解析优先级；无法识别返回 null */
     public static ExitPriority fromReasonLabel(String reason) {
         if (reason == null || reason.isEmpty()) {
             return null;

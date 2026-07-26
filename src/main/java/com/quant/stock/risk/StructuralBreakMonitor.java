@@ -44,6 +44,7 @@ public class StructuralBreakMonitor {
         return new BigDecimal("0.5");
     }
 
+    /** 是否处于结构突变降仓状态 */
     public boolean isBreakActive() {
         return props.isStructuralBreakEnabled() && breakActive;
     }
@@ -87,6 +88,7 @@ public class StructuralBreakMonitor {
         return sc;
     }
 
+    /** 结构突变监控状态 */
     public Map<String, Object> status() {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.put("enabled", props.isStructuralBreakEnabled());
@@ -102,6 +104,7 @@ public class StructuralBreakMonitor {
         return m;
     }
 
+    /** 单测重置突变状态 */
     public void clearForTests() {
         lastScore.set(null);
         breakActive = false;
@@ -115,6 +118,7 @@ public class StructuralBreakMonitor {
         return sc != null && threshold != null && sc.compareTo(threshold) >= 0;
     }
 
+    /** 计算双窗突变分（静态工具，供回测断言） */
     public static BigDecimal scoreAt(List<BarDTO> bars, int index, int window) {
         int w = Math.max(10, window);
         if (bars == null || index < w * 2) {

@@ -22,7 +22,9 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public class AccountRiskState {
 
+    /** 熔断原因：峰值回撤深度 */
     public static final String HALT_DEPTH = "DEPTH";
+    /** 熔断原因：回撤持续期 */
     public static final String HALT_DURATION = "DURATION";
 
     private final QuantProperties props;
@@ -51,24 +53,29 @@ public class AccountRiskState {
         this.props = props;
     }
 
+    /** 历史峰值权益 */
     public BigDecimal getPeakEquity() {
         BigDecimal p = peakEquity.get();
         return p == null ? BigDecimal.ZERO : p;
     }
 
+    /** 昨日收盘权益（单日亏损基准） */
     public BigDecimal getPrevCloseEquity() {
         BigDecimal p = prevCloseEquity.get();
         return p == null ? BigDecimal.ZERO : p;
     }
 
+    /** 当前连续亏损回合数 */
     public int getConsecutiveLosses() {
         return consecutiveLosses.get();
     }
 
+    /** 权益低于峰值的连续交易日数 */
     public int getUnderwaterTradingDays() {
         return underwaterTradingDays.get();
     }
 
+    /** 回测开始时重置为初始资金状态 */
     public void reset(BigDecimal initCapital) {
         peakEquity.set(initCapital);
         prevCloseEquity.set(initCapital);
@@ -235,6 +242,7 @@ public class AccountRiskState {
         onClosedRound(win, tradeDay);
     }
 
+    /** 是否允许新开仓（含单日亏损、连亏禁开、熔断） */
     public boolean allowNewOpen(LocalDate tradeDay, BigDecimal equity) {
         if (halted) {
             return false;
@@ -254,6 +262,7 @@ public class AccountRiskState {
         return true;
     }
 
+    /** 根据峰值回撤与持续期返回仓位系数（0 / 0.5 / 1） */
     public BigDecimal positionScale(BigDecimal equity) {
         BigDecimal dd = drawdown(equity);
         if (halted || dd.compareTo(props.getDrawdownHaltPct()) >= 0) {
@@ -269,6 +278,7 @@ public class AccountRiskState {
         return BigDecimal.ONE;
     }
 
+    /** 相对历史峰值的回撤比例（0~1） */
     public BigDecimal drawdown(BigDecimal equity) {
         BigDecimal peak = peakEquity.get();
         if (peak == null || peak.compareTo(BigDecimal.ZERO) <= 0 || equity == null) {

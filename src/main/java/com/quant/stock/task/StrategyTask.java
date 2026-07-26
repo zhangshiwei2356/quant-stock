@@ -152,6 +152,7 @@ public class StrategyTask {
         this.icDecayMonitor = icDecayMonitor;
     }
 
+    /** 应用启动：恢复账本、风控与运行时状态。 */
     @PostConstruct
     public void init() {
         restoreLedger();
@@ -340,6 +341,8 @@ public class StrategyTask {
     }
 
     /**
+     * 实盘分钟扫描并撮合：目标池内标的逐根处理挂买/挂卖/止损与信号。
+     *
      * @return false 表示锁忙未执行
      */
     public boolean scanAndTrade() {
@@ -705,6 +708,8 @@ public class StrategyTask {
     }
 
     /**
+     * sdk 模式：推进网关 SUBMITTED→FILLED 并将待入账写入策略账本。
+     *
      * @return false 表示锁忙未执行
      */
     public boolean syncOrders() {
@@ -1157,6 +1162,7 @@ public class StrategyTask {
         return simCash;
     }
 
+    /** 模拟账户初始资金（收益率分母；恢复现金不修改此值）。 */
     public BigDecimal getSimInitCash() {
         return simInitCash;
     }
@@ -1166,6 +1172,7 @@ public class StrategyTask {
         return markEquity(null);
     }
 
+    /** 仅持仓部分市值（不含现金）。 */
     public BigDecimal getPositionMarketValue() {
         return calcPositionMv();
     }

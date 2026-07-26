@@ -15,6 +15,7 @@ public final class LimitPriceProtect {
     private LimitPriceProtect() {
     }
 
+    /** 构建限价保护能力快照（供运维/验收接口）。 */
     public static Map<String, Object> status(QuantProperties props) {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.put("enabled", props != null && props.isLimitPriceProtectEnabled());
@@ -22,7 +23,7 @@ public final class LimitPriceProtect {
         m.put("fiveLevelBook", "UNAVAILABLE");
         m.put("l2Depth", "UNAVAILABLE");
         m.put("advCap", "ParticipationCap");
-        m.put("hint", "clamp buy<=limitUp / sell>=limitDown; five-level/L2 UNAVAILABLE; use with ADV cap");
+        m.put("hint", "买入价≤涨停、卖出价≥跌停；五档/L2 本地不可用；与 ADV 参与率帽配合");
         return m;
     }
 

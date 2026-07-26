@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class LiveAccountRiskState extends AccountRiskState {
+    /** Spring 单例；构造时注入全局配置 */
     public LiveAccountRiskState(QuantProperties props) {
         super(props);
     }

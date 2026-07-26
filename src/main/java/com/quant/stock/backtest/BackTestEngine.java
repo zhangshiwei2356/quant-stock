@@ -62,10 +62,16 @@ public class BackTestEngine {
     private final OpenFilterService openFilterService;
     private final TradingCalendar tradingCalendar;
 
+    /** 使用默认费率与 {@link MaCrossStrategy} 运行单股回测 */
     public BackTestResult run(String stockCode, List<BarDTO> closedBars, BigDecimal initCapital) {
         return run(stockCode, closedBars, initCapital, props.getFeeRate(), props.getSlipPoint(), maCrossStrategy);
     }
 
+    /**
+     * 单股回测主入口：指定策略与费率覆盖。
+     *
+     * @param closedBars 已收盘 K 线（至少约 65 根）
+     */
     public BackTestResult run(String stockCode, List<BarDTO> closedBars, BigDecimal initCapital,
                               BigDecimal feeRate, BigDecimal slipPoint, BaseStrategy strategy) {
         String strategyId = strategy == null ? "MaCrossStrategy" : strategy.getClass().getSimpleName();

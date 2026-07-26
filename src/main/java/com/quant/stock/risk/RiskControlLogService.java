@@ -26,6 +26,7 @@ public class RiskControlLogService {
         this.jdbc = jdbc;
     }
 
+    /** 写入一条风控事件到 risk_control_log */
     public void record(LocalDate logDate, String symbol, String ruleType,
                        BigDecimal triggerValue, String actionTaken) {
         try {

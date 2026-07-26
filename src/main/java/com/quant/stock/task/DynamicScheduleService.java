@@ -58,18 +58,21 @@ public class DynamicScheduleService implements ApplicationRunner {
         return s;
     }
 
+    /** Spring Boot 启动完成后建表、种子数据并注册调度。 */
     @Override
     public void run(ApplicationArguments args) {
         ensureSchemaAndSeed();
         reloadAll();
     }
 
+    /** 销毁时取消全部已注册触发器并关闭调度线程池。 */
     @PreDestroy
     public void destroy() {
         cancelAll();
         taskScheduler.shutdown();
     }
 
+    /** 取消并重新从库表加载全部启用任务的触发器。 */
     public synchronized void reloadAll() {
         cancelAll();
         if (!quantProperties.getSchedule().isEnabled()) {
@@ -91,6 +94,7 @@ public class DynamicScheduleService implements ApplicationRunner {
         log.info("动态调度已加载：启用 {} / 共 {}", n, jobs.size());
     }
 
+    /** 任务列表视图（含总闸、是否已注册、预置说明）。 */
     public List<Map<String, Object>> listJobs() {
         boolean masterOn = quantProperties.getSchedule().isEnabled();
         List<Map<String, Object>> list = new ArrayList<Map<String, Object>>();
@@ -100,6 +104,7 @@ public class DynamicScheduleService implements ApplicationRunner {
         return list;
     }
 
+    /** 调度总览：总闸状态、已注册数、任务明细。 */
     public Map<String, Object> status() {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         boolean masterOn = quantProperties.getSchedule().isEnabled();
@@ -113,6 +118,11 @@ public class DynamicScheduleService implements ApplicationRunner {
         return m;
     }
 
+    /**
+     * 部分更新任务配置并热重载调度。
+     *
+     * @return 更新后的单条任务视图
+     */
     public Map<String, Object> updateJob(String jobCode, ScheduleJobUpdateRequest req) {
         ScheduleJobDO existing = requireJob(jobCode);
         ScheduleJobDO patch = ScheduleJobDO.builder().jobCode(jobCode).build();
@@ -157,6 +167,9 @@ public class DynamicScheduleService implements ApplicationRunner {
         return toView(requireJob(jobCode), quantProperties.getSchedule().isEnabled());
     }
 
+    /**
+     * 启停单条任务；{@code enabled} 为 null 时在 0/1 间切换。
+     */
     public Map<String, Object> toggle(String jobCode, Boolean enabled) {
         ScheduleJobDO existing = requireJob(jobCode);
         int next;
@@ -195,6 +208,9 @@ public class DynamicScheduleService implements ApplicationRunner {
         }
     }
 
+    /**
+     * 运维「执行一次」：同步调用 handler，失败向上抛。
+     */
     public Map<String, Object> runOnce(String jobCode) {
         requireJob(jobCode);
         invoke(jobCode, true);

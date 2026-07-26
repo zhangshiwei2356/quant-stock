@@ -36,6 +36,7 @@ public class IcDecayMonitor {
         this.riskAlertService = riskAlertService;
     }
 
+    /** 追加一条滚动 IC 样本并重新评估衰减 */
     public void onIcSample(LocalDate day, BigDecimal ic) {
         if (!props.isIcDecayEnabled() || ic == null) {
             return;
@@ -48,6 +49,7 @@ public class IcDecayMonitor {
         evaluate(day);
     }
 
+    /** IC 衰减激活时的仓位乘数（0.5 或 1） */
     public BigDecimal positionScaleMultiplier() {
         if (!props.isIcDecayEnabled() || !decayActive) {
             return BigDecimal.ONE;
@@ -55,10 +57,12 @@ public class IcDecayMonitor {
         return new BigDecimal("0.5");
     }
 
+    /** 是否处于 IC 衰减降仓状态 */
     public boolean isDecayActive() {
         return props.isIcDecayEnabled() && decayActive;
     }
 
+    /** IC 衰减监控状态快照 */
     public Map<String, Object> status() {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.put("enabled", props.isIcDecayEnabled());
@@ -77,6 +81,7 @@ public class IcDecayMonitor {
         return m;
     }
 
+    /** 单测重置 IC 序列 */
     public void clearForTests() {
         icSeries.clear();
         lastHalfLife = null;

@@ -24,6 +24,7 @@ public final class LimitBoardHelper {
         return limitPct(stockCode, false);
     }
 
+    /** 涨跌停幅度（未考虑 ST 时用板块默认） */
     public static BigDecimal limitPct(String stockCode, boolean stStock) {
         if (stStock) {
             return ST_LIMIT;
@@ -38,10 +39,12 @@ public final class LimitBoardHelper {
         return MAIN_LIMIT;
     }
 
+    /** 涨停价（四舍五入到分） */
     public static BigDecimal limitUpPrice(BigDecimal prevClose, String stockCode) {
         return limitUpPrice(prevClose, stockCode, false);
     }
 
+    /** 涨停价（可指定 ST 状态） */
     public static BigDecimal limitUpPrice(BigDecimal prevClose, String stockCode, boolean stStock) {
         if (prevClose == null || prevClose.compareTo(BigDecimal.ZERO) <= 0) {
             return null;
@@ -50,10 +53,12 @@ public final class LimitBoardHelper {
                 .setScale(2, RoundingMode.HALF_UP);
     }
 
+    /** 跌停价 */
     public static BigDecimal limitDownPrice(BigDecimal prevClose, String stockCode) {
         return limitDownPrice(prevClose, stockCode, false);
     }
 
+    /** 跌停价（可指定 ST 状态） */
     public static BigDecimal limitDownPrice(BigDecimal prevClose, String stockCode, boolean stStock) {
         if (prevClose == null || prevClose.compareTo(BigDecimal.ZERO) <= 0) {
             return null;
@@ -69,14 +74,17 @@ public final class LimitBoardHelper {
         return isLimitUp(cur, prevClose, stockCode, false);
     }
 
+    /** 是否涨停（可指定 ST） */
     public static boolean isLimitUp(BarDTO cur, BigDecimal prevClose, String stockCode, boolean stStock) {
         return isLimitSide(cur, prevClose, stockCode, true, stStock);
     }
 
+    /** 是否跌停 */
     public static boolean isLimitDown(BarDTO cur, BigDecimal prevClose, String stockCode) {
         return isLimitDown(cur, prevClose, stockCode, false);
     }
 
+    /** 是否跌停（可指定 ST） */
     public static boolean isLimitDown(BarDTO cur, BigDecimal prevClose, String stockCode, boolean stStock) {
         return isLimitSide(cur, prevClose, stockCode, false, stStock);
     }

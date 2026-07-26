@@ -35,10 +35,12 @@ public class StrategyRetirementService {
         this.tradingCalendar = tradingCalendar;
     }
 
+    /** 策略是否处于退役（禁新开）状态 */
     public boolean isRetired() {
         return retired;
     }
 
+    /** 是否允许新开仓（未退役为 true） */
     public boolean allowNewOpen() {
         return !retired;
     }
@@ -58,6 +60,7 @@ public class StrategyRetirementService {
                 "回撤持续期熔断自动退役 underwaterDays=" + state.getUnderwaterTradingDays());
     }
 
+    /** 手动或 API 触发退役 */
     public synchronized Map<String, Object> retire(LocalDate on, String reasonCode, String noteText) {
         retired = true;
         retiredOn = on == null ? LocalDate.now() : on;
@@ -75,6 +78,7 @@ public class StrategyRetirementService {
         return resume(today, force, null);
     }
 
+    /** 带确认码的恢复（双人复核） */
     public synchronized Map<String, Object> resume(LocalDate today, boolean force, String confirmCode) {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         if (!retired) {
@@ -115,6 +119,7 @@ public class StrategyRetirementService {
         return m;
     }
 
+    /** 冷却期是否已满（按交易日计） */
     public boolean cooldownSatisfied(LocalDate today) {
         int need = props.getRetirementCooldownTradingDays();
         if (need <= 0) {
@@ -126,6 +131,7 @@ public class StrategyRetirementService {
         return tradingCalendar.tradingDaysAfter(retiredOn, today == null ? LocalDate.now() : today) >= need;
     }
 
+    /** 剩余冷却交易日数 */
     public int remainingCooldownDays(LocalDate today) {
         int need = props.getRetirementCooldownTradingDays();
         if (!retired || need <= 0 || retiredOn == null) {
@@ -135,6 +141,7 @@ public class StrategyRetirementService {
         return Math.max(0, need - passed);
     }
 
+    /** 退役/冷却状态快照（供 API） */
     public Map<String, Object> status(LocalDate today) {
         LocalDate asOf = today == null ? LocalDate.now() : today;
         Map<String, Object> m = new LinkedHashMap<String, Object>();
@@ -155,6 +162,7 @@ public class StrategyRetirementService {
         return m;
     }
 
+    /** 单测清空内存状态 */
     public void clearForTests() {
         retired = false;
         retiredOn = null;

@@ -7,13 +7,18 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 
+/**
+ * 批量扫池单股结果：信号、指标、动量与可选回测参考指标。
+ */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class BatchScanResultDTO {
 
+    /** 标的代码 */
     private String stockCode;
+    /** 最新收盘价 */
     private BigDecimal lastClose;
     /** 历史回测收益率（辅助参考，不再作为入池主排序） */
     private BigDecimal totalRate;

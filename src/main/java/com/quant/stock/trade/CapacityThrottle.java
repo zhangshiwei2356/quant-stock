@@ -16,6 +16,13 @@ public final class CapacityThrottle {
     private CapacityThrottle() {
     }
 
+    /**
+     * 汇总容量节流配置与当前有效 ADV 参与率（供运维/诊断接口展示）。
+     *
+     * @param props  量化配置
+     * @param equity 当前账户权益（用于 AUM 缩放）
+     * @return 配置项、有效顶、POV 及 TWAP 可用性提示
+     */
     public static Map<String, Object> status(QuantProperties props, BigDecimal equity) {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         BigDecimal cfg = props == null ? null : props.getMaxParticipationAdv();

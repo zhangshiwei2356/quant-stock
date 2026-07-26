@@ -36,6 +36,7 @@ public class SingleBacktestHistoryRecord {
     /** 策略相关配置指纹（P0-93） */
     private String configFingerprint;
 
+    /** 由 {@link BackTestResult} 构建历史记录（不含权益曲线） */
     public static SingleBacktestHistoryRecord fromResult(String id, String savedAt,
                                                          String period, String backStart, String backEnd,
                                                          BackTestResult result) {
