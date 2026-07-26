@@ -185,7 +185,7 @@ sequenceDiagram
 ### 8. 量化知识 / 应用说明
 
 - **量化知识**：A 股基础、指标、涨跌停、T+1、成本、仓位、风控、撮合、回测要点等
-- **应用说明**：系统概述 → **项目 README** → 交易规则 → 待办清单 → 宽睿文档梳理
+- **应用说明**：系统概述 → **项目 README** → 交易规则 → 能力与待办 → 宽睿文档梳理
 - 介绍页可导出 PDF：`GET /api/docs/pdf/{stock|app}`
 - 在线 README：`GET /api/docs/readme`
 
@@ -287,7 +287,7 @@ sequenceDiagram
   - `sync-orders`：本地桩将 `SUBMITTED→FILLED` 并改仓；`trade-mode=sdk` 时策略在 sync 后才落现金/批次
   - `position-pnl-sync`：本地成本 + 最新价浮盈日志
 - 页面标「未实现」（缺外部 API）：`market-collect`
-- 对照：**应用说明 → 待办清单**；宽睿对接：**应用说明 → 宽睿文档梳理**
+- 对照：**应用说明 → 能力与待办**；宽睿对接：**应用说明 → 宽睿文档梳理**
 
 ---
 
@@ -347,7 +347,7 @@ sequenceDiagram
 - 行情/券商 SDK 默认为 Noop；生产需接真实行情与柜台（可参考宽睿 Quant360）
 - 市值无交易所接口时依赖 `float-shares-yi` 或启发式
 - 实盘路径为模拟现金账本；`sdk` 下单为 SUBMITTED（预留资金/可卖量），`sync-orders` 确认 FILLED 后再改现金与批次
-- 复权/财报/舆情等见待办清单
+- 复权/财报/舆情等见「能力与待办」
 
 ---
 
@@ -358,7 +358,7 @@ sequenceDiagram
 1. 本 `README.md`
 2. 「应用说明 → 系统概述」（`static/docs/app.html`）
 3. 规则变更 → 「交易规则」（`rules.html`）
-4. 能力/待办 → 「待办清单」（`memo.html`）
+4. 能力/待办 → 「能力与待办」（`memo.html`；待对接置顶，已落地默认折叠）
 5. 宽睿资料 → 「宽睿文档梳理」（`kuangrui.html`）
 
 规则：`.cursor/rules/sync-readme.mdc`、`.cursor/rules/sync-memo.mdc`。

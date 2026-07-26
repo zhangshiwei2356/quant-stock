@@ -1575,11 +1575,51 @@ button.home-action {
   font-weight: 600;
 }
 
+.knowledge-body .memo-lead {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--accent, #2563eb);
+  background: rgba(37, 99, 235, 0.06);
+}
+
 .knowledge-body .memo-todo {
   margin: 0 0 10px;
   padding: 8px 10px;
   border-left: 3px solid var(--accent, #3d9);
   background: rgba(127, 127, 127, 0.08);
+}
+
+.knowledge-body .memo-todo--focus {
+  border-left-color: var(--danger, #c45);
+  background: rgba(196, 85, 85, 0.08);
+}
+
+.knowledge-body details.memo-todo--done {
+  border-left-color: rgba(127, 127, 127, 0.55);
+}
+
+.knowledge-body details.memo-todo--done > summary {
+  cursor: pointer;
+  list-style: none;
+  font-weight: 600;
+  user-select: none;
+}
+
+.knowledge-body details.memo-todo--done > summary::-webkit-details-marker {
+  display: none;
+}
+
+.knowledge-body details.memo-todo--done > summary::before {
+  content: "▸ ";
+  color: var(--muted, #888);
+}
+
+.knowledge-body details.memo-todo--done[open] > summary::before {
+  content: "▾ ";
+}
+
+.knowledge-body details.memo-todo--done > ol {
+  margin-top: 8px;
 }
 
 .knowledge-body .memo-todo li { margin-bottom: 6px; }

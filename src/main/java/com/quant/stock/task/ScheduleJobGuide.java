@@ -71,7 +71,7 @@ public final class ScheduleJobGuide {
                 "仅扫描 trade_pool 中 status=1 的标的；目标池为空则跳过。",
                 "默认工作日 9–11、13–15 点每分钟一次（CRON）；非交易日（周末/内置节假日）风控拒单。",
                 "写入 trade_orders；更新 trade_positions / trade_position_lots；现金写入 system_config(sim.cash)。",
-                "已实现（本地模拟账本，重启可恢复）。需先有盘后扫描写入的目标池标的，并开启总闸与本任务。真券商下单见待办清单。"
+                "已实现（本地模拟账本，重启可恢复）。需先有盘后扫描写入的目标池标的，并开启总闸与本任务。真券商下单见「能力与待办」。"
         ));
         m.put("sync-orders", new Detail(
                 "同步委托/成交状态：将本地已报订单推进为成交，并落本地仓位与现金。",
@@ -92,7 +92,7 @@ public final class ScheduleJobGuide {
                 "当日账户与持仓；池内∪持仓标的的行情聚合。",
                 "默认工作日 15:30（CRON）。",
                 "写入 trade_cashflows（权益日表）、更新 system_config(sim.cash)；聚合依赖本地/已有行情。",
-                "本地日结已实现；真实行情增量拉取仍待外部行情 API（见待办清单）。"
+                "本地日结已实现；真实行情增量拉取仍待外部行情 API（见「能力与待办」）。"
         ));
         m.put("pool-rebuild", new Detail(
                 "全市场扫描：按策略条件筛选可入选标的，覆盖唯一目标池，并生成分析报告落库。",

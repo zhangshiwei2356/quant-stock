@@ -1,24 +1,50 @@
-<!-- 片段：由 stock.html 知识面板加载 —— 待办清单（整应用路线图） -->
-<p>本页记录<strong>整个应用</strong>的待办与落地状态：能本地补齐的已做；依赖外部 API / 数据源的列在下方，便于后续对接。侧栏菜单名以当前页面为准。宽睿 Quant360 能力对照见「应用说明 → <b>宽睿文档梳理</b>」。</p>
+<!-- 片段：由 stock.html 知识面板加载 —— 能力与待办（整应用路线图） -->
+<p class="memo-lead">
+  本页是<strong>整应用路线图</strong>（非「仅未完成事项」）：
+  <b>先看下方待对接项</b>；本地已具备的能力默认折叠，需要时再展开核对。
+  宽睿 Quant360 对照见「应用说明 → <b>宽睿文档梳理</b>」。
+</p>
 
-<div class="memo-todo">
-  <h4 style="margin-top:0">一、本地已落地</h4>
+<div class="memo-todo memo-todo--focus">
+  <h4 style="margin-top:0">一、待办 · 依赖外部 API / 数据源</h4>
+  <p class="hint" style="margin:0 0 8px;">当前真正待推进的能力缺口（本地模拟无法替代）。</p>
+  <ol>
+    <li><b>真实行情 API（优先对接宽睿 MDS）</b> — 未接入 · <code>market-collect</code> 仍为骨架。待接：<code>MdsClient.subscribeMarketData</code>、L1/L2 快照回调、<code>qryMktDataSnapshot</code> / <code>qrySnapshotList</code>；自聚合成分钟/日线后落库</li>
+    <li><b>券商交易 API（优先对接宽睿 OES）</b> — 未接入 · <code>quant.trade-mode=sdk</code> 仅为状态桩。待接：<code>sendOrdReq</code> / <code>sendBatchOrdsReq</code> / <code>sendOrdCancelReq</code> + <code>OesCallBack</code> 委托/成交回报与 <code>initRptSync</code></li>
+    <li><b>券商委托/持仓对账（OES 查询）</b> — 未接入 · <code>sync-orders</code> ← <code>queryOrder</code>/<code>queryTrade</code>；<code>position-pnl-sync</code> ← <code>queryCashAsset</code>/<code>queryStkHolding</code>（及可选 <code>queryClientOverview</code>）</li>
+    <li><b>证券状态 / 静态信息（MDS+OES）</b> — 部分本地粗滤 · 待接 MDS <code>qrySecurityStatus</code>、<code>qryStockStaticInfo(List)</code>（涨跌停价、停牌标识）；OES <code>queryStock</code></li>
+    <li><b>交易日 / 市场时段（OES+MDS）</b> — 部分静态表 · 待接 OES <code>queryTradingDay</code> / <code>queryMarketState</code>；MDS <code>qryTrdSessionStatus</code></li>
+    <li><b>真实佣金费率（OES）</b> — 未落地 · 待接 <code>queryCommissionRate</code>（替换配置近似费率）</li>
+    <li><b>银证转账（OES，真仓运维）</b> — 未落地 · <code>sendCashTrsfReq</code> + <code>queryCashTransferSerial</code>（模拟账本可不接）</li>
+    <li><b>历史 K 线全市场源</b> — 部分：本地库/种子 · MDS 偏实时，不替代多年回测历史；需另源或自建落库管道</li>
+    <li><b>复权因子</b>（除权除息）— 未落地 · 宽睿包未覆盖；需复权因子或前复权行情源</li>
+    <li><b>资金流向</b>（主力净流入/北向）— 未落地 · 无专用接口；L2 逐笔可自算近似，北向需另源</li>
+    <li><b>真实市值/流通股本/日均额</b> — 部分启发式 · MDS/OES 静态信息可补一部分；完整股本与日均额或需基本面源</li>
+    <li><b>财报与估值 / 公告时钟</b>（PE/ROE、静默期）— 未落地 · 宽睿不覆盖；需财务/公告 API；本地仅声明边界</li>
+    <li><b>新闻舆情 / 另类数据</b> — 未落地 · 宽睿不覆盖</li>
+    <li><b>两融 / 期权 / ETF 申赎 / 新股中签</b> — 未规划 · OES 有完整接口族，当前现货模拟策略范围外</li>
+  </ol>
+  <p style="margin:0"><b>一句总结</b>：本地模拟闭环已可跑；对接宽睿时优先 <strong>MDS 行情 → OES 下单回报 → 委托/持仓对账</strong>；复权/财报/舆情仍要其他数据源。</p>
+</div>
+
+<details class="memo-todo memo-todo--done">
+  <summary><b>二、能力 · 本地已落地</b>（默认折叠 · 点击展开台账）</summary>
   <ol>
     <li><b>模拟账本持久化</b> — 已落地 · 成交写 <code>trade_orders</code>；持仓/批次写 <code>trade_positions</code>、<code>trade_position_lots</code>；现金写 <code>system_config(sim.cash)</code>；启动恢复</li>
     <li><b>收盘权益日表</b> — 已落地 · <code>settle-after-close</code> 写 <code>trade_cashflows</code>；账户概览 →「权益日结」可查看</li>
     <li><b>风控日志</b> — 已落地 · 峰值回撤熔断写入 <code>risk_control_log</code>；账户概览 →「风控事件」</li>
     <li><b>交易日历（静态）</b> — 已落地 · 周末 + 内置法定节假日（含 2026 中秋 9/25–27、国庆 10/1–7；10/8 开市）；风控拒非交易日</li>
-    <li><b>账户概览</b> — 已落地 · 资金权益 / 当前持仓（批次 T+1）/ 委托记录 / 权益日结 / 风控事件</li>
+    <li><b>账户概览</b> — 已落地 · 资金权益 / 当前持仓（批次 T+1）/ 委托记录 / 权益日结 / 风控事件 / 风控日报</li>
     <li><b>唯一目标池</b> — 已落地 · 「当前池」手动「扫描更新」或定时 <code>pool-rebuild</code> / <code>after-market-batch-scan</code>；「扫描历史」可查看批次，亦可手动扫描；移出≠卖出；漏斗 + Markdown 报告</li>
     <li><b>运维中心</b> — 已落地 · 任务管理（库表动态调度）/ 数据健康（本地空与滞后）/ 运行参数（中文说明对照配置键）</li>
     <li><b>数据表</b> — 已落地 · MySQL 白名单分页只读浏览</li>
-    <li><b>回测工作台</b> — 已落地 · 行情/个股/组合工作台内模糊选股；个股二级：回测工作台 / 批量扫描 / 回测历史；组合二级：回测工作台 / 回测历史；结果含 <code>configFingerprint</code></li>
+    <li><b>回测工作台</b> — 已落地 · 行情/个股/组合工作台内模糊选股；个股二级：回测工作台 / 批量扫描 / 回测历史；组合二级：回测工作台 / 回测历史；结果含 <code>configFingerprint</code> / <code>atrRisk</code></li>
     <li><b>ADV 参与率硬顶</b> — 已落地 · <code>quant.max-participation-adv</code> 默认 0.10；买入/死叉卖受限，止损与熔断卖不受限</li>
     <li><b>退出优先级契约</b> — 已落地 · <code>ExitPriority</code>（止损 &gt; 熔断挂卖 &gt; 时间止损 &gt; 死叉）；见交易规则</li>
     <li><b>纸面-实盘对账闸</b> — 已落地（本地）· <code>GET /api/account/paper-live-gap</code>；账户 →「纸面对账」；真券商对账仍待 API</li>
     <li><b>时间止损</b> — 已落地 · <code>quant.max-hold-trading-days</code> 默认 0（关闭）</li>
     <li><b>回撤持续期双门禁</b> — 已落地 · 低于峰值满 N 日降仓 / 满 M 日熔断（默认 10/30）</li>
-    <li><b>策略退役冷却</b> — 已落地 · 持续期熔断可自动退役；账户页手动退役/恢复；冷却默认 20 交易日</li>
+    <li><b>策略退役冷却</b> — 已落地 · 持续期熔断可自动退役；账户页手动退役/恢复；强制恢复双人复核；冷却默认 20 交易日</li>
     <li><b>止损跳空穿价</b> — 已落地 · 开盘≤止损按开盘价；盘中触及按止损价（P0-115 用例集）</li>
     <li><b>组合相关监控</b> — 已落地 · 组合回测附 correlation；账户 <code>GET /api/account/correlation</code>（只告警）</li>
     <li><b>告警分级冷却</b> — 已落地 · <code>RiskAlertService</code>；软预算 WARN + 熔断/退役 CRITICAL；<code>GET /api/account/alerts</code></li>
@@ -26,7 +52,7 @@
     <li><b>涨跌停限价保护</b> — 已落地（局部）· <code>limit-price-protect-enabled</code> 默认 true；买≤涨停/卖≥跌停；五档/L2 仍待行情 API</li>
     <li><b>回测部成对齐</b> — 已落地 · <code>backtest-fill-ratio</code> 默认 1；残量挂单；<code>GET /api/account/partial-fill</code></li>
     <li><b>压力情景库</b> — 已落地 · 预注册 ADV 断崖/一字板/相关尖峰等；<code>GET /api/account/stress</code>；不改金叉</li>
-    <li><b>信号漂移监控</b> — 已落地（可落部分）· 滚动胜率+MA价差IC；默认不自动退役；<code>GET /api/account/signal-drift</code></li>
+    <li><b>信号漂移监控</b> — 已落地（可落部分）· 滚动胜率+MA价差代理 IC；默认不自动退役；<code>GET /api/account/signal-drift</code></li>
     <li><b>多源对账闸</b> — 已落地（本地）· 日线 vs 分钟聚合；<code>/api/ops/data-reconcile</code>；默认不阻断；外部行情对账仍待 API</li>
     <li><b>扩容降频 + POV</b> — 已落地 · <code>capacity-aum-base</code> 收紧 ADV；<code>pov-max-bar-volume-pct</code> 当根量切片</li>
     <li><b>结构突变监控</b> — 已落地 · 双窗突变分→降仓+挂漂移；<code>GET /api/account/structural-break</code></li>
@@ -51,28 +77,7 @@
     <li><b>本地可调度任务</b> — 已落地 · <code>scan-and-trade</code>、<code>pool-rebuild</code>、<code>after-market-batch-scan</code>、<code>settle-after-close</code>、<code>data-validate</code>、<code>sync-orders</code>、<code>position-pnl-sync</code>；入池粗筛可读 <code>factor_daily</code>；运维「执行一次」可手动触发；失败会返回错误而非假成功</li>
     <li><b>宽睿资料梳理</b> — 已落地（文档）· 「应用说明 → 宽睿文档梳理」；API 代码未接入</li>
   </ol>
-</div>
-
-<div class="memo-todo">
-  <h4>二、依赖外部 API / 数据源（暂不能补）</h4>
-  <ol>
-    <li><b>真实行情 API（优先对接宽睿 MDS）</b> — 未接入 · <code>market-collect</code> 仍为骨架。待接：<code>MdsClient.subscribeMarketData</code>、L1/L2 快照回调、<code>qryMktDataSnapshot</code> / <code>qrySnapshotList</code>；自聚合成分钟/日线后落库</li>
-    <li><b>券商交易 API（优先对接宽睿 OES）</b> — 未接入 · <code>quant.trade-mode=sdk</code> 仅为状态桩。待接：<code>sendOrdReq</code> / <code>sendBatchOrdsReq</code> / <code>sendOrdCancelReq</code> + <code>OesCallBack</code> 委托/成交回报与 <code>initRptSync</code></li>
-    <li><b>券商委托/持仓对账（OES 查询）</b> — 未接入 · <code>sync-orders</code> ← <code>queryOrder</code>/<code>queryTrade</code>；<code>position-pnl-sync</code> ← <code>queryCashAsset</code>/<code>queryStkHolding</code>（及可选 <code>queryClientOverview</code>）</li>
-    <li><b>证券状态 / 静态信息（MDS+OES）</b> — 部分本地粗滤 · 待接 MDS <code>qrySecurityStatus</code>、<code>qryStockStaticInfo(List)</code>（涨跌停价、停牌标识）；OES <code>queryStock</code></li>
-    <li><b>交易日 / 市场时段（OES+MDS）</b> — 部分静态表 · 待接 OES <code>queryTradingDay</code> / <code>queryMarketState</code>；MDS <code>qryTrdSessionStatus</code></li>
-    <li><b>真实佣金费率（OES）</b> — 未落地 · 待接 <code>queryCommissionRate</code>（替换配置近似费率）</li>
-    <li><b>银证转账（OES，真仓运维）</b> — 未落地 · <code>sendCashTrsfReq</code> + <code>queryCashTransferSerial</code>（模拟账本可不接）</li>
-    <li><b>历史 K 线全市场源</b> — 部分：本地库/种子 · MDS 偏实时，不替代多年回测历史；需另源或自建落库管道</li>
-    <li><b>复权因子</b>（除权除息）— 未落地 · 宽睿包未覆盖；需复权因子或前复权行情源</li>
-    <li><b>资金流向</b>（主力净流入/北向）— 未落地 · 无专用接口；L2 逐笔可自算近似，北向需另源</li>
-    <li><b>真实市值/流通股本/日均额</b> — 部分启发式 · MDS/OES 静态信息可补一部分；完整股本与日均额或需基本面源</li>
-    <li><b>财报与估值 / 公告时钟</b>（PE/ROE、静默期）— 未落地 · 宽睿不覆盖；需财务/公告 API；本地仅声明边界</li>
-    <li><b>新闻舆情 / 另类数据</b> — 未落地 · 宽睿不覆盖</li>
-    <li><b>两融 / 期权 / ETF 申赎 / 新股中签</b> — 未规划 · OES 有完整接口族，当前现货模拟策略范围外</li>
-  </ol>
-  <p style="margin:0"><b>一句总结</b>：本地模拟闭环已可跑；对接宽睿时优先 <strong>MDS 行情 → OES 下单回报 → 委托/持仓对账</strong>；复权/财报/舆情仍要其他数据源。</p>
-</div>
+</details>
 
 <div class="memo-todo">
   <h4>三、定时任务实现口径（对照运维中心）</h4>
