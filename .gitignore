@@ -10,4 +10,8 @@ target/
 
 # 回测历史/分析落盘（保留目录占位）
 data/backtest/*.json
+data/backtest/reports/
 !data/backtest/.gitkeep
+
+# Superpowers 本地 SDD 过程产物（正式规格在 docs/superpowers/）
+.superpowers/
