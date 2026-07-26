@@ -1,0 +1,97 @@
+{
+	//是否为测试模式(通过API-TESTER进行性能测试时需设置为true,测试模式会为消息打时间戳)
+	"testMode": false,
+    //通道事件监听
+    "SELECTOR": {
+    	//选择器阻塞时长(毫秒)
+    	"timeout": "50MS",
+    	//心跳检查间隔时间(秒)
+		"checkHeartBeat": "5S",
+        //统计信息打印间隔时间(秒)(等于0S则不打印)
+        "printStatsInfo": "300S",
+        //是否统计处理延迟
+        "isLatencyStats": false,
+        //回调任务队列容量大小
+        "callBackTaskQueueCapacity": 2000
+    },
+	//OES客户端
+    "OESCLIENT": {
+    	//是否为开发模式: true:开发模式,解码错误直接抛异常断连; false:生产模式，解码错误打印错误日志保持连接
+    	//注:如果需要低版本API兼容高版本服务器协议也需要设置为false
+        "devMode": false,
+    	// 客户端环境号, 用于区分不同客户端实例上报的委托申报, 取值由客户端自行分配
+    	// 取值范围 [0~99] ( [100~127] 为保留区间，不可使用 )
+    	"clEnvId": 99,
+    	// 待订阅回报的客户端环境号
+    	// 大于0 : 区分环境号, 仅订阅环境号对应的回报数据
+    	// 小于等于0: 不区分环境号, 订阅该客户端下的所有回报数据
+    	"subcribeEnvId": 0,
+    	// 客户端设备序列号(硬盘序列号)
+    	"clDriverId": "YOUR_CL_DRIVER_ID",
+    	// 登录密码加密方式 (0: 默认; 1: 宽睿密码; 2: 主柜密码)
+    	"encryptType": 0,
+    	// 登录委托方式(需OES服务端开启该功能否则无需关注该参数)
+    	"entrustWay": "A",
+    	// 登录超时时间(秒)(主柜密码登录时超时时间)
+    	"logonTimeout": "30S",
+    	//委托通道
+    	"ordChannel": {
+    		//连接超时设置(毫秒)
+			"connTimeout": "3000MS",
+			//同步读超时设置(毫秒)
+			"synReadTimeout": "3000MS",
+    		//TCP 接收缓存大小
+	    	"so_rcv_buf": "16K",
+	    	//TCP 发送缓存大小
+	    	"so_snd_buf": "512K",
+	    	//读-字节缓冲大小
+	    	"read_buf_size": "8K",
+	    	//读-字节缓冲最小可用预留大小
+	    	"min_usable_buf_size": "1K",
+	    	//写-字节缓冲大小
+	    	"write_buf_size": "64K",
+	    	//委托请求缓存队列大小
+	    	"reqMsgQueueSize": 3000,
+	    	//应答消息缓存队列大小
+	    	"rspMsgQueueSize": 100,
+    		//服务地址配置   *注: 1. hostNum目前不起做用; 2.addr、part要与OES的配置相对应; 3.可配多个主备地址，按实际情况进行配置; 
+            // 阿里云模拟（非实盘）示例：106.15.58.119:6101；实盘请改券商地址
+            "address": [
+            {"hostNum": 1, "addr": "106.15.58.119", "port": "6101"},
+            {"hostNum": 2, "addr": "106.15.58.119", "port": "6101"}
+            ]
+        },
+        //回报通道
+        "rptChannel": {
+        	"connTimeout": "3000MS",
+			"synReadTimeout": "3000MS",
+	    	"so_rcv_buf": "1M",
+	    	"so_snd_buf": "32K",
+	    	"read_buf_size": "256K",
+	    	"min_usable_buf_size": "2K",
+	    	"write_buf_size": "8K",
+	    	//请求消息缓存队列大小
+	    	"reqMsgQueueSize": 100,
+	    	//应答消息缓存队列大小
+	    	"rspMsgQueueSize": 500,
+            "address": [
+            {"hostNum": 1, "addr": "106.15.58.119", "port": "6301"},
+            {"hostNum": 2, "addr": "106.15.58.119", "port": "6301"}
+            ]
+        },
+        //查询通道
+        "queryChannel": {
+        	"connTimeout": "3000MS",
+			"synReadTimeout": "3000MS",
+        	"so_rcv_buf": "512K",
+	    	"so_snd_buf": "128K",
+	    	"read_buf_size": "128K",
+	    	"min_usable_buf_size": "1K",
+	    	"write_buf_size": "8K",
+            "address": [
+            {"hostNum": 1, "addr": "106.15.58.119", "port": "6401"},
+            {"hostNum": 2, "addr": "106.15.58.119", "port": "6401"}
+            ]
+        }
+    }
+}

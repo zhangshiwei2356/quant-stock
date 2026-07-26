@@ -1,0 +1,126 @@
+{
+	//是否为测试模式(测试模式会为消息打时间戳)
+	"testMode": false,
+    //通道事件监听
+    "SELECTOR": {
+    	//选择器阻塞时长(毫秒)
+    	"timeout": "50MS",
+    	//心跳检查间隔时间(秒)
+		"checkHeartBeat": "5S",
+		//统计信息打印间隔时间(秒)(等于0S则不打印)
+		"printStatsInfo": "300S",
+		//是否统计处理延迟
+		"isLatencyStats": false,
+		//回调任务队列大小
+        "callBackTaskQueueCapacity": 100000
+    },
+    //MDS客户端
+    "MDSCLIENT": {
+    	//是否为开发模式: true:开发模式,解码错误直接抛异常断连; false:生产模式，解码错误打印错误日志保持连接
+    	//注:如果需要低版本API兼容高版本服务器协议也需要设置为false
+        "devMode": false,
+    	// 客户端环境号, 取值由客户端自行分配
+    	// 取值范围 [0~99] ( [100~127] 为保留区间，不可使用 )
+    	"clEnvId": 99,
+    	// 客户端设备序列号(硬盘序列号)
+    	"clDriverId": "YOUR_CL_DRIVER_ID",
+    	//行情通道
+        "mktChannel": {
+        	//连接超时设置(毫秒)
+			"connTimeout": "3000MS",
+			//同步读超时设置(毫秒)
+			"synReadTimeout": "3000MS",
+        	//TCP 接收缓存大小
+	    	"so_rcv_buf": "4M",
+	    	//TCP 发送缓存大小
+	    	"so_snd_buf": "128K",
+	    	//读-字节缓冲大小
+	    	"read_buf_size": "1M",
+	    	//读-字节缓冲最小可用预留大小
+	    	"min_usable_buf_size": "8K",
+	    	//写-字节缓冲大小
+	    	"write_buf_size": "64K",
+	    	//请求缓存队列大小
+	    	"reqMsgQueueSize": 100,
+	    	//行情回报消息缓存队列大小
+	    	"rspMsgQueueSize": 10000,
+	    	//是否可丢弃消息(在行情波峰时段,如果客户实现的行情回调处理用时过多可能会造成行情数据积压,
+		    //该配置可选择是否主动丢弃接收队列中较旧的行情数据,以保障对最新的行情数据接收)
+	    	"isDropable": false,
+	    	//每次丢弃消息数量("isDropable"为true时起作用)
+	    	"dropNum": 1,
+    		//服务地址配置   *注: 1. hostNum目前不起做用; 2.addr、part要与OES的配置相对应; 3.可配多个主备地址，按实际情况进行配置;
+            // 阿里云模拟（非实盘）示例：139.196.228.232:5103；UDP 组播公网通常不可用
+            "address": [
+            {"hostNum": 1, "addr": "139.196.228.232", "port": "5103"},
+            {"hostNum": 2, "addr": "139.196.228.232", "port": "5103"}
+            ]
+        },
+        //查询通道
+        "queryChannel": {
+        	"connTimeout": "3000MS",
+			"synReadTimeout": "3000MS",
+	    	"so_rcv_buf": "1M",
+	    	"so_snd_buf": "128K",
+	    	"read_buf_size": "128K",
+	    	"min_usable_buf_size": "8K",
+	    	"write_buf_size": "8K",
+            "address": [
+            {"hostNum": 1, "addr": "139.196.228.232", "port": "5203"},
+            {"hostNum": 2, "addr": "139.196.228.232", "port": "5203"}
+            ]
+        },
+        //组播UDP行情通道集合
+        "mktUdpChannels": [
+            {
+            	//组播通道描述
+            	"desc": "SNAP1",
+	        	//通道接收缓存大小
+		    	"so_rcv_buf": "2M",
+		    	//读-字节缓冲大小
+		    	"read_buf_size": "1M",
+		    	//读-字节缓冲最小可用预留大小
+		    	"min_usable_buf_size": "8K",
+		    	//行情回报消息缓存队列大小
+		    	"rspMsgQueueSize": 1000,
+		    	//是否可丢弃消息(在行情波峰时段,如果客户实现的行情回调处理用时过多可能会造成行情数据积压,
+		    	//该配置可选择是否主动丢弃接收队列中较旧的行情数据,以保障对最新的行情数据接收)
+		    	"isDropable": false,
+		    	//每次丢弃消息数量("isDropable"为true时起作用)
+		    	"dropNum": 1,
+	    		//服务地址配置   *注: addr:组播地址; port:组播端口; bindAddr:绑定本地网卡地址
+	            "address": {"addr": "232.200.151.100", "port": "5301", "bindAddr": "YOUR_LOCAL_BIND_IP"}
+        	},
+        	{
+                "desc": "SNAP2",
+                "so_rcv_buf": "2M",
+                "read_buf_size": "1M",
+                "min_usable_buf_size": "8K",
+                "rspMsgQueueSize": 1000,
+                "isDropable": false,
+                "dropNum": 1,
+                "address": {"addr": "232.200.152.100", "port": "5302", "bindAddr": "YOUR_LOCAL_BIND_IP"}
+            },
+        	{
+        		"desc": "TICK1",
+	        	"so_rcv_buf": "2M",
+		    	"read_buf_size": "1M",
+		    	"min_usable_buf_size": "8K",
+		    	"rspMsgQueueSize": 1000,
+		    	"isDropable": false,
+		    	"dropNum": 1,
+	    		"address": {"addr": "232.200.153.100", "port": "5303", "bindAddr": "YOUR_LOCAL_BIND_IP"}
+        	},
+        	{
+        		"desc": "TICK2",
+	        	"so_rcv_buf": "2M",
+		    	"read_buf_size": "1M",
+		    	"min_usable_buf_size": "8K",
+		    	"rspMsgQueueSize": 1000,
+		    	"isDropable": false,
+		    	"dropNum": 1,
+	    		"address": {"addr": "232.200.154.100", "port": "5304", "bindAddr": "YOUR_LOCAL_BIND_IP"}
+        	}
+        ]
+    }
+}

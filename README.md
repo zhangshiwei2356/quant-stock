@@ -287,7 +287,8 @@ sequenceDiagram
   - `sync-orders`：本地桩将 `SUBMITTED→FILLED` 并改仓；`trade-mode=sdk` 时策略在 sync 后才落现金/批次
   - `position-pnl-sync`：本地成本 + 最新价浮盈日志
 - 页面标「未实现」（缺外部 API）：`market-collect`
-- 对照：**应用说明 → 能力与待办**；宽睿对接：**应用说明 → 宽睿文档梳理**（含文档/Demo 分析与分阶段接入计划：环境→MDS L1→OES 只读→报撤→静态/费率；业务代码尚未接入）
+- 对照：**应用说明 → 能力与待办**；宽睿对接：**应用说明 → 宽睿文档梳理**（分阶段：环境→MDS L1→OES 只读→报撤→静态/费率）
+- 宽睿 **M0**：`config/kuangrui/README.md` + `scripts/kuangrui/m0-env-check.ps1`（登录探针）。阿里云模拟地址 TCP 已通，但预登录返回 `1045`（OES/MDS），`M0_STATUS=BLOCKED`；需账号/API 版本与柜台确认后再 `-RunLoginProbe` 至 `COMPLETE` 才开 M1；主应用默认仍 `sim`+`db`
 
 ---
 

@@ -6,7 +6,7 @@
   厂商：上海宽睿；产品 <b>OES</b>（交易）/ <b>MDS</b>（行情）。
   <strong>业务代码尚未接入</strong>；默认仍用本地 <code>sim</code> + <code>db</code>。
 </p>
-<p class="hint" style="margin-top:0">更新：2026-07-26 · 分析+计划已落页；动手改代码前以本页阶段表为准。</p>
+<p class="hint" style="margin-top:0">更新：2026-07-26 · 分析+计划已落页；<b>M0 脚手架已落地</b>；阿里云模拟 TCP 已通，但预登录返回 <code>1045</code>，M0 仍为 BLOCKED。</p>
 
 <div class="memo-todo">
   <h4 style="margin-top:0">一、资料包结构</h4>
@@ -98,14 +98,26 @@
 <div class="memo-todo memo-todo--focus">
   <h4>五、接入计划（已定稿 · 业务代码未开工）</h4>
   <p class="hint" style="margin-top:0">原则：不静默改金叉；默认 <code>sim</code>+<code>db</code>；宽睿独立开关默认关；先仿真、先只读、再报单；每阶段可验收可回滚。</p>
+
+  <h5 style="margin:8px 0 4px;">M0 当前状态（2026-07-26 · 阿里云模拟）</h5>
+  <ul>
+    <li><b>脚手架</b>：已就绪 · <code>config/kuangrui/</code>（examples + local）、<code>scripts/kuangrui/m0-env-check.ps1</code>、<code>M0LoginProbe.java</code></li>
+    <li><b>资料包 / JDK</b>：官方 jar <code>0.17.6.4</code>（运行日志 ApplVerId <code>0.17.6.3</code>）；本机 Java 21 可编译运行探针</li>
+    <li><b>阿里云模拟地址（非实盘）</b>：OES <code>106.15.58.119</code> ord/rpt/qry=<code>6101/6301/6401</code>；MDS <code>139.196.228.232</code> tcp/qry=<code>5103/5203</code> — <b>TCP 全部可达</b></li>
+    <li><b>登录探针</b>：TCP 握手成功后卡在 <b>Pre Logon</b>，OES/MDS 均 <code>errorCode=1045</code>（Java 枚举无此码，映射为 <code>OTHER_ERROR</code>）。手册 V0.17.6 错误表只到 <code>1043</code>，换 <code>encryptType</code>/<code>clEnvId</code>/显式 IP·MAC 无效（预登录阶段尚未验密）</li>
+    <li><b>M0_STATUS</b>：<code>BLOCKED</code>（网络已通，预登录被拒）。需向宽睿确认：账号是否已开通、是否要更新 API 包以匹配阿里云服务端协议。通过后：
+      <code>.\scripts\kuangrui\m0-env-check.ps1 -RunLoginProbe</code> → <code>M0_STATUS=COMPLETE</code></li>
+    <li>密钥只放 <code>config/kuangrui/local/</code>（已 gitignore）+ 环境变量；勿提交仓库</li>
+  </ul>
+
   <table>
     <thead><tr><th>阶段</th><th>目标</th><th>要点</th><th>Done 标准</th></tr></thead>
     <tbody>
       <tr>
         <td><b>0. 环境</b></td>
         <td>能登录</td>
-        <td>账号/地址/<code>clEnvId</code>/加密；用包内 Demo/Tester 验证</td>
-        <td>OES+MDS 仿真登录成功（可不改本仓库）</td>
+        <td>账号/地址/<code>clEnvId</code>/加密；<code>m0-env-check.ps1 -RunLoginProbe</code></td>
+        <td>OES+MDS 仿真登录成功（报告 <code>M0_STATUS=COMPLETE</code>）</td>
       </tr>
       <tr>
         <td><b>1. MDS L1</b></td>

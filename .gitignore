@@ -15,3 +15,8 @@ data/backtest/reports/
 
 # Superpowers 本地 SDD 过程产物（正式规格在 docs/superpowers/）
 .superpowers/
+
+# 宽睿 M0：本地真实配置与探针输出（勿提交密钥/地址）
+config/kuangrui/local/**
+!config/kuangrui/local/.gitkeep
+scripts/kuangrui/out/

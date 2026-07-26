@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 自动扫描配置: true; 扫描间隔： 10 minutes (milliseconds, seconds, minutes or hours) -->
+<configuration scan="true" scanPeriod="10 minutes" debug="false">
+
+    <property name="LOG_HOME" value="log" />
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <!-- <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{24}:%line - %msg%n</pattern> -->
+            <pattern>%d{HH:mm:ss.SSS} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="API"
+        class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- daily rollover -->
+            <fileNamePattern>${LOG_HOME}/%d{yyyy-MM-dd}-api.log
+            </fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{24}:%line - %msg%n</pattern>
+        </encoder>
+    </appender>
+    
+    <appender name="DEMO"
+        class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- daily rollover -->
+            <fileNamePattern>${LOG_HOME}/%d{yyyy-MM-dd}-demo.log
+            </fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{24}:%line - %msg%n</pattern>
+        </encoder>
+    </appender>
+    
+    <appender name="TESTER"
+        class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- daily rollover -->
+            <fileNamePattern>${LOG_HOME}/%d{yyyy-MM-dd}_tester.log
+            </fileNamePattern>
+            <!-- keep 1 months' worth of history -->
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level - [TEST] - %msg%n</pattern>
+        </encoder>
+    </appender>
+    
+    <!-- additivity: true-向上级传递Console打印 false-不传递不打印Console信息 -->  
+    <logger name="com.quant360.api" level="INFO" additivity="true">
+        <appender-ref ref="API"/>
+    </logger>
+    <logger name="com.quant360.api.helper.task" level="INFO" additivity="false">
+        <appender-ref ref="API"/>
+    </logger>
+    <logger name="com.quant360.demo" level="DEBUG" additivity="true">
+        <appender-ref ref="DEMO"/>
+    </logger>
+    <logger name="com.quant360.tester" level="INFO" additivity="true">
+        <appender-ref ref="TESTER"/>
+    </logger>   
+    
+    <!-- 日志输出级别 -->
+    <root level="WARN">
+        <appender-ref ref="STDOUT" />
+    </root>
+
+</configuration>
