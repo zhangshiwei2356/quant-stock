@@ -32,6 +32,7 @@ public class ScheduleController {
     private final QuantProperties props;
     private final ObjectProvider<DynamicScheduleService> scheduleServiceProvider;
 
+    /** 调度器总状态：是否启用、已注册任务数及提示信息。 */
     @GetMapping
     public Map<String, Object> status() {
         DynamicScheduleService svc = scheduleServiceProvider.getIfAvailable();
@@ -47,6 +48,7 @@ public class ScheduleController {
         return m;
     }
 
+    /** 列出 sys_schedule_job 中全部任务配置。 */
     @GetMapping("/jobs")
     public Map<String, Object> jobs() {
         DynamicScheduleService svc = requireService();
@@ -56,6 +58,7 @@ public class ScheduleController {
         return m;
     }
 
+    /** 更新指定任务的 cron、描述等字段并重载调度。 */
     @PutMapping("/jobs/{jobCode}")
     public Map<String, Object> update(@PathVariable String jobCode,
                                       @RequestBody ScheduleJobUpdateRequest body) {
@@ -66,6 +69,7 @@ public class ScheduleController {
         }
     }
 
+    /** 启用或停用指定定时任务。 */
     @PostMapping("/jobs/{jobCode}/toggle")
     public Map<String, Object> toggle(@PathVariable String jobCode,
                                       @RequestParam(required = false) Boolean enabled) {
@@ -76,6 +80,7 @@ public class ScheduleController {
         }
     }
 
+    /** 立即手动触发一次指定任务（与 cron 无关）。 */
     @PostMapping("/jobs/{jobCode}/run")
     public Map<String, Object> runOnce(@PathVariable String jobCode) {
         try {
@@ -90,6 +95,7 @@ public class ScheduleController {
         }
     }
 
+    /** 从数据库重新加载全部任务并刷新 Spring 调度注册。 */
     @PostMapping("/reload")
     public Map<String, Object> reload() {
         requireService().reloadAll();

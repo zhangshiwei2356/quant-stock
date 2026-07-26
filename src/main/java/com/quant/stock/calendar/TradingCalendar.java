@@ -18,6 +18,7 @@ public class TradingCalendar {
 
     private final Set<LocalDate> holidays;
 
+    /** 加载内置 A 股法定节假日集合（周末另判）。 */
     public TradingCalendar() {
         Set<LocalDate> h = new HashSet<LocalDate>();
         // 2025（上交所公告：国庆/中秋连休至 10/8）
@@ -46,6 +47,7 @@ public class TradingCalendar {
         }
     }
 
+    /** 判断给定日期是否为 A 股交易日（非周末且非法定休市）。 */
     public boolean isAshareTradingDay(LocalDate date) {
         if (date == null) {
             return false;

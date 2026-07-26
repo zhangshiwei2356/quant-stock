@@ -16,10 +16,12 @@ public class PositionAmountUtil {
 
     private final QuantProperties quantProperties;
 
+    /** 按默认仓位系数计算可买整手股数（100 股整数倍）。 */
     public int calcBuyVolume(BigDecimal totalCash, BigDecimal price, BigDecimal currentAtr) {
         return calcBuyVolume(totalCash, price, currentAtr, BigDecimal.ONE);
     }
 
+    /** 在单只上限、ATR 调节与 scale 系数下计算可买整手股数。 */
     public int calcBuyVolume(BigDecimal totalCash, BigDecimal price, BigDecimal currentAtr, BigDecimal scale) {
         if (totalCash == null || price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
             return 0;
@@ -61,6 +63,7 @@ public class PositionAmountUtil {
         return vol;
     }
 
+    /** 判断加仓后总市值是否不超过总仓位上限比例。 */
     public boolean withinTotalPosition(BigDecimal totalCash, BigDecimal positionMarketValue, BigDecimal addMoney) {
         BigDecimal max = totalCash.multiply(quantProperties.getMaxTotalPosition());
         return positionMarketValue.add(addMoney).compareTo(max) <= 0;

@@ -50,6 +50,7 @@ public class MockKlineDataGenerator {
             {"000858", "五粮液", "128.00"}
     };
 
+    /** CLI 入口：生成模拟 K 线 JSON 至 resources/data/kline（支持 only=、out= 参数）。 */
     public static void main(String[] args) throws Exception {
         Path outDir = resolveOutDir(args);
         Files.createDirectories(outDir);
@@ -194,6 +195,9 @@ public class MockKlineDataGenerator {
         Files.write(stockDir.resolve(period.name() + ".json"), JSON.toJSONBytes(file));
     }
 
+    /**
+     * 生成指定代码在 {@link #START}～{@link #END} 区间内的 1 分钟 K（供离线 JSON 工具使用）。
+     */
     public static List<BarDTO> generateYear1Min(String code, BigDecimal basePrice) {
         List<BarDTO> bars = new ArrayList<BarDTO>(60000);
         Random random = new Random(code.hashCode() * 31L + 20260718L);

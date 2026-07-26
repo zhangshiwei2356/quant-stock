@@ -43,6 +43,7 @@ public class PaperLiveReconcileService {
         this.tradePoolProvider = tradePoolProvider;
     }
 
+    /** 生成纸面与实盘假设差异对账报告（费用、部成、目标池、撮合模式等） */
     public Map<String, Object> report() {
         List<Map<String, Object>> orders = accountOverviewService.orders();
         List<Map<String, Object>> positions = accountOverviewService.positions();

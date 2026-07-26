@@ -52,6 +52,7 @@ public class DataReconcileGateService {
         return props.isDataReconcileGateEnabled() && gateOpenBlocked.get();
     }
 
+    /** 返回最近一次对账结果摘要（含闸状态） */
     public Map<String, Object> lastReport() {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.putAll(lastReport);
@@ -66,6 +67,9 @@ public class DataReconcileGateService {
         return m;
     }
 
+    /**
+     * 对给定代码列表（空则经桥接取目标池/universe）执行主源日线 vs 分钟聚合日线对账。
+     */
     public Map<String, Object> reconcile(List<String> codes) {
         List<String> universe = codes;
         if (universe == null || universe.isEmpty()) {
@@ -188,6 +192,7 @@ public class DataReconcileGateService {
      * 避免 admin→pool 循环依赖的窄桥；无池时返回空列表。
      */
     public interface TradePoolServiceBridge {
+        /** 对账扫描用的股票代码列表 */
         List<String> activeOrUniverseCodes();
     }
 }

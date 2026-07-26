@@ -23,6 +23,7 @@ import java.util.Map;
 @Service
 public class DocsPdfService {
 
+    /** PDF 导出目录项：id、分组、标题与 classpath 下 HTML 文件名。 */
     private static final class Topic {
         final String id;
         final String group;
@@ -65,6 +66,7 @@ public class DocsPdfService {
         TOPICS = Collections.unmodifiableList(list);
     }
 
+    /** 按 group（stock|app）合并文档、净化 HTML 并生成 PDF 字节与文件名。 */
     public Map<String, Object> export(String group) {
         if (!"stock".equals(group) && !"app".equals(group)) {
             throw new IllegalArgumentException("group 仅支持 stock 或 app");

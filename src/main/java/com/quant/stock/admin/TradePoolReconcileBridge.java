@@ -21,6 +21,7 @@ public class TradePoolReconcileBridge implements DataReconcileGateService.TradeP
         this.tradePoolService = tradePoolService;
     }
 
+    /** 优先活跃目标池代码，否则退回全市场 universe */
     @Override
     public List<String> activeOrUniverseCodes() {
         List<String> codes = new ArrayList<String>(tradePoolService.listActiveCodes());

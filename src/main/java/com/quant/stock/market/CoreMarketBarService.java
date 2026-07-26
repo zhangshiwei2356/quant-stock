@@ -31,10 +31,12 @@ public class CoreMarketBarService {
     private final MarketDailyMapper marketDailyMapper;
     private final MarketMinuteMapper marketMinuteMapper;
 
+    /** 是否已有 {@code market_daily} 数据 */
     public boolean hasDaily(String symbol) {
         return marketDailyMapper.countBySymbol(symbol) > 0;
     }
 
+    /** 是否已有 {@code market_minute} 数据 */
     public boolean hasMinute(String symbol) {
         return marketMinuteMapper.countBySymbol(symbol) > 0;
     }
@@ -113,6 +115,9 @@ public class CoreMarketBarService {
         return n;
     }
 
+    /**
+     * 从核心表读取 K 线；周/月及 15/30/60 分钟由内存聚合。
+     */
     public List<BarDTO> load(String code, BarPeriod period, LocalDateTime start, LocalDateTime end) {
         if (period == null) {
             period = BarPeriod.DAY;

@@ -59,6 +59,7 @@ public class TradePoolService {
     private final QuantProperties quantProperties;
     private final JdbcTemplate jdbcTemplate;
 
+    /** 启动时确保目标池相关表结构存在并清理废弃表名 */
     @PostConstruct
     public void initSchemaAndSeed() {
         ensureTables();
@@ -266,6 +267,7 @@ public class TradePoolService {
         return sb.toString();
     }
 
+    /** 当前活跃目标池概览（含上限配置） */
     public Map<String, Object> overview() {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         List<Map<String, Object>> items = new ArrayList<Map<String, Object>>();

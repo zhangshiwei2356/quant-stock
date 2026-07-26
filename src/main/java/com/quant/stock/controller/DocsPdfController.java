@@ -28,6 +28,7 @@ public class DocsPdfController {
     private final DocsPdfService docsPdfService;
     private final DocsReadmeService docsReadmeService;
 
+    /** 将仓库根目录 README.md 渲染为 HTML 片段供页面嵌入。 */
     @GetMapping(value = "/readme", produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> readmeHtml() {
         try {
@@ -42,6 +43,7 @@ public class DocsPdfController {
         }
     }
 
+    /** 按分组（stock/app）合并 static/docs 文档并下载 PDF。 */
     @GetMapping("/pdf/{group}")
     public ResponseEntity<byte[]> download(@PathVariable("group") String group) {
         try {

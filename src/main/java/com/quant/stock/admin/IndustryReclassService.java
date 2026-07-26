@@ -33,12 +33,14 @@ public class IndustryReclassService {
         this.stockBasicMapperProvider = stockBasicMapperProvider;
     }
 
+    /** 启动时建行业变更日志表，并在空表时用 stock_basic 快照打底。 */
     @PostConstruct
     public void init() {
         ensureTable();
         seedSnapshotIfEmpty();
     }
 
+    /** 按 as-of 日取该标的当时行业（无日志时回退 stock_basic） */
     public String industryAsOf(String symbol, LocalDate asOf) {
         if (!StringUtils.hasText(symbol)) {
             return null;
@@ -55,6 +57,7 @@ public class IndustryReclassService {
         }
     }
 
+    /** 追加一条行业重分类 as-of 记录 */
     public Map<String, Object> logReclass(String symbol, LocalDate effectiveDate,
                                           String from, String to, String source, String note) {
         ensureTable();
@@ -103,6 +106,7 @@ public class IndustryReclassService {
         return m;
     }
 
+    /** 服务状态与最近重分类记录 */
     public Map<String, Object> status() {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.put("logRows", countRows());
@@ -113,6 +117,7 @@ public class IndustryReclassService {
         return m;
     }
 
+    /** 最近 {@code limit} 条行业重分类日志 */
     public List<Map<String, Object>> recent(int limit) {
         int lim = Math.max(1, Math.min(limit, 200));
         try {

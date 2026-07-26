@@ -53,7 +53,12 @@ public class MarketDataService {
     }
 
     /**
-     * 统一查询
+     * 按周期与时间窗查询 K 线（已过滤未闭合 bar，并视情况写入 Redis 缓存）。
+     *
+     * @param code   股票代码
+     * @param period 周期；null 时按 1 分钟路由
+     * @param start  起始时间（含）；null 不限
+     * @param end    结束时间（含）；null 不限
      */
     public List<BarDTO> getKline(String code, BarPeriod period, LocalDateTime start, LocalDateTime end) {
         if (StrUtil.isBlank(code)) {
@@ -138,6 +143,7 @@ public class MarketDataService {
         return getKline(code, BarPeriod.MIN_5, null, null);
     }
 
+    /** 按时间窗加载 5 分钟序列（同 {@link #getKline}） */
     public List<BarDTO> loadMinuteBars(String code, LocalDateTime start, LocalDateTime end) {
         return getKline(code, BarPeriod.MIN_5, start, end);
     }
@@ -271,6 +277,12 @@ public class MarketDataService {
         }
     }
 
+    /**
+     * 内存生成演示用 5 分钟 K（按代码 hash 固定随机种子，便于复现）。
+     *
+     * @param code        股票代码
+     * @param tradingDays 生成的交易日数量
+     */
     public List<BarDTO> generateMockBars(String code, int tradingDays) {
         List<BarDTO> bars = new ArrayList<BarDTO>();
         long seed = Math.abs(code.hashCode());

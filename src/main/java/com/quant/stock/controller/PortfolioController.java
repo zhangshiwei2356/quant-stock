@@ -20,6 +20,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 组合回测 API：多标的联合回测、历史与分析持久化查询。
+ */
 @RestController
 @RequestMapping("/api/portfolio")
 @RequiredArgsConstructor
@@ -29,6 +32,7 @@ public class PortfolioController {
     private final BackTestHistoryStore backTestHistoryStore;
     private final BackTestAnalysisStore backTestAnalysisStore;
 
+    /** 提交组合回测请求并写入历史与分析记录。 */
     @PostMapping("/run")
     public PortfolioResultDTO run(@RequestBody BackTestQueryDTO query) {
         PortfolioResultDTO result = portfolioBackTestEngine.run(query);
@@ -39,6 +43,7 @@ public class PortfolioController {
         return result;
     }
 
+    /** 列出全部组合回测历史记录。 */
     @GetMapping("/history")
     public List<PortfolioBacktestHistoryRecord> history() {
         return backTestHistoryStore.listPortfolio();

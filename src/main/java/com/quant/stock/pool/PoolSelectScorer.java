@@ -59,6 +59,9 @@ public class PoolSelectScorer {
         return false;
     }
 
+    /**
+     * 在已打分结果中筛选可入选标的，按综合分降序取 Top {@code max}。
+     */
     public List<BatchScanResultDTO> pickTop(List<BatchScanResultDTO> scanned, int max) {
         applyScores(scanned);
         List<BatchScanResultDTO> eligible = new ArrayList<BatchScanResultDTO>();

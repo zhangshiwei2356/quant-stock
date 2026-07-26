@@ -33,6 +33,7 @@ public class DataHealthService {
         this.tradePoolService = tradePoolService;
     }
 
+    /** 对 universe 内各标的检查日线/分钟覆盖与滞后 */
     public Map<String, Object> check() {
         List<String> codes = new ArrayList<String>();
         for (Map<String, String> u : tradePoolService.listUniverse()) {

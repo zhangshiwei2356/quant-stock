@@ -50,6 +50,7 @@ public class MockDataImporter {
     private final MarketMinuteMapper marketMinuteMapper;
     private final FactorDailyMapper factorDailyMapper;
 
+    /** 应用就绪后触发：空库则导入 classpath 模拟行情种子。 */
     @EventListener(ApplicationReadyEvent.class)
     public void onReady() {
         try {
@@ -59,6 +60,9 @@ public class MockDataImporter {
         }
     }
 
+    /**
+     * 若库内尚无行情则自 classpath JSON 增量导入日线、5 分钟线并计算因子。
+     */
     public void importIfNeeded() throws Exception {
         PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
         Resource metaRes = resolver.getResource(BASE + "meta.json");

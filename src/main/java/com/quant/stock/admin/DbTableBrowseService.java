@@ -146,6 +146,7 @@ public class DbTableBrowseService {
 
     private final JdbcTemplate jdbcTemplate;
 
+    /** 白名单表列表及行数、是否存在 */
     public List<Map<String, Object>> listTables() {
         List<Map<String, Object>> list = new ArrayList<Map<String, Object>>();
         for (TableDef def : DbTableCatalog.all()) {
@@ -177,6 +178,11 @@ public class DbTableBrowseService {
         return m;
     }
 
+    /**
+     * 分页只读浏览单表（列中文 label 优先取 COMMENT）。
+     *
+     * @throws IllegalArgumentException 表不在白名单或不可访问
+     */
     public Map<String, Object> page(String tableName, int page, int size) {
         TableDef def = DbTableCatalog.get(tableName);
         if (def == null) {

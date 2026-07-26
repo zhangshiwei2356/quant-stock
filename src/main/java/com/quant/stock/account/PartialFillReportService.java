@@ -25,6 +25,7 @@ public class PartialFillReportService {
         this.props = props;
     }
 
+    /** 当日委托部成率统计与未满额成交明细 */
     public Map<String, Object> dailyReport() {
         List<Map<String, Object>> orders = accountOverviewService.orders();
         int submittedLike = 0;

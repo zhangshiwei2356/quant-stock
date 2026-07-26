@@ -11,6 +11,9 @@ import java.util.Map;
  */
 public final class DbTableCatalog {
 
+    /**
+     * 白名单内单表元数据：名称、模块、默认排序及用途说明。
+     */
     public static final class TableDef {
         private final String name;
         private final String title;
@@ -154,6 +157,7 @@ public final class DbTableCatalog {
     private DbTableCatalog() {
     }
 
+    /** 按表名（不区分大小写）获取定义；未知表返回 null */
     public static TableDef get(String name) {
         if (name == null) {
             return null;
@@ -161,10 +165,12 @@ public final class DbTableCatalog {
         return TABLES.get(name.trim().toLowerCase());
     }
 
+    /** 表名是否在浏览白名单内 */
     public static boolean isAllowed(String name) {
         return get(name) != null;
     }
 
+    /** 全部白名单表定义（插入顺序即展示顺序） */
     public static List<TableDef> all() {
         return new ArrayList<TableDef>(TABLES.values());
     }

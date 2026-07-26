@@ -8,13 +8,18 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/**
+ * 5 分钟行情持久化实体，对应表 {@code market_minute}。
+ */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class MarketMinuteDO {
     private Long id;
+    /** 股票代码 */
     private String symbol;
+    /** bar 起始时刻 */
     private LocalDateTime tradeTime;
     private BigDecimal open;
     private BigDecimal high;
@@ -23,6 +28,7 @@ public class MarketMinuteDO {
     private Long volume;
     private BigDecimal amount;
 
+    /** 转为分钟/5 分钟 {@link BarDTO} */
     public BarDTO toBarDTO() {
         return BarDTO.builder()
                 .code(symbol)
@@ -35,6 +41,7 @@ public class MarketMinuteDO {
                 .build();
     }
 
+    /** 由 {@link BarDTO} 构造分钟行 */
     public static MarketMinuteDO fromBarDTO(BarDTO bar) {
         if (bar == null) {
             return null;

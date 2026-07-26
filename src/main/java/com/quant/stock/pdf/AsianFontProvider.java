@@ -10,6 +10,7 @@ import com.itextpdf.tool.xml.XMLWorkerFontProvider;
  */
 public class AsianFontProvider extends XMLWorkerFontProvider {
 
+    /** 为 HTML 转 PDF 提供 STSong-Light 中文字体，失败时回退默认字体。 */
     @Override
     public Font getFont(final String fontname, final String encoding, final boolean embedded,
                         final float size, final int style, final BaseColor color) {

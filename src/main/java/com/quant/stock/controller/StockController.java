@@ -30,6 +30,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 行情与单股回测 REST：K 线、数据概览、回测执行及历史/分析查询。
+ */
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
@@ -85,6 +88,7 @@ public class StockController {
         return map;
     }
 
+    /** 1 分钟 K 线快捷接口（默认截取末尾约 1500 根）。 */
     @GetMapping("/kline/minute")
     public Map<String, Object> minuteKline(@RequestParam("code") String code) {
         return kline(code, BarPeriod.MIN_1.name(), null, null, 1500);
@@ -126,6 +130,7 @@ public class StockController {
         return resp;
     }
 
+    /** 对单只股票执行金叉策略回测并持久化历史与分析。 */
     @GetMapping("/backtest/run")
     public BackTestResult runBacktest(@RequestParam("code") String code,
                                       @RequestParam(value = "initCapital", required = false) BigDecimal initCapital,

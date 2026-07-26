@@ -29,6 +29,7 @@ public class AccountLedgerQueryService {
         this.jdbc = jdbc;
     }
 
+    /** 分页查询 LIVE 账户委托（最新在前） */
     public List<Map<String, Object>> listOrders(int limit) {
         int lim = Math.max(1, Math.min(limit <= 0 ? 200 : limit, 500));
         try {
@@ -102,6 +103,7 @@ public class AccountLedgerQueryService {
         return t >= 4 ? "SELL" : "BUY";
     }
 
+    /** 权益日结流水（{@code trade_cashflows}，按交易日倒序） */
     public List<Map<String, Object>> listCashflows(int limit) {
         int lim = Math.max(1, Math.min(limit <= 0 ? 120 : limit, 500));
         try {
@@ -131,6 +133,7 @@ public class AccountLedgerQueryService {
         }
     }
 
+    /** 风控触发日志（{@code risk_control_log}） */
     public List<Map<String, Object>> listRiskLogs(int limit) {
         int lim = Math.max(1, Math.min(limit <= 0 ? 100 : limit, 500));
         try {

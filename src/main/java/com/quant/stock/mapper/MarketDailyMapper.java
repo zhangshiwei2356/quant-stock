@@ -6,13 +6,19 @@ import org.apache.ibatis.annotations.Param;
 import java.time.LocalDate;
 import java.util.List;
 
+/**
+ * 原始日线行情 Mapper：market_daily 表的查询与批量 upsert。
+ */
 public interface MarketDailyMapper {
 
+    /** 统计某 symbol 在 market_daily 中的总行数。 */
     int countBySymbol(@Param("symbol") String symbol);
 
+    /** 按 symbol 与交易日期区间查询日线。 */
     List<MarketDailyDO> selectRange(@Param("symbol") String symbol,
                                     @Param("start") LocalDate start,
                                     @Param("end") LocalDate end);
 
+    /** 批量写入日线，冲突时更新 OHLCV 等字段。 */
     int batchUpsert(@Param("list") List<MarketDailyDO> list);
 }

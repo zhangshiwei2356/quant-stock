@@ -38,6 +38,7 @@ public class SystemParamsService {
         this.jdbcProvider = jdbcProvider;
     }
 
+    /** 只读展示当前生效的 QuantProperties 分组与 system_config 键值 */
     public Map<String, Object> view() {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.put("dbEnabled", props.isDbEnabled());

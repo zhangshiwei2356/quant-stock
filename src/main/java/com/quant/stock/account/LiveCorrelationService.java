@@ -42,6 +42,7 @@ public class LiveCorrelationService {
         this.stressScenarioService = stressScenarioService;
     }
 
+    /** 持仓成分日收益相关性与压力情景联动告警 */
     public Map<String, Object> report() {
         Map<String, List<BigDecimal>> closes = new LinkedHashMap<String, List<BigDecimal>>();
         for (Map<String, Object> row : strategyTask.listLivePositionViews()) {

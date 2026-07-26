@@ -32,6 +32,7 @@ public class OpsController {
     private final ObjectProvider<StPitService> stPitProvider;
     private final ObjectProvider<IndustryReclassService> industryReclassProvider;
 
+    /** 全市场数据健康抽检（覆盖率、缺口、异常项）。 */
     @GetMapping("/data-health")
     public Map<String, Object> dataHealth() {
         DataHealthService svc = dataHealthProvider.getIfAvailable();
@@ -47,6 +48,7 @@ public class OpsController {
         return svc.check();
     }
 
+    /** 运行参数与配置指纹只读视图。 */
     @GetMapping("/params")
     public Map<String, Object> params() {
         return systemParamsService.view();
@@ -79,6 +81,7 @@ public class OpsController {
         return m;
     }
 
+    /** 维护 ST 时点记录（按生效日 as-of 标记是否 ST）。 */
     @PostMapping("/st-pit")
     public Map<String, Object> stPitUpsert(@RequestParam String symbol,
                                            @RequestParam String effectiveDate,
@@ -106,6 +109,7 @@ public class OpsController {
         return svc.status();
     }
 
+    /** 同步行业重分类快照（需 db-enabled）。 */
     @PostMapping("/industry-reclass/sync")
     public Map<String, Object> industryReclassSync() {
         IndustryReclassService svc = industryReclassProvider.getIfAvailable();

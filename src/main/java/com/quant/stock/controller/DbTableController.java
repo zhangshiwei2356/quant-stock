@@ -28,6 +28,7 @@ public class DbTableController {
 
     private final ObjectProvider<DbTableBrowseService> browseServiceProvider;
 
+    /** 列出白名单内数据表及行数（未开库时仅返回目录元数据）。 */
     @GetMapping("/tables")
     public Map<String, Object> tables() {
         DbTableBrowseService svc = browseServiceProvider.getIfAvailable();
@@ -43,6 +44,7 @@ public class DbTableController {
         return m;
     }
 
+    /** 按表名只读分页浏览指定表白名单表数据。 */
     @GetMapping("/tables/{name}")
     public Map<String, Object> page(
             @PathVariable("name") String name,

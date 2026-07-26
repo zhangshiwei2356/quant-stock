@@ -42,6 +42,7 @@ public class BarStorageService {
         return batchUpsert(BarPeriod.MIN_1.getTableName(), list);
     }
 
+    /** 从 legacy 分表按时间窗读取 K 线 */
     public List<BarDTO> loadBars(String code, BarPeriod period, LocalDateTime start, LocalDateTime end) {
         List<StockBarDO> rows = stockBarMapper.selectRange(period.getTableName(), code, start, end);
         List<BarDTO> result = new ArrayList<BarDTO>(rows.size());
@@ -51,10 +52,12 @@ public class BarStorageService {
         return result;
     }
 
+    /** 区间内是否存在 K 线数据 */
     public boolean hasBars(String code, BarPeriod period, LocalDateTime start, LocalDateTime end) {
         return stockBarMapper.countRange(period.getTableName(), code, start, end) > 0;
     }
 
+    /** 该标的在该周期表中的最新 bar 时间 */
     public LocalDateTime maxBarTime(String code, BarPeriod period) {
         return stockBarMapper.selectMaxBarTime(period.getTableName(), code);
     }

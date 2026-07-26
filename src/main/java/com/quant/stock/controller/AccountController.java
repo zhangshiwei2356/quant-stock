@@ -56,16 +56,19 @@ public class AccountController {
     private final QuantProperties quantProperties;
     private final StrategyTask strategyTask;
 
+    /** 账户完整概览：资金、权益、持仓与委托汇总。 */
     @GetMapping
     public Map<String, Object> overview() {
         return accountOverviewService.overview();
     }
 
+    /** 账户摘要指标（不含明细列表）。 */
     @GetMapping("/summary")
     public Map<String, Object> summary() {
         return accountOverviewService.summary();
     }
 
+    /** 当前持仓列表，并附带账户摘要。 */
     @GetMapping("/positions")
     public Map<String, Object> positions() {
         List<Map<String, Object>> items = accountOverviewService.positions();
@@ -76,6 +79,7 @@ public class AccountController {
         return m;
     }
 
+    /** 当前委托列表（含在途与历史可见项）。 */
     @GetMapping("/orders")
     public Map<String, Object> orders() {
         List<Map<String, Object>> items = accountOverviewService.orders();
@@ -129,11 +133,13 @@ public class AccountController {
         return m;
     }
 
+    /** 资金流水明细，按条数上限截断。 */
     @GetMapping("/cashflows")
     public Map<String, Object> cashflows(@RequestParam(defaultValue = "120") int limit) {
         return accountOverviewService.cashflows(limit);
     }
 
+    /** 风控拦截与降仓日志，按条数上限截断。 */
     @GetMapping("/risk-logs")
     public Map<String, Object> riskLogs(@RequestParam(defaultValue = "100") int limit) {
         return accountOverviewService.riskLogs(limit);

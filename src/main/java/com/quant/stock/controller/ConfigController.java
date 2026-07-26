@@ -20,6 +20,7 @@ public class ConfigController {
 
     private final QuantProperties props;
 
+    /** 返回前端可用的公开配置（鉴权开关、限流、费率等）。 */
     @GetMapping
     public Map<String, Object> publicConfig() {
         Map<String, Object> m = new HashMap<String, Object>();

@@ -10,13 +10,18 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
+/**
+ * 日线行情持久化实体，对应表 {@code market_daily}。
+ */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class MarketDailyDO {
     private Long id;
+    /** 股票代码 */
     private String symbol;
+    /** 交易日期 */
     private LocalDate tradeDate;
     private BigDecimal open;
     private BigDecimal high;
@@ -24,10 +29,14 @@ public class MarketDailyDO {
     private BigDecimal close;
     private Long volume;
     private BigDecimal amount;
+    /** 换手率 */
     private BigDecimal turnoverRate;
+    /** 涨停价（前收推算，首日可为空） */
     private BigDecimal limitUp;
+    /** 跌停价 */
     private BigDecimal limitDown;
 
+    /** 转为日 K {@link BarDTO}（bar 时间取当日 9:30） */
     public BarDTO toBarDTO() {
         return BarDTO.builder()
                 .code(symbol)
@@ -40,6 +49,7 @@ public class MarketDailyDO {
                 .build();
     }
 
+    /** 由 {@link BarDTO} 构造日线行（涨跌停等扩展字段默认 null） */
     public static MarketDailyDO fromBarDTO(BarDTO bar) {
         if (bar == null || bar.getBarBegin() == null) {
             return null;

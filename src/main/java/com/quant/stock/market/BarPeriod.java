@@ -23,6 +23,7 @@ public enum BarPeriod {
         this.aggregatePeriod = aggregatePeriod;
     }
 
+    /** 对应 legacy 分表名（如 {@code stock_bar_5min}） */
     public String getTableName() {
         return tableName;
     }
@@ -32,6 +33,7 @@ public enum BarPeriod {
         return aggregatePeriod;
     }
 
+    /** 是否为原始层（1 分钟），无需从更细粒度再聚合 */
     public boolean isRaw() {
         return this == MIN_1;
     }

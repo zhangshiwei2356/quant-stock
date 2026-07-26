@@ -31,6 +31,7 @@ public class SlippageResidualService {
         this.props = props;
     }
 
+    /** 成交价/费用相对模型与委托价的残差日报 */
     public Map<String, Object> dailyReport() {
         List<Map<String, Object>> orders = accountOverviewService.orders();
         List<Map<String, Object>> rows = new ArrayList<Map<String, Object>>();

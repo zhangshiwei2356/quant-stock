@@ -19,12 +19,14 @@ public final class HtmlPdfExporter {
     private HtmlPdfExporter() {
     }
 
+    /** 将 XHTML 字符串转为 A4 PDF 字节数组。 */
     public static byte[] toPdfBytes(String xhtml) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         writeChinesePdf(out, xhtml);
         return out.toByteArray();
     }
 
+    /** 将 XHTML 写入输出流（UTF-8，宋体）。 */
     public static void writeChinesePdf(OutputStream out, String xhtml) {
         Document document = new Document(PageSize.A4, 48, 48, 52, 52);
         try {

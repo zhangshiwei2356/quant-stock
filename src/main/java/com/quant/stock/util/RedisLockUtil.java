@@ -35,6 +35,7 @@ public class RedisLockUtil {
                 }
             };
 
+    /** 尝试获取分布式锁（可重入）；Redis 不可用时降级本地锁。 */
     public boolean tryLock(String key, long expireSeconds) {
         String lockKey = LOCK_PREFIX + key;
         Map<String, Hold> held = heldByThread.get();
@@ -66,6 +67,7 @@ public class RedisLockUtil {
         return false;
     }
 
+    /** 释放当前线程持有的锁（token 校验后删 Redis 键或解本地锁）。 */
     public void unlock(String key) {
         String lockKey = LOCK_PREFIX + key;
         Map<String, Hold> held = heldByThread.get();
@@ -97,6 +99,7 @@ public class RedisLockUtil {
         }
     }
 
+    /** 在持锁状态下执行 supplier，失败则抛 IllegalStateException。 */
     public <T> T executeWithLock(String key, long expireSeconds, Supplier<T> supplier) {
         boolean locked = tryLock(key, expireSeconds);
         if (!locked) {

@@ -11,6 +11,8 @@ public interface KlineSdkClient {
 
     /**
      * 拉取 1 分钟 K；无数据返回空列表（勿返回 null）。
+     *
+     * @param stockCode 股票代码
      */
     List<BarDTO> fetchMinuteBars(String stockCode);
 }

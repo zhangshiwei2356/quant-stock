@@ -39,6 +39,7 @@ public class AccountOverviewService {
     private final ObjectProvider<StockBasicMapper> stockBasicMapperProvider;
     private final ObjectProvider<AccountLedgerQueryService> ledgerQueryProvider;
 
+    /** 账户摘要：现金、权益、回撤、是否允许新开等 */
     public Map<String, Object> summary() {
         BigDecimal cash = nz(strategyTask.getSimCash());
         BigDecimal posMv = nz(strategyTask.getPositionMarketValue());
@@ -96,6 +97,7 @@ public class AccountOverviewService {
         return m;
     }
 
+    /** 当前持仓列表（含简称） */
     public List<Map<String, Object>> positions() {
         Map<String, String> names = nameMap();
         List<Map<String, Object>> list = new ArrayList<Map<String, Object>>();
@@ -149,6 +151,7 @@ public class AccountOverviewService {
         return list;
     }
 
+    /** 摘要 + 持仓 + 委托一览 */
     public Map<String, Object> overview() {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         Map<String, Object> sum = summary();

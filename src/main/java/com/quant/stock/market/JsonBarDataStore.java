@@ -41,6 +41,7 @@ public class JsonBarDataStore {
     @Getter
     private final List<Map<String, String>> stocks = new ArrayList<Map<String, String>>();
 
+    /** 启动时加载 {@code meta.json} 与股票清单 */
     @PostConstruct
     public void init() {
         try {
@@ -72,10 +73,12 @@ public class JsonBarDataStore {
         }
     }
 
+    /** classpath 模拟 K 线是否可用（meta 与 stocks 非空） */
     public boolean available() {
         return meta != null && !stocks.isEmpty();
     }
 
+    /** meta 中配置的股票代码列表 */
     public List<String> stockCodes() {
         List<String> codes = new ArrayList<String>();
         for (Map<String, String> s : stocks) {
@@ -84,6 +87,7 @@ public class JsonBarDataStore {
         return codes;
     }
 
+    /** 懒加载指定代码与周期的全部 K 线（带进程内缓存） */
     public List<BarDTO> getBars(String code, BarPeriod period) {
         if (code == null || period == null) {
             return Collections.emptyList();
@@ -104,6 +108,7 @@ public class JsonBarDataStore {
         }
     }
 
+    /** 在时间窗内过滤 {@link #getBars(String, BarPeriod)} 结果 */
     public List<BarDTO> getBars(String code, BarPeriod period, LocalDateTime start, LocalDateTime end) {
         List<BarDTO> all = getBars(code, period);
         if (all.isEmpty() || (start == null && end == null)) {
@@ -122,6 +127,7 @@ public class JsonBarDataStore {
         return filtered;
     }
 
+    /** 供运维/调试用的 JSON 数据源摘要 */
     public Map<String, Object> summary() {
         Map<String, Object> map = new LinkedHashMap<String, Object>();
         map.put("available", available());

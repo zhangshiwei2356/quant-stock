@@ -29,6 +29,7 @@ public final class BarAggregateUtil {
     private BarAggregateUtil() {
     }
 
+    /** 内存聚合目标周期（与 {@link BarPeriod} 中预聚合层对应） */
     public enum Period {
         M5(5), M15(15), M30(30), M60(60), DAY(0), WEEK(0), MONTH(0);
 
@@ -43,6 +44,13 @@ public final class BarAggregateUtil {
         }
     }
 
+    /**
+     * 将 1 分钟 K 序列聚合为指定更大周期。
+     *
+     * @param minuteBars 已排序或无序的分钟 K 列表
+     * @param period     目标周期
+     * @return 聚合后的 K 线；入参为空时返回空列表
+     */
     public static List<BarDTO> aggregate(List<BarDTO> minuteBars, Period period) {
         if (minuteBars == null || minuteBars.isEmpty() || period == null) {
             return new ArrayList<BarDTO>();
@@ -186,6 +194,7 @@ public final class BarAggregateUtil {
         return closed;
     }
 
+    /** 价格/数量统一保留 4 位小数（null 视为 0） */
     public static BigDecimal scale(BigDecimal v) {
         return v == null ? BigDecimal.ZERO : v.setScale(4, RoundingMode.HALF_UP);
     }

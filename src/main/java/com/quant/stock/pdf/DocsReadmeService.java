@@ -24,12 +24,14 @@ public class DocsReadmeService {
     private final Parser parser;
     private final HtmlRenderer renderer;
 
+    /** 初始化 CommonMark 解析器（含 GFM 表格扩展）。 */
     public DocsReadmeService() {
         List<Extension> extensions = Arrays.<Extension>asList(TablesExtension.create());
         this.parser = Parser.builder().extensions(extensions).build();
         this.renderer = HtmlRenderer.builder().extensions(extensions).escapeHtml(true).build();
     }
 
+    /** 读取并解析 README.md，返回带样式容器的 HTML 片段。 */
     public String toHtmlFragment() throws IOException {
         Path path = locateReadme();
         if (path == null) {

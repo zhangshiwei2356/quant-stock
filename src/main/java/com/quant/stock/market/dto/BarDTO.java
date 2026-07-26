@@ -23,8 +23,10 @@ import java.time.ZonedDateTime;
 @AllArgsConstructor
 public class BarDTO {
 
+    /** 股票代码 */
     private String code;
 
+    /** K 线起始时刻（bar 左端） */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime barBegin;
 
@@ -32,6 +34,7 @@ public class BarDTO {
     private BigDecimal high;
     private BigDecimal low;
     private BigDecimal close;
+    /** 成交量（股/手口径与数据源一致） */
     private BigDecimal volume;
 
     /** 5 分钟 K 结束时间（与 market_minute 物理粒度一致） */
