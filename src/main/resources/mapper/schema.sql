@@ -191,6 +191,7 @@ CREATE TABLE IF NOT EXISTS `bt_backtest_record` (
   `trade_stats_json` MEDIUMTEXT DEFAULT NULL COMMENT 'BackTestTradeStats JSON',
   `trades_json` LONGTEXT DEFAULT NULL COMMENT '成交明细JSON',
   `stock_results_json` LONGTEXT DEFAULT NULL COMMENT '组合分股结果JSON',
+  `config_fingerprint` VARCHAR(64) DEFAULT NULL COMMENT '策略配置指纹 P0-93',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY `uk_record_id` (`record_id`),
   KEY `idx_kind_code` (`kind`, `stock_code`),
@@ -286,6 +287,31 @@ INSERT IGNORE INTO `sys_schedule_job`
 ('pool-rebuild', '全市场入池扫描', 'CRON', '0 10 15 * * MON-FRI', NULL, 0, 1, '全市场扫描覆盖唯一目标池；与 after-market-batch-scan 启用其一即可'),
 ('after-market-batch-scan', '盘后入池扫描', 'CRON', '0 0 16 * * MON-FRI', NULL, 0, 1, '工作日 16:00 覆盖唯一目标池；与 pool-rebuild 启用其一即可'),
 ('data-validate', '数据校验', 'CRON', '0 0 17 * * MON-FRI', NULL, 0, 0, '未实现：待接入外部行情对账 API（本地仅有骨架）');
+
+-- ---------- ST 日切 / 行业 reclass（P0-101 / P0-121；启动亦可 ensure） ----------
+CREATE TABLE IF NOT EXISTS `st_status_hist` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `symbol` VARCHAR(10) NOT NULL,
+  `effective_date` DATE NOT NULL COMMENT '该日起生效的ST状态',
+  `is_st` TINYINT NOT NULL DEFAULT 0,
+  `note` VARCHAR(200) DEFAULT NULL,
+  `updated_at` DATETIME DEFAULT NULL,
+  UNIQUE KEY `uk_sym_eff` (`symbol`,`effective_date`),
+  KEY `idx_eff` (`effective_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ST状态日切(P0-101)';
+
+CREATE TABLE IF NOT EXISTS `industry_reclass_log` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `symbol` VARCHAR(10) NOT NULL,
+  `effective_date` DATE NOT NULL,
+  `industry_from` VARCHAR(50) DEFAULT NULL,
+  `industry_to` VARCHAR(50) DEFAULT NULL,
+  `source` VARCHAR(40) DEFAULT NULL,
+  `note` VARCHAR(200) DEFAULT NULL,
+  `created_at` DATETIME DEFAULT NULL,
+  KEY `idx_sym_eff` (`symbol`,`effective_date`),
+  KEY `idx_eff` (`effective_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='行业重分类as-of日志(P0-121)';
 
 -- 初始化配置（忽略重复）
 INSERT IGNORE INTO `system_config` (`config_key`, `config_value`, `type`, `description`) VALUES

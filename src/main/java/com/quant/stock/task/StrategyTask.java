@@ -9,14 +9,28 @@ import com.quant.stock.market.CoreMarketBarService;
 import com.quant.stock.market.MarketDataService;
 import com.quant.stock.market.dto.BarDTO;
 import com.quant.stock.pool.TradePoolService;
+import com.quant.stock.risk.AccountRiskState;
+import com.quant.stock.risk.ExitPriority;
+import com.quant.stock.risk.AlertSeverity;
 import com.quant.stock.risk.LimitBoardHelper;
+import com.quant.stock.risk.LimitPriceProtect;
 import com.quant.stock.risk.LiveAccountRiskState;
 import com.quant.stock.risk.OpenFilterService;
-import com.quant.stock.risk.RiskControlLogService;
+import com.quant.stock.risk.RiskAlertService;
 import com.quant.stock.risk.RiskControlService;
+import com.quant.stock.admin.DataReconcileGateService;
+import com.quant.stock.risk.SignalDriftMonitor;
+import com.quant.stock.risk.StopFillPrice;
+import com.quant.stock.risk.StrategyRetirementService;
+import com.quant.stock.risk.StressScenarioService;
+import com.quant.stock.risk.StructuralBreakMonitor;
+import com.quant.stock.risk.TurnoverGuardService;
+import com.quant.stock.risk.IcDecayMonitor;
 import com.quant.stock.strategy.IndicatorSignalUtil;
 import com.quant.stock.strategy.MaCrossStrategy;
+import com.quant.stock.trade.CapacityThrottle;
 import com.quant.stock.trade.LiveLedgerService;
+import com.quant.stock.trade.ParticipationCap;
 import com.quant.stock.trade.TradeCostModel;
 import com.quant.stock.trade.TradeGatewayService;
 import com.quant.stock.trade.dto.OrderDTO;
@@ -72,7 +86,14 @@ public class StrategyTask {
     private TradePoolService tradePoolService;
 
     private final ObjectProvider<LiveLedgerService> liveLedgerProvider;
-    private final ObjectProvider<RiskControlLogService> riskLogProvider;
+    private final StrategyRetirementService strategyRetirementService;
+    private final RiskAlertService riskAlertService;
+    private final StressScenarioService stressScenarioService;
+    private final SignalDriftMonitor signalDriftMonitor;
+    private final StructuralBreakMonitor structuralBreakMonitor;
+    private final DataReconcileGateService dataReconcileGateService;
+    private final TurnoverGuardService turnoverGuardService;
+    private final IcDecayMonitor icDecayMonitor;
 
     private volatile BigDecimal simCash = new BigDecimal("100000");
     /** 模拟账户初始资金（用于收益率；恢复现金不改此值） */
@@ -96,7 +117,14 @@ public class StrategyTask {
                         BatchStockBackTestService batchStockBackTestService,
                         TradingCalendar tradingCalendar,
                         ObjectProvider<LiveLedgerService> liveLedgerProvider,
-                        ObjectProvider<RiskControlLogService> riskLogProvider) {
+                        StrategyRetirementService strategyRetirementService,
+                        RiskAlertService riskAlertService,
+                        StressScenarioService stressScenarioService,
+                        SignalDriftMonitor signalDriftMonitor,
+                        StructuralBreakMonitor structuralBreakMonitor,
+                        DataReconcileGateService dataReconcileGateService,
+                        TurnoverGuardService turnoverGuardService,
+                        IcDecayMonitor icDecayMonitor) {
         this.quantProperties = quantProperties;
         this.marketDataService = marketDataService;
         this.maCrossStrategy = maCrossStrategy;
@@ -110,7 +138,14 @@ public class StrategyTask {
         this.batchStockBackTestService = batchStockBackTestService;
         this.tradingCalendar = tradingCalendar;
         this.liveLedgerProvider = liveLedgerProvider;
-        this.riskLogProvider = riskLogProvider;
+        this.strategyRetirementService = strategyRetirementService;
+        this.riskAlertService = riskAlertService;
+        this.stressScenarioService = stressScenarioService;
+        this.signalDriftMonitor = signalDriftMonitor;
+        this.structuralBreakMonitor = structuralBreakMonitor;
+        this.dataReconcileGateService = dataReconcileGateService;
+        this.turnoverGuardService = turnoverGuardService;
+        this.icDecayMonitor = icDecayMonitor;
     }
 
     @PostConstruct
@@ -193,12 +228,12 @@ public class StrategyTask {
                         && book.pos.canSellStops(tradeDay)) {
                     book.pos.updateHighest(high);
                     int sellable = (book.pos.sellableShares(tradeDay) / 100) * 100;
-                    if (sellable >= 100
-                            && book.pos.getStopPrice().compareTo(BigDecimal.ZERO) > 0
-                            && low.compareTo(book.pos.getStopPrice()) <= 0) {
-                        BigDecimal fillBase = book.pos.getStopPrice().max(low);
-                        boolean full = sellable >= book.pos.getShares();
-                        executeLiveSell(code, book, bars, i, fillBase, sellable, full, tradeDay);
+                    if (sellable >= 100) {
+                        StopFillPrice.Result stopFill = StopFillPrice.resolve(open, low, book.pos.getStopPrice());
+                        if (stopFill.triggered()) {
+                            boolean full = sellable >= book.pos.getShares();
+                            executeLiveSell(code, book, bars, i, stopFill.fillBase, sellable, full, tradeDay);
+                        }
                     }
                 } else if (book.pos.hasPosition()) {
                     book.pos.updateHighest(high);
@@ -208,16 +243,51 @@ public class StrategyTask {
                 boolean wasHalted = accountRiskState.isHalted();
                 accountRiskState.onEquity(tradeDay, equity);
                 if (!wasHalted && accountRiskState.isHalted()) {
-                    RiskControlLogService riskLog = riskLogProvider.getIfAvailable();
-                    if (riskLog != null) {
-                        riskLog.record(tradeDay, code, "DRAWDOWN_HALT",
-                                accountRiskState.drawdown(equity), "熔断禁开并挂清仓");
+                    String rule = AccountRiskState.HALT_DURATION.equals(accountRiskState.getHaltReason())
+                            ? "DRAWDOWN_DURATION_HALT" : "DRAWDOWN_HALT";
+                    String action = AccountRiskState.HALT_DURATION.equals(accountRiskState.getHaltReason())
+                            ? "持续期熔断禁开并挂清仓 underwaterDays=" + accountRiskState.getUnderwaterTradingDays()
+                            : "深度熔断禁开并挂清仓";
+                    riskAlertService.emit(tradeDay, code, rule, AlertSeverity.CRITICAL,
+                            accountRiskState.drawdown(equity), action);
+                    strategyRetirementService.onAccountHalt(accountRiskState, tradeDay);
+                    if (strategyRetirementService.isRetired()) {
+                        riskAlertService.emit(tradeDay, code, "STRATEGY_RETIRED", AlertSeverity.CRITICAL,
+                                BigDecimal.valueOf(accountRiskState.getUnderwaterTradingDays()),
+                                "持续期熔断触发策略退役");
                     }
                 }
-                BigDecimal posScale = accountRiskState.positionScale(equity);
-                if (book.pos.hasPosition() && accountRiskState.isHalted() && !book.pendingSell) {
+                stressScenarioService.evaluateOnBar(code, bars, i, tradeDay,
+                        book.limitDownFailDays, accountRiskState.isHalted());
+                BigDecimal icSample = signalDriftMonitor.evaluateRollingIc(bars, i, tradeDay);
+                if (icSample != null) {
+                    icDecayMonitor.onIcSample(tradeDay, icSample);
+                }
+                structuralBreakMonitor.evaluate(bars, i, tradeDay);
+                BigDecimal posScale = accountRiskState.positionScale(equity)
+                        .multiply(stressScenarioService.positionScaleMultiplier())
+                        .multiply(structuralBreakMonitor.positionScaleMultiplier())
+                        .multiply(turnoverGuardService.evaluateAndScale(tradeDay, equity))
+                        .multiply(icDecayMonitor.positionScaleMultiplier());
+                BigDecimal posMvNow = calcPositionMv();
+                BigDecimal singleMv = book.pos.hasPosition()
+                        ? close.multiply(BigDecimal.valueOf(book.pos.getShares())) : BigDecimal.ZERO;
+                riskAlertService.checkSoftBudget(tradeDay, equity, posMvNow, code, singleMv);
+                if (book.pos.hasPosition() && accountRiskState.isHalted()
+                        && ExitPriority.ACCOUNT_HALT.canRegisterPending(false, book.pendingSell)) {
                     book.pendingSell = true;
+                    book.pendingSellReason = ExitPriority.ACCOUNT_HALT.getLabel();
                     book.pendingSellSignalDay = tradeDay;
+                }
+
+                if (book.pos.hasPosition() && quantProperties.getMaxHoldTradingDays() > 0
+                        && ExitPriority.TIME_STOP.canRegisterPending(false, book.pendingSell)) {
+                    int held = tradingCalendar.tradingDaysAfter(book.pos.getEarliestOpenDate(), tradeDay);
+                    if (held >= quantProperties.getMaxHoldTradingDays()) {
+                        book.pendingSell = true;
+                        book.pendingSellReason = ExitPriority.TIME_STOP.getLabel();
+                        book.pendingSellSignalDay = tradeDay;
+                    }
                 }
 
                 // Step4: 信号挂单
@@ -226,14 +296,21 @@ public class StrategyTask {
                 boolean stoppedOutToday = false;
 
                 if (!book.pos.hasPosition() && buySignal && !book.pendingSell && book.pendingBuyVol == null
+                        && strategyRetirementService.allowNewOpen()
                         && accountRiskState.allowNewOpen(tradeDay, equity)
+                        && !dataReconcileGateService.blockNewOpen()
+                        && turnoverGuardService.allowNewOpen(tradeDay, equity)
                         && posScale.compareTo(BigDecimal.ZERO) > 0
                         && openFilterService.canOpen(code, bars, i)) {
                     BigDecimal atr = atrAt(ind, i);
                     if (atr.compareTo(quantProperties.getAtrMinThreshold()) > 0) {
                         book.targetFullVol = positionAmountUtil.calcBuyVolume(simCash, close, atr, posScale);
+                        long advBuy = IndicatorSignalUtil.avgVolume(bars, i, 20);
+                        long barVol = barVolume(bars, i);
+                        book.targetFullVol = capParticipation(book.targetFullVol, advBuy, equity, barVol);
                         int first = quantProperties.isPyramidEnabled()
                                 ? positionAmountUtil.pyramidSlice(book.targetFullVol, 0) : book.targetFullVol;
+                        first = capParticipation(first, advBuy, equity, barVol);
                         if (first >= 100) {
                             book.pendingBuyVol = first;
                             book.pendingBuyPyramid = false;
@@ -247,9 +324,14 @@ public class StrategyTask {
                         && close.compareTo(book.pos.getAvgCost()
                         .multiply(BigDecimal.ONE.add(quantProperties.getPyramidAddPct()))) >= 0
                         && ind.ma5[i] > ind.ma20[i]
+                        && strategyRetirementService.allowNewOpen()
                         && accountRiskState.allowNewOpen(tradeDay, equity)
+                        && !dataReconcileGateService.blockNewOpen()
+                        && turnoverGuardService.allowNewOpen(tradeDay, equity)
                         && posScale.compareTo(BigDecimal.ZERO) > 0) {
                     int slice = positionAmountUtil.pyramidSlice(book.targetFullVol, book.pyramidStage);
+                    long advAdd = IndicatorSignalUtil.avgVolume(bars, i, 20);
+                    slice = capParticipation(slice, advAdd, equity, barVolume(bars, i));
                     BigDecimal posMv = calcPositionMv();
                     BigDecimal addMoney = close.multiply(BigDecimal.valueOf(Math.max(slice, 0)));
                     if (slice >= 100 && positionAmountUtil.withinTotalPosition(equity, posMv, addMoney)) {
@@ -259,8 +341,10 @@ public class StrategyTask {
                     }
                 }
 
-                if (book.pos.hasPosition() && sellSignal && !stoppedOutToday && !book.pendingSell) {
+                if (book.pos.hasPosition() && sellSignal
+                        && ExitPriority.DEATH_CROSS.canRegisterPending(stoppedOutToday, book.pendingSell)) {
                     book.pendingSell = true;
+                    book.pendingSellReason = ExitPriority.DEATH_CROSS.getLabel();
                     book.pendingSellSignalDay = tradeDay;
                 }
 
@@ -288,28 +372,36 @@ public class StrategyTask {
             if (sellable < 100) {
                 // 无可卖旧仓，挂单保留至次日
             } else {
-                boolean limitDown = openFilterService.isLimitDownAt(bars, i);
-                if (limitDown) {
-                    if (book.lastLimitDownFailDay == null || !book.lastLimitDownFailDay.equals(tradeDay)) {
-                        book.limitDownFailDays++;
-                        book.lastLimitDownFailDay = tradeDay;
-                    }
-                    if (book.limitDownFailDays < LIMIT_DOWN_FORCE_DAYS) {
-                        // 跌停暂缓
-                    } else {
-                        BigDecimal prev = openFilterService.prevTradingDayClose(bars, i);
-                        BigDecimal force = LimitBoardHelper.limitDownPrice(prev, code,
-                                openFilterService.isSt(code));
-                        if (force == null) {
-                            force = open;
+                int vol = sellable;
+                ExitPriority exitPri = ExitPriority.fromReasonLabel(book.pendingSellReason);
+                if (exitPri == null || !exitPri.bypassParticipationCap()) {
+                    long adv = IndicatorSignalUtil.avgVolume(bars, i, 20);
+                    vol = capParticipation(vol, adv, markEquity(open), barVolume(bars, i));
+                }
+                if (vol >= 100) {
+                    boolean limitDown = openFilterService.isLimitDownAt(bars, i);
+                    if (limitDown) {
+                        if (book.lastLimitDownFailDay == null || !book.lastLimitDownFailDay.equals(tradeDay)) {
+                            book.limitDownFailDays++;
+                            book.lastLimitDownFailDay = tradeDay;
                         }
-                        force = force.multiply(new BigDecimal("0.99")).setScale(2, RoundingMode.HALF_UP);
-                        boolean full = sellable >= book.pos.getShares();
-                        executeLiveSell(code, book, bars, i, force, sellable, full, tradeDay);
+                        if (book.limitDownFailDays < LIMIT_DOWN_FORCE_DAYS) {
+                            // 跌停暂缓
+                        } else {
+                            BigDecimal prev = openFilterService.prevTradingDayClose(bars, i);
+                            BigDecimal force = LimitBoardHelper.limitDownPrice(prev, code,
+                                    openFilterService.isSt(code));
+                            if (force == null) {
+                                force = open;
+                            }
+                            force = force.multiply(new BigDecimal("0.99")).setScale(2, RoundingMode.HALF_UP);
+                            boolean full = vol >= book.pos.getShares();
+                            executeLiveSell(code, book, bars, i, force, vol, full, tradeDay);
+                        }
+                    } else {
+                        boolean full = vol >= book.pos.getShares();
+                        executeLiveSell(code, book, bars, i, open, vol, full, tradeDay);
                     }
-                } else {
-                    boolean full = sellable >= book.pos.getShares();
-                    executeLiveSell(code, book, bars, i, open, sellable, full, tradeDay);
                 }
             }
         }
@@ -331,8 +423,16 @@ public class StrategyTask {
         if (book.pendingSell && book.pos.hasPosition()) {
             int sellable = (book.pos.sellableShares(tradeDay) / 100) * 100;
             if (sellable >= 100) {
-                boolean full = sellable >= book.pos.getShares();
-                executeLiveSell(code, book, bars, i, close, sellable, full, tradeDay);
+                int vol = sellable;
+                ExitPriority exitPri = ExitPriority.fromReasonLabel(book.pendingSellReason);
+                if (exitPri == null || !exitPri.bypassParticipationCap()) {
+                    long adv = IndicatorSignalUtil.avgVolume(bars, i, 20);
+                    vol = capParticipation(vol, adv, markEquity(close), barVolume(bars, i));
+                }
+                if (vol >= 100) {
+                    boolean full = vol >= book.pos.getShares();
+                    executeLiveSell(code, book, bars, i, close, vol, full, tradeDay);
+                }
             }
         }
         if (book.pendingBuyVol != null && book.pendingBuyVol >= 100) {
@@ -351,6 +451,10 @@ public class StrategyTask {
             return;
         }
         BigDecimal deal = tradeCostModel.buyPrice(base, bars, i, vol);
+        if (quantProperties.isLimitPriceProtectEnabled()) {
+            deal = LimitPriceProtect.clampBuy(deal, openFilterService.prevTradingDayClose(bars, i),
+                    code, openFilterService.isSt(code));
+        }
         BigDecimal amount = deal.multiply(BigDecimal.valueOf(vol));
         BigDecimal fee = tradeCostModel.buyFee(amount);
         BigDecimal equity = markEquity(bars.get(i).getClose());
@@ -393,8 +497,12 @@ public class StrategyTask {
         }
         BigDecimal avg = book.pos.getAvgCost();
         BigDecimal deal = tradeCostModel.sellPrice(base, bars, i, vol);
+        if (quantProperties.isLimitPriceProtectEnabled()) {
+            deal = LimitPriceProtect.clampSell(deal, openFilterService.prevTradingDayClose(bars, i),
+                    code, openFilterService.isSt(code));
+        }
         BigDecimal amount = deal.multiply(BigDecimal.valueOf(vol));
-        BigDecimal fee = tradeCostModel.sellFee(amount);
+        BigDecimal fee = tradeCostModel.sellFee(amount, null, tradeDay);
         BigDecimal pnl = deal.subtract(avg).multiply(BigDecimal.valueOf(vol)).subtract(fee);
         OrderDTO order = tradeGatewayService.placeOrder(code, OrderDTO.Side.SELL, deal, vol);
         if (order == null || order.getStatus() == OrderDTO.Status.REJECTED) {
@@ -460,6 +568,71 @@ public class StrategyTask {
         persistOrderOnly(order, pending == null ? LocalDate.now() : pending.tradeDay, null);
         log.info("策略撤单: {}", id);
         return order;
+    }
+
+    /**
+     * 改价=撤补重置队尾（P0-95）：先撤旧单释放预留，再按新价报新单（新 orderId，不保队列优先级）。
+     */
+    public OrderDTO replaceOrder(String orderId, BigDecimal newPrice, Integer newVolume) {
+        if (orderId == null || orderId.trim().isEmpty() || newPrice == null) {
+            return null;
+        }
+        String id = orderId.trim();
+        PendingFill oldPending = pendingFills.get(id);
+        OrderDTO cancelled = cancelOrder(id);
+        if (cancelled == null) {
+            return null;
+        }
+        int remain = cancelled.getVolume() == null ? 0 : cancelled.getVolume();
+        int filled = cancelled.getFilledVolume() == null ? 0 : cancelled.getFilledVolume();
+        int leftover = Math.max(0, remain - filled);
+        int vol = newVolume == null || newVolume <= 0 ? leftover : newVolume;
+        vol = (vol / 100) * 100;
+        if (vol < 100) {
+            return null;
+        }
+        String code = cancelled.getStockCode();
+        OrderDTO.Side side = cancelled.getSide();
+        LocalDate tradeDay = oldPending == null ? LocalDate.now() : oldPending.tradeDay;
+        BigDecimal amount = newPrice.multiply(BigDecimal.valueOf(vol));
+        OrderDTO neu = tradeGatewayService.placeOrder(code, side, newPrice, vol,
+                "RPL-" + System.currentTimeMillis());
+        if (neu == null || neu.getStatus() == OrderDTO.Status.REJECTED) {
+            return neu;
+        }
+        LiveBook book = books.computeIfAbsent(code, k -> new LiveBook());
+        if (side == OrderDTO.Side.BUY) {
+            BigDecimal fee = tradeCostModel.buyFee(amount);
+            PendingFill pending = PendingFill.buy(code, vol, newPrice, amount, fee, tradeDay,
+                    oldPending != null && oldPending.pyramid,
+                    oldPending == null ? BigDecimal.ZERO : oldPending.atr,
+                    oldPending == null ? BigDecimal.ZERO : oldPending.equity);
+            if (neu.getStatus() == OrderDTO.Status.FILLED) {
+                applyBuyFill(book, neu, pending);
+            } else if (neu.getStatus() == OrderDTO.Status.SUBMITTED) {
+                reserveBuy(pending);
+                pendingFills.put(neu.getOrderId(), pending);
+                persistOrderOnly(neu, tradeDay, fee);
+            }
+        } else {
+            BigDecimal fee = tradeCostModel.sellFee(amount, null, tradeDay);
+            BigDecimal avg = oldPending == null ? book.pos.getAvgCost() : oldPending.avg;
+            if (avg == null) {
+                avg = BigDecimal.ZERO;
+            }
+            BigDecimal pnl = newPrice.subtract(avg).multiply(BigDecimal.valueOf(vol)).subtract(fee);
+            PendingFill pending = PendingFill.sell(code, vol, newPrice, amount, fee, tradeDay,
+                    oldPending != null && oldPending.clearAll, avg, pnl);
+            if (neu.getStatus() == OrderDTO.Status.FILLED) {
+                applySellFill(book, neu, pending);
+            } else if (neu.getStatus() == OrderDTO.Status.SUBMITTED) {
+                reserveSell(pending);
+                pendingFills.put(neu.getOrderId(), pending);
+                persistOrderOnly(neu, tradeDay, fee);
+            }
+        }
+        log.info("策略改价撤补(队尾重置): {} → {} @{} x{}", id, neu.getOrderId(), newPrice, vol);
+        return neu;
     }
 
     /**
@@ -569,6 +742,7 @@ public class StrategyTask {
             book.pyramidStage = Math.max(book.pyramidStage, 1);
         }
         p.remainingVol -= qty;
+        turnoverGuardService.recordTrade(p.tradeDay, sliceAmt);
         persistBook(p.code, book, order, p.tradeDay, sliceFee);
         log.info("策略买入: {} {}@{} x{} fee={}", p.code, order.getOrderId(), p.deal, qty, sliceFee);
     }
@@ -594,10 +768,13 @@ public class StrategyTask {
             book.pyramidStage = 0;
             book.targetFullVol = 0;
             book.pendingSell = false;
+            book.pendingSellReason = null;
             book.pendingSellSignalDay = null;
             book.limitDownFailDays = 0;
             book.lastLimitDownFailDay = null;
-            accountRiskState.onClosedRound(slicePnl.compareTo(BigDecimal.ZERO) > 0, p.tradeDay);
+            boolean win = slicePnl.compareTo(BigDecimal.ZERO) > 0;
+            accountRiskState.onClosedRound(win, p.tradeDay);
+            signalDriftMonitor.onClosedRound(win, p.tradeDay);
         } else {
             book.pos.removeShares(qty);
             book.pendingSell = true;
@@ -606,6 +783,7 @@ public class StrategyTask {
             }
         }
         p.remainingVol -= qty;
+        turnoverGuardService.recordTrade(p.tradeDay, sliceAmt);
         persistBook(p.code, book, order, p.tradeDay, sliceFee);
         log.info("策略卖出: {} {}@{} x{} fee={} pnl={}",
                 p.code, order.getOrderId(), p.deal, qty, sliceFee, slicePnl);
@@ -801,6 +979,20 @@ public class StrategyTask {
         return list;
     }
 
+    private int capParticipation(int vol, long adv20, BigDecimal equity, long barVol) {
+        BigDecimal eff = CapacityThrottle.effectiveMaxParticipation(
+                quantProperties.getMaxParticipationAdv(), equity, quantProperties.getCapacityAumBase());
+        int capped = ParticipationCap.capVolume(vol, adv20, eff);
+        return CapacityThrottle.povCapVolume(capped, barVol, quantProperties.getPovMaxBarVolumePct());
+    }
+
+    private static long barVolume(List<BarDTO> bars, int i) {
+        if (bars == null || i < 0 || i >= bars.size() || bars.get(i).getVolume() == null) {
+            return 0L;
+        }
+        return bars.get(i).getVolume().longValue();
+    }
+
     private BigDecimal markEquity(BigDecimal fallbackPrice) {
         BigDecimal mv = simCash;
         Map<String, Integer> positions = tradeGatewayService.queryPositions();
@@ -857,6 +1049,7 @@ public class StrategyTask {
         boolean pendingBuyPyramid;
         LocalDate pendingBuySignalDay;
         boolean pendingSell;
+        String pendingSellReason;
         LocalDate pendingSellSignalDay;
         int pyramidStage;
         int targetFullVol;

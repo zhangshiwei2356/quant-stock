@@ -27,6 +27,7 @@ public class RiskControlService {
     private final OpenFilterService openFilterService;
     private final LiveAccountRiskState accountRiskState;
     private final TradingCalendar tradingCalendar;
+    private final StrategyRetirementService strategyRetirementService;
 
     public boolean isTradingTime(LocalDateTime now) {
         if (now == null || !tradingCalendar.isAshareTradingDay(now.toLocalDate())) {
@@ -68,6 +69,9 @@ public class RiskControlService {
         }
         LocalDate tradeDay = clock.toLocalDate();
         BigDecimal equity = totalCash.add(totalPositionValue);
+        if (!strategyRetirementService.allowNewOpen()) {
+            return false;
+        }
         if (!accountRiskState.allowNewOpen(tradeDay, equity)) {
             return false;
         }

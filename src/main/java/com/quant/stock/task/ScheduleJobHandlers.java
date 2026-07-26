@@ -1,5 +1,6 @@
 package com.quant.stock.task;
 
+import com.quant.stock.admin.DataReconcileGateService;
 import com.quant.stock.market.MarketDataService;
 import com.quant.stock.market.dto.BarDTO;
 import com.quant.stock.pool.TradePoolService;
@@ -40,6 +41,7 @@ public class ScheduleJobHandlers {
     private final StrategyTask strategyTask;
     private final RedisLockUtil redisLockUtil;
     private final JdbcTemplate jdbcTemplate;
+    private final DataReconcileGateService dataReconcileGateService;
 
     /**
      * 行情采集：按股票池刷新本地 K 线缓存/落库。
@@ -222,6 +224,13 @@ public class ScheduleJobHandlers {
                     }
                 }
                 log.info("[data-validate] 完成 universe={} warn={}", codes.size(), warn);
+                try {
+                    Map<String, Object> recon = dataReconcileGateService.reconcile(codes);
+                    log.info("[data-validate] 多源对账 diverge={} block={}",
+                            recon.get("divergeCodeCount"), recon.get("blockNewOpen"));
+                } catch (Exception e) {
+                    log.warn("[data-validate] 多源对账失败: {}", e.getMessage());
+                }
             }
         });
     }

@@ -1738,6 +1738,10 @@
       data: JSON.stringify(body)
     }).done(function (pf) {
         var stats = resolveTradeStats(pf);
+        var corr = pf.correlation || {};
+        var corrText = corr.avgCorrelation == null ? ''
+          : (' 相关均值<b>' + num(corr.avgCorrelation, 2) + '</b>'
+            + (corr.warn ? '<span class="pnl-neg">（高相关告警）</span>' : ''));
         $('#pfMetrics').html(
           '成分股<b>' + codes.length + '</b>' +
           ' 期末资产<b>' + num(pf.finalAsset) + '</b>' +
@@ -1745,7 +1749,7 @@
           ' 收益率<b>' + pct(pf.totalRate) + '</b>' +
           ' 最大回撤<b>' + pct(pf.maxDrawDown) + '</b>' +
           ' 买/卖<b>' + (stats.buyCount || 0) + '/' + (stats.sellCount || 0) + '</b>' +
-          ' 胜率<b>' + pct(pf.winRate) + '</b>'
+          ' 胜率<b>' + pct(pf.winRate) + '</b>' + corrText
         );
         lastEquity = pf;
         setPortfolioResultPanelsVisible(true);
@@ -2089,7 +2093,7 @@
   }
 
   function hideAllWorkspaceViews() {
-    $('#viewHome, #viewNavIntro, #viewPool, #viewSingle, #viewPortfolio, #viewTradePool, #viewTpHistory, #viewDbTable, #viewSchedule, #viewDataHealth, #viewSysParams, #viewAcctFunds, #viewAcctPositions, #viewAcctOrders, #viewAcctCashflows, #viewAcctRiskLogs').prop('hidden', true);
+    $('#viewHome, #viewNavIntro, #viewPool, #viewSingle, #viewPortfolio, #viewTradePool, #viewTpHistory, #viewDbTable, #viewSchedule, #viewDataHealth, #viewSysParams, #viewAcctFunds, #viewAcctPositions, #viewAcctOrders, #viewAcctCashflows, #viewAcctRiskLogs, #viewAcctRiskDash, #viewAcctPaperGap').prop('hidden', true);
     $('body').removeClass('home-theme-peek');
     $('#btnExpandHome').prop('hidden', true);
   }
@@ -2221,7 +2225,8 @@
   function showAccountPanel(panel) {
     panel = panel || lastAccountPanel || 'funds';
     if (panel !== 'funds' && panel !== 'positions' && panel !== 'orders'
-        && panel !== 'cashflows' && panel !== 'risklogs') {
+        && panel !== 'cashflows' && panel !== 'risklogs' && panel !== 'riskdash'
+        && panel !== 'papergap') {
       panel = 'funds';
     }
     lastAccountPanel = panel;
@@ -2246,6 +2251,12 @@
       $('#viewAcctRiskLogs').prop('hidden', false);
       loadAccountRiskLogs();
       loadAccountOverview();
+    } else if (panel === 'riskdash') {
+      $('#viewAcctRiskDash').prop('hidden', false);
+      loadAccountRiskDash();
+    } else if (panel === 'papergap') {
+      $('#viewAcctPaperGap').prop('hidden', false);
+      loadAccountPaperGap();
     } else {
       $('#viewAcctFunds').prop('hidden', false);
       loadAccountOverview();
@@ -2256,6 +2267,8 @@
   function riskRuleLabel(t) {
     var map = {
       DRAWDOWN_HALT: '峰值回撤熔断',
+      DRAWDOWN_DURATION_HALT: '回撤持续期熔断',
+      STRATEGY_RETIRED: '策略退役',
       DAILY_LOSS: '单日亏损禁开',
       CONSECUTIVE_LOSS: '连亏禁开'
     };
@@ -2353,6 +2366,190 @@
       });
   }
 
+  function gapDimLabel(d) {
+    var map = {
+      FLICKER: '闪烁', COST: '成本', SELECTION: '选股',
+      FILL_ASSUMPTION: '撮合', MODE: '模式'
+    };
+    return map[d] || d || '—';
+  }
+
+  function dashText() {
+    var parts = [];
+    for (var i = 0; i < arguments.length; i++) {
+      if (arguments[i] != null && arguments[i] !== '') parts.push(String(arguments[i]));
+    }
+    return parts.length ? parts.join(' · ') : '—';
+  }
+
+  function loadAccountRiskDash() {
+    var urls = [
+      '/api/account/alerts?limit=20',
+      '/api/account/turnover',
+      '/api/account/ic-decay',
+      '/api/account/signal-drift',
+      '/api/account/structural-break',
+      '/api/account/stress',
+      '/api/account/partial-fill',
+      '/api/account/slippage-residual',
+      '/api/account/order-protect',
+      '/api/account/execution-cap',
+      '/api/account/short-policy'
+    ];
+    var keys = [
+      'alerts', 'turnover', 'icDecay', 'signalDrift', 'structuralBreak',
+      'stress', 'partialFill', 'slippage', 'orderProtect', 'executionCap', 'shortPolicy'
+    ];
+    var reqs = urls.map(function (u) {
+      var dfd = $.Deferred();
+      $.getJSON(u)
+        .done(function (d) { dfd.resolve(d || {}); })
+        .fail(function () { dfd.resolve({ _error: true }); });
+      return dfd.promise();
+    });
+    $.when.apply($, reqs)
+      .done(function () {
+        var bag = {};
+        var args = arguments;
+        // 单请求时 $.when 直接返回该对象，多请求时为参数列表
+        if (keys.length === 1) {
+          bag[keys[0]] = args[0];
+        } else {
+          for (var i = 0; i < keys.length; i++) {
+            bag[keys[i]] = args[i];
+          }
+        }
+        var alertN = (bag.alerts && bag.alerts.recent) ? bag.alerts.recent.length
+          : (bag.alerts && bag.alerts.count != null ? bag.alerts.count : 0);
+        $('#acctDashAlerts').text(String(alertN));
+        $('#acctDashTurnover').text(dashText(
+          bag.turnover && bag.turnover.softHit ? '软顶' : null,
+          bag.turnover && bag.turnover.hardHit ? '硬顶' : null,
+          bag.turnover && bag.turnover.scaleMultiplier != null ? ('×' + bag.turnover.scaleMultiplier) : null,
+          bag.turnover && bag.turnover.enabled === false ? '关' : null
+        ));
+        $('#acctDashIc').text(dashText(
+          bag.icDecay && bag.icDecay.decayActive ? '衰减中' : '正常',
+          bag.icDecay && bag.icDecay.ir != null ? ('IR=' + bag.icDecay.ir) : null,
+          bag.icDecay && bag.icDecay.scaleMultiplier != null ? ('×' + bag.icDecay.scaleMultiplier) : null
+        ));
+        $('#acctDashDrift').text(dashText(
+          bag.signalDrift && bag.signalDrift.killArmed ? 'Kill' : '监控中',
+          bag.signalDrift && bag.signalDrift.icSource ? bag.signalDrift.icSource : null,
+          bag.signalDrift && bag.signalDrift.rollingIc != null ? ('IC=' + bag.signalDrift.rollingIc) : null
+        ));
+        $('#acctDashBreak').text(dashText(
+          bag.structuralBreak && bag.structuralBreak.active ? '触发' : '未触发',
+          bag.structuralBreak && bag.structuralBreak.score != null ? ('score=' + bag.structuralBreak.score) : null
+        ));
+        $('#acctDashStress').text(dashText(
+          bag.stress && bag.stress.activeScenario ? bag.stress.activeScenario : null,
+          bag.stress && bag.stress.scaleMultiplier != null ? ('×' + bag.stress.scaleMultiplier) : null,
+          bag.stress && bag.stress.enabled === false ? '关' : '就绪'
+        ));
+        $('#acctDashPartial').text(dashText(
+          bag.partialFill && bag.partialFill.fillRatio != null ? ('ratio=' + bag.partialFill.fillRatio) : null,
+          bag.partialFill && bag.partialFill.partialCount != null ? ('部成' + bag.partialFill.partialCount) : null,
+          bag.partialFill && bag.partialFill.hint ? null : null
+        ));
+        $('#acctDashSlip').text(dashText(
+          bag.slippage && bag.slippage.avgAbsAdverseBps != null ? (bag.slippage.avgAbsAdverseBps + 'bp') : null,
+          bag.slippage && bag.slippage.sampleCount != null ? ('n=' + bag.slippage.sampleCount) : null
+        ));
+        $('#acctDashProtect').text(dashText(
+          bag.orderProtect && bag.orderProtect.enabled ? '开' : '关',
+          bag.orderProtect && bag.orderProtect.fiveLevelBook
+        ));
+        $('#acctDashExec').text(dashText(
+          bag.executionCap && bag.executionCap.effectiveMaxParticipationAdv != null
+            ? ('ADV=' + bag.executionCap.effectiveMaxParticipationAdv) : null,
+          bag.executionCap && bag.executionCap.twapSlicer
+        ));
+        $('#acctDashShort').text(dashText(
+          bag.shortPolicy && bag.shortPolicy.mode,
+          bag.shortPolicy && bag.shortPolicy.allowShort === false ? '禁空' : null
+        ));
+        var okN = 0;
+        keys.forEach(function (k) { if (bag[k] && !bag[k]._error) okN++; });
+        $('#acctDashBadge').text(String(okN));
+        $('#sideDashCount').text(String(okN));
+        $('#acctDashMeta').text('已加载 ' + okN + '/' + keys.length + ' · ' + new Date().toLocaleString());
+        $('#acctDashHint').text('聚合只读监控；外部五档/TWAP/真柜台仍不可用。');
+        try {
+          $('#acctDashRaw').text(JSON.stringify(bag, null, 2));
+        } catch (e) {
+          $('#acctDashRaw').text(String(e));
+        }
+      })
+      .fail(function () {
+        $('#acctDashHint').text('风控日报加载失败');
+        toast('风控日报加载失败', 'err');
+      });
+  }
+
+  function loadAccountPaperGap() {
+    $.getJSON('/api/account/paper-live-gap')
+      .done(function (data) {
+        data = data || {};
+        var sum = data.summary || {};
+        var gaps = data.gaps || [];
+        var costs = data.costRows || [];
+        $('#acctGapPass').text(data.gatePass ? '通过' : '告警');
+        $('#acctGapMode').text(data.tradeMode || '—');
+        $('#acctGapFp').text(data.configFingerprint || '—');
+        $('#acctGapSameDay').text(sum.sameDayFillVsNextBar == null ? '—' : String(sum.sameDayFillVsNextBar));
+        $('#acctGapFeeSum').text(sum.feeResidualSum == null ? '—' : num(sum.feeResidualSum));
+        $('#acctGapPartial').text(sum.partialCount == null ? '—' : String(sum.partialCount));
+        $('#acctGapAdverseBps').text(sum.avgAbsAdverseBps == null ? '—' : String(sum.avgAbsAdverseBps));
+        $('#acctGapBadge').text(String(gaps.length));
+        $('#sideGapCount').text(String(gaps.length));
+        $('#acctGapMeta').text(data.asOf ? ('更新：' + data.asOf) : '');
+        if (data.gateHint) $('#acctGapHint').text(data.gateHint);
+        var $g = $('#acctGapBody').empty();
+        if (!gaps.length) {
+          $g.html('<tr><td colspan="6" class="empty-state">暂无差异条目</td></tr>');
+        } else {
+          gaps.forEach(function (it) {
+            $g.append(
+              '<tr>'
+              + '<td>' + escHtml(gapDimLabel(it.dimension)) + '</td>'
+              + '<td>' + escHtml(it.severity || '—') + '</td>'
+              + '<td><b>' + escHtml(it.code || '—') + '</b></td>'
+              + '<td>' + escHtml(it.title || '—') + '</td>'
+              + '<td>' + escHtml(it.detail || '—') + '</td>'
+              + '<td class="mono">' + escHtml(it.orderId || '—') + '</td>'
+              + '</tr>'
+            );
+          });
+        }
+        var $c = $('#acctGapCostBody').empty();
+        if (!costs.length) {
+          $c.html('<tr><td colspan="9" class="empty-state">暂无成交对照</td></tr>');
+        } else {
+          costs.forEach(function (it) {
+            $c.append(
+              '<tr>'
+              + '<td class="mono">' + escHtml(it.orderId || '—') + '</td>'
+              + '<td><b>' + escHtml(it.code || '—') + '</b></td>'
+              + '<td>' + escHtml(sideLabel(it.side)) + '</td>'
+              + '<td class="mono">' + escHtml(num(it.orderPrice)) + '</td>'
+              + '<td class="mono">' + escHtml(num(it.filledPrice)) + '</td>'
+              + '<td class="mono">' + escHtml(num(it.priceResidualBps, 2)) + '</td>'
+              + '<td class="mono">' + escHtml(num(it.actualFee)) + '</td>'
+              + '<td class="mono">' + escHtml(num(it.modelFee)) + '</td>'
+              + '<td class="mono ' + pnlClass(it.feeResidual) + '">' + escHtml(num(it.feeResidual)) + '</td>'
+              + '</tr>'
+            );
+          });
+        }
+      })
+      .fail(function (xhr) {
+        var msg = (xhr && xhr.responseJSON && xhr.responseJSON.message) || '纸面对账加载失败';
+        $('#acctGapHint').text(msg);
+        toast(msg, 'err');
+      });
+  }
+
   function pnlClass(v) {
     var n = Number(v);
     if (!isFinite(n) || n === 0) return '';
@@ -2389,10 +2586,22 @@
     $('#acctDrawdown').text(pct(data.drawdown));
     $('#acctPeak').text(num(data.peakEquity));
     $('#acctPrevClose').text(num(data.prevCloseEquity));
+    var haltReasonMap = { DEPTH: '深度', DURATION: '持续期' };
     $('#acctHalted').text(data.halted ? '是（禁开）' : '否');
+    $('#acctHaltReason').text(data.halted
+      ? (haltReasonMap[data.haltReason] || data.haltReason || '—') : '—');
+    var uw = data.underwaterTradingDays;
+    var uwNeed = data.drawdownDurationHaltDays;
+    $('#acctUnderwater').text(uw == null ? '—'
+      : (String(uw) + (uwNeed ? (' / 熔断阈 ' + uwNeed) : '')));
     $('#acctAllowOpen').text(data.allowNewOpen ? '是' : '否');
     $('#acctPosScale').text(data.positionScale == null ? '—' : num(data.positionScale, 2) + '×');
     $('#acctLossStreak').text(data.consecutiveLosses == null ? '—' : String(data.consecutiveLosses));
+    var ret = data.retirement || {};
+    $('#acctRetired').text(data.strategyRetired
+      ? ('是 · 剩余冷却 ' + (ret.remainingCooldownDays == null ? '—' : ret.remainingCooldownDays) + ' 日')
+      : '否');
+    $('#acctRetireHint').text(ret.hint || '');
   }
 
   function pendingLabel(it) {
@@ -3348,12 +3557,84 @@
     loadAccountOverview();
   });
 
+  $('#btnAcctRetire').on('click', function () {
+    var $btn = $(this);
+    if ($btn.prop('disabled')) return;
+    $btn.prop('disabled', true).addClass('is-loading');
+    $.post('/api/account/retirement/retire', { reason: 'MANUAL', note: '页面手动退役' })
+      .done(function (r) {
+        toast(r && r.hint ? r.hint : '已退役', r && r.retired ? 'ok' : 'err');
+        loadAccountOverview();
+      })
+      .fail(function () { toast('退役失败', 'err'); })
+      .always(function () { $btn.prop('disabled', false).removeClass('is-loading'); });
+  });
+
+  $('#btnAcctResume').on('click', function () {
+    var $btn = $(this);
+    if ($btn.prop('disabled')) return;
+    $btn.prop('disabled', true).addClass('is-loading');
+    $.post('/api/account/retirement/resume', { force: false })
+      .done(function (r) {
+        toast((r && r.message) || '操作完成', r && r.ok ? 'ok' : 'err');
+        loadAccountOverview();
+      })
+      .fail(function () { toast('恢复失败', 'err'); })
+      .always(function () { $btn.prop('disabled', false).removeClass('is-loading'); });
+  });
+
+  $('#btnAcctResumeForce').on('click', function () {
+    var $btn = $(this);
+    if ($btn.prop('disabled')) return;
+    $btn.prop('disabled', true).addClass('is-loading');
+    // 双人复核：先武装令牌，再请第二人确认码
+    $.post('/api/account/retirement/resume', { force: true })
+      .done(function (r) {
+        if (r && r.ok) {
+          toast((r && r.message) || '已强制恢复', 'ok');
+          loadAccountOverview();
+          return;
+        }
+        var token = r && r.forceConfirmToken ? String(r.forceConfirmToken) : '';
+        var code = window.prompt(
+          (r && r.message ? r.message + '\n\n' : '') + '请第二人输入复核码（confirmCode）：',
+          token
+        );
+        if (!code) {
+          toast('已取消强制恢复', 'err');
+          return;
+        }
+        $.post('/api/account/retirement/resume', { force: true, confirmCode: code })
+          .done(function (r2) {
+            toast((r2 && r2.message) || '操作完成', r2 && r2.ok ? 'ok' : 'err');
+            loadAccountOverview();
+          })
+          .fail(function () { toast('强制恢复失败', 'err'); });
+      })
+      .fail(function () { toast('强制恢复失败', 'err'); })
+      .always(function () { $btn.prop('disabled', false).removeClass('is-loading'); });
+  });
+
   $('#btnAcctRefreshCf').on('click', function () {
     loadAccountCashflows();
   });
 
   $('#btnAcctRefreshRisk').on('click', function () {
     loadAccountRiskLogs();
+  });
+
+  $('#btnAcctRefreshGap').on('click', function () {
+    loadAccountPaperGap();
+  });
+
+  $('#btnAcctRefreshDash').on('click', function () {
+    var $btn = $(this);
+    if ($btn.prop('disabled')) return;
+    $btn.prop('disabled', true).addClass('is-loading');
+    loadAccountRiskDash();
+    setTimeout(function () {
+      $btn.prop('disabled', false).removeClass('is-loading');
+    }, 600);
   });
 
   $('#dbtablesMenu').on('click', 'li[data-table]', function () {

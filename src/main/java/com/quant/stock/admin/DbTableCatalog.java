@@ -135,6 +135,14 @@ public final class DbTableCatalog {
                 "动态定时任务定义（cron/固定间隔、启停、是否已实现）。",
                 "schema 种子初始化；页面「运维中心 → 任务管理」修改。",
                 "DynamicScheduleService 按本表注册/重载调度；改配置后立即生效。");
+        add(m, "st_status_hist", "ST状态日切", "基础信息", "effective_date DESC",
+                "ST/*ST 状态 as-of 历史；开仓过滤与涨跌幅规则按交易日回看。",
+                "启动可从 stock_basic 快照种子；亦可 POST /api/ops/st-pit 写入。",
+                "OpenFilterService.isSt(code,asOf)；无行时回退 stock_basic.is_st（有前视风险）。");
+        add(m, "industry_reclass_log", "行业重分类日志", "基础信息", "effective_date DESC",
+                "行业分类 as-of reclass 日志，避免用现行业回测历史。",
+                "启动种子 + syncFromStockBasic；外部申万/中信源待 API。",
+                "选股中性/归因用当时行业；不并金叉主路径。");
         TABLES = Collections.unmodifiableMap(m);
     }
 

@@ -57,6 +57,25 @@ public class TradingCalendar {
         return !holidays.contains(date);
     }
 
+    /**
+     * 开仓日之后至 asOf（含）的交易日个数，用于最大持仓日判定。
+     * 例：周一开仓，次日周二 asOf → 1。
+     */
+    public int tradingDaysAfter(LocalDate openDate, LocalDate asOf) {
+        if (openDate == null || asOf == null || asOf.isBefore(openDate)) {
+            return 0;
+        }
+        int n = 0;
+        LocalDate d = openDate.plusDays(1);
+        while (!d.isAfter(asOf)) {
+            if (isAshareTradingDay(d)) {
+                n++;
+            }
+            d = d.plusDays(1);
+        }
+        return n;
+    }
+
     /** 含 date 在内向前找最近一个 A 股交易日（最多回溯 30 天）。 */
     public LocalDate lastTradingDayOnOrBefore(LocalDate date) {
         if (date == null) {

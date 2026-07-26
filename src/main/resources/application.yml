@@ -64,6 +64,8 @@ quant:
   hard-stop-capital-pct: 0.02
   trailing-stop-enabled: true
   trailing-atr-multiplier: 1.5
+  # 最大持仓交易日；0=关闭（P0-114 时间止损）
+  max-hold-trading-days: 0
 
   # ---- 金字塔 ----
   pyramid-enabled: true
@@ -77,6 +79,61 @@ quant:
   consecutive-loss-limit: 5
   drawdown-reduce-pct: 0.15
   drawdown-halt-pct: 0.25
+  # 回撤持续期双门禁（P0-122）：低于峰值满 N 日降仓 / 满 M 日熔断；0=关闭该项
+  drawdown-duration-reduce-days: 10
+  drawdown-duration-halt-days: 30
+  # 持续期熔断自动退役 + 冷却交易日（P0-92）
+  auto-retire-on-duration-halt: true
+  retirement-cooldown-trading-days: 20
+  # 组合相关监控（P0-105，只告警）
+  correlation-lookback-days: 60
+  correlation-warn-threshold: 0.75
+  # 告警分级冷却 + 软预算线（P0-97；硬顶仍为 max-total/single-position）
+  alert-cooldown-warn-minutes: 240
+  alert-cooldown-critical-minutes: 60
+  soft-total-position-pct: 0.70
+  soft-single-position-pct: 0.25
+  # 限价保护：成交价夹紧涨跌停（P0-94；无五档时仅此+ADV 帽）
+  limit-price-protect-enabled: true
+  # 回测部成比例（P0-95）；1=满额；<1 残量挂单保留
+  backtest-fill-ratio: 1.0
+  # 压力情景（P0-96）：ADV断崖降仓；不改金叉
+  stress-scenario-enabled: true
+  stress-adv-cliff-ratio: 0.40
+  # 信号漂移（P0-90）：滚动胜率+MA价差IC；默认不自动退役
+  signal-drift-enabled: true
+  drift-lookback-rounds: 20
+  drift-min-win-rate: 0.35
+  drift-ic-lookback-days: 60
+  drift-min-ic: 0.02
+  drift-confirm-rounds: 3
+  auto-retire-on-signal-drift: false
+  # 多源对账闸（P0-107）：日线 vs 分钟聚合；默认告警不阻断
+  data-reconcile-gate-enabled: true
+  data-reconcile-block-on-diverge: false
+  data-reconcile-max-close-diff-pct: 0.02
+  data-reconcile-sample-days: 5
+  # 扩容降频 + POV（P0-112）
+  capacity-aum-base: 100000
+  pov-max-bar-volume-pct: 0.10
+  # 结构突变（P0-120）：挂漂移/降仓，不改金叉
+  structural-break-enabled: true
+  structural-break-window: 20
+  structural-break-threshold: 2.0
+  structural-break-confirm-bars: 2
+  # ST 开仓过滤（P0-101）：as-of 日切优先；财报时钟本地无数据
+  st-open-filter-enabled: true
+  # 换手 L1（P0-104）：日成交额/权益；软顶降仓硬顶禁开
+  turnover-guard-enabled: true
+  turnover-soft-pct: 0.50
+  turnover-hard-pct: 1.00
+  # IC 衰减（P0-125）：滚动 IC 半衰期/IR；只降仓
+  ic-decay-enabled: true
+  ic-decay-lookback: 40
+  ic-decay-min-half-life-bars: 5
+  ic-decay-min-ir: 0.10
+  # 实验种子（P0-93）：进配置指纹；默认空
+  experiment-seed: ""
 
   # ---- 开仓过滤 ----
   quiet-open-enabled: true
@@ -94,6 +151,8 @@ quant:
   vol-large-threshold: 20000000
   vol-mid-threshold: 5000000
   impact-coeff: 0.1
+  # 单笔最大参与率（相对近20日均量）；≤0 关闭；止损/熔断卖出不受限
+  max-participation-adv: 0.10
   next-bar-open-fill: true
 
   # ---- 定时任务总闸；各任务以 MySQL sys_schedule_job 为准（种子默认全关，页面可启停/改 cron）----

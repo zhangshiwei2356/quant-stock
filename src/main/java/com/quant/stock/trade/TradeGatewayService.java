@@ -119,6 +119,32 @@ public class TradeGatewayService {
     }
 
     /**
+     * 改价=撤补重置队尾（P0-95）：撤销未完结委托后以新价/新量重新下单（新 orderId，不保队列优先级）。
+     *
+     * @return 新委托；撤单失败或参数非法时 null
+     */
+    public OrderDTO replaceOrder(String orderId, BigDecimal newPrice, Integer newVolume) {
+        OrderDTO old = cancelOrder(orderId);
+        if (old == null) {
+            return null;
+        }
+        int remain = old.getVolume() == null ? 0 : old.getVolume();
+        int filled = old.getFilledVolume() == null ? 0 : old.getFilledVolume();
+        int leftover = Math.max(0, remain - filled);
+        int vol = newVolume == null || newVolume <= 0 ? leftover : newVolume;
+        vol = (vol / 100) * 100;
+        if (vol < 100 || newPrice == null || newPrice.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("改价补单失败：余量或价格非法 orderId={} vol={} px={}", orderId, vol, newPrice);
+            return null;
+        }
+        String cid = "RPL-" + IdUtil.fastSimpleUUID();
+        OrderDTO neu = placeOrder(old.getStockCode(), old.getSide(), newPrice, vol, cid);
+        log.info("改价撤补 orderId={} → newOrderId={} px={} vol={} (队尾重置)",
+                orderId, neu == null ? null : neu.getOrderId(), newPrice, vol);
+        return neu;
+    }
+
+    /**
      * 本地部成桩：对 SUBMITTED/PARTIAL 追加成交量并改仓；满量则 FILLED。
      *
      * @param fillQty 本笔追加成交量（须为 100 整数倍）

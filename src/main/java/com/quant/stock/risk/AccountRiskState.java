@@ -14,10 +14,14 @@ import java.util.concurrent.atomic.AtomicReference;
  * <ul>
  *   <li>单日亏损：相对「昨日收盘权益」回撤 ≥ 配置阈值 → 当日禁新开</li>
  *   <li>连亏：连续 N 笔完整开平回合亏损 → 当日禁开、次日恢复</li>
- *   <li>峰值回撤：≥reduce 仓位×0.5；≥halt 熔断清仓且禁开</li>
+ *   <li>峰值回撤深度：≥reduce 仓位×0.5；≥halt 熔断清仓且禁开</li>
+ *   <li>回撤持续期（P0-122）：低于峰值满 N 交易日降仓 / 满 M 日熔断</li>
  * </ul>
  */
 public class AccountRiskState {
+
+    public static final String HALT_DEPTH = "DEPTH";
+    public static final String HALT_DURATION = "DURATION";
 
     private final QuantProperties props;
 
@@ -29,9 +33,17 @@ public class AccountRiskState {
     private final AtomicInteger consecutiveLosses = new AtomicInteger(0);
     /** 禁开截止日期（含当日）；次日即恢复 */
     private final AtomicReference<LocalDate> blockOpenThrough = new AtomicReference<LocalDate>(null);
+    /** 连续「低于峰值」的交易日计数（创新高清零） */
+    private final AtomicInteger underwaterTradingDays = new AtomicInteger(0);
+    /** 已计入 underwater 的最近交易日（同日多 bar 不重复加） */
+    private final AtomicReference<LocalDate> lastUnderwaterCountDay = new AtomicReference<LocalDate>(null);
 
     @Getter
     private volatile boolean halted;
+
+    /** DEPTH / DURATION；未熔断为 null */
+    @Getter
+    private volatile String haltReason;
 
     public AccountRiskState(QuantProperties props) {
         this.props = props;
@@ -51,6 +63,10 @@ public class AccountRiskState {
         return consecutiveLosses.get();
     }
 
+    public int getUnderwaterTradingDays() {
+        return underwaterTradingDays.get();
+    }
+
     public void reset(BigDecimal initCapital) {
         peakEquity.set(initCapital);
         prevCloseEquity.set(initCapital);
@@ -58,11 +74,14 @@ public class AccountRiskState {
         day.set(null);
         consecutiveLosses.set(0);
         blockOpenThrough.set(null);
+        underwaterTradingDays.set(0);
+        lastUnderwaterCountDay.set(null);
         halted = false;
+        haltReason = null;
     }
 
     /**
-     * 每个 bar 调用：跨日时用昨收权益作为当日基准；更新峰值与熔断。
+     * 每个 bar 调用：跨日时用昨收权益作为当日基准；更新峰值、持续期与熔断。
      */
     public void onEquity(LocalDate tradeDay, BigDecimal equity) {
         if (tradeDay == null || equity == null) {
@@ -80,10 +99,29 @@ public class AccountRiskState {
         BigDecimal peak = peakEquity.get();
         if (equity.compareTo(peak) > 0) {
             peakEquity.set(equity);
+            underwaterTradingDays.set(0);
+            lastUnderwaterCountDay.set(tradeDay);
+        } else if (equity.compareTo(peak) < 0) {
+            LocalDate counted = lastUnderwaterCountDay.get();
+            if (counted == null || !counted.equals(tradeDay)) {
+                underwaterTradingDays.incrementAndGet();
+                lastUnderwaterCountDay.set(tradeDay);
+            }
         }
+
         BigDecimal dd = drawdown(equity);
         if (dd.compareTo(props.getDrawdownHaltPct()) >= 0) {
             halted = true;
+            if (haltReason == null) {
+                haltReason = HALT_DEPTH;
+            }
+        }
+        int durationHalt = props.getDrawdownDurationHaltDays();
+        if (durationHalt > 0 && underwaterTradingDays.get() >= durationHalt) {
+            halted = true;
+            if (haltReason == null) {
+                haltReason = HALT_DURATION;
+            }
         }
     }
 
@@ -136,10 +174,14 @@ public class AccountRiskState {
 
     public BigDecimal positionScale(BigDecimal equity) {
         BigDecimal dd = drawdown(equity);
-        if (dd.compareTo(props.getDrawdownHaltPct()) >= 0) {
+        if (halted || dd.compareTo(props.getDrawdownHaltPct()) >= 0) {
             return BigDecimal.ZERO;
         }
         if (dd.compareTo(props.getDrawdownReducePct()) >= 0) {
+            return new BigDecimal("0.5");
+        }
+        int durationReduce = props.getDrawdownDurationReduceDays();
+        if (durationReduce > 0 && underwaterTradingDays.get() >= durationReduce) {
             return new BigDecimal("0.5");
         }
         return BigDecimal.ONE;

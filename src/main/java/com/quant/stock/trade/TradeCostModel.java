@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -50,15 +51,23 @@ public class TradeCostModel {
         return commissionWithFloor(amount, rate).setScale(2, RoundingMode.HALF_UP);
     }
 
-    /** 卖出：佣金（含最低 5 元）+ 印花税 */
+    /** 卖出：佣金（含最低 5 元）+ 印花税（无成交日则用配置税率） */
     public BigDecimal sellFee(BigDecimal amount) {
-        return sellFee(amount, props.getFeeRate());
+        return sellFee(amount, props.getFeeRate(), null);
     }
 
     public BigDecimal sellFee(BigDecimal amount, BigDecimal feeRate) {
+        return sellFee(amount, feeRate, null);
+    }
+
+    /** 卖出费用；印花税按成交日 as-of（P0-104） */
+    public BigDecimal sellFee(BigDecimal amount, BigDecimal feeRate, LocalDate tradeDay) {
         BigDecimal rate = feeRate == null ? props.getFeeRate() : feeRate;
         BigDecimal commission = commissionWithFloor(amount, rate);
-        BigDecimal stamp = amount.multiply(props.getStampTaxRate());
+        BigDecimal stampRate = tradeDay != null
+                ? StampTaxAsOf.rateOn(tradeDay, null)
+                : StampTaxAsOf.rateOn(null, props.getStampTaxRate());
+        BigDecimal stamp = amount.multiply(stampRate);
         return commission.add(stamp).setScale(2, RoundingMode.HALF_UP);
     }
 

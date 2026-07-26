@@ -1,6 +1,7 @@
 package com.quant.stock.backtest;
 
 import com.quant.stock.backtest.dto.BackTestResult;
+import com.quant.stock.calendar.TradingCalendar;
 import com.quant.stock.config.QuantProperties;
 import com.quant.stock.market.dto.BarDTO;
 import com.quant.stock.risk.OpenFilterService;
@@ -40,7 +41,8 @@ class BackTestEngineSmokeTest {
                 new PositionAmountUtil(props),
                 new MaCrossStrategy(props),
                 new TradeCostModel(props),
-                openFilter);
+                openFilter,
+                new TradingCalendar());
 
         List<BarDTO> bars = syntheticUptrendDays("600036", 120);
         BackTestResult result = engine.run("600036", bars, new BigDecimal("100000"));
@@ -48,6 +50,11 @@ class BackTestEngineSmokeTest {
         assertNotNull(result.getFinalAsset());
         assertTrue(result.getFinalAsset().compareTo(BigDecimal.ZERO) > 0);
         assertNotNull(result.getTotalRate());
+        assertNotNull(result.getConfigFingerprint());
+        assertTrue(result.getConfigFingerprint().startsWith("v1:"));
+        assertNotNull(result.getAtrRisk());
+        assertTrue(result.getAtrRisk().containsKey("atrStopMultiplier"));
+        assertTrue(result.getAtrRisk().containsKey("stopExitEvents"));
     }
 
     private static List<BarDTO> syntheticUptrendDays(String code, int days) {

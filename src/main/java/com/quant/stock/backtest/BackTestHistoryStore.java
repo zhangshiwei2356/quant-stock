@@ -13,10 +13,13 @@ import com.quant.stock.backtest.dto.SingleBacktestHistoryRecord;
 import com.quant.stock.backtest.dto.SingleStockBackResult;
 import com.quant.stock.mapper.BacktestRecordMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import javax.annotation.PostConstruct;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -41,6 +44,23 @@ public class BackTestHistoryStore {
 
     @Autowired(required = false)
     private BacktestRecordMapper backtestRecordMapper;
+
+    private final ObjectProvider<JdbcTemplate> jdbcProvider;
+
+    public BackTestHistoryStore(ObjectProvider<JdbcTemplate> jdbcProvider) {
+        this.jdbcProvider = jdbcProvider;
+    }
+
+    @PostConstruct
+    public void ensureSchema() {
+        JdbcTemplate jdbc = jdbcProvider.getIfAvailable();
+        if (jdbc == null) {
+            return;
+        }
+        ensureColumn(jdbc, "bt_backtest_record", "config_fingerprint",
+                "ALTER TABLE `bt_backtest_record` ADD COLUMN `config_fingerprint` VARCHAR(64) DEFAULT NULL "
+                        + "COMMENT '策略配置指纹 P0-93' AFTER `stock_results_json`");
+    }
 
     public SingleBacktestHistoryRecord appendSingle(String period, String backStart, String backEnd,
                                                     BackTestResult result) {
@@ -71,6 +91,7 @@ public class BackTestHistoryStore {
                 .winRate(result.getWinRate())
                 .tradeStatsJson(JSON.toJSONString(rec.getTradeStats()))
                 .tradesJson(JSON.toJSONString(rec.getTrades()))
+                .configFingerprint(result.getConfigFingerprint())
                 .build();
         backtestRecordMapper.insert(row);
         return rec;
@@ -108,6 +129,7 @@ public class BackTestHistoryStore {
                 .tradeStatsJson(JSON.toJSONString(rec.getTradeStats()))
                 .tradesJson(JSON.toJSONString(rec.getTrades()))
                 .stockResultsJson(JSON.toJSONString(rec.getStockResults()))
+                .configFingerprint(result.getConfigFingerprint())
                 .build();
         backtestRecordMapper.insert(row);
         return rec;
@@ -174,6 +196,7 @@ public class BackTestHistoryStore {
                 .winRate(r.getWinRate())
                 .tradeStats(stats)
                 .trades(trades)
+                .configFingerprint(r.getConfigFingerprint())
                 .build();
     }
 
@@ -204,6 +227,7 @@ public class BackTestHistoryStore {
                 .tradeStats(stats)
                 .stockResults(stockResults == null ? new ArrayList<SingleStockBackResult>() : stockResults)
                 .trades(trades)
+                .configFingerprint(r.getConfigFingerprint())
                 .build();
     }
 
@@ -216,9 +240,21 @@ public class BackTestHistoryStore {
     }
 
     private static String emptyToNull(String s) {
-        if (s == null || s.trim().isEmpty()) {
-            return null;
+        return StringUtils.hasText(s) ? s.trim() : null;
+    }
+
+    private void ensureColumn(JdbcTemplate jdbc, String table, String column, String alterSql) {
+        try {
+            Integer n = jdbc.queryForObject(
+                    "SELECT COUNT(1) FROM information_schema.COLUMNS "
+                            + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+                    Integer.class, table, column);
+            if (n == null || n == 0) {
+                jdbc.execute(alterSql);
+                log.info("已补齐列 {}.{}", table, column);
+            }
+        } catch (Exception e) {
+            log.warn("检查/补齐列 {}.{} 失败: {}", table, column, e.getMessage());
         }
-        return s.trim();
     }
 }

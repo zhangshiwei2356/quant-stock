@@ -7,7 +7,9 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Builder
@@ -27,6 +29,12 @@ public class PortfolioResultDTO {
     private List<BackTradeRecord> trades;
     private List<AnalysisEvent> analysisEvents;
     private String analysisSummary;
+    /** 策略相关配置指纹（P0-93） */
+    private String configFingerprint;
+    /** 成分股两两收益相关摘要（P0-105） */
+    private Map<String, Object> correlation;
+    /** ATR 止损/定仓一体契约快照（P0-108，与单股对齐） */
+    private Map<String, Object> atrRisk;
 
     public static PortfolioResultDTO empty(BigDecimal init) {
         return PortfolioResultDTO.builder()
@@ -42,6 +50,7 @@ public class PortfolioResultDTO {
                 .trades(new ArrayList<BackTradeRecord>())
                 .analysisEvents(new ArrayList<AnalysisEvent>())
                 .analysisSummary("")
+                .atrRisk(new LinkedHashMap<String, Object>())
                 .build();
     }
 }

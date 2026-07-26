@@ -12,7 +12,40 @@
     <li><b>唯一目标池</b> — 已落地 · 「当前池」手动「扫描更新」或定时 <code>pool-rebuild</code> / <code>after-market-batch-scan</code>；「扫描历史」可查看批次，亦可手动扫描；移出≠卖出；漏斗 + Markdown 报告</li>
     <li><b>运维中心</b> — 已落地 · 任务管理（库表动态调度）/ 数据健康（本地空与滞后）/ 运行参数（中文说明对照配置键）</li>
     <li><b>数据表</b> — 已落地 · MySQL 白名单分页只读浏览</li>
-    <li><b>回测工作台</b> — 已落地 · 行情/个股/组合工作台内模糊选股；个股二级：回测工作台 / 批量扫描 / 回测历史；组合二级：回测工作台 / 回测历史</li>
+    <li><b>回测工作台</b> — 已落地 · 行情/个股/组合工作台内模糊选股；个股二级：回测工作台 / 批量扫描 / 回测历史；组合二级：回测工作台 / 回测历史；结果含 <code>configFingerprint</code></li>
+    <li><b>ADV 参与率硬顶</b> — 已落地 · <code>quant.max-participation-adv</code> 默认 0.10；买入/死叉卖受限，止损与熔断卖不受限</li>
+    <li><b>退出优先级契约</b> — 已落地 · <code>ExitPriority</code>（止损 &gt; 熔断挂卖 &gt; 时间止损 &gt; 死叉）；见交易规则</li>
+    <li><b>纸面-实盘对账闸</b> — 已落地（本地）· <code>GET /api/account/paper-live-gap</code>；账户 →「纸面对账」；真券商对账仍待 API</li>
+    <li><b>时间止损</b> — 已落地 · <code>quant.max-hold-trading-days</code> 默认 0（关闭）</li>
+    <li><b>回撤持续期双门禁</b> — 已落地 · 低于峰值满 N 日降仓 / 满 M 日熔断（默认 10/30）</li>
+    <li><b>策略退役冷却</b> — 已落地 · 持续期熔断可自动退役；账户页手动退役/恢复；冷却默认 20 交易日</li>
+    <li><b>止损跳空穿价</b> — 已落地 · 开盘≤止损按开盘价；盘中触及按止损价（P0-115 用例集）</li>
+    <li><b>组合相关监控</b> — 已落地 · 组合回测附 correlation；账户 <code>GET /api/account/correlation</code>（只告警）</li>
+    <li><b>告警分级冷却</b> — 已落地 · <code>RiskAlertService</code>；软预算 WARN + 熔断/退役 CRITICAL；<code>GET /api/account/alerts</code></li>
+    <li><b>滑点残差日报</b> — 已落地 · <code>GET /api/account/slippage-residual</code>；纸面对账摘要含不利 bp；不自动回写改价</li>
+    <li><b>涨跌停限价保护</b> — 已落地（局部）· <code>limit-price-protect-enabled</code> 默认 true；买≤涨停/卖≥跌停；五档/L2 仍待行情 API</li>
+    <li><b>回测部成对齐</b> — 已落地 · <code>backtest-fill-ratio</code> 默认 1；残量挂单；<code>GET /api/account/partial-fill</code></li>
+    <li><b>压力情景库</b> — 已落地 · 预注册 ADV 断崖/一字板/相关尖峰等；<code>GET /api/account/stress</code>；不改金叉</li>
+    <li><b>信号漂移监控</b> — 已落地（可落部分）· 滚动胜率+MA价差IC；默认不自动退役；<code>GET /api/account/signal-drift</code></li>
+    <li><b>多源对账闸</b> — 已落地（本地）· 日线 vs 分钟聚合；<code>/api/ops/data-reconcile</code>；默认不阻断；外部行情对账仍待 API</li>
+    <li><b>扩容降频 + POV</b> — 已落地 · <code>capacity-aum-base</code> 收紧 ADV；<code>pov-max-bar-volume-pct</code> 当根量切片</li>
+    <li><b>结构突变监控</b> — 已落地 · 双窗突变分→降仓+挂漂移；<code>GET /api/account/structural-break</code></li>
+    <li><b>ST as-of 日切</b> — 已落地（局部）· 表 <code>st_status_hist</code> + 禁开；无历史行时回退现状态；财报时钟仍缺</li>
+    <li><b>换手 L1 + 印花税 as-of</b> — 已落地 · 软/硬顶；印花税 2023-08-28 政策切点；<code>GET /api/account/turnover</code></li>
+    <li><b>行业 reclass 日志</b> — 已落地 · <code>industry_reclass_log</code>；外部申万/中信源仍待 API</li>
+    <li><b>IC 衰减监控</b> — 已落地（代理）· 滚动 IC 半衰期/IR→仓位×0.5；<code>GET /api/account/ic-decay</code>；真因子 IC 仍待</li>
+    <li><b>改价=撤补队尾</b> — 已落地 · <code>POST /api/account/orders/{id}/replace</code>；新 clientOrderId，不保队列优先级</li>
+    <li><b>实验种子指纹</b> — 已落地 · <code>quant.experiment-seed</code> 进 <code>configFingerprint</code>；默认空</li>
+    <li><b>ATR 一体验收字段</b> — 已落地 · 回测 <code>atrRisk</code> + 定仓/止损/trail 单测；不改金叉</li>
+    <li><b>信号漂移 IC 边界</b> — 已落地（声明）· <code>icSource=MA_SPREAD_PROXY</code>；真因子 IC=`UNAVAILABLE`</li>
+    <li><b>禁空头边界</b> — 已落地 · <code>ShortSellPolicy</code> + <code>GET /api/account/short-policy</code>；两融仍不在范围</li>
+    <li><b>限价/执行边界声明</b> — 已落地 · <code>/api/account/order-protect</code>（无五档/L2）；
+        <code>/api/account/execution-cap</code>（无 TWAP）；组合回测已对齐 AUM+POV</li>
+    <li><b>对账/行业外部源声明</b> — 已落地 · vendor/申万中信=<code>UNAVAILABLE</code>；本地闸与日志仍可用</li>
+    <li><b>组合↔单股路径对齐</b> — 已落地 · 部成/压力降仓/ST as-of/<code>atrRisk</code>；纸面对账含 <code>ENGINE_PATH</code></li>
+    <li><b>退役强制恢复双人复核</b> — 已落地 · 武装令牌 + <code>confirmCode</code>；冷却满仍可直接 resume</li>
+    <li><b>账户风控日报页</b> — 已落地 · 聚合 alerts/换手/IC/漂移/突变/压力/部成/残差/边界 API</li>
+    <li><b>组合回测冒烟单测</b> — 已落地 · 合成双标的；断言指纹与 <code>atrRisk</code></li>
     <li><b>文档 PDF</b> — 已落地 · 量化知识 / 应用说明介绍页一键导出（服务端 iText，<code>GET /api/docs/pdf/{stock|app}</code>）</li>
     <li><b>项目 README 在线查看</b> — 已落地 · 应用说明 →「项目 README」；<code>GET /api/docs/readme</code> 实时渲染仓库根目录 Markdown（含 Mermaid 架构图）</li>
     <li><b>本地可调度任务</b> — 已落地 · <code>scan-and-trade</code>、<code>pool-rebuild</code>、<code>after-market-batch-scan</code>、<code>settle-after-close</code>、<code>data-validate</code>、<code>sync-orders</code>、<code>position-pnl-sync</code>；入池粗筛可读 <code>factor_daily</code>；运维「执行一次」可手动触发；失败会返回错误而非假成功</li>
@@ -34,7 +67,7 @@
     <li><b>复权因子</b>（除权除息）— 未落地 · 宽睿包未覆盖；需复权因子或前复权行情源</li>
     <li><b>资金流向</b>（主力净流入/北向）— 未落地 · 无专用接口；L2 逐笔可自算近似，北向需另源</li>
     <li><b>真实市值/流通股本/日均额</b> — 部分启发式 · MDS/OES 静态信息可补一部分；完整股本与日均额或需基本面源</li>
-    <li><b>财报与估值</b>（PE/ROE 等）— 未落地 · 宽睿不覆盖；需财务数据 API</li>
+    <li><b>财报与估值 / 公告时钟</b>（PE/ROE、静默期）— 未落地 · 宽睿不覆盖；需财务/公告 API；本地仅声明边界</li>
     <li><b>新闻舆情 / 另类数据</b> — 未落地 · 宽睿不覆盖</li>
     <li><b>两融 / 期权 / ETF 申赎 / 新股中签</b> — 未规划 · OES 有完整接口族，当前现货模拟策略范围外</li>
   </ol>

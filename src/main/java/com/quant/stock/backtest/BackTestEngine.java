@@ -2,14 +2,25 @@ package com.quant.stock.backtest;
 
 import com.quant.stock.backtest.dto.BackTestResult;
 import com.quant.stock.backtest.dto.BackTradeRecord;
+import com.quant.stock.calendar.TradingCalendar;
+import com.quant.stock.config.ConfigFingerprint;
 import com.quant.stock.config.QuantProperties;
 import com.quant.stock.market.dto.BarDTO;
 import com.quant.stock.risk.AccountRiskState;
+import com.quant.stock.risk.AtrRiskReport;
+import com.quant.stock.risk.ExitPriority;
 import com.quant.stock.risk.LimitBoardHelper;
 import com.quant.stock.risk.OpenFilterService;
+import com.quant.stock.risk.LimitPriceProtect;
+import com.quant.stock.risk.StopFillPrice;
 import com.quant.stock.strategy.BaseStrategy;
 import com.quant.stock.strategy.IndicatorSignalUtil;
 import com.quant.stock.strategy.MaCrossStrategy;
+import com.quant.stock.risk.StressScenarioService;
+import com.quant.stock.risk.StructuralBreakMonitor;
+import com.quant.stock.trade.CapacityThrottle;
+import com.quant.stock.trade.PartialFillSim;
+import com.quant.stock.trade.ParticipationCap;
 import com.quant.stock.trade.TradeCostModel;
 import com.quant.stock.util.PositionAmountUtil;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +59,7 @@ public class BackTestEngine {
     private final MaCrossStrategy maCrossStrategy;
     private final TradeCostModel tradeCostModel;
     private final OpenFilterService openFilterService;
+    private final TradingCalendar tradingCalendar;
 
     public BackTestResult run(String stockCode, List<BarDTO> closedBars, BigDecimal initCapital) {
         return run(stockCode, closedBars, initCapital, props.getFeeRate(), props.getSlipPoint(), maCrossStrategy);
@@ -55,11 +67,15 @@ public class BackTestEngine {
 
     public BackTestResult run(String stockCode, List<BarDTO> closedBars, BigDecimal initCapital,
                               BigDecimal feeRate, BigDecimal slipPoint, BaseStrategy strategy) {
+        String strategyId = strategy == null ? "MaCrossStrategy" : strategy.getClass().getSimpleName();
+        final BigDecimal commissionRate = feeRate != null ? feeRate : props.getFeeRate();
+        String fingerprint = ConfigFingerprint.of(props, strategyId, commissionRate);
         if (closedBars == null || closedBars.size() < 65 || initCapital == null) {
-            return BackTestResult.empty(stockCode, initCapital == null ? BigDecimal.ZERO : initCapital);
+            BackTestResult empty = BackTestResult.empty(stockCode, initCapital == null ? BigDecimal.ZERO : initCapital);
+            empty.setConfigFingerprint(fingerprint);
+            return empty;
         }
         // 佣金率：入参优先；实际滑点由 TradeCostModel 分级（quant.slip-*），slipPoint 仅做合法性校验
-        final BigDecimal commissionRate = feeRate != null ? feeRate : props.getFeeRate();
         if (slipPoint != null && slipPoint.signum() < 0) {
             throw new IllegalArgumentException("slipPoint must be >= 0");
         }
@@ -125,7 +141,7 @@ public class BackTestEngine {
             }
 
             BigDecimal equity = markEquity(cash, pos, close);
-            BigDecimal posScale = accountRiskState.positionScale(equity);
+            BigDecimal posScale = resolvePosScale(accountRiskState, equity, closedBars, i);
 
             // ---- Step1: 撮合挂单（先卖后买） ----
             boolean fillWindow = props.isNextBarOpenFill()
@@ -149,41 +165,59 @@ public class BackTestEngine {
                     int sellable = (pos.sellableShares(tradeDay) / 100) * 100;
                     if (sellable >= 100) {
                         int vol = sellable;
-                        boolean fullExit = sellable >= pos.getShares();
-                        BigDecimal fillBase = open;
-                        if (force && limitDown) {
-                            BigDecimal prevClose = openFilterService.prevTradingDayClose(closedBars, i);
-                            fillBase = approxLimitDownPrice(prevClose, bar)
-                                    .multiply(new BigDecimal("0.99"))
-                                    .setScale(2, RoundingMode.HALF_UP);
-                        }
-                        String sellWhy = pendingSellReason == null ? "挂单卖出" : pendingSellReason;
-                        if (force && limitDown) {
-                            sellWhy = sellWhy + "（跌停连续失败达" + LIMIT_DOWN_FORCE_DAYS + "日，按跌停价×0.99强平）";
-                        }
-                        if (!fullExit) {
-                            sellWhy = sellWhy + "（T+1仅卖可卖旧仓）";
-                        }
-                        SellOutcome so = executeSell(stockCode, bar, closedBars, i, cash, pos, fillBase, vol, fullExit,
-                                commissionRate, trades, sellMarks);
-                        cash = so.cash;
-                        if (fullExit) {
-                            closedRound++;
-                            if (so.win) {
-                                winTrades++;
+                        ExitPriority exitPri = ExitPriority.fromReasonLabel(pendingSellReason);
+                        if (exitPri == null || !exitPri.bypassParticipationCap()) {
+                            long adv = IndicatorSignalUtil.avgVolume(closedBars, i, 20);
+                            int capped = capVol(vol, adv, equity, closedBars, i);
+                            if (capped < vol) {
+                                vol = capped;
                             }
-                            accountRiskState.onClosedRound(so.win, tradeDay);
-                            pyramidStage = 0;
-                            targetFullVol = 0;
-                            pendingSell = false;
-                            pendingSellReason = null;
-                            pendingSellSignalDay = null;
-                            limitDownFailDays = 0;
-                            lastLimitDownFailDay = null;
                         }
-                        logLastTrade(analysis, trades, sellWhy + "；次日有效开盘撮合");
-                        equity = markEquity(cash, pos, close);
-                        posScale = accountRiskState.positionScale(equity);
+                        if (vol < 100) {
+                            Map<String, Object> rd = new LinkedHashMap<String, Object>();
+                            rd.put("原因", "参与率硬顶后不足1手");
+                            rd.put("maxParticipationAdv", props.getMaxParticipationAdv());
+                            analysis.reject(stockCode, bar.getBarBegin(), "卖单暂缓",
+                                    "ADV参与率硬顶后不足1手，挂单保留", rd);
+                        } else {
+                            boolean fullExit = vol >= pos.getShares();
+                            BigDecimal fillBase = open;
+                            if (force && limitDown) {
+                                BigDecimal prevClose = openFilterService.prevTradingDayClose(closedBars, i);
+                                fillBase = approxLimitDownPrice(prevClose, bar)
+                                        .multiply(new BigDecimal("0.99"))
+                                        .setScale(2, RoundingMode.HALF_UP);
+                            }
+                            String sellWhy = pendingSellReason == null ? "挂单卖出" : pendingSellReason;
+                            if (force && limitDown) {
+                                sellWhy = sellWhy + "（跌停连续失败达" + LIMIT_DOWN_FORCE_DAYS + "日，按跌停价×0.99强平）";
+                            }
+                            if (!fullExit && vol < sellable) {
+                                sellWhy = sellWhy + "（ADV参与率硬顶部分卖出）";
+                            } else if (!fullExit) {
+                                sellWhy = sellWhy + "（T+1仅卖可卖旧仓）";
+                            }
+                            SellOutcome so = executeSell(stockCode, bar, closedBars, i, cash, pos, fillBase, vol, fullExit,
+                                    commissionRate, trades, sellMarks);
+                            cash = so.cash;
+                            if (fullExit) {
+                                closedRound++;
+                                if (so.win) {
+                                    winTrades++;
+                                }
+                                accountRiskState.onClosedRound(so.win, tradeDay);
+                                pyramidStage = 0;
+                                targetFullVol = 0;
+                                pendingSell = false;
+                                pendingSellReason = null;
+                                pendingSellSignalDay = null;
+                                limitDownFailDays = 0;
+                                lastLimitDownFailDay = null;
+                            }
+                            logLastTrade(analysis, trades, sellWhy + "；次日有效开盘撮合");
+                            equity = markEquity(cash, pos, close);
+                            posScale = resolvePosScale(accountRiskState, equity, closedBars, i);
+                        }
                     }
                 }
             }
@@ -221,8 +255,11 @@ public class BackTestEngine {
                     int rawVol = vol;
                     vol = BigDecimal.valueOf(vol).multiply(posScale).intValue();
                     vol = (vol / 100) * 100;
+                    int requestVol = vol;
+                    vol = PartialFillSim.fillVolume(vol, props.getBacktestFillRatio());
                     if (vol >= 100) {
-                        BigDecimal deal = tradeCostModel.buyPrice(open, closedBars, i, vol);
+                        BigDecimal deal = protectBuyDeal(stockCode, tradeCostModel.buyPrice(open, closedBars, i, vol),
+                                closedBars, i);
                         BigDecimal amount = deal.multiply(BigDecimal.valueOf(vol));
                         BigDecimal fee = tradeCostModel.buyFee(amount, commissionRate);
                         BigDecimal posMv = close.multiply(BigDecimal.valueOf(pos.getShares()));
@@ -238,23 +275,33 @@ public class BackTestEngine {
                             buyMarks.add(mark(bar, deal));
                             Map<String, Object> bd = DecisionAnalysisLog.indSnapshot(ind, i, close, cash, equity, posScale, atr);
                             bd.put("挂单股数", rawVol);
+                            bd.put("本bar请求股数", requestVol);
                             bd.put("实际成交股数", vol);
                             bd.put("成交价(含滑点冲击)", deal);
                             bd.put("成交额", amount);
                             bd.put("佣金", fee);
                             bd.put("金字塔加仓", isPyramid);
                             bd.put("止损价", pos.getStopPrice());
-                            bd.put("数量公式", "挂单股×仓位系数后取整手；满仓目标=资金×单只上限30%×ATR调节×仓位系数");
+                            bd.put("backtestFillRatio", props.getBacktestFillRatio());
+                            bd.put("数量公式", "挂单股×仓位系数×部成比例后取整手；满仓目标=资金×单只上限30%×ATR调节×仓位系数");
+                            String fillNote = vol < requestVol ? "；部成残量保留挂单" : "";
                             analysis.fillBuy(stockCode, bar.getBarBegin(),
-                                    (isPyramid ? "金字塔加仓成交" : "金叉首开成交") + "；次日有效开盘撮合", bd);
+                                    (isPyramid ? "金字塔加仓成交" : "金叉首开成交") + "；次日有效开盘撮合" + fillNote, bd);
                             if (isPyramid) {
                                 pyramidStage++;
                             } else {
                                 pyramidStage = Math.max(pyramidStage, 1);
                             }
-                            pendingBuyVol = null;
-                            pendingBuyPyramid = false;
-                            pendingBuySignalDay = null;
+                            int rem = PartialFillSim.remainder(requestVol, vol);
+                            if (rem >= 100) {
+                                pendingBuyVol = rem;
+                                pendingBuyPyramid = isPyramid;
+                                // 保留原信号日，避免部成重置过期时钟
+                            } else {
+                                pendingBuyVol = null;
+                                pendingBuyPyramid = false;
+                                pendingBuySignalDay = null;
+                            }
                         } else {
                             Map<String, Object> rd = new LinkedHashMap<String, Object>();
                             rd.put("拟买股数", vol);
@@ -266,6 +313,9 @@ public class BackTestEngine {
                             pendingBuyPyramid = false;
                             pendingBuySignalDay = null;
                         }
+                    } else if (requestVol >= 100) {
+                        analysis.reject(stockCode, bar.getBarBegin(), "买单暂缓",
+                                "部成比例后不足1手，挂单保留", null);
                     } else {
                         analysis.reject(stockCode, bar.getBarBegin(), "买单取消",
                                 "仓位系数缩放后不足1手", null);
@@ -279,26 +329,30 @@ public class BackTestEngine {
             }
 
             equity = markEquity(cash, pos, close);
-            posScale = accountRiskState.positionScale(equity);
+            posScale = resolvePosScale(accountRiskState, equity, closedBars, i);
 
             // ---- Step2: 仅老仓止损（分档 T+1） ----
             if (pos.hasPosition() && props.isStopLossEnabled() && pos.canSellStops(tradeDay)) {
                 pos.updateHighest(high);
                 int sellable = (pos.sellableShares(tradeDay) / 100) * 100;
-                if (sellable >= 100
-                        && pos.getStopPrice().compareTo(BigDecimal.ZERO) > 0
-                        && low.compareTo(pos.getStopPrice()) <= 0) {
-                    BigDecimal fillBase = pos.getStopPrice().max(low);
+                StopFillPrice.Result stopFill = StopFillPrice.resolve(open, low, pos.getStopPrice());
+                if (sellable >= 100 && stopFill.triggered()) {
+                    BigDecimal fillBase = stopFill.fillBase;
                     boolean fullExit = sellable >= pos.getShares();
                     SellOutcome so = executeSell(stockCode, bar, closedBars, i, cash, pos, fillBase, sellable,
                             fullExit, commissionRate, trades, sellMarks);
                     cash = so.cash;
                     Map<String, Object> stopData = lastTradeData(trades);
-                    stopData.put("止损价", fillBase);
+                    stopData.put("止损线", pos.getStopPrice());
+                    stopData.put("成交基准价", fillBase);
+                    stopData.put("穿价模式", stopFill.mode.name());
+                    stopData.put("跳空穿价", stopFill.mode == StopFillPrice.Mode.GAP_THROUGH);
                     stopData.put("可卖老仓股数", sellable);
                     stopData.put("全仓退出", fullExit);
-                    analysis.stop(stockCode, bar.getBarBegin(),
-                            fullExit ? "止损/移动止盈触及，老仓清仓" : "止损/移动止盈触及，部分卖出老仓", stopData);
+                    String stopWhy = stopFill.mode == StopFillPrice.Mode.GAP_THROUGH
+                            ? (fullExit ? "跳空穿价止损，按开盘价老仓清仓" : "跳空穿价止损，部分卖出老仓")
+                            : (fullExit ? "止损/移动止盈触及，老仓清仓" : "止损/移动止盈触及，部分卖出老仓");
+                    analysis.stop(stockCode, bar.getBarBegin(), stopWhy, stopData);
                     if (fullExit || !pos.hasPosition()) {
                         closedRound++;
                         if (so.win) {
@@ -329,16 +383,35 @@ public class BackTestEngine {
 
             // ---- Step3: 账户风控快照 ----
             accountRiskState.onEquity(tradeDay, equity);
-            posScale = accountRiskState.positionScale(equity);
+            posScale = resolvePosScale(accountRiskState, equity, closedBars, i);
             if (pos.hasPosition() && accountRiskState.isHalted()) {
-                if (!pendingSell) {
+                if (ExitPriority.ACCOUNT_HALT.canRegisterPending(stoppedOutToday, pendingSell)) {
                     pendingSell = true;
-                    pendingSellReason = "回撤熔断";
+                    pendingSellReason = ExitPriority.ACCOUNT_HALT.getLabel();
                     pendingSellSignalDay = tradeDay;
                     Map<String, Object> rd = new LinkedHashMap<String, Object>();
                     rd.put("权益", equity.setScale(2, RoundingMode.HALF_UP));
                     rd.put("仓位系数", posScale);
+                    rd.put("退出优先级", ExitPriority.ACCOUNT_HALT.getRank());
                     analysis.risk(stockCode, bar.getBarBegin(), "账户回撤熔断，挂清仓卖单且禁新开", rd);
+                }
+            }
+
+            // ---- Step3b: 最大持仓日（时间止损）----
+            if (pos.hasPosition() && props.getMaxHoldTradingDays() > 0
+                    && ExitPriority.TIME_STOP.canRegisterPending(stoppedOutToday, pendingSell)) {
+                LocalDate openDay = pos.getEarliestOpenDate();
+                int held = tradingCalendar.tradingDaysAfter(openDay, tradeDay);
+                if (held >= props.getMaxHoldTradingDays()) {
+                    pendingSell = true;
+                    pendingSellReason = ExitPriority.TIME_STOP.getLabel();
+                    pendingSellSignalDay = tradeDay;
+                    Map<String, Object> td = new LinkedHashMap<String, Object>();
+                    td.put("开仓日", openDay == null ? null : openDay.toString());
+                    td.put("持仓交易日", held);
+                    td.put("阈值", props.getMaxHoldTradingDays());
+                    td.put("退出优先级", ExitPriority.TIME_STOP.getRank());
+                    analysis.risk(stockCode, bar.getBarBegin(), "持仓达最大交易日，挂时间止损清仓", td);
                 }
             }
 
@@ -353,8 +426,11 @@ public class BackTestEngine {
                 if (atr.compareTo(props.getAtrMinThreshold()) > 0
                         && openFilterService.canOpen(stockCode, closedBars, i)) {
                     targetFullVol = positionAmountUtil.calcBuyVolume(cash, close, atr, posScale);
+                    long advBuy = IndicatorSignalUtil.avgVolume(closedBars, i, 20);
+                    targetFullVol = capVol(targetFullVol, advBuy, equity, closedBars, i);
                     int first = props.isPyramidEnabled()
                             ? positionAmountUtil.pyramidSlice(targetFullVol, 0) : targetFullVol;
+                    first = capVol(first, advBuy, equity, closedBars, i);
                     if (first >= 100) {
                         pendingBuyVol = first;
                         pendingBuyPyramid = false;
@@ -362,10 +438,12 @@ public class BackTestEngine {
                         Map<String, Object> sd = DecisionAnalysisLog.indSnapshot(ind, i, close, cash, equity, posScale, atr);
                         sd.put("满仓目标股数", targetFullVol);
                         sd.put("挂单股数", first);
+                        sd.put("ADV20", advBuy);
+                        sd.put("maxParticipationAdv", props.getMaxParticipationAdv());
                         sd.put("金字塔开启", props.isPyramidEnabled());
                         sd.put("数量公式", props.isPyramidEnabled()
-                                ? "满仓目标=可用资金×单只上限30%×ATR调节(0.2~1.5)×仓位系数，整手；首批=满仓目标×50%"
-                                : "满仓目标=可用资金×单只上限30%×ATR调节(0.2~1.5)×仓位系数，整手；一次满仓");
+                                ? "满仓目标=可用资金×单只上限30%×ATR调节(0.2~1.5)×仓位系数，整手；再×ADV参与率硬顶；首批=满仓目标×50%"
+                                : "满仓目标=可用资金×单只上限30%×ATR调节(0.2~1.5)×仓位系数，整手；再×ADV参与率硬顶");
                         analysis.signalBuy(stockCode, bar.getBarBegin(),
                                 "金叉且通过开仓过滤，挂次日有效开盘买单", sd);
                     }
@@ -379,6 +457,8 @@ public class BackTestEngine {
                     && accountRiskState.allowNewOpen(tradeDay, equity)
                     && posScale.compareTo(BigDecimal.ZERO) > 0) {
                 int slice = positionAmountUtil.pyramidSlice(targetFullVol, pyramidStage);
+                long advAdd = IndicatorSignalUtil.avgVolume(closedBars, i, 20);
+                slice = capVol(slice, advAdd, equity, closedBars, i);
                 BigDecimal posMv = close.multiply(BigDecimal.valueOf(pos.getShares()));
                 BigDecimal addMoney = close.multiply(BigDecimal.valueOf(Math.max(slice, 0)));
                 if (slice >= 100 && positionAmountUtil.withinTotalPosition(equity, posMv, addMoney)) {
@@ -390,6 +470,8 @@ public class BackTestEngine {
                     pd.put("金字塔档位", pyramidStage);
                     pd.put("满仓目标股数", targetFullVol);
                     pd.put("挂单股数", slice);
+                    pd.put("ADV20", advAdd);
+                    pd.put("maxParticipationAdv", props.getMaxParticipationAdv());
                     pd.put("综合成本", pos.getAvgCost());
                     pd.put("数量公式", pyramidStage == 1
                             ? "第2批=满仓目标×30%，成交后占档"
@@ -400,38 +482,54 @@ public class BackTestEngine {
                 }
             }
 
-            if (pos.hasPosition() && sellSignal && !stoppedOutToday && !pendingSell) {
+            if (pos.hasPosition() && sellSignal
+                    && ExitPriority.DEATH_CROSS.canRegisterPending(stoppedOutToday, pendingSell)) {
                 pendingSell = true;
-                pendingSellReason = "死叉";
+                pendingSellReason = ExitPriority.DEATH_CROSS.getLabel();
                 pendingSellSignalDay = tradeDay;
                 Map<String, Object> sd = DecisionAnalysisLog.indSnapshot(ind, i, close, cash, equity, posScale, atrAt(ind, i));
                 sd.put("持仓股数", pos.getShares());
+                sd.put("退出优先级", ExitPriority.DEATH_CROSS.getRank());
                 analysis.signalSell(stockCode, bar.getBarBegin(), "死叉，挂次日有效开盘全仓卖出", sd);
             }
 
             // 非 nextBar 兼容：当根收盘撮合
             if (!props.isNextBarOpenFill()) {
                 if (pendingBuyVol != null && pendingBuyVol >= 100) {
-                    int vol = pendingBuyVol;
+                    int requestVol = pendingBuyVol;
                     boolean isPyramid = pendingBuyPyramid;
-                    pendingBuyVol = null;
-                    pendingBuyPyramid = false;
-                    pendingBuySignalDay = null;
-                    BigDecimal deal = tradeCostModel.buyPrice(close, closedBars, i, vol);
-                    BigDecimal amount = deal.multiply(BigDecimal.valueOf(vol));
-                    BigDecimal fee = tradeCostModel.buyFee(amount, commissionRate);
-                    if (amount.add(fee).compareTo(cash) <= 0) {
-                        cash = cash.subtract(amount).subtract(fee);
-                        pos.addBuy(vol, deal, fee, tradeDay);
-                        pos.raiseStopByCost(atrAt(ind, i), equity, props.getAtrStopMultiplier(),
-                                props.getHardStopCapitalPct());
-                        trades.add(record(stockCode, "BUY", bar, deal, vol, fee, amount));
-                        buyMarks.add(mark(bar, deal));
-                        logLastTrade(analysis, trades, isPyramid ? "金字塔加仓成交；当根收盘撮合" : "金叉首开成交；当根收盘撮合");
-                        if (isPyramid) {
-                            pyramidStage++;
+                    int vol = PartialFillSim.fillVolume(requestVol, props.getBacktestFillRatio());
+                    if (vol >= 100) {
+                        BigDecimal deal = protectBuyDeal(stockCode,
+                                tradeCostModel.buyPrice(close, closedBars, i, vol), closedBars, i);
+                        BigDecimal amount = deal.multiply(BigDecimal.valueOf(vol));
+                        BigDecimal fee = tradeCostModel.buyFee(amount, commissionRate);
+                        if (amount.add(fee).compareTo(cash) <= 0) {
+                            cash = cash.subtract(amount).subtract(fee);
+                            pos.addBuy(vol, deal, fee, tradeDay);
+                            pos.raiseStopByCost(atrAt(ind, i), equity, props.getAtrStopMultiplier(),
+                                    props.getHardStopCapitalPct());
+                            trades.add(record(stockCode, "BUY", bar, deal, vol, fee, amount));
+                            buyMarks.add(mark(bar, deal));
+                            logLastTrade(analysis, trades, isPyramid ? "金字塔加仓成交；当根收盘撮合" : "金叉首开成交；当根收盘撮合");
+                            if (isPyramid) {
+                                pyramidStage++;
+                            } else {
+                                pyramidStage = Math.max(pyramidStage, 1);
+                            }
+                            int rem = PartialFillSim.remainder(requestVol, vol);
+                            if (rem >= 100) {
+                                pendingBuyVol = rem;
+                                pendingBuyPyramid = isPyramid;
+                            } else {
+                                pendingBuyVol = null;
+                                pendingBuyPyramid = false;
+                                pendingBuySignalDay = null;
+                            }
                         } else {
-                            pyramidStage = Math.max(pyramidStage, 1);
+                            pendingBuyVol = null;
+                            pendingBuyPyramid = false;
+                            pendingBuySignalDay = null;
                         }
                     }
                 }
@@ -439,26 +537,36 @@ public class BackTestEngine {
                     int sellable = (pos.sellableShares(tradeDay) / 100) * 100;
                     if (sellable >= 100) {
                         int vol = sellable;
-                        boolean fullExit = sellable >= pos.getShares();
-                        String sellWhy = pendingSellReason == null ? "挂单卖出" : pendingSellReason;
-                        if (!fullExit) {
-                            sellWhy = sellWhy + "（T+1仅卖可卖旧仓）";
+                        ExitPriority exitPri = ExitPriority.fromReasonLabel(pendingSellReason);
+                        if (exitPri == null || !exitPri.bypassParticipationCap()) {
+                            long adv = IndicatorSignalUtil.avgVolume(closedBars, i, 20);
+                            vol = capVol(vol, adv, equity, closedBars, i);
                         }
-                        SellOutcome so = executeSell(stockCode, bar, closedBars, i, cash, pos, close, vol, fullExit,
-                                commissionRate, trades, sellMarks);
-                        cash = so.cash;
-                        if (fullExit) {
-                            closedRound++;
-                            if (so.win) {
-                                winTrades++;
+                        if (vol >= 100) {
+                            boolean fullExit = vol >= pos.getShares();
+                            String sellWhy = pendingSellReason == null ? "挂单卖出" : pendingSellReason;
+                            if (!fullExit && vol < sellable) {
+                                sellWhy = sellWhy + "（ADV参与率硬顶部分卖出）";
+                            } else if (!fullExit) {
+                                sellWhy = sellWhy + "（T+1仅卖可卖旧仓）";
                             }
-                            accountRiskState.onClosedRound(so.win, tradeDay);
-                            pyramidStage = 0;
-                            targetFullVol = 0;
-                            pendingSell = false;
-                            pendingSellSignalDay = null;
+                            SellOutcome so = executeSell(stockCode, bar, closedBars, i, cash, pos, close, vol, fullExit,
+                                    commissionRate, trades, sellMarks);
+                            cash = so.cash;
+                            if (fullExit) {
+                                closedRound++;
+                                if (so.win) {
+                                    winTrades++;
+                                }
+                                accountRiskState.onClosedRound(so.win, tradeDay);
+                                pyramidStage = 0;
+                                targetFullVol = 0;
+                                pendingSell = false;
+                                pendingSellReason = null;
+                                pendingSellSignalDay = null;
+                            }
+                            logLastTrade(analysis, trades, sellWhy + "；当根收盘撮合");
                         }
-                        logLastTrade(analysis, trades, sellWhy + "；当根收盘撮合");
                     }
                 }
             }
@@ -511,6 +619,8 @@ public class BackTestEngine {
                 .sellMarks(sellMarks)
                 .analysisEvents(analysis.events())
                 .analysisSummary(analysis.summary())
+                .configFingerprint(fingerprint)
+                .atrRisk(AtrRiskReport.from(props, analysis))
                 .build();
     }
 
@@ -579,14 +689,64 @@ public class BackTestEngine {
         return cur != null && cur.getOpen() != null ? cur.getOpen() : (cur != null ? cur.getClose() : BigDecimal.ZERO);
     }
 
+    private BigDecimal resolvePosScale(AccountRiskState risk, BigDecimal equity,
+                                       List<BarDTO> bars, int index) {
+        BigDecimal scale = risk.positionScale(equity);
+        if (props.isStressScenarioEnabled()
+                && StressScenarioService.isAdvCliff(bars, index, props.getStressAdvCliffRatio())) {
+            scale = scale.multiply(new BigDecimal("0.5"));
+        }
+        if (props.isStructuralBreakEnabled()
+                && StructuralBreakMonitor.crossesThreshold(bars, index,
+                props.getStructuralBreakWindow(), props.getStructuralBreakThreshold())) {
+            scale = scale.multiply(new BigDecimal("0.5"));
+        }
+        return scale;
+    }
+
+    private BigDecimal effAdv(BigDecimal equity) {
+        return CapacityThrottle.effectiveMaxParticipation(
+                props.getMaxParticipationAdv(), equity, props.getCapacityAumBase());
+    }
+
+    private int capVol(int vol, long adv20, BigDecimal equity, List<BarDTO> bars, int index) {
+        long barVol = 0L;
+        if (bars != null && index >= 0 && index < bars.size() && bars.get(index).getVolume() != null) {
+            barVol = bars.get(index).getVolume().longValue();
+        }
+        int capped = ParticipationCap.capVolume(vol, adv20, effAdv(equity));
+        return CapacityThrottle.povCapVolume(capped, barVol, props.getPovMaxBarVolumePct());
+    }
+
+    private BigDecimal protectBuyDeal(String code, BigDecimal deal, List<BarDTO> bars, int index) {
+        if (!props.isLimitPriceProtectEnabled() || deal == null) {
+            return deal;
+        }
+        BigDecimal prev = openFilterService.prevTradingDayClose(bars, index);
+        LocalDate asOf = bars != null && index >= 0 && index < bars.size() && bars.get(index).getBarBegin() != null
+                ? bars.get(index).getBarBegin().toLocalDate() : null;
+        return LimitPriceProtect.clampBuy(deal, prev, code, openFilterService.isSt(code, asOf));
+    }
+
+    private BigDecimal protectSellDeal(String code, BigDecimal deal, List<BarDTO> bars, int index) {
+        if (!props.isLimitPriceProtectEnabled() || deal == null) {
+            return deal;
+        }
+        BigDecimal prev = openFilterService.prevTradingDayClose(bars, index);
+        LocalDate asOf = bars != null && index >= 0 && index < bars.size() && bars.get(index).getBarBegin() != null
+                ? bars.get(index).getBarBegin().toLocalDate() : null;
+        return LimitPriceProtect.clampSell(deal, prev, code, openFilterService.isSt(code, asOf));
+    }
+
     private SellOutcome executeSell(String stockCode, BarDTO bar, List<BarDTO> bars, int index,
                                     BigDecimal cash, PositionState pos, BigDecimal fillBase, int vol,
                                     boolean clearAll, BigDecimal commissionRate,
                                     List<BackTradeRecord> trades, List<BackTestResult.MarkPoint> sellMarks) {
         BigDecimal avg = pos.getAvgCost();
-        BigDecimal deal = tradeCostModel.sellPrice(fillBase, bars, index, vol);
+        BigDecimal deal = protectSellDeal(stockCode, tradeCostModel.sellPrice(fillBase, bars, index, vol), bars, index);
         BigDecimal amount = deal.multiply(BigDecimal.valueOf(vol));
-        BigDecimal fee = tradeCostModel.sellFee(amount, commissionRate);
+        LocalDate tradeDay = bar != null && bar.getBarBegin() != null ? bar.getBarBegin().toLocalDate() : null;
+        BigDecimal fee = tradeCostModel.sellFee(amount, commissionRate, tradeDay);
         BigDecimal pnl = deal.subtract(avg).multiply(BigDecimal.valueOf(vol)).subtract(fee);
         BigDecimal newCash = cash.add(amount).subtract(fee);
         trades.add(record(stockCode, "SELL", bar, deal, vol, fee, amount));

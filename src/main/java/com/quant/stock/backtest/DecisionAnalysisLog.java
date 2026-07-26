@@ -82,6 +82,11 @@ public class DecisionAnalysisLog {
         return events;
     }
 
+    /** 止损/移动止盈触发次数（P0-108 验收字段） */
+    public int stopCount() {
+        return stop;
+    }
+
     public String summary() {
         String base = String.format(
                 "信号买%d/卖%d/加仓%d · 成交买%d/卖%d · 止损%d · 拒绝%d · 过期%d · 风控%d",

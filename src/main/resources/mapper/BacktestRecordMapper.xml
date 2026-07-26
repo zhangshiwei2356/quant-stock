@@ -22,17 +22,19 @@
         <result column="trade_stats_json" property="tradeStatsJson"/>
         <result column="trades_json" property="tradesJson"/>
         <result column="stock_results_json" property="stockResultsJson"/>
+        <result column="config_fingerprint" property="configFingerprint"/>
     </resultMap>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO bt_backtest_record
         (record_id, kind, saved_at, stock_code, stock_codes_json, period, back_start, back_end,
          init_capital, final_asset, total_rate, max_drawdown, total_trade_num, win_rate,
-         trade_stats_json, trades_json, stock_results_json)
+         trade_stats_json, trades_json, stock_results_json, config_fingerprint)
         VALUES
         (#{recordId}, #{kind}, #{savedAt}, #{stockCode}, #{stockCodesJson}, #{period},
          #{backStart}, #{backEnd}, #{initCapital}, #{finalAsset}, #{totalRate}, #{maxDrawdown},
-         #{totalTradeNum}, #{winRate}, #{tradeStatsJson}, #{tradesJson}, #{stockResultsJson})
+         #{totalTradeNum}, #{winRate}, #{tradeStatsJson}, #{tradesJson}, #{stockResultsJson},
+         #{configFingerprint})
     </insert>
 
     <select id="selectByKind" resultMap="RecMap">

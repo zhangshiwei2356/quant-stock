@@ -7,7 +7,9 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Builder
@@ -30,6 +32,10 @@ public class BackTestResult {
     /** 本次回测决策分析事件（为何买卖、看了哪些数据、买多少） */
     private List<AnalysisEvent> analysisEvents;
     private String analysisSummary;
+    /** 策略相关配置指纹（P0-93，格式 v1:&lt;16hex&gt;） */
+    private String configFingerprint;
+    /** ATR 止损/定仓一体契约快照（P0-108） */
+    private Map<String, Object> atrRisk;
 
     @Data
     @Builder
@@ -56,6 +62,7 @@ public class BackTestResult {
                 .sellMarks(new ArrayList<MarkPoint>())
                 .analysisEvents(new ArrayList<AnalysisEvent>())
                 .analysisSummary("")
+                .atrRisk(new LinkedHashMap<String, Object>())
                 .build();
     }
 }

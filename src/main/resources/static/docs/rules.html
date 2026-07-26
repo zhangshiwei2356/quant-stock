@@ -41,13 +41,56 @@
 <h4>四、卖出何时触发</h4>
 <ul>
   <li><b>死叉</b>：挂卖 → 下一有效撮合卖出<strong>该标的全部持仓</strong>（含今仓，不受 T+1 限制）；已挂卖不刷新信号日</li>
-  <li><b>同日优先级（回测）</b>：先止损/trail；若当日已止损清仓（<code>stoppedOutToday</code>）→ 忽略同日死叉</li>
+  <li><b>同日优先级（回测，预注册 <code>ExitPriority</code>）</b>：
+      止损/trail（当根，rank100）&gt; 回撤熔断挂卖（rank80）&gt; 时间止损挂卖（rank70）&gt; 死叉挂卖（rank40）；
+      若当日已止损清仓（<code>stoppedOutToday</code>）或已有挂卖 → 忽略同日死叉</li>
+  <li><b>时间止损</b>：<code>quant.max-hold-trading-days</code>（默认 0=关）；自最早开仓日后计交易日，达阈挂清仓；不受 ADV 参与率限制</li>
   <li><b>止损线</b> = max(成本−2×ATR, 成本−权益×2%/股数)，只上移</li>
   <li><b>T+1（仅止损/trail）</b>：仅 <code>openDate &lt; 今日</code> 的老仓可卖；可<strong>部分卖出</strong>（只卖可卖手数）；未全清时保留今仓并重算止损线（单股引擎）</li>
-  <li><b>止损跳空成交价</b>：触及后基准价 = <code>max(止损价, 当根最低价)</code>，再套卖滑点/冲击——低开时按止损价成交（偏乐观）</li>
+  <li><b>止损跳空成交价（P0-115）</b>：
+      若开盘价≤止损线（跳空穿价）→ 基准=<strong>开盘价</strong>；
+      否则盘中最低触及 → 基准=<strong>止损价</strong>；再套卖滑点/冲击。
+      （旧逻辑 max(止损,low) 在跳空时偏乐观，已废弃）</li>
   <li><b>移动止盈</b>：盘后 trail = 持仓最高 − 1.5×ATR（只上移）；次日盘中老仓最低价触及判定</li>
   <li><b>跌停</b>：相对昨收；挂卖连续 3 个交易日失败后按跌停价×0.99 强平</li>
-  <li><b>回撤熔断</b>：峰值回撤≥25% → 挂清仓且禁新开；<strong>本轮粘性</strong>（回测结束或进程重启前不自动解除）</li>
+  <li><b>回撤熔断（深度）</b>：峰值回撤≥25% → 挂清仓且禁新开；<strong>本轮粘性</strong>（回测结束或进程重启前不自动解除）</li>
+  <li><b>回撤持续期（P0-122）</b>：权益低于峰值满 <code>drawdown-duration-reduce-days</code>（默认 10）交易日 → 仓位×0.5；
+      满 <code>drawdown-duration-halt-days</code>（默认 30）→ 持续期熔断（原因 DURATION）；创新高清零计数；单项 0=关闭</li>
+  <li><b>策略退役（P0-92）</b>：持续期熔断且 <code>auto-retire-on-duration-halt=true</code> 时自动退役禁新开；
+      冷却 <code>retirement-cooldown-trading-days</code>（默认 20）后可 resume；页面可手动退役/强制恢复</li>
+  <li><b>告警分级冷却（P0-97）</b>：软预算 WARN（总仓默认 70% / 单票 25%，相对权益；硬顶仍为 max-total/single）；
+      熔断/退役 CRITICAL；冷却窗内同类去重（WARN 默认 240 分 / CRITICAL 60 分）；
+      <code>GET /api/account/alerts</code>；硬拦截仍由仓位与熔断逻辑执行</li>
+  <li><b>信号漂移（P0-90）</b>：滚动胜率（闭环回合）+ MA5/MA20 价差 vs 次日收益<strong>代理</strong> IC（真因子 IC 不可用）；低于阈连续确认后 CRITICAL；
+      <code>auto-retire-on-signal-drift</code> 默认 false；<code>GET /api/account/signal-drift</code>；不改金叉、不报复满仓</li>
+  <li><b>多源对账闸（P0-107）</b>：主源日线 vs 分钟聚合日线收盘分歧；超 <code>data-reconcile-max-close-diff-pct</code>（默认 2%）告警；
+      <code>data-reconcile-block-on-diverge</code> 默认 false；开启后阻断新开；<code>GET/POST /api/ops/data-reconcile*</code>；外部源仍待 API</li>
+  <li><b>结构突变（P0-120）</b>：双窗收益均值差/波动；超阈确认后仓位×0.5 并挂漂移；<code>GET /api/account/structural-break</code>；不改金叉</li>
+  <li><b>ST as-of（P0-101）</b>：优先 <code>st_status_hist</code> 日切；无行回退 <code>stock_basic.is_st</code>（有前视风险）；
+      <code>st-open-filter-enabled</code> 默认 true 禁开；涨跌幅按 as-of ST 规则；<strong>财报公告时钟本地无数据</strong>，事件沙箱不进金叉</li>
+  <li><b>换手 + 印花税 as-of（P0-104）</b>：日换手=成交额合计/权益；软顶默认 50%→仓位×0.5，硬顶 100%→禁开；
+      卖出印花税按成交日（2023-08-28 前千一、起万一）；<code>GET /api/account/turnover</code></li>
+  <li><b>行业 reclass（P0-121）</b>：<code>industry_reclass_log</code> as-of；选股中性用当时行业；不并金叉；
+      <code>GET/POST /api/ops/industry-reclass*</code></li>
+  <li><b>IC 衰减（P0-125）</b>：滚动 IC（与信号漂移同源 MA 价差代理）估半衰期/IR；触发后仓位×0.5；
+      <code>GET /api/account/ic-decay</code>；真因子 IC 仍待；不改金叉</li>
+  <li><b>实验种子（P0-93）</b>：<code>quant.experiment-seed</code> 写入 <code>configFingerprint</code>；默认空；不影响撮合随机</li>
+  <li><b>ATR 一体验收（P0-108）</b>：定仓 ATR 调节夹紧 0.2~1.5；止损线=max(成本−atrMult×ATR, 成本−权益×hardPct/股)；
+      移动止盈只上移；回测结果带 <code>atrRisk</code>（含 <code>stopExitEvents</code>）</li>
+  <li><b>信号漂移 IC 边界（P0-90）</b>：<code>icSource=MA_SPREAD_PROXY</code>；<code>factorIcStatus=UNAVAILABLE</code>
+      （<code>factor_daily</code> 仅为技术缓存，不作截面 alpha IC）；Kill 不改金叉</li>
+  <li><b>禁空头（P0-102）</b>：多头现货；卖出≤持仓；无融券开关；<code>GET /api/account/short-policy</code></li>
+  <li><b>限价保护边界（P0-94）</b>：涨跌停夹紧可用；五档/L2=<code>UNAVAILABLE</code>；
+      <code>GET /api/account/order-protect</code></li>
+  <li><b>执行降频边界（P0-112）</b>：单股+组合均 AUM 收紧 ADV + 当根量 POV；TWAP=<code>UNAVAILABLE</code>；
+      <code>GET /api/account/execution-cap</code></li>
+  <li><b>多源/行业外部源（P0-107/121）</b>：本地日线↔分钟聚合 / 行业日志已具备；
+      <code>externalVendorSource</code> / <code>externalIndustrySource</code>=<code>UNAVAILABLE</code></li>
+  <li><b>组合↔单股对齐</b>：组合回测已挂部成残量、AUM+POV、ADV断崖/结构突变×0.5、ST as-of 限价、
+      结果 <code>atrRisk</code>；实盘另有换手/IC衰减（纸面对账 <code>ENGINE_PATH</code> 维度说明）</li>
+  <li><b>退役双人复核（P0-92）</b>：<code>force=true</code> 先武装 <code>forceConfirmToken</code>，
+      第二人带 <code>confirmCode</code> 再恢复；冷却满可直接 resume</li>
+  <li><b>风控日报（页面）</b>：账户 →「风控日报」聚合 <code>/api/account/alerts|turnover|ic-decay|signal-drift|…</code> 只读状态</li>
 </ul>
 
 <h4>五、撮合与成本</h4>
@@ -60,10 +103,18 @@
   <li>例外：老仓止损/trail 按触及价<strong>当根</strong>卖</li>
   <li>买单超过信号日 <b>+5 日历日</b>未成交 → 取消</li>
   <li><b>买单过滤未成交时挂单保留</b>：熔断/静默/开仓过滤等仅记 REJECT，<strong>不清空</strong>挂单，可跨 bar/跨日重试，直至成交、现金不足取消、止损清仓取消或过期</li>
-  <li>佣金万三；印花税千一（仅卖）；无最低佣金 5 元规则</li>
+  <li>佣金万三（<strong>最低 5 元</strong>）；印花税千一（仅卖）</li>
   <li>分级滑点（近20均量）：≥2000万→0.05%；≥500万→0.2%；否则→0.5%</li>
   <li>冲击：min(0.1×本笔量/20日均量, 2%)；买上浮、卖下浮，与滑点叠加</li>
+  <li><b>ADV 参与率硬顶</b>：单笔量 ≤ 近20日均量 × <code>quant.max-participation-adv</code>（默认 0.10）；买入与死叉卖出受限，不足1手则挂单保留；<strong>止损/熔断/时间止损卖出不受限</strong>；≤0 关闭</li>
+  <li><b>扩容降频 + POV（P0-112）</b>：权益超过 <code>capacity-aum-base</code>（默认 100000）时按比例收紧 ADV 顶；另可选 <code>pov-max-bar-volume-pct</code>（默认 0.10）限制单笔≤当根量×比例；只降频不改金叉</li>
+  <li><b>限价保护（P0-94）</b>：<code>quant.limit-price-protect-enabled</code>（默认 true）时，成交价买≤涨停、卖≥跌停夹紧；无本地五档，完整 L2 保护仍待行情源</li>
+  <li><b>回测部成 / 改价撤补（P0-95）</b>：<code>quant.backtest-fill-ratio</code>（默认 1=满额）；&lt;1 时买单按比例成交、残量挂单保留；
+      部成率见 <code>GET /api/account/partial-fill</code>；实盘改价=<code>POST /api/account/orders/{id}/replace</code>（撤旧+新单，队尾重置，不保优先级）</li>
+  <li><b>压力情景（P0-96）</b>：预注册 ADV 断崖（adv20/adv60&lt;<code>stress-adv-cliff-ratio</code> 默认 0.40 → 仓位×0.5）、一字板告警、相关尖峰、回撤政权；只降仓/告警，<strong>不改金叉</strong>；<code>GET /api/account/stress</code></li>
   <li><code>quant.slip-point</code>：仅做入参合法性校验（≥0），<strong>不参与成交定价</strong>；真实滑点以分级滑点为准</li>
+  <li><b>滑点残差日报（P0-99）</b>：<code>GET /api/account/slippage-residual</code> 对照委托价与费用模型；纸面对账摘要带平均不利 bp；<strong>不自动回写</strong>改价/滑点配置</li>
+  <li>回测结果字段 <code>configFingerprint</code>（格式 <code>v1:&lt;16hex&gt;</code>）摘要策略相关配置，历史表可落 <code>config_fingerprint</code></li>
 </ul>
 
 <h4>六、开仓过滤与账户风控</h4>
@@ -153,7 +204,8 @@
       <li>网关持仓与内存账本可能双路径；sdk 模式为桩实现</li>
     </ul>
   </li>
-  <li><code>trade-mode=sim</code>：下单即时成交并记账；<code>sdk</code>：SUBMITTED 预留资金/可卖量，由 <code>sync-orders</code> 推进 FILLED 后再落账；可 <code>POST /api/account/orders/{id}/cancel</code> 撤单或 <code>partial-fill</code> 部成</li>
+  <li><code>trade-mode=sim</code>：下单即时成交并记账；<code>sdk</code>：SUBMITTED 预留资金/可卖量，由 <code>sync-orders</code> 推进 FILLED 后再落账；
+      可 <code>POST /api/account/orders/{id}/cancel</code> 撤单、<code>partial-fill</code> 部成或 <code>replace</code> 改价撤补</li>
   <li>本地模拟持仓/现金在成交后落库：<code>trade_positions</code> / <code>trade_position_lots</code>、<code>system_config(sim.cash)</code>；收盘写 <code>trade_cashflows</code>；启动可恢复</li>
   <li>收盘后任务：约 15:30 相关清算；16:00 可触发批量扫描日志等</li>
 </ul>

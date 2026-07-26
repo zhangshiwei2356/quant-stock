@@ -132,7 +132,7 @@
             <span class="chevron">▸</span>
           </button>
           <div id="accountBody" class="side-nav-body">
-            <p class="hint">本地模拟账本；二级：资金 / 持仓 / 委托 / 日结 / 风控</p>
+            <p class="hint">本地模拟账本；二级：资金 / 持仓 / 委托 / 日结 / 风控 / 日报 / 纸面对账</p>
             <ul id="accountMenu" class="side-nav-menu">
               <li data-account-panel="funds" role="button" tabindex="0">资金权益</li>
               <li data-account-panel="positions" role="button" tabindex="0">
@@ -146,6 +146,12 @@
               </li>
               <li data-account-panel="risklogs" role="button" tabindex="0">
                 风控事件 <span class="trade-pool-count" id="sideRiskCount">0</span>
+              </li>
+              <li data-account-panel="riskdash" role="button" tabindex="0">
+                风控日报 <span class="trade-pool-count" id="sideDashCount">0</span>
+              </li>
+              <li data-account-panel="papergap" role="button" tabindex="0">
+                纸面对账 <span class="trade-pool-count" id="sideGapCount">0</span>
               </li>
             </ul>
           </div>
@@ -727,11 +733,20 @@
             <div class="result-group">
               <div class="result-group-title">状态</div>
               <div class="result-kv"><span class="label">熔断</span><span class="value" id="acctHalted">—</span></div>
+              <div class="result-kv"><span class="label">熔断原因</span><span class="value" id="acctHaltReason">—</span></div>
+              <div class="result-kv"><span class="label">低于峰值天数</span><span class="value" id="acctUnderwater">—</span></div>
               <div class="result-kv"><span class="label">允许开仓</span><span class="value" id="acctAllowOpen">—</span></div>
               <div class="result-kv"><span class="label">仓位缩放</span><span class="value" id="acctPosScale">—</span></div>
               <div class="result-kv"><span class="label">连亏计数</span><span class="value" id="acctLossStreak">—</span></div>
+              <div class="result-kv"><span class="label">策略退役</span><span class="value" id="acctRetired">—</span></div>
             </div>
           </div>
+        </div>
+        <div class="toolbar" style="margin-top:12px;">
+          <button type="button" id="btnAcctRetire" class="secondary">手动退役</button>
+          <button type="button" id="btnAcctResume" class="secondary">恢复（冷却后）</button>
+          <button type="button" id="btnAcctResumeForce" class="secondary">强制恢复</button>
+          <span class="field-hint" id="acctRetireHint"></span>
         </div>
       </section>
     </div>
@@ -830,6 +845,103 @@
             </thead>
             <tbody id="acctRiskBody">
             <tr><td colspan="6" class="empty-state">暂无风控事件</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- 账户概览 · 风控日报（聚合只读 API） -->
+    <div id="viewAcctRiskDash" class="workspace-view" hidden>
+      <section class="panel">
+        <h3>风控日报 <span id="acctDashBadge" class="trade-pool-count">0</span></h3>
+        <p class="hint" id="acctDashHint">聚合账户侧只读监控：告警 / 换手 / IC / 漂移 / 突变 / 压力 / 部成 / 滑点残差 / 限价与执行边界 / 禁空头。不改金叉。</p>
+        <div class="toolbar" style="margin-top:8px;">
+          <button type="button" id="btnAcctRefreshDash" class="secondary">刷新日报</button>
+          <span class="field-hint" id="acctDashMeta"></span>
+        </div>
+        <div class="result-board" id="acctDashBoard" style="margin-top:12px;">
+          <div class="result-groups">
+            <div class="result-group">
+              <div class="result-group-title">告警 / 换手 / IC</div>
+              <div class="result-kv"><span class="label">告警条数</span><span class="value" id="acctDashAlerts">—</span></div>
+              <div class="result-kv"><span class="label">换手状态</span><span class="value" id="acctDashTurnover">—</span></div>
+              <div class="result-kv"><span class="label">IC衰减</span><span class="value" id="acctDashIc">—</span></div>
+            </div>
+            <div class="result-group">
+              <div class="result-group-title">漂移 / 突变 / 压力</div>
+              <div class="result-kv"><span class="label">信号漂移</span><span class="value" id="acctDashDrift">—</span></div>
+              <div class="result-kv"><span class="label">结构突变</span><span class="value" id="acctDashBreak">—</span></div>
+              <div class="result-kv"><span class="label">压力情景</span><span class="value" id="acctDashStress">—</span></div>
+            </div>
+            <div class="result-group">
+              <div class="result-group-title">成交质量</div>
+              <div class="result-kv"><span class="label">部成日报</span><span class="value" id="acctDashPartial">—</span></div>
+              <div class="result-kv"><span class="label">滑点残差</span><span class="value" id="acctDashSlip">—</span></div>
+            </div>
+            <div class="result-group">
+              <div class="result-group-title">边界</div>
+              <div class="result-kv"><span class="label">限价保护</span><span class="value" id="acctDashProtect">—</span></div>
+              <div class="result-kv"><span class="label">执行降频</span><span class="value" id="acctDashExec">—</span></div>
+              <div class="result-kv"><span class="label">空头策略</span><span class="value" id="acctDashShort">—</span></div>
+            </div>
+          </div>
+        </div>
+        <h4 style="margin-top:16px;">原始摘要</h4>
+        <pre id="acctDashRaw" class="mono" style="margin-top:8px;max-height:280px;overflow:auto;white-space:pre-wrap;font-size:12px;">点击「刷新日报」加载</pre>
+      </section>
+    </div>
+
+    <!-- 账户概览 · 纸面-实盘对账 -->
+    <div id="viewAcctPaperGap" class="workspace-view" hidden>
+      <section class="panel">
+        <h3>纸面对账 <span id="acctGapBadge" class="trade-pool-count">0</span></h3>
+        <p class="hint" id="acctGapHint">对照纸面撮合/成本假设与本地模拟成交（非真柜台）。维度含引擎路径差与真柜台不可用声明。</p>
+        <div class="toolbar" style="margin-top:8px;">
+          <button type="button" id="btnAcctRefreshGap" class="secondary">刷新对账</button>
+          <span class="field-hint" id="acctGapMeta"></span>
+        </div>
+        <div class="result-board" id="acctGapBoard" style="margin-top:12px;">
+          <div class="result-groups">
+            <div class="result-group">
+              <div class="result-group-title">闸门</div>
+              <div class="result-kv"><span class="label">gatePass</span><span class="value" id="acctGapPass">—</span></div>
+              <div class="result-kv"><span class="label">tradeMode</span><span class="value" id="acctGapMode">—</span></div>
+              <div class="result-kv"><span class="label">指纹</span><span class="value mono" id="acctGapFp">—</span></div>
+            </div>
+            <div class="result-group">
+              <div class="result-group-title">摘要</div>
+              <div class="result-kv"><span class="label">同日成交</span><span class="value" id="acctGapSameDay">—</span></div>
+              <div class="result-kv"><span class="label">费用残差合计</span><span class="value" id="acctGapFeeSum">—</span></div>
+              <div class="result-kv"><span class="label">部成笔数</span><span class="value" id="acctGapPartial">—</span></div>
+              <div class="result-kv"><span class="label">平均不利bp</span><span class="value" id="acctGapAdverseBps">—</span></div>
+            </div>
+          </div>
+        </div>
+        <h4 style="margin-top:16px;">差异明细</h4>
+        <div class="table-wrap" style="margin-top:8px;max-height:none;">
+          <table class="tp-table">
+            <thead>
+            <tr>
+              <th>维度</th><th>级别</th><th>代码</th><th>标题</th><th>详情</th><th>订单</th>
+            </tr>
+            </thead>
+            <tbody id="acctGapBody">
+            <tr><td colspan="6" class="empty-state">暂无差异</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h4 style="margin-top:16px;">成本对照（成交）</h4>
+        <div class="table-wrap" style="margin-top:8px;max-height:none;">
+          <table class="tp-table">
+            <thead>
+            <tr>
+              <th>订单</th><th>代码</th><th>方向</th><th>委托价</th><th>成交价</th><th>价差bp</th>
+              <th>实际费</th><th>模型费</th><th>费用残差</th>
+            </tr>
+            </thead>
+            <tbody id="acctGapCostBody">
+            <tr><td colspan="9" class="empty-state">暂无成交</td></tr>
             </tbody>
           </table>
         </div>

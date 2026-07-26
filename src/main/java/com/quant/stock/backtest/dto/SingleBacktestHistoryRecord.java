@@ -33,6 +33,8 @@ public class SingleBacktestHistoryRecord {
     /** 买卖次数/股数/手数/金额/费用/总盈亏 */
     private BackTestTradeStats tradeStats;
     private List<BackTradeRecord> trades;
+    /** 策略相关配置指纹（P0-93） */
+    private String configFingerprint;
 
     public static SingleBacktestHistoryRecord fromResult(String id, String savedAt,
                                                          String period, String backStart, String backEnd,
@@ -54,6 +56,7 @@ public class SingleBacktestHistoryRecord {
                 .winRate(result.getWinRate())
                 .tradeStats(BackTestTradeStats.from(tradeList, result.getInitCapital(), result.getFinalAsset()))
                 .trades(tradeList)
+                .configFingerprint(result.getConfigFingerprint())
                 .build();
     }
 }

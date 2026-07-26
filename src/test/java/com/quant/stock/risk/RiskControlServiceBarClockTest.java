@@ -29,12 +29,14 @@ class RiskControlServiceBarClockTest {
         props.setMarketCapFilterEnabled(false);
         props.setMinAvgVolume20(1L);
         OpenFilterService openFilter = new OpenFilterService(props);
+        TradingCalendar cal = new TradingCalendar();
         risk = new RiskControlService(
                 props,
                 new PositionAmountUtil(props),
                 openFilter,
                 new LiveAccountRiskState(props),
-                new TradingCalendar());
+                cal,
+                new StrategyRetirementService(props, cal));
     }
 
     @Test

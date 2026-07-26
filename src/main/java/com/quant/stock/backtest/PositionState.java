@@ -70,6 +70,20 @@ public class PositionState {
         this.addedToday = false;
     }
 
+    /** 最早开仓日（批次最小 openDate）；无持仓返回 null */
+    public LocalDate getEarliestOpenDate() {
+        LocalDate earliest = null;
+        for (Lot lot : lots) {
+            if (lot.openDate == null) {
+                continue;
+            }
+            if (earliest == null || lot.openDate.isBefore(earliest)) {
+                earliest = lot.openDate;
+            }
+        }
+        return earliest;
+    }
+
     /** 可止损卖出的老仓股数（openDate &lt; today） */
     public int sellableShares(LocalDate today) {
         if (today == null || shares <= 0) {

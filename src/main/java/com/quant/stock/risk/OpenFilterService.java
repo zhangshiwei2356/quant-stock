@@ -6,6 +6,7 @@ import com.quant.stock.mapper.StockBasicMapper;
 import com.quant.stock.market.dto.BarDTO;
 import com.quant.stock.market.dto.StockBasicDO;
 import com.quant.stock.strategy.IndicatorSignalUtil;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -32,11 +33,47 @@ public class OpenFilterService {
     @Autowired(required = false)
     private StockBasicMapper stockBasicMapper;
 
+    private final ObjectProvider<StPitService> stPitProvider;
+
     private volatile Set<String> stCodesCache;
     private volatile long stCodesCacheAtMs;
 
+    /** 单测便捷构造：无 ST PIT 时等价于仅用 stock_basic */
     public OpenFilterService(QuantProperties props) {
+        this(props, emptyStPitProvider());
+    }
+
+    /**
+     * Spring 注入入口。须唯一标注 {@link Autowired}：多构造器时否则会回退无参构造并启动失败。
+     */
+    @Autowired
+    public OpenFilterService(QuantProperties props, ObjectProvider<StPitService> stPitProvider) {
         this.props = props;
+        this.stPitProvider = stPitProvider == null ? emptyStPitProvider() : stPitProvider;
+    }
+
+    private static ObjectProvider<StPitService> emptyStPitProvider() {
+        return new ObjectProvider<StPitService>() {
+            @Override
+            public StPitService getObject() {
+                return null;
+            }
+
+            @Override
+            public StPitService getObject(Object... args) {
+                return null;
+            }
+
+            @Override
+            public StPitService getIfAvailable() {
+                return null;
+            }
+
+            @Override
+            public StPitService getIfUnique() {
+                return null;
+            }
+        };
     }
 
     public boolean canOpen(String stockCode, List<BarDTO> bars, int index) {
@@ -51,6 +88,10 @@ public class OpenFilterService {
             return false;
         }
         if (isSuspended(cur)) {
+            return false;
+        }
+        if (props.isStOpenFilterEnabled() && isSt(stockCode, cur.getBarBegin() == null
+                ? null : cur.getBarBegin().toLocalDate())) {
             return false;
         }
         long avgVol = IndicatorSignalUtil.avgVolume(bars, index, 20);
@@ -151,7 +192,9 @@ public class OpenFilterService {
         }
         String code = cur != null && StringUtils.hasText(cur.getCode())
                 ? cur.getCode() : null;
-        boolean st = isSt(code);
+        LocalDate asOf = cur != null && cur.getBarBegin() != null
+                ? cur.getBarBegin().toLocalDate() : null;
+        boolean st = isSt(code, asOf);
         if (up) {
             return LimitBoardHelper.isLimitUp(cur, ref, code, st);
         }
@@ -159,7 +202,19 @@ public class OpenFilterService {
     }
 
     public boolean isSt(String code) {
-        if (!StringUtils.hasText(code) || stockBasicMapper == null) {
+        return isSt(code, LocalDate.now());
+    }
+
+    /** ST as-of（P0-101）：优先日切表，否则 stock_basic 快照 */
+    public boolean isSt(String code, LocalDate asOf) {
+        if (!StringUtils.hasText(code)) {
+            return false;
+        }
+        StPitService pit = stPitProvider == null ? null : stPitProvider.getIfAvailable();
+        if (pit != null) {
+            return pit.isStAsOf(code, asOf);
+        }
+        if (stockBasicMapper == null) {
             return false;
         }
         long now = System.currentTimeMillis();

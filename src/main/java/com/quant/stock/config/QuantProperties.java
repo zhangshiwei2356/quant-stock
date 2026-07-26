@@ -57,6 +57,11 @@ public class QuantProperties {
     private BigDecimal hardStopCapitalPct = new BigDecimal("0.02");
     private boolean trailingStopEnabled = true;
     private BigDecimal trailingAtrMultiplier = new BigDecimal("1.5");
+    /**
+     * 最大持仓交易日（开仓日后计；P0-114）。到期挂时间止损清仓。
+     * 默认 0=关闭；生产可设 40～60。
+     */
+    private int maxHoldTradingDays = 0;
 
     /** 金字塔仓位 50/30/20 */
     private boolean pyramidEnabled = true;
@@ -70,6 +75,106 @@ public class QuantProperties {
     private int consecutiveLossLimit = 5;
     private BigDecimal drawdownReducePct = new BigDecimal("0.15");
     private BigDecimal drawdownHaltPct = new BigDecimal("0.25");
+    /**
+     * 回撤持续期降仓：权益低于峰值满 N 个交易日 → 仓位×0.5（P0-122）。
+     * 0=关闭。与深度降仓（drawdownReducePct）并行，先触达者生效。
+     */
+    private int drawdownDurationReduceDays = 10;
+    /**
+     * 回撤持续期熔断：低于峰值满 N 个交易日 → 熔断禁开（P0-122）。
+     * 0=关闭。可在未触及深度 halt 时触发「阴跌」熔断。
+     */
+    private int drawdownDurationHaltDays = 30;
+    /**
+     * 持续期熔断时是否自动退役策略（P0-92）；退役后禁新开，需冷却满后再 resume。
+     */
+    private boolean autoRetireOnDurationHalt = true;
+    /** 退役冷却交易日；满后方可 POST resume。0=禁止自动 resume（仅手动 force） */
+    private int retirementCooldownTradingDays = 20;
+
+    /** 组合相关监控：收益回看交易日数（P0-105） */
+    private int correlationLookbackDays = 60;
+    /** 平均两两相关告警阈值 */
+    private BigDecimal correlationWarnThreshold = new BigDecimal("0.75");
+
+    /** 告警冷却：WARN 分钟（P0-97） */
+    private int alertCooldownWarnMinutes = 240;
+    /** 告警冷却：CRITICAL 分钟 */
+    private int alertCooldownCriticalMinutes = 60;
+    /** 软预算：总仓占比告警线（相对权益；硬顶仍为 maxTotalPosition） */
+    private BigDecimal softTotalPositionPct = new BigDecimal("0.70");
+    /** 软预算：单票占比告警线 */
+    private BigDecimal softSinglePositionPct = new BigDecimal("0.25");
+
+    /** 限价保护：成交价夹紧到涨跌停（P0-94）；无五档时仅此+ADV 帽 */
+    private boolean limitPriceProtectEnabled = true;
+
+    /**
+     * 回测部成比例（P0-95）。1=满额（默认）；&lt;1 时本 bar 只成交该比例整手，残量保留挂单。
+     */
+    private BigDecimal backtestFillRatio = BigDecimal.ONE;
+
+    /** 压力情景总开关（P0-96） */
+    private boolean stressScenarioEnabled = true;
+    /**
+     * ADV 断崖：近20均量 / 近60均量 &lt; 此值 → 仓位×0.5。默认 0.40；≤0 关闭断崖判定。
+     */
+    private BigDecimal stressAdvCliffRatio = new BigDecimal("0.40");
+
+    /** 信号漂移监控（P0-90） */
+    private boolean signalDriftEnabled = true;
+    private int driftLookbackRounds = 20;
+    private BigDecimal driftMinWinRate = new BigDecimal("0.35");
+    private int driftIcLookbackDays = 60;
+    private BigDecimal driftMinIc = new BigDecimal("0.02");
+    private int driftConfirmRounds = 3;
+    /** 漂移确认后是否自动退役；默认 false（只 CRITICAL 告警） */
+    private boolean autoRetireOnSignalDrift = false;
+
+    /** 多源对账闸（P0-107）：日线 vs 分钟聚合 */
+    private boolean dataReconcileGateEnabled = true;
+    private boolean dataReconcileBlockOnDiverge = false;
+    private BigDecimal dataReconcileMaxCloseDiffPct = new BigDecimal("0.02");
+    private int dataReconcileSampleDays = 5;
+
+    /**
+     * 容量基准权益（P0-112）：权益超过此值时按比例收紧 ADV 参与率（扩容降频）。
+     * 默认与演示初始资金同量级；≤0 关闭缩放。
+     */
+    private BigDecimal capacityAumBase = new BigDecimal("100000");
+    /**
+     * POV：单笔不超过当根成交量 × 此比例；≤0 关闭（仅 ADV 帽）。
+     */
+    private BigDecimal povMaxBarVolumePct = new BigDecimal("0.10");
+
+    /** 结构突变（P0-120） */
+    private boolean structuralBreakEnabled = true;
+    private int structuralBreakWindow = 20;
+    private BigDecimal structuralBreakThreshold = new BigDecimal("2.0");
+    private int structuralBreakConfirmBars = 2;
+
+    /**
+     * ST 开仓过滤（P0-101）：as-of 为 ST 则禁开；涨跌幅仍按 ST 规则。
+     * 默认 true；无日切表时回退 stock_basic 现状态。
+     */
+    private boolean stOpenFilterEnabled = true;
+
+    /** 换手门禁（P0-104）：日成交额/权益 */
+    private boolean turnoverGuardEnabled = true;
+    private BigDecimal turnoverSoftPct = new BigDecimal("0.50");
+    private BigDecimal turnoverHardPct = new BigDecimal("1.00");
+
+    /** IC 衰减监控（P0-125） */
+    private boolean icDecayEnabled = true;
+    private int icDecayLookback = 40;
+    /** 半衰期低于此交易日数则告警降仓；0=不按半衰期判 */
+    private int icDecayMinHalfLifeBars = 5;
+    private BigDecimal icDecayMinIr = new BigDecimal("0.10");
+
+    /**
+     * 实验种子（P0-93）：写入配置指纹，便于对照实验；不影响撮合随机性（引擎无此随机）。
+     */
+    private String experimentSeed = "";
 
     /** 开仓静默时段（分钟，相对交易时段） */
     private boolean quietOpenEnabled = true;
@@ -99,6 +204,11 @@ public class QuantProperties {
     private long volLargeThreshold = 20000000L;
     private long volMidThreshold = 5000000L;
     private BigDecimal impactCoeff = new BigDecimal("0.1");
+    /**
+     * 单笔最大参与率（相对近 20 日均量 ADV）。默认 0.10=10%；≤0 关闭。
+     * 买入挂单与死叉卖出受此硬顶；止损/熔断卖出不受限。
+     */
+    private BigDecimal maxParticipationAdv = new BigDecimal("0.10");
 
     /** 下一根开盘撮合（消除未来函数） */
     private boolean nextBarOpenFill = true;

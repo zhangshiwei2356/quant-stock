@@ -33,6 +33,8 @@ public class PortfolioBacktestHistoryRecord {
     private BackTestTradeStats tradeStats;
     private List<SingleStockBackResult> stockResults;
     private List<BackTradeRecord> trades;
+    /** 策略相关配置指纹（P0-93） */
+    private String configFingerprint;
 
     public static PortfolioBacktestHistoryRecord fromResult(String id, String savedAt,
                                                             BackTestQueryDTO query,
@@ -61,6 +63,7 @@ public class PortfolioBacktestHistoryRecord {
                 .stockResults(result.getStockResults() == null
                         ? new ArrayList<SingleStockBackResult>() : result.getStockResults())
                 .trades(tradeList)
+                .configFingerprint(result.getConfigFingerprint())
                 .build();
     }
 }
