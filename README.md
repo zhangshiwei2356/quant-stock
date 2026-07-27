@@ -241,7 +241,8 @@ sequenceDiagram
 
 | 接口 | 说明 |
 |------|------|
-| GET `/api/config` | 公开配置 |
+| GET `/api/config` | 公开配置（含 `activeStrategy`） |
+| GET `/api/config/strategies` | 已注册策略列表（回测下拉；不改全局激活） |
 | GET `/api/stock/pool` | 标的/股票池 |
 | GET `/api/kline?code=&period=` | 统一周期 K 线 |
 | GET `/api/backtest/run` | 单只回测 |
@@ -294,7 +295,7 @@ sequenceDiagram
 
 ## 策略与风控（已实现）
 
-- **单活策略可切换**：`quant.active-strategy` 默认 **`maCross`**（均线金叉死叉 + MA60/放量/ADX/RSI 过滤，实现仍在 `MaCrossStrategy`，不静默改规则）。回测/扫池/`StrategyTask` 共用 `StrategyRegistry.active()` 与一套账本/目标池。新策略：新建 `@Component` 继承 `BaseStrategy` 后改配置即可；占位 `holdNothing` 永不交易。运维「运行参数」展示当前策略；单股/组合回测可选 `strategyId`（缺省=配置）
+- **单活策略可切换**：`quant.active-strategy` 默认 **`maCross`**（均线金叉死叉 + MA60/放量/ADX/RSI 过滤，实现仍在 `MaCrossStrategy`，不静默改规则）。回测/扫池/`StrategyTask` 共用 `StrategyRegistry.active()` 与一套账本/目标池。新策略：新建 `@Component` 继承 `BaseStrategy` 后改配置即可；占位 `holdNothing` 永不交易。运维「运行参数」展示当前策略；**个股/组合回测工作台可选策略下拉**（仅当次回测传 `strategyId`，不改纸面扫描激活策略）
 - 止损：相对综合成本的 ATR + 权益硬止损；移动止盈盘后上移；**跳空穿价按开盘价**成交（盘中触及按止损价）
 - 组合相关监控：成分日收益两两相关（回看 60 日，均值≥0.75 告警）；组合回测结果字段 `correlation`；`GET /api/account/correlation`
 - **T+1 分档**：仅非当日买入批次可卖/可止损

@@ -1621,6 +1621,8 @@
     var params = { code: code, initCapital: capital, period: period };
     if (backStart) params.backStart = backStart;
     if (backEnd) params.backEnd = backEnd;
+    var strategyId = ($('#singleStrategyId').val() || '').trim();
+    if (strategyId) params.strategyId = strategyId;
     withLoading($('#btnBacktest'), $.getJSON('/api/backtest/run', params)
       .done(function (bt) {
         $('#btMetrics').html(
@@ -1631,7 +1633,8 @@
           ' 交易次数<b>' + (bt.totalTradeNum || 0) + '</b>' +
           ' 胜率<b>' + pct(bt.winRate) + '</b>'
         );
-        toast('回测完成 · 交易 ' + (bt.totalTradeNum || 0) + ' 笔', 'ok');
+        toast('回测完成 · 交易 ' + (bt.totalTradeNum || 0) + ' 笔'
+          + (strategyId ? (' · 策略 ' + strategyId) : ''), 'ok');
         lastBacktestCode = code;
         lastSignalMarks = { buy: bt.buyMarks || [], sell: bt.sellMarks || [] };
         lastSingleEquity = {
@@ -1730,6 +1733,8 @@
       feeRate: 0.0003,
       slipPoint: 0.001
     };
+    var pfStrategyId = ($('#pfStrategyId').val() || '').trim();
+    if (pfStrategyId) body.strategyId = pfStrategyId;
     clearPortfolioResult();
     withLoading($('#btnPortfolio'), $.ajax({
       url: '/api/portfolio/run',
@@ -1756,7 +1761,8 @@
         renderEquityChart(pf);
         renderPortfolioTradeTable(pf);
         renderPortfolioStockBreakdown(pf);
-        toast('组合回测完成 · 成交 ' + ((pf.trades || []).length) + ' 笔', 'ok');
+        toast('组合回测完成 · 成交 ' + ((pf.trades || []).length) + ' 笔'
+          + (pfStrategyId ? (' · 策略 ' + pfStrategyId) : ''), 'ok');
         loadPortfolioHistory();
         try {
           document.getElementById('pfTradeSummary').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -1769,10 +1775,10 @@
   }
 
   var knowledgeTopics = [
-    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260727-kuangrui-it' },
+    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260728-bt-strategy' },
     { id: 'readme', group: 'app', title: '项目 README', src: '/api/docs/readme' },
-    { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260726-ops-harden' },
-    { id: 'memo', group: 'app', title: '能力与待办', src: '/docs/memo.html?v=20260726-ops-harden' },
+    { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260728-bt-strategy' },
+    { id: 'memo', group: 'app', title: '能力与待办', src: '/docs/memo.html?v=20260728-bt-strategy' },
     { id: 'kuangrui', group: 'app', title: '宽睿文档梳理', src: '/docs/kuangrui.html?v=20260727-kuangrui-it' },
     { id: 'ashare', group: 'stock', title: 'A股基础', src: '/docs/ashare.html?v=20260720-nav-rename' },
     { id: 'session', group: 'stock', title: '交易时间', src: '/docs/session.html?v=20260720-nav-rename' },
@@ -4168,11 +4174,46 @@
     }
   });
 
+  function fillStrategySelect($sel, data) {
+    if (!$sel || !$sel.length) return;
+    var list = (data && data.strategies) || [];
+    var active = (data && data.activeStrategy) || '';
+    $sel.empty();
+    if (!list.length) {
+      $sel.append($('<option/>').val('').text('无可用策略'));
+      return;
+    }
+    list.forEach(function (s) {
+      var id = s.id || '';
+      var label = s.label || id;
+      if (id && id === active) {
+        label = label + ' · 配置默认';
+      }
+      $sel.append($('<option/>').val(id).text(label));
+    });
+    if (active) {
+      $sel.val(active);
+    }
+  }
+
+  function loadStrategyOptions() {
+    return $.getJSON('/api/config/strategies')
+      .done(function (data) {
+        fillStrategySelect($('#singleStrategyId'), data);
+        fillStrategySelect($('#pfStrategyId'), data);
+      })
+      .fail(function () {
+        $('#singleStrategyId, #pfStrategyId').empty()
+          .append($('<option/>').val('maCross').text('均线金叉（maCross）'));
+      });
+  }
+
   initKnowledge();
   initTheme();
   loadSummary();
   loadPool();
   loadDbTablesMenu();
+  loadStrategyOptions();
   showHome();
   bindCapitalHint($('#initCapital'), $('#initCapitalHint'));
   bindCapitalHint($('#pfInitCapital'), $('#pfInitCapitalHint'));

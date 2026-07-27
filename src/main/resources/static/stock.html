@@ -340,6 +340,11 @@
           <label class="field">初始资金 <span id="initCapitalHint" class="field-hint">(10万)</span>
             <input id="initCapital" type="number" value="100000"/>
           </label>
+          <label class="field">策略 <span class="field-hint">（仅本次回测）</span>
+            <select id="singleStrategyId" title="不影响纸面扫描的 quant.active-strategy">
+              <option value="">加载中…</option>
+            </select>
+          </label>
           <button id="btnLoadKline" class="secondary">加载K线</button>
           <button id="btnBacktest">执行回测</button>
           <button id="btnBatch" class="secondary">批量扫描</button>
@@ -987,6 +992,11 @@
           <label class="field">初始资金 <span id="pfInitCapitalHint" class="field-hint">(10万)</span>
             <input id="pfInitCapital" type="number" value="100000"/>
           </label>
+          <label class="field">策略 <span class="field-hint">（仅本次回测）</span>
+            <select id="pfStrategyId" title="不影响纸面扫描的 quant.active-strategy">
+              <option value="">加载中…</option>
+            </select>
+          </label>
           <button id="btnPortfolio" class="danger">执行组合回测</button>
         </div>
         <p id="backTimeHint" class="hint" style="margin:8px 0 0;"></p>
@@ -1081,6 +1091,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260722-bugfix"></script>
+<script src="/js/stock-chart.js?v=20260728-bt-strategy"></script>
 </body>
 </html>

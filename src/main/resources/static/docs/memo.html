@@ -37,7 +37,7 @@
     <li><b>账本/退出/运维补强</b> — 已落地 · 信号日≠成交日落库；熔断/时间止损可抢占死叉挂单；持仓以批次为准；委托撤/部成/改价与对账闸挂 UI；schema 任务 implemented 与运行时对齐；Redis 锁 token</li>
     <li><b>收盘权益日表</b> — 已落地 · <code>settle-after-close</code> 写 <code>trade_cashflows</code>；账户概览 →「权益日结」可查看</li>
     <li><b>风控日志</b> — 已落地 · 峰值回撤熔断写入 <code>risk_control_log</code>；账户概览 →「风控事件」</li>
-    <li><b>单活策略可切换</b> — 已落地 · <code>StrategyRegistry</code> + <code>quant.active-strategy</code>（默认 <code>maCross</code>）；回测/扫池/纸面共用一套账本；占位 <code>holdNothing</code>；不改金叉买卖规则；多策略并行分账本仍不做</li>
+    <li><b>单活策略可切换</b> — 已落地 · <code>StrategyRegistry</code> + <code>quant.active-strategy</code>（默认 <code>maCross</code>）；回测工作台策略下拉（仅本次，<code>GET /api/config/strategies</code>）；扫池/纸面仍用配置激活；占位 <code>holdNothing</code>；多策略并行分账本仍不做</li>
     <li><b>交易日历（静态）</b> — 已落地 · 周末 + 内置法定节假日（含 2026 中秋 9/25–27、国庆 10/1–7；10/8 开市）；风控拒非交易日</li>
     <li><b>账户概览</b> — 已落地 · 资金权益 / 当前持仓（批次 T+1）/ 委托记录 / 权益日结 / 风控事件 / 风控日报</li>
     <li><b>唯一目标池</b> — 已落地 · 「当前池」手动「扫描更新」或定时 <code>pool-rebuild</code> / <code>after-market-batch-scan</code>；「扫描历史」可查看批次，亦可手动扫描；移出≠卖出；漏斗 + Markdown 报告</li>

@@ -15,7 +15,7 @@
 
 <h4>二、买入何时触发</h4>
 <ul>
-  <li><b>单活策略</b>：同一时刻只跑 <code>quant.active-strategy</code>（默认 <code>maCross</code>）；回测/扫池/纸面经 <code>StrategyRegistry</code> 取当前策略，共用一套账本。以下买卖规则描述默认金叉实现；切换其它策略 id 时以对应 <code>BaseStrategy</code> 为准（不静默改写金叉类）</li>
+  <li><b>单活策略</b>：同一时刻只跑 <code>quant.active-strategy</code>（默认 <code>maCross</code>）；回测/扫池/纸面经 <code>StrategyRegistry</code> 取当前策略，共用一套账本。个股/组合<strong>回测工作台</strong>可下拉选择其它策略 id（仅当次回测；列表见 <code>GET /api/config/strategies</code>），不改纸面扫描激活策略。以下买卖规则描述默认金叉实现；切换其它策略 id 时以对应 <code>BaseStrategy</code> 为准（不静默改写金叉类）</li>
   <li><b>金叉首开</b>：上一根 MA5≤MA20，本根 MA5&gt;MA20（收盘确认；单股引擎有效回测通常需 K 线约≥65 根）</li>
   <li><b>必过过滤</b>：RSI14 &lt; 60；ATR14 &gt; 0.001；
     <b>硬过滤</b>（可关 <code>market-cap-filter-enabled</code>）：模拟市值 &lt; 50 亿 → <strong>直接跳过、不开仓</strong></li>
