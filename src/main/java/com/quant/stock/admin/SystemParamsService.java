@@ -54,6 +54,8 @@ public class SystemParamsService {
                 kv("tradeMode", "交易模式", props.getTradeMode(), "sim=本地模拟；sdk=券商 SDK 桩"),
                 kv("dbEnabled", "启用 MySQL", props.isDbEnabled(), "false 时行情/账本等不落库"),
                 kv("marketMode", "行情模式", props.getMarketMode(), "db / json / sdk"),
+                kv("activeStrategy", "当前策略", props.getActiveStrategy(),
+                        "单活策略 id；默认 maCross（金叉）；holdNothing=永不交易占位"),
                 kv("stockCodes", "默认股票池", props.getStockCodes(), "演示用代码列表"),
                 kv("feeRate", "佣金费率", props.getFeeRate(), "双边佣金比例"),
                 kv("slipPoint", "基础滑点", props.getSlipPoint(), "回测撮合滑点"),

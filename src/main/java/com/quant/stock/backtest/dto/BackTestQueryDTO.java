@@ -35,4 +35,6 @@ public class BackTestQueryDTO {
     private BigDecimal feeRate;
     /** 滑点参数（合法性校验；实际滑点由 TradeCostModel 分级） */
     private BigDecimal slipPoint;
+    /** 策略 id（如 maCross）；空则用 quant.active-strategy */
+    private String strategyId;
 }

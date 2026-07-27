@@ -2,10 +2,13 @@ package com.quant.stock.backtest;
 
 import com.quant.stock.backtest.dto.BackTestResult;
 import com.quant.stock.calendar.TradingCalendar;
+import com.quant.stock.config.ConfigFingerprint;
 import com.quant.stock.config.QuantProperties;
 import com.quant.stock.market.dto.BarDTO;
 import com.quant.stock.risk.OpenFilterService;
+import com.quant.stock.strategy.HoldNothingStrategy;
 import com.quant.stock.strategy.MaCrossStrategy;
+import com.quant.stock.strategy.StrategyRegistry;
 import com.quant.stock.trade.TradeCostModel;
 import com.quant.stock.util.PositionAmountUtil;
 import org.junit.jupiter.api.Test;
@@ -16,13 +19,15 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 回测引擎冒烟：合成日 K 足以跑通，结果非空。
+ * 回测引擎冒烟：合成日 K 足以跑通，结果非空；默认金叉指纹兼容。
  */
 class BackTestEngineSmokeTest {
 
@@ -35,11 +40,14 @@ class BackTestEngineSmokeTest {
         props.setMinAvgVolume20(1L);
         props.setStopLossEnabled(true);
         props.setFeeRate(new BigDecimal("0.0003"));
+        props.setActiveStrategy("maCross");
         OpenFilterService openFilter = new OpenFilterService(props);
+        StrategyRegistry registry = new StrategyRegistry(
+                Arrays.asList(new MaCrossStrategy(props), new HoldNothingStrategy()), props);
         BackTestEngine engine = new BackTestEngine(
                 props,
                 new PositionAmountUtil(props),
-                new MaCrossStrategy(props),
+                registry,
                 new TradeCostModel(props),
                 openFilter,
                 new TradingCalendar());
@@ -52,9 +60,35 @@ class BackTestEngineSmokeTest {
         assertNotNull(result.getTotalRate());
         assertNotNull(result.getConfigFingerprint());
         assertTrue(result.getConfigFingerprint().startsWith("v1:"));
+        assertEquals(ConfigFingerprint.of(props, "MaCrossStrategy", props.getFeeRate()),
+                result.getConfigFingerprint());
         assertNotNull(result.getAtrRisk());
         assertTrue(result.getAtrRisk().containsKey("atrStopMultiplier"));
         assertTrue(result.getAtrRisk().containsKey("stopExitEvents"));
+    }
+
+    @Test
+    void holdNothingProducesNoTrades() {
+        QuantProperties props = new QuantProperties();
+        props.setQuietOpenEnabled(false);
+        props.setQuietCloseEnabled(false);
+        props.setMarketCapFilterEnabled(false);
+        props.setMinAvgVolume20(1L);
+        props.setStopLossEnabled(false);
+        props.setActiveStrategy("holdNothing");
+        StrategyRegistry registry = new StrategyRegistry(
+                Arrays.asList(new MaCrossStrategy(props), new HoldNothingStrategy()), props);
+        BackTestEngine engine = new BackTestEngine(
+                props,
+                new PositionAmountUtil(props),
+                registry,
+                new TradeCostModel(props),
+                new OpenFilterService(props),
+                new TradingCalendar());
+        BackTestResult result = engine.run("600036", syntheticUptrendDays("600036", 120),
+                new BigDecimal("100000"));
+        assertNotNull(result);
+        assertTrue(result.getTotalTradeNum() == null || result.getTotalTradeNum() == 0);
     }
 
     private static List<BarDTO> syntheticUptrendDays(String code, int days) {

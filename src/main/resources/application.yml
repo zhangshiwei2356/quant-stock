@@ -46,6 +46,8 @@ quant:
   pool-min-avg-amount20: 0
   # db：优先读 MySQL market_daily / market_minute；启动空库时从 classpath JSON 导入
   market-mode: db
+  # 单活策略 id（maCross=金叉默认；holdNothing=永不交易占位，用于切换验证）
+  active-strategy: maCross
   mock-bar-days: 15
   db-enabled: true
 

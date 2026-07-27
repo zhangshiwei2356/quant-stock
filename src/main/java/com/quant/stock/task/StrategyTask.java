@@ -27,8 +27,9 @@ import com.quant.stock.risk.StressScenarioService;
 import com.quant.stock.risk.StructuralBreakMonitor;
 import com.quant.stock.risk.TurnoverGuardService;
 import com.quant.stock.risk.IcDecayMonitor;
+import com.quant.stock.strategy.BaseStrategy;
 import com.quant.stock.strategy.IndicatorSignalUtil;
-import com.quant.stock.strategy.MaCrossStrategy;
+import com.quant.stock.strategy.StrategyRegistry;
 import com.quant.stock.trade.CapacityThrottle;
 import com.quant.stock.trade.FillVolumeScale;
 import com.quant.stock.trade.LiveLedgerService;
@@ -72,7 +73,7 @@ public class StrategyTask {
 
     private final QuantProperties quantProperties;
     private final MarketDataService marketDataService;
-    private final MaCrossStrategy maCrossStrategy;
+    private final StrategyRegistry strategyRegistry;
     private final RiskControlService riskControlService;
     private final OpenFilterService openFilterService;
     private final LiveAccountRiskState accountRiskState;
@@ -110,7 +111,7 @@ public class StrategyTask {
 
     public StrategyTask(QuantProperties quantProperties,
                         MarketDataService marketDataService,
-                        MaCrossStrategy maCrossStrategy,
+                        StrategyRegistry strategyRegistry,
                         RiskControlService riskControlService,
                         OpenFilterService openFilterService,
                         LiveAccountRiskState accountRiskState,
@@ -131,7 +132,7 @@ public class StrategyTask {
                         IcDecayMonitor icDecayMonitor) {
         this.quantProperties = quantProperties;
         this.marketDataService = marketDataService;
-        this.maCrossStrategy = maCrossStrategy;
+        this.strategyRegistry = strategyRegistry;
         this.riskControlService = riskControlService;
         this.openFilterService = openFilterService;
         this.accountRiskState = accountRiskState;
@@ -300,6 +301,7 @@ public class StrategyTask {
             ledger.saveConfig(LiveLedgerService.KEY_RETIREMENT,
                     JSONUtil.toJsonStr(strategyRetirementService.exportState()), "策略退役快照");
             Map<String, Object> meta = new LinkedHashMap<String, Object>();
+            meta.put("_activeStrategy", strategyRegistry.active().name());
             for (Map.Entry<String, LiveBook> e : books.entrySet()) {
                 LiveBook book = e.getValue();
                 if (book == null) {
@@ -458,9 +460,10 @@ public class StrategyTask {
                     }
                 }
 
-                // Step4: 信号挂单
-                boolean buySignal = maCrossStrategy.isBuySignalAt(ind, i);
-                boolean sellSignal = ind.isMaCrossDown(i);
+                // Step4: 信号挂单（当前激活策略）
+                BaseStrategy strategy = strategyRegistry.active();
+                boolean buySignal = strategy.isBuySignalAt(ind, i);
+                boolean sellSignal = strategy.isSellSignalAt(ind, i);
 
                 if (!book.pos.hasPosition() && buySignal && !book.pendingSell && book.pendingBuyVol == null
                         && strategyRetirementService.allowNewOpen()

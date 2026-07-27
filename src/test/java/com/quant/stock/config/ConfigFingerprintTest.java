@@ -26,4 +26,21 @@ class ConfigFingerprintTest {
         b.setMaxParticipationAdv(new BigDecimal("0.05"));
         assertNotEquals(ConfigFingerprint.of(a), ConfigFingerprint.of(b));
     }
+
+    @Test
+    void defaultActiveStrategyMapsToMaCrossFingerprintName() {
+        QuantProperties p = new QuantProperties();
+        assertEquals("maCross", p.getActiveStrategy());
+        assertEquals("MaCrossStrategy", ConfigFingerprint.fingerprintStrategyId(p));
+        assertEquals(ConfigFingerprint.of(p, "MaCrossStrategy", null), ConfigFingerprint.of(p));
+    }
+
+    @Test
+    void holdNothingChangesFingerprintStrategyField() {
+        QuantProperties a = new QuantProperties();
+        QuantProperties b = new QuantProperties();
+        b.setActiveStrategy("holdNothing");
+        assertEquals("holdNothing", ConfigFingerprint.fingerprintStrategyId(b));
+        assertNotEquals(ConfigFingerprint.of(a), ConfigFingerprint.of(b));
+    }
 }

@@ -8,7 +8,9 @@ import com.quant.stock.market.BarPeriod;
 import com.quant.stock.market.MarketDataService;
 import com.quant.stock.market.dto.BarDTO;
 import com.quant.stock.risk.OpenFilterService;
+import com.quant.stock.strategy.HoldNothingStrategy;
 import com.quant.stock.strategy.MaCrossStrategy;
+import com.quant.stock.strategy.StrategyRegistry;
 import com.quant.stock.trade.TradeCostModel;
 import com.quant.stock.util.PositionAmountUtil;
 import org.junit.jupiter.api.Test;
@@ -56,7 +58,7 @@ class PortfolioBackTestEngineSmokeTest {
                 new PositionAmountUtil(props),
                 new TradeCostModel(props),
                 new OpenFilterService(props),
-                new MaCrossStrategy(props),
+                new StrategyRegistry(Arrays.asList(new MaCrossStrategy(props), new HoldNothingStrategy()), props),
                 new TradingCalendar());
 
         BackTestQueryDTO q = BackTestQueryDTO.builder()

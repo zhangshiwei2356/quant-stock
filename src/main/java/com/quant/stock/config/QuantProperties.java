@@ -58,6 +58,11 @@ public class QuantProperties {
     private long poolMinAvgAmount20 = 0L;
     /** 行情数据源模式：如 {@code json}、库表等 */
     private String marketMode = "json";
+    /**
+     * 当前激活策略 id（单活可切换），对应 {@link com.quant.stock.strategy.BaseStrategy#name()}。
+     * 默认 {@code maCross}；可选已注册策略如 {@code holdNothing}。
+     */
+    private String activeStrategy = "maCross";
     /** mock/JSON 模式下生成的 K 线天数 */
     private int mockBarDays = 30;
     /** 是否启用 MySQL 与 MyBatis（false 时走 classpath 模拟数据） */

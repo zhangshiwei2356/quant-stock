@@ -13,6 +13,7 @@ import com.quant.stock.market.MarketDataService;
 import com.quant.stock.market.dto.BarDTO;
 import com.quant.stock.pool.TradePoolService;
 import com.quant.stock.strategy.IndicatorSignalUtil;
+import com.quant.stock.strategy.StrategyRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -47,6 +48,7 @@ public class StockController {
     private final BackTestAnalysisStore backTestAnalysisStore;
     private final JsonBarDataStore jsonBarDataStore;
     private final ObjectProvider<TradePoolService> tradePoolServiceProvider;
+    private final StrategyRegistry strategyRegistry;
 
     /**
      * 浏览/回测用股票列表：优先全市场 stock_basic，其次 json 种子，最后 yml stock-codes。
@@ -130,12 +132,13 @@ public class StockController {
         return resp;
     }
 
-    /** 对单只股票执行金叉策略回测并持久化历史与分析。 */
+    /** 对单只股票执行当前（或指定）策略回测并持久化历史与分析。 */
     @GetMapping("/backtest/run")
     public BackTestResult runBacktest(@RequestParam("code") String code,
                                       @RequestParam(value = "initCapital", required = false) BigDecimal initCapital,
                                       @RequestParam(value = "period", defaultValue = "DAY") String period,
                                       @RequestParam(value = "feeRate", required = false) BigDecimal feeRate,
+                                      @RequestParam(value = "strategyId", required = false) String strategyId,
                                       @RequestParam(value = "backStart", required = false)
                                       @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime backStart,
                                       @RequestParam(value = "backEnd", required = false)
@@ -150,7 +153,7 @@ public class StockController {
         BigDecimal capital = initCapital == null ? new BigDecimal("100000") : initCapital;
         BigDecimal fee = feeRate != null ? feeRate : quantProperties.getFeeRate();
         BackTestResult result = backTestEngine.run(code, bars, capital, fee, quantProperties.getSlipPoint(),
-                null /* 使用引擎内置 MaCross；null 时回退 */);
+                strategyRegistry.resolve(strategyId));
         String startStr = backStart == null ? null : backStart.format(FMT);
         String endStr = backEnd == null ? null : backEnd.format(FMT);
         SingleBacktestHistoryRecord hist = backTestHistoryStore.appendSingle(

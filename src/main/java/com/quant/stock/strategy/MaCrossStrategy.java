@@ -19,10 +19,16 @@ public class MaCrossStrategy extends BaseStrategy {
 
     private final QuantProperties quantProperties;
 
-    /** 策略标识：均线金叉。 */
+    /** 策略稳定 id（配置 quant.active-strategy）。 */
     @Override
     public String name() {
-        return "MA_CROSS_FILTERED";
+        return "maCross";
+    }
+
+    /** 保持历史指纹字段 strategy=MaCrossStrategy，避免默认配置下指纹漂移。 */
+    @Override
+    public String fingerprintId() {
+        return "MaCrossStrategy";
     }
 
     /**
@@ -119,10 +125,17 @@ public class MaCrossStrategy extends BaseStrategy {
     /**
      * 指定 bar 是否为「过滤通过」的金叉买入信号。
      */
+    @Override
     public boolean isBuySignalAt(IndicatorSignalUtil.IndicatorBundle ind, int i) {
         if (!ind.isMaCrossUp(i)) {
             return false;
         }
         return rejectReason(ind, i) == null;
+    }
+
+    /** 指定 bar 是否为死叉卖出信号。 */
+    @Override
+    public boolean isSellSignalAt(IndicatorSignalUtil.IndicatorBundle ind, int i) {
+        return ind.isMaCrossDown(i);
     }
 }

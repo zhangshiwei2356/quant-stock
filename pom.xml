@@ -148,4 +148,55 @@
             </plugin>
         </plugins>
     </build>
+
+    <!-- 宽睿联通测试（可选）：mvn -Pkuangrui test -Dtest=KuangruiLoginConnectivityTest -->
+    <profiles>
+        <profile>
+            <id>kuangrui</id>
+            <dependencies>
+                <dependency>
+                    <groupId>com.quant360</groupId>
+                    <artifactId>quant360-all-api</artifactId>
+                    <version>0.17.6.4</version>
+                    <scope>test</scope>
+                </dependency>
+                <!-- API 依赖 fastjson 1.x（与资料包 all/lib 一致；主工程用的是 fastjson2） -->
+                <dependency>
+                    <groupId>com.alibaba</groupId>
+                    <artifactId>fastjson</artifactId>
+                    <version>1.2.83</version>
+                    <scope>test</scope>
+                </dependency>
+                <dependency>
+                    <groupId>org.lz4</groupId>
+                    <artifactId>lz4-java</artifactId>
+                    <version>1.8.0</version>
+                    <scope>test</scope>
+                </dependency>
+            </dependencies>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>build-helper-maven-plugin</artifactId>
+                        <version>3.4.0</version>
+                        <executions>
+                            <execution>
+                                <id>add-kuangrui-test-source</id>
+                                <phase>generate-test-sources</phase>
+                                <goals>
+                                    <goal>add-test-source</goal>
+                                </goals>
+                                <configuration>
+                                    <sources>
+                                        <source>src/test-kuangrui/java</source>
+                                    </sources>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

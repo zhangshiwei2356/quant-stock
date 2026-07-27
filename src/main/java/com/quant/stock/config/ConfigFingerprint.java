@@ -23,13 +23,29 @@ public final class ConfigFingerprint {
     }
 
     /**
-     * 使用默认策略 id {@code MaCrossStrategy} 与配置内 {@link QuantProperties#getFeeRate()} 计算指纹。
+     * 使用当前激活策略的指纹名（{@code maCross}→历史 {@code MaCrossStrategy}）与配置内费率计算指纹。
      *
      * @param props 量化配置，可为 null（见 {@link #canonical} 行为）
      * @return {@code v1:} 前缀的 16 位十六进制摘要
      */
     public static String of(QuantProperties props) {
-        return of(props, "MaCrossStrategy", null);
+        return of(props, fingerprintStrategyId(props), null);
+    }
+
+    /**
+     * 将 {@code quant.active-strategy} 映射为指纹字段；金叉默认保持 {@code MaCrossStrategy}。
+     */
+    public static String fingerprintStrategyId(QuantProperties props) {
+        if (props == null || props.getActiveStrategy() == null || props.getActiveStrategy().trim().isEmpty()) {
+            return "MaCrossStrategy";
+        }
+        String id = props.getActiveStrategy().trim();
+        if ("maCross".equalsIgnoreCase(id)
+                || "MaCrossStrategy".equalsIgnoreCase(id)
+                || "MA_CROSS_FILTERED".equalsIgnoreCase(id)) {
+            return "MaCrossStrategy";
+        }
+        return id;
     }
 
     /**

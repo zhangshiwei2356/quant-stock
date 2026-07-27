@@ -94,7 +94,7 @@ flowchart LR
 | 包 | 职责 |
 |----|------|
 | `market` | K 线统一入口：MySQL → Redis → JSON → mock/SDK |
-| `strategy` | 均线金叉死叉 + 可配置过滤（`MaCrossStrategy`） |
+| `strategy` | 策略注册表 `StrategyRegistry` + 单活 `quant.active-strategy`（默认 `maCross` 金叉；可切换如 `holdNothing`） |
 | `backtest` | 单股/组合引擎、批量扫描、历史与分析落盘 |
 | `pool` | 唯一目标池：盘后扫描覆盖、打分、报告 |
 | `trade` | 交易网关、成本模型、模拟账本落库 |
@@ -288,13 +288,13 @@ sequenceDiagram
   - `position-pnl-sync`：本地成本 + 最新价浮盈日志
 - 页面标「未实现」（缺外部 API）：`market-collect`
 - 对照：**应用说明 → 能力与待办**；宽睿对接：**应用说明 → 宽睿文档梳理**（分阶段：环境→MDS L1→OES 只读→报撤→静态/费率）
-- 宽睿 **M0**：`config/kuangrui/README.md` + `scripts/kuangrui/m0-env-check.ps1`（登录探针）。阿里云模拟地址 TCP 已通，但预登录返回 `1045`（OES/MDS），`M0_STATUS=BLOCKED`；需账号/API 版本与柜台确认后再 `-RunLoginProbe` 至 `COMPLETE` 才开 M1；主应用默认仍 `sim`+`db`
+- 宽睿 **M0**：`config/kuangrui/README.md` + `scripts/kuangrui/m0-env-check.ps1`；本应用联通测试 `mvn -Pkuangrui test -Dtest=KuangruiLoginConnectivityTest`（对齐 Demo 登录，可复现 Pre Logon `1045`）。阿里云 TCP 已通但预登录仍 BLOCKED；主应用默认仍 `sim`+`db`
 
 ---
 
 ## 策略与风控（已实现）
 
-- 均线金叉死叉 + 可配置：MA60 / 放量 / ADX / RSI（演示 yml 中部分过滤默认关）
+- **单活策略可切换**：`quant.active-strategy` 默认 **`maCross`**（均线金叉死叉 + MA60/放量/ADX/RSI 过滤，实现仍在 `MaCrossStrategy`，不静默改规则）。回测/扫池/`StrategyTask` 共用 `StrategyRegistry.active()` 与一套账本/目标池。新策略：新建 `@Component` 继承 `BaseStrategy` 后改配置即可；占位 `holdNothing` 永不交易。运维「运行参数」展示当前策略；单股/组合回测可选 `strategyId`（缺省=配置）
 - 止损：相对综合成本的 ATR + 权益硬止损；移动止盈盘后上移；**跳空穿价按开盘价**成交（盘中触及按止损价）
 - 组合相关监控：成分日收益两两相关（回看 60 日，均值≥0.75 告警）；组合回测结果字段 `correlation`；`GET /api/account/correlation`
 - **T+1 分档**：仅非当日买入批次可卖/可止损

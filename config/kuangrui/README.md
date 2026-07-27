@@ -58,7 +58,26 @@ mvn install:install-file `
   "-Dversion=0.17.6.4" "-Dpackaging=jar"
 ```
 
-M1 起再考虑把该依赖挂进可选 Maven profile；**M0 不改 Spring 主工程 classpath**。
+## 本应用内 JUnit 联通测试（对齐 Demo）
+
+资料包 `all/demo/OesExample` / `MdsExample` 登录三步：建客户端 → `initCallBack` → `start(logonReq)`。  
+本仓库对应测试（**仅 profile `kuangrui`，不进 Spring 主路径**）：
+
+`src/test-kuangrui/java/com/quant/stock/kuangrui/KuangruiLoginConnectivityTest.java`  
+（**不要**放在 `src/main/java`；默认主工程不编译 quant360，会红、会污染生产 classpath）
+
+```powershell
+# 需已 install quant360-all-api 到本地 Maven 仓；local 配置与账号就绪
+$env:QUANT_KUANGRUI_USER = "你的账号"
+$env:QUANT_KUANGRUI_PASSWORD = "你的密码"
+mvn -Pkuangrui test "-Dtest=KuangruiLoginConnectivityTest"
+```
+
+- 登录失败（当前常见）：测试失败，并提示日志中的 **Pre Logon 1045** → 即复现 M0 BLOCKED  
+- 可选断言「仍为 1045」：`mvn -Pkuangrui test "-Dtest=KuangruiLoginConnectivityTest#oesStillBlockedWithPreLogon1045" "-Dkuangrui.expect1045=true"`  
+- IDEA：启用 Maven profile `kuangrui` 后，直接运行该类中的测试方法  
+
+默认 `mvn test` **不会**编译/运行该测试（无 `-Pkuangrui`）。
 
 ## 阿里云模拟环境（公开地址，非实盘）
 

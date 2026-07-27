@@ -101,12 +101,14 @@
 
   <h5 style="margin:8px 0 4px;">M0 当前状态（2026-07-26 · 阿里云模拟）</h5>
   <ul>
-    <li><b>脚手架</b>：已就绪 · <code>config/kuangrui/</code>（examples + local）、<code>scripts/kuangrui/m0-env-check.ps1</code>、<code>M0LoginProbe.java</code></li>
+    <li><b>脚手架</b>：已就绪 · <code>config/kuangrui/</code>、<code>scripts/kuangrui/m0-env-check.ps1</code>、<code>M0LoginProbe</code>；本应用联通测试 <code>KuangruiLoginConnectivityTest</code>（Maven <code>-Pkuangrui</code>，对齐 Demo 登录三步）</li>
     <li><b>资料包 / JDK</b>：官方 jar <code>0.17.6.4</code>（运行日志 ApplVerId <code>0.17.6.3</code>）；本机 Java 21 可编译运行探针</li>
     <li><b>阿里云模拟地址（非实盘）</b>：OES <code>106.15.58.119</code> ord/rpt/qry=<code>6101/6301/6401</code>；MDS <code>139.196.228.232</code> tcp/qry=<code>5103/5203</code> — <b>TCP 全部可达</b></li>
     <li><b>登录探针</b>：TCP 握手成功后卡在 <b>Pre Logon</b>，OES/MDS 均 <code>errorCode=1045</code>（Java 枚举无此码，映射为 <code>OTHER_ERROR</code>）。手册 V0.17.6 错误表只到 <code>1043</code>，换 <code>encryptType</code>/<code>clEnvId</code>/显式 IP·MAC 无效（预登录阶段尚未验密）</li>
-    <li><b>M0_STATUS</b>：<code>BLOCKED</code>（网络已通，预登录被拒）。需向宽睿确认：账号是否已开通、是否要更新 API 包以匹配阿里云服务端协议。通过后：
-      <code>.\scripts\kuangrui\m0-env-check.ps1 -RunLoginProbe</code> → <code>M0_STATUS=COMPLETE</code></li>
+    <li><b>复现 1045</b>：配置 local + 环境变量后执行
+      <code>mvn -Pkuangrui test -Dtest=KuangruiLoginConnectivityTest</code>
+      或 <code>.\scripts\kuangrui\m0-env-check.ps1 -RunLoginProbe</code>；日志应出现 <code>Pre Logon ... 1045</code></li>
+    <li><b>M0_STATUS</b>：<code>BLOCKED</code>（网络已通，预登录被拒）。需向宽睿确认账号/API 版本。通过后同上命令应登录成功 → <code>M0_STATUS=COMPLETE</code></li>
     <li>密钥只放 <code>config/kuangrui/local/</code>（已 gitignore）+ 环境变量；勿提交仓库</li>
   </ul>
 

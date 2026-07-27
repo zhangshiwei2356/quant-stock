@@ -16,7 +16,7 @@ import com.quant.stock.risk.LimitPriceProtect;
 import com.quant.stock.risk.StopFillPrice;
 import com.quant.stock.strategy.BaseStrategy;
 import com.quant.stock.strategy.IndicatorSignalUtil;
-import com.quant.stock.strategy.MaCrossStrategy;
+import com.quant.stock.strategy.StrategyRegistry;
 import com.quant.stock.risk.StressScenarioService;
 import com.quant.stock.risk.StructuralBreakMonitor;
 import com.quant.stock.trade.CapacityThrottle;
@@ -57,24 +57,27 @@ public class BackTestEngine {
 
     private final QuantProperties props;
     private final PositionAmountUtil positionAmountUtil;
-    private final MaCrossStrategy maCrossStrategy;
+    private final StrategyRegistry strategyRegistry;
     private final TradeCostModel tradeCostModel;
     private final OpenFilterService openFilterService;
     private final TradingCalendar tradingCalendar;
 
-    /** 使用默认费率与 {@link MaCrossStrategy} 运行单股回测 */
+    /** 使用默认费率与当前激活策略运行单股回测 */
     public BackTestResult run(String stockCode, List<BarDTO> closedBars, BigDecimal initCapital) {
-        return run(stockCode, closedBars, initCapital, props.getFeeRate(), props.getSlipPoint(), maCrossStrategy);
+        return run(stockCode, closedBars, initCapital, props.getFeeRate(), props.getSlipPoint(), null);
     }
 
     /**
-     * 单股回测主入口：指定策略与费率覆盖。
+     * 单股回测主入口：指定策略与费率覆盖；{@code strategy} 为 null 时用 {@link StrategyRegistry#active()}。
      *
      * @param closedBars 已收盘 K 线（至少约 65 根）
      */
     public BackTestResult run(String stockCode, List<BarDTO> closedBars, BigDecimal initCapital,
                               BigDecimal feeRate, BigDecimal slipPoint, BaseStrategy strategy) {
-        String strategyId = strategy == null ? "MaCrossStrategy" : strategy.getClass().getSimpleName();
+        if (strategy == null) {
+            strategy = strategyRegistry.active();
+        }
+        String strategyId = strategy.fingerprintId();
         final BigDecimal commissionRate = feeRate != null ? feeRate : props.getFeeRate();
         String fingerprint = ConfigFingerprint.of(props, strategyId, commissionRate);
         if (closedBars == null || closedBars.size() < 65 || initCapital == null) {
@@ -432,8 +435,8 @@ public class BackTestEngine {
             }
 
             // ---- Step4: 收盘信号 ----
-            boolean buySignal = maCrossStrategy.isBuySignalAt(ind, i);
-            boolean sellSignal = ind.isMaCrossDown(i);
+            boolean buySignal = strategy.isBuySignalAt(ind, i);
+            boolean sellSignal = strategy.isSellSignalAt(ind, i);
 
             if (!pos.hasPosition() && buySignal && !pendingSell && pendingBuyVol == null
                     && accountRiskState.allowNewOpen(tradeDay, equity)

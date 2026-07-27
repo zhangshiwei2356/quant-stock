@@ -83,6 +83,9 @@ public class M0LoginProbe {
             }
             System.err.println("[M0] OES FAIL errorCode=" + (rsp == null ? "null" : rsp.getErrorCode())
                     + (rsp == null || rsp.getApplVerId() == null ? "" : (" serverApplVerId=" + rsp.getApplVerId())));
+            System.err.println("[M0] HINT: 若上方日志含 Pre Logon ... errorCode = 1045，"
+                    + "表示 TCP 已通但预登录被拒（Java 常映射 OTHER_ERROR）。"
+                    + "可用 mvn -Pkuangrui test -Dtest=KuangruiLoginConnectivityTest 复现。");
             return false;
         } catch (Exception e) {
             System.err.println("[M0] OES FAIL exception=" + e.getClass().getSimpleName() + ": " + e.getMessage());
@@ -114,6 +117,8 @@ public class M0LoginProbe {
             }
             System.err.println("[M0] MDS FAIL errorCode=" + (rsp == null ? "null" : rsp.getErrorCode())
                     + (rsp == null || rsp.getApplVerId() == null ? "" : (" serverApplVerId=" + rsp.getApplVerId())));
+            System.err.println("[M0] HINT: 若上方日志含 Pre Logon ... errorCode = 1045，"
+                    + "表示 TCP 已通但预登录被拒。可用 mvn -Pkuangrui test -Dtest=KuangruiLoginConnectivityTest 复现。");
             return false;
         } catch (Exception e) {
             System.err.println("[M0] MDS FAIL exception=" + e.getClass().getSimpleName() + ": " + e.getMessage());

@@ -6,7 +6,7 @@ import com.quant.stock.config.QuantProperties;
 import com.quant.stock.market.MarketDataService;
 import com.quant.stock.market.dto.BarDTO;
 import com.quant.stock.strategy.IndicatorSignalUtil;
-import com.quant.stock.strategy.MaCrossStrategy;
+import com.quant.stock.strategy.StrategyRegistry;
 import com.quant.stock.strategy.dto.TradeSignal;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -31,18 +31,18 @@ public class BatchStockBackTestService {
     private final QuantProperties quantProperties;
     private final MarketDataService marketDataService;
     private final BackTestEngine backTestEngine;
-    private final MaCrossStrategy maCrossStrategy;
+    private final StrategyRegistry strategyRegistry;
     private final Executor batchScanExecutor;
 
     public BatchStockBackTestService(QuantProperties quantProperties,
                                      MarketDataService marketDataService,
                                      BackTestEngine backTestEngine,
-                                     MaCrossStrategy maCrossStrategy,
+                                     StrategyRegistry strategyRegistry,
                                      @Qualifier("batchScanExecutor") Executor batchScanExecutor) {
         this.quantProperties = quantProperties;
         this.marketDataService = marketDataService;
         this.backTestEngine = backTestEngine;
-        this.maCrossStrategy = maCrossStrategy;
+        this.strategyRegistry = strategyRegistry;
         this.batchScanExecutor = batchScanExecutor;
     }
 
@@ -99,7 +99,7 @@ public class BatchStockBackTestService {
             BigDecimal init = new BigDecimal("100000");
             BackTestResult bt = backTestEngine.run(code, bars, init);
             Map<String, BigDecimal> ind = IndicatorSignalUtil.calcLatestIndicators(bars);
-            TradeSignal signal = maCrossStrategy.calcSignal(code, bars);
+            TradeSignal signal = strategyRegistry.active().calcSignal(code, bars);
             boolean canBuy = signal.getSignalType() == TradeSignal.Signal.BUY;
             BigDecimal close = ind.getOrDefault("close", bars.get(bars.size() - 1).getClose());
             BigDecimal mom5 = momReturn(bars, 5);

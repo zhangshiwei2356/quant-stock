@@ -21,8 +21,9 @@ import com.quant.stock.risk.LimitPriceProtect;
 import com.quant.stock.risk.StopFillPrice;
 import com.quant.stock.risk.StressScenarioService;
 import com.quant.stock.risk.StructuralBreakMonitor;
+import com.quant.stock.strategy.BaseStrategy;
 import com.quant.stock.strategy.IndicatorSignalUtil;
-import com.quant.stock.strategy.MaCrossStrategy;
+import com.quant.stock.strategy.StrategyRegistry;
 import com.quant.stock.trade.CapacityThrottle;
 import com.quant.stock.trade.FillVolumeScale;
 import com.quant.stock.trade.PartialFillSim;
@@ -60,18 +61,21 @@ public class PortfolioBackTestEngine {
     private final PositionAmountUtil positionAmountUtil;
     private final TradeCostModel tradeCostModel;
     private final OpenFilterService openFilterService;
-    private final MaCrossStrategy maCrossStrategy;
+    private final StrategyRegistry strategyRegistry;
     private final TradingCalendar tradingCalendar;
 
     /**
      * 组合回测：拉取多标的日 K、对齐时间轴、共享资金池撮合。
+     * 可选 {@link BackTestQueryDTO#getStrategyId()}，缺省用当前激活策略。
      */
     public PortfolioResultDTO run(BackTestQueryDTO query) {
         BigDecimal initCapitalPreview = query == null || query.getInitCapital() == null
                 ? new BigDecimal("100000") : query.getInitCapital();
         BigDecimal commissionRate = query != null && query.getFeeRate() != null
                 ? query.getFeeRate() : props.getFeeRate();
-        String fingerprint = ConfigFingerprint.of(props, "MaCrossStrategy", commissionRate);
+        BaseStrategy strategy = strategyRegistry.resolve(
+                query != null ? query.getStrategyId() : null);
+        String fingerprint = ConfigFingerprint.of(props, strategy.fingerprintId(), commissionRate);
         if (query == null || query.getStockCodeList() == null || query.getStockCodeList().isEmpty()) {
             PortfolioResultDTO empty = PortfolioResultDTO.empty(BigDecimal.ZERO);
             empty.setConfigFingerprint(fingerprint);
@@ -281,8 +285,8 @@ public class PortfolioBackTestEngine {
                 BarDTO bar = bars.get(idx);
                 BigDecimal close = bar.getClose();
                 BigDecimal posScale = resolvePosScale(accountRisk, equity, bars, idx);
-                boolean buySignal = maCrossStrategy.isBuySignalAt(ind, idx);
-                boolean sellSignal = ind.isMaCrossDown(idx);
+                boolean buySignal = strategy.isBuySignalAt(ind, idx);
+                boolean sellSignal = strategy.isSellSignalAt(ind, idx);
 
                 if (!book.pos.hasPosition() && buySignal && !book.pendingSell && book.pendingBuyVol == null
                         && accountRisk.allowNewOpen(tradeDay, equity)
