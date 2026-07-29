@@ -38,7 +38,7 @@
 <h4>模拟数据与默认参数</h4>
 <ul>
   <li>演示股：模拟五只（空库灌 <code>market_1min</code>）；目标池用 <code>fetch_min1_tdx.py --from-pool</code> 回填约 90 交易日 1 分钟</li>
-  <li>物理真相源：仅 <code>market_1min</code>；更大周期内存聚合。<code>market_daily</code> / <code>market_minute</code> 表保留兼容但应用不再读写。灌数：<code>python scripts/fetch_min1_tdx.py --from-pool</code> 或 <code>--codes 600036</code></li>
+  <li>物理真相源：仅 <code>market_1min</code>；更大周期内存聚合。灌数：<code>python scripts/fetch_min1_tdx.py --from-pool</code> 或 <code>--codes 600036</code></li>
   <li>回测区间默认留空 = 全量 K 线；初始资金默认 <b>100000</b></li>
   <li>页头主题默认<strong>日间</strong>（夜盘 / 银河 / 极光可切换并记住）</li>
 </ul>

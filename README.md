@@ -206,8 +206,8 @@ sequenceDiagram
 - 种子目录：`src/main/resources/data/kline/`（仅导入用）
 - 演示股：模拟五只（空库启动灌 `market_1min`）；目标池可用 `scripts/fetch_min1_tdx.py --from-pool` 回填约 90 交易日 1 分钟
 - 区间：模拟样本约 `2025-07-17` ~ `2026-07-17`；TDX 1 分钟公开节点通常约 90 个交易日（以节点为准）
-- **物理真相源**：仅 `market_1min`；5/15/30/60/日/周/月一律内存聚合。`market_daily` / `market_minute` 表结构保留兼容，**应用主路径不再读写**
-- 1 分钟回填：`python scripts/fetch_min1_tdx.py --from-pool` 或 `--codes 600036 --sleep 0.2`（只写 `market_1min`）
+- **物理真相源**：仅 `market_1min`；5/15/30/60/日/周/月一律内存聚合（已删除 `market_daily` / `market_minute`）
+- 1 分钟回填：`python scripts/fetch_min1_tdx.py --from-pool` 或 `--codes 600036 --sleep 0.2`
 - 回测历史/分析：`bt_backtest_record` / `bt_backtest_analysis`（亦可落盘 `quant.history-dir`）
 - 重新生成模拟种子：`mvn -q compile exec:java -Dexec.mainClass=com.quant.stock.market.mock.MockKlineDataGenerator`
 
@@ -217,7 +217,6 @@ sequenceDiagram
 |----|------|
 | `stock_basic` | 标的档案 |
 | `market_1min` | **唯一**物理行情（1 分钟）；更大周期查询时聚合 |
-| `market_daily` / `market_minute` | 兼容保留（应用已停用读写） |
 | `trade_pool` / `trade_pool_report` | 唯一目标池与报告 |
 | `trade_orders` / `trade_positions` / `trade_position_lots` / `trade_cashflows` | 模拟委托、持仓、批次、日结 |
 | `risk_control_log` | 风控日志 |

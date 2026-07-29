@@ -2,10 +2,8 @@
 
 目录：`classpath:data/kline/`
 
-应用默认连接 MySQL `quant_stock`，**唯一物理行情表**：
-
-- `market_1min`（1 分钟真相源；5/15/30/60/日/周/月由应用内存聚合）
-- `market_daily` / `market_minute`：表结构兼容保留，**应用主路径不再读写**
+应用默认连接 MySQL `quant_stock`，**唯一物理行情表**：`market_1min`  
+（5/15/30/60/日/周/月由应用内存聚合；已删除 `market_daily` / `market_minute`）
 
 **启动时若某代码尚无 `market_1min`**，`MockDataImporter` 会优先导入 `MIN_1.json`；若无则将 `MIN_5.json` 拆成 5 根同价量分摊的 1 分钟 bar。
 
@@ -28,6 +26,7 @@
 - **只写入** `market_1min`；更大周期由应用聚合。
 - TDX 公开节点的完整 OHLC 分钟历史通常约 90 个交易日，实际深度随节点和标的而变化。
 
-## 历史脚本说明
+## 已废弃脚本
 
-- `scripts/fetch_stocks_batch.py` 等仍可能写旧 `market_daily`，但**回测/图表已不再读取该表**；需要行情请改用 TDX 1 分钟回填。
+- `scripts/fetch_stocks_batch.py` / `scripts/fetch_extra_stocks.py`：原写日线/5 分钟旧表，已改为退出提示；请改用 TDX 1 分钟回填。
+- 历史标的清单仍可参考：`scripts/batch100_universe.json`

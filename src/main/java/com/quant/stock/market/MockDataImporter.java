@@ -31,7 +31,7 @@ import java.util.List;
 /**
  * 启动时若某演示股尚无 {@code market_1min}，则从 classpath:data/kline 导入 1 分钟种子；
  * 优先 {@code MIN_1.json}，否则将 {@code MIN_5.json} 拆成 5 根同价量分摊的 1 分钟 bar。
- * 日线/更大周期由查询时聚合，不再写入 {@code market_daily}/{@code market_minute}。
+ * 日线/更大周期由查询时聚合，不再落物理日线/5 分钟表。
  */
 @Slf4j
 @Component

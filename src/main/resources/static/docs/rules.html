@@ -219,7 +219,7 @@
 
 <h4>十二、行情与页面产品规则</h4>
 <ul>
-  <li>行情真相源：仅 <code>market_1min</code>；5/15/30/60/日/周/月一律内存聚合。<code>market_daily</code> / <code>market_minute</code> 表结构保留兼容，应用主路径不再读写</li>
+  <li>行情真相源：仅 <code>market_1min</code>；5/15/30/60/日/周/月一律内存聚合（已删除日线/5 分钟物理表）</li>
   <li>聚合交易分钟：约 09:30–11:29、13:00–14:59；周线键为周一所在周</li>
   <li>空库启动时从 <code>classpath:data/kline</code> 导入 1 分钟种子（优先 <code>MIN_1.json</code>，否则拆 <code>MIN_5.json</code>），运行时不再读 JSON 做展示</li>
   <li>行情页展示 / K 线图表：走统一 <code>MarketDataService#getKline</code></li>

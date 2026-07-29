@@ -1,5 +1,5 @@
 -- ============================================================
--- Quant Stock 核心表结构（1分钟原始层 + 兼容旧日线/5分钟表 + 因子 + 交易 + 回测）
+-- Quant Stock 核心表结构（1分钟行情真相源 + 因子 + 交易 + 回测）
 -- 库名：quant_stock  |  MySQL 5.7+ / 8.0+
 -- 股票代码统一使用 6 位裸码（000001），与现有 Java 一致
 -- ============================================================
@@ -23,37 +23,10 @@ CREATE TABLE IF NOT EXISTS `stock_basic` (
   KEY `idx_market` (`market`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='股票基本信息表';
 
--- ---------- 模块二：行情（1分钟原始层为唯一真相源；日线/5分钟表仅兼容保留，应用不再读写） ----------
-CREATE TABLE IF NOT EXISTS `market_daily` (
-  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
-  `symbol` VARCHAR(10) NOT NULL COMMENT '股票代码',
-  `trade_date` DATE NOT NULL COMMENT '交易日期',
-  `open` DECIMAL(10,4) NOT NULL,
-  `high` DECIMAL(10,4) NOT NULL,
-  `low` DECIMAL(10,4) NOT NULL,
-  `close` DECIMAL(10,4) NOT NULL,
-  `volume` BIGINT NOT NULL COMMENT '成交量(股)',
-  `amount` DECIMAL(16,4) DEFAULT NULL COMMENT '成交额(元)',
-  `turnover_rate` DECIMAL(8,4) DEFAULT NULL,
-  `limit_up` DECIMAL(10,4) DEFAULT NULL,
-  `limit_down` DECIMAL(10,4) DEFAULT NULL,
-  UNIQUE KEY `idx_symbol_date` (`symbol`, `trade_date`),
-  KEY `idx_date` (`trade_date`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='日线行情表(兼容保留,应用已停用)';
-
-CREATE TABLE IF NOT EXISTS `market_minute` (
-  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
-  `symbol` VARCHAR(10) NOT NULL,
-  `trade_time` DATETIME NOT NULL COMMENT '5分钟K起始时间',
-  `open` DECIMAL(10,4) NOT NULL,
-  `high` DECIMAL(10,4) NOT NULL,
-  `low` DECIMAL(10,4) NOT NULL,
-  `close` DECIMAL(10,4) NOT NULL,
-  `volume` BIGINT NOT NULL,
-  `amount` DECIMAL(16,4) DEFAULT NULL,
-  UNIQUE KEY `idx_symbol_time` (`symbol`, `trade_time`),
-  KEY `idx_time` (`trade_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='5分钟线行情表(兼容保留,应用已停用)';
+-- ---------- 模块二：行情（仅 market_1min；已废弃 market_daily / market_minute） ----------
+-- 升级已有库时可执行（幂等）：
+DROP TABLE IF EXISTS `market_minute`;
+DROP TABLE IF EXISTS `market_daily`;
 
 CREATE TABLE IF NOT EXISTS `market_1min` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY,

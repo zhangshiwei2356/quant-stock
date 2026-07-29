@@ -124,7 +124,7 @@
       <tr>
         <td><b>1. MDS L1</b></td>
         <td>真行情进库</td>
-        <td>TCP 订阅目标池；价÷10000；写 <code>market_minute</code>→聚合日线；回调异步</td>
+        <td>TCP 订阅目标池；价÷10000；写 <code>market_1min</code>（更大周期内存聚合）；回调异步</td>
         <td><code>market-collect</code> 有增量；关开关行为不变</td>
       </tr>
       <tr>
