@@ -55,7 +55,7 @@
     <li><b>收盘权益日表</b> — 已落地 · <code>settle-after-close</code> 写 <code>trade_cashflows</code>；账户概览 →「权益日结」可查看</li>
     <li><b>风控日志</b> — 已落地 · 峰值回撤熔断写入 <code>risk_control_log</code>；账户概览 →「风控事件」</li>
     <li><b>单活策略可切换</b> — 已落地 · <code>StrategyRegistry</code> + <code>quant.active-strategy</code>（默认 <code>maCross</code>）；对照画像 <code>maCrossTrend/Volume/Balanced/Strict</code>（固定过滤，不改原版类）；回测下拉对比；扫池/纸面仍用配置激活；占位 <code>holdNothing</code>；多策略并行分账本仍不做</li>
-    <li><b>1 分钟唯一真相源</b> — 已落地 · 仅读写 <code>market_1min</code>；更大周期内存聚合；已删除 <code>market_daily</code> / <code>market_minute</code> 表与 Mapper；旧批量日线脚本已废弃，请用 TDX 1 分钟回填</li>
+    <li><b>1 分钟唯一真相源</b> — 已落地 · 仅读写 <code>market_1min</code>；更大周期内存聚合；已删除日线/5 分钟旧表与 Mapper，以及旧批量日线脚本；灌数请用 <code>scripts/fetch_min1_tdx.py</code></li>
     <li><b>TDX 1 分钟历史回填</b> — 已落地 · <code>scripts/fetch_min1_tdx.py</code>（含 <code>--from-pool</code>）只写 <code>market_1min</code>；公开节点通常约 90 个交易日，非全市场多年历史源</li>
     <li><b>交易日历（静态）</b> — 已落地 · 周末 + 内置法定节假日（含 2026 中秋 9/25–27、国庆 10/1–7；10/8 开市）；风控拒非交易日</li>
     <li><b>账户概览</b> — 已落地 · 资金权益 / 当前持仓（批次 T+1）/ 委托记录 / 权益日结 / 风控事件 / 风控日报</li>

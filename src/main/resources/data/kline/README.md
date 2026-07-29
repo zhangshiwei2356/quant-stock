@@ -26,7 +26,7 @@
 - **只写入** `market_1min`；更大周期由应用聚合。
 - TDX 公开节点的完整 OHLC 分钟历史通常约 90 个交易日，实际深度随节点和标的而变化。
 
-## 已废弃脚本
+## 相关文件
 
-- `scripts/fetch_stocks_batch.py` / `scripts/fetch_extra_stocks.py`：原写日线/5 分钟旧表，已改为退出提示；请改用 TDX 1 分钟回填。
-- 历史标的清单仍可参考：`scripts/batch100_universe.json`
+- 历史标的清单（可拼进 `--codes`）：`scripts/batch100_universe.json`
+- 主灌数：`python scripts/fetch_min1_tdx.py --from-pool` 或 `--codes ...`
