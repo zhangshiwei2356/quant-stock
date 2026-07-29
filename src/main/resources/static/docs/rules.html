@@ -150,7 +150,7 @@
 <h4>八、单只回测（页面「个股回测」）</h4>
 <ul>
   <li>工作台选股<strong>仅来自目标池</strong>（<code>trade_pool</code>）；池空需先「扫描更新」。行情浏览仍为全市场</li>
-  <li>默认周期 <b>DAY</b>；起止时间留空 = 该股全量可用 K 线。库内有足够 <code>market_1min</code> 且 <code>quant.kline-source=auto</code> 时，非 DAY 周期可由 1 分钟聚合供 K 线/回测；页面默认工作台仍为 DAY</li>
+  <li>默认周期 <b>DAY</b>；起止时间留空 = 该股全量可用 K 线（由 <code>market_1min</code> 聚合）；非 DAY 周期同样由 1 分钟聚合；页面默认工作台仍为 DAY</li>
   <li>初始资金默认 <b>100000</b>（可改）</li>
   <li>K 线 &lt; 65 根 → 返回空结果</li>
   <li>决策顺序：①撮合挂单（先卖后买）→ ②老仓止损/trail → ③账户风控 → ④收盘挂金叉/金字塔/死叉 → ⑤盘后更新 trail</li>
@@ -219,11 +219,9 @@
 
 <h4>十二、行情与页面产品规则</h4>
 <ul>
-  <li>行情真相源（双写过渡）：优先 <code>market_1min</code>（根数 ≥ <code>quant.min-1min-bars</code> 且 <code>kline-source=auto</code> 时，更大周期由 1 分钟聚合）；
-    否则回退 <code>market_daily</code>（日线）+ <code>market_minute</code>（5 分钟）。缓存表可继续写入但不作为终态基准。
-    <code>legacy</code> 强制旧表；不足 1 分钟时 <code>prefer_1min</code> 返回空</li>
+  <li>行情真相源：仅 <code>market_1min</code>；5/15/30/60/日/周/月一律内存聚合。<code>market_daily</code> / <code>market_minute</code> 表结构保留兼容，应用主路径不再读写</li>
   <li>聚合交易分钟：约 09:30–11:29、13:00–14:59；周线键为周一所在周</li>
-  <li>空库启动时从 <code>classpath:data/kline</code> 的 DAY/MIN_5 JSON <b>导入一次</b>，运行时不再读 JSON 做展示</li>
+  <li>空库启动时从 <code>classpath:data/kline</code> 导入 1 分钟种子（优先 <code>MIN_1.json</code>，否则拆 <code>MIN_5.json</code>），运行时不再读 JSON 做展示</li>
   <li>行情页展示 / K 线图表：走统一 <code>MarketDataService#getKline</code></li>
   <li>回测时间留空 = 全量；填写则截取区间；初始资金默认 100000</li>
   <li>侧栏：一级菜单互斥；回测成功前可隐藏权益/成交等结果面板</li>

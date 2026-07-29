@@ -4,15 +4,10 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.quant.stock.mapper.FactorDailyMapper;
-import com.quant.stock.mapper.MarketDailyMapper;
-import com.quant.stock.mapper.MarketMinuteMapper;
 import com.quant.stock.mapper.StockBasicMapper;
 import com.quant.stock.market.dto.BarDTO;
 import com.quant.stock.market.dto.FactorDailyDO;
-import com.quant.stock.market.dto.MarketDailyDO;
-import com.quant.stock.market.dto.MarketMinuteDO;
 import com.quant.stock.market.dto.StockBasicDO;
-import com.quant.stock.risk.LimitBoardHelper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -34,8 +29,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 启动时若 market_daily 为空，则从 classpath:data/kline 导入 DAY + MIN_5 模拟数据；
- * 若存在 MIN_1.json 且库内尚无 market_1min，则可选导入 1 分钟层。
+ * 启动时若某演示股尚无 {@code market_1min}，则从 classpath:data/kline 导入 1 分钟种子；
+ * 优先 {@code MIN_1.json}，否则将 {@code MIN_5.json} 拆成 5 根同价量分摊的 1 分钟 bar。
+ * 日线/更大周期由查询时聚合，不再写入 {@code market_daily}/{@code market_minute}。
  */
 @Slf4j
 @Component
@@ -48,12 +44,10 @@ public class MockDataImporter {
     private static final int BATCH = 400;
 
     private final StockBasicMapper stockBasicMapper;
-    private final MarketDailyMapper marketDailyMapper;
-    private final MarketMinuteMapper marketMinuteMapper;
     private final FactorDailyMapper factorDailyMapper;
     private final CoreMarketBarService coreMarketBarService;
 
-    /** 应用就绪后触发：空库则导入 classpath 模拟行情种子。 */
+    /** 应用就绪后触发：空库则导入 classpath 模拟 1 分钟行情种子。 */
     @EventListener(ApplicationReadyEvent.class)
     public void onReady() {
         try {
@@ -64,7 +58,7 @@ public class MockDataImporter {
     }
 
     /**
-     * 若库内尚无行情则自 classpath JSON 增量导入日线、5 分钟线并计算因子。
+     * 若库内尚无 1 分钟行情则自 classpath JSON 增量导入，并计算日频因子。
      */
     public void importIfNeeded() throws Exception {
         PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
@@ -83,34 +77,24 @@ public class MockDataImporter {
             JSONObject s = stocks.getJSONObject(i);
             String code = s.getString("code");
             String name = s.getString("name");
-            boolean hasDaily = marketDailyMapper.countBySymbol(code) > 0;
-            boolean hasMinute = marketMinuteMapper.countBySymbol(code) > 0;
-            if (hasDaily && hasMinute) {
-                upsertBasic(code, name);
-                importMinute1IfNeeded(resolver, code);
+            upsertBasic(code, name);
+            if (coreMarketBarService.hasOneMin(code)) {
                 continue;
             }
-            // 仅有日线且无 MIN_5.json：视为「日线扩展样本」已覆盖（批量公开接口场景）
-            if (hasDaily && !hasMinute) {
-                Resource minRes = resolver.getResource(BASE + code + "/MIN_5.json");
-                if (!minRes.exists()) {
-                    upsertBasic(code, name);
-                    continue;
-                }
+            log.info("增量导入模拟 1 分钟行情 symbol={} ...", code);
+            int n = importOneMin(resolver, code);
+            if (n <= 0) {
+                log.warn("跳过 symbol={}：无 MIN_1.json / MIN_5.json 可导入", code);
+                continue;
             }
-            log.info("增量导入模拟行情 symbol={} ...", code);
-            upsertBasic(code, name);
-            importDaily(resolver, code);
-            importMinute(resolver, code);
-            importMinute1IfNeeded(resolver, code);
             computeFactors(code);
             imported++;
-            log.info("导入完成 symbol={}", code);
+            log.info("导入完成 symbol={} bars={}", code, n);
         }
         if (imported == 0) {
-            log.info("MySQL 已覆盖 meta 中全部股票，跳过 JSON 导入");
+            log.info("MySQL market_1min 已覆盖 meta 中全部股票，跳过 JSON 导入");
         } else {
-            log.info("本次增量导入 {} 只股票到 MySQL", imported);
+            log.info("本次增量导入 {} 只股票到 market_1min", imported);
         }
     }
 
@@ -134,93 +118,32 @@ public class MockDataImporter {
                 .build());
     }
 
-    private void importDaily(PathMatchingResourcePatternResolver resolver, String code) throws Exception {
-        JSONArray bars = loadBarsArray(resolver, code, "DAY");
-        if (bars == null || bars.isEmpty()) {
-            return;
-        }
-        List<MarketDailyDO> batch = new ArrayList<MarketDailyDO>(BATCH);
-        BigDecimal prevClose = null;
-        for (int i = 0; i < bars.size(); i++) {
-            JSONArray row = bars.getJSONArray(i);
-            LocalDateTime t = LocalDateTime.parse(row.getString(0), FMT);
-            BigDecimal open = bd(row.get(1));
-            BigDecimal high = bd(row.get(2));
-            BigDecimal low = bd(row.get(3));
-            BigDecimal close = bd(row.get(4));
-            long volume = row.getLongValue(5);
-            BigDecimal amount = close.multiply(BigDecimal.valueOf(volume)).setScale(4, RoundingMode.HALF_UP);
-            BigDecimal limitUp = null;
-            BigDecimal limitDown = null;
-            if (prevClose != null) {
-                limitUp = LimitBoardHelper.limitUpPrice(prevClose, code);
-                limitDown = LimitBoardHelper.limitDownPrice(prevClose, code);
-            }
-            batch.add(MarketDailyDO.builder()
-                    .symbol(code)
-                    .tradeDate(t.toLocalDate())
-                    .open(open).high(high).low(low).close(close)
-                    .volume(volume)
-                    .amount(amount)
-                    .limitUp(limitUp)
-                    .limitDown(limitDown)
-                    .build());
-            prevClose = close;
-            if (batch.size() >= BATCH) {
-                marketDailyMapper.batchUpsert(batch);
-                batch.clear();
-            }
-        }
-        if (!batch.isEmpty()) {
-            marketDailyMapper.batchUpsert(batch);
-        }
-        log.info("market_daily 写入 {} bars={}", code, bars.size());
-    }
-
-    private void importMinute(PathMatchingResourcePatternResolver resolver, String code) throws Exception {
-        JSONArray bars = loadBarsArray(resolver, code, "MIN_5");
-        if (bars == null || bars.isEmpty()) {
-            return;
-        }
-        List<MarketMinuteDO> batch = new ArrayList<MarketMinuteDO>(BATCH);
-        for (int i = 0; i < bars.size(); i++) {
-            JSONArray row = bars.getJSONArray(i);
-            LocalDateTime t = LocalDateTime.parse(row.getString(0), FMT);
-            BigDecimal open = bd(row.get(1));
-            BigDecimal high = bd(row.get(2));
-            BigDecimal low = bd(row.get(3));
-            BigDecimal close = bd(row.get(4));
-            long volume = row.getLongValue(5);
-            BigDecimal amount = close.multiply(BigDecimal.valueOf(volume)).setScale(4, RoundingMode.HALF_UP);
-            batch.add(MarketMinuteDO.builder()
-                    .symbol(code)
-                    .tradeTime(t)
-                    .open(open).high(high).low(low).close(close)
-                    .volume(volume)
-                    .amount(amount)
-                    .build());
-            if (batch.size() >= BATCH) {
-                marketMinuteMapper.batchUpsert(batch);
-                batch.clear();
-            }
-        }
-        if (!batch.isEmpty()) {
-            marketMinuteMapper.batchUpsert(batch);
-        }
-        log.info("market_minute 写入 {} bars={}", code, bars.size());
-    }
-
-    /** 可选：classpath 有 MIN_1.json 且 market_1min 为空时写入 1 分钟 K。 */
-    private void importMinute1IfNeeded(PathMatchingResourcePatternResolver resolver, String code)
-            throws Exception {
-        if (coreMarketBarService.hasOneMin(code)) {
-            return;
-        }
+    /** @return 写入的 1 分钟根数 */
+    private int importOneMin(PathMatchingResourcePatternResolver resolver, String code) throws Exception {
         JSONArray bars = loadBarsArray(resolver, code, "MIN_1");
-        if (bars == null || bars.isEmpty()) {
-            return;
+        List<BarDTO> dtos;
+        if (bars != null && !bars.isEmpty()) {
+            dtos = parseMinuteBars(code, bars, false);
+        } else {
+            bars = loadBarsArray(resolver, code, "MIN_5");
+            if (bars == null || bars.isEmpty()) {
+                return 0;
+            }
+            dtos = parseMinuteBars(code, bars, true);
         }
-        List<BarDTO> dtos = new ArrayList<BarDTO>(bars.size());
+        for (int i = 0; i < dtos.size(); i += BATCH) {
+            int to = Math.min(i + BATCH, dtos.size());
+            coreMarketBarService.saveMinutes1(dtos.subList(i, to));
+        }
+        log.info("market_1min 写入 {} bars={}", code, dtos.size());
+        return dtos.size();
+    }
+
+    /**
+     * @param expandFiveMin true 时把每根 5 分钟拆成 5 根 1 分钟（OHLC 相同，量额均分）
+     */
+    private List<BarDTO> parseMinuteBars(String code, JSONArray bars, boolean expandFiveMin) {
+        List<BarDTO> dtos = new ArrayList<BarDTO>(expandFiveMin ? bars.size() * 5 : bars.size());
         for (int i = 0; i < bars.size(); i++) {
             JSONArray row = bars.getJSONArray(i);
             LocalDateTime t = LocalDateTime.parse(row.getString(0), FMT);
@@ -229,39 +152,46 @@ public class MockDataImporter {
             BigDecimal low = bd(row.get(3));
             BigDecimal close = bd(row.get(4));
             long volume = row.getLongValue(5);
-            dtos.add(BarDTO.builder()
-                    .code(code)
-                    .barBegin(t)
-                    .periodMinutes(1)
-                    .open(open)
-                    .high(high)
-                    .low(low)
-                    .close(close)
-                    .volume(BigDecimal.valueOf(volume))
-                    .build());
-            if (dtos.size() >= BATCH) {
-                coreMarketBarService.saveMinutes1(dtos);
-                dtos.clear();
+            if (!expandFiveMin) {
+                dtos.add(bar(code, t, open, high, low, close, volume));
+                continue;
+            }
+            long volEach = volume / 5;
+            long volRem = volume - volEach * 5;
+            for (int j = 0; j < 5; j++) {
+                long v = volEach + (j == 4 ? volRem : 0);
+                dtos.add(bar(code, t.plusMinutes(j), open, high, low, close, v));
             }
         }
-        if (!dtos.isEmpty()) {
-            coreMarketBarService.saveMinutes1(dtos);
-        }
-        log.info("market_1min 写入 {} bars={}", code, bars.size());
+        return dtos;
+    }
+
+    private static BarDTO bar(String code, LocalDateTime t, BigDecimal open, BigDecimal high,
+                              BigDecimal low, BigDecimal close, long volume) {
+        return BarDTO.builder()
+                .code(code)
+                .barBegin(t)
+                .periodMinutes(1)
+                .open(open)
+                .high(high)
+                .low(low)
+                .close(close)
+                .volume(BigDecimal.valueOf(volume))
+                .build();
     }
 
     private void computeFactors(String code) {
-        List<MarketDailyDO> days = marketDailyMapper.selectRange(code, null, null);
+        List<BarDTO> days = coreMarketBarService.load(code, BarPeriod.DAY, null, null);
         if (days.isEmpty()) {
             return;
         }
         factorDailyMapper.deleteBySymbol(code);
         List<FactorDailyDO> factors = new ArrayList<FactorDailyDO>(days.size());
         for (int i = 0; i < days.size(); i++) {
-            MarketDailyDO d = days.get(i);
+            BarDTO d = days.get(i);
             FactorDailyDO f = FactorDailyDO.builder()
                     .symbol(code)
-                    .tradeDate(d.getTradeDate())
+                    .tradeDate(d.getBarBegin().toLocalDate())
                     .ma5(smaClose(days, i, 5))
                     .ma20(smaClose(days, i, 20))
                     .ma60(smaClose(days, i, 60))
@@ -276,7 +206,11 @@ public class MockDataImporter {
             }
             if (f.getVolumeMa20() != null && d.getVolume() != null) {
                 BigDecimal thr = f.getVolumeMa20().multiply(new BigDecimal("1.2"));
-                f.setIsVolumeBreak(BigDecimal.valueOf(d.getVolume()).compareTo(thr) >= 0 ? 1 : 0);
+                if (d.getVolume().compareTo(thr) >= 0) {
+                    f.setIsVolumeBreak(1);
+                } else {
+                    f.setIsVolumeBreak(0);
+                }
             }
             factors.add(f);
             if (factors.size() >= BATCH) {
@@ -294,14 +228,13 @@ public class MockDataImporter {
             throws Exception {
         Resource res = resolver.getResource(BASE + code + "/" + period + ".json");
         if (!res.exists()) {
-            log.warn("缺少文件 {}/{}.json", code, period);
             return null;
         }
         JSONObject obj = JSON.parseObject(readAll(res.getInputStream()));
         return obj.getJSONArray("bars");
     }
 
-    private static BigDecimal smaClose(List<MarketDailyDO> days, int idx, int n) {
+    private static BigDecimal smaClose(List<BarDTO> days, int idx, int n) {
         if (idx + 1 < n) {
             return null;
         }
@@ -312,18 +245,19 @@ public class MockDataImporter {
         return sum.divide(BigDecimal.valueOf(n), 4, RoundingMode.HALF_UP);
     }
 
-    private static BigDecimal smaVol(List<MarketDailyDO> days, int idx, int n) {
+    private static BigDecimal smaVol(List<BarDTO> days, int idx, int n) {
         if (idx + 1 < n) {
             return null;
         }
         BigDecimal sum = BigDecimal.ZERO;
         for (int j = idx - n + 1; j <= idx; j++) {
-            sum = sum.add(BigDecimal.valueOf(days.get(j).getVolume()));
+            BigDecimal v = days.get(j).getVolume();
+            sum = sum.add(v == null ? BigDecimal.ZERO : v);
         }
         return sum.divide(BigDecimal.valueOf(n), 4, RoundingMode.HALF_UP);
     }
 
-    private static BigDecimal rsi(List<MarketDailyDO> days, int idx, int n) {
+    private static BigDecimal rsi(List<BarDTO> days, int idx, int n) {
         if (idx < n) {
             return null;
         }
@@ -347,14 +281,14 @@ public class MockDataImporter {
                 new BigDecimal("100").divide(BigDecimal.ONE.add(rs), 4, RoundingMode.HALF_UP));
     }
 
-    private static BigDecimal atr(List<MarketDailyDO> days, int idx, int n) {
+    private static BigDecimal atr(List<BarDTO> days, int idx, int n) {
         if (idx < n) {
             return null;
         }
         BigDecimal sum = BigDecimal.ZERO;
         for (int j = idx - n + 1; j <= idx; j++) {
-            MarketDailyDO cur = days.get(j);
-            MarketDailyDO prev = days.get(j - 1);
+            BarDTO cur = days.get(j);
+            BarDTO prev = days.get(j - 1);
             BigDecimal tr1 = cur.getHigh().subtract(cur.getLow());
             BigDecimal tr2 = cur.getHigh().subtract(prev.getClose()).abs();
             BigDecimal tr3 = cur.getLow().subtract(prev.getClose()).abs();

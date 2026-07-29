@@ -46,8 +46,8 @@ public class ScheduleJobHandlers {
     /**
      * 行情采集：按股票池刷新本地 K 线缓存/落库。
      * <p>
-     * TODO(api): 接入真实行情源（扩展 {@code KlineSdkClient}：日线/分钟增量拉取、复权、停牌标记），
-     * 当前走 {@link MarketDataService#fetchAndPersistMinute}（落库 market_minute / mock/sdk 回退）。
+     * TODO(api): 接入真实行情源（扩展 {@code KlineSdkClient}：1 分钟增量拉取、复权、停牌标记），
+     * 当前走 {@link MarketDataService#fetchAndPersistMinute}（落库 market_1min / mock/sdk 回退）。
      */
     public void marketCollect() {
         runWithLock("job:market-collect", 55, new Runnable() {
@@ -155,7 +155,7 @@ public class ScheduleJobHandlers {
     }
 
     /**
-     * 数据校验：检查股票池日线/分钟是否为空或明显滞后。
+     * 数据校验：检查股票池 1 分钟行情是否为空或明显滞后。
      * <p>
      * TODO(api): 与外部行情源对账（条数、OHLC 抽样、复权因子一致性）。
      */
@@ -176,46 +176,36 @@ public class ScheduleJobHandlers {
                 LocalDateTime now = LocalDateTime.now();
                 for (String code : codes) {
                     try {
-                        Integer dailyCnt = jdbcTemplate.queryForObject(
-                                "SELECT COUNT(1) FROM market_daily WHERE symbol = ?", Integer.class, code);
-                        LocalDate maxDaily = jdbcTemplate.query(
-                                "SELECT MAX(trade_date) FROM market_daily WHERE symbol = ?",
-                                rs -> rs.next() ? rs.getObject(1, LocalDate.class) : null,
-                                code);
-                        Integer minuteCnt = jdbcTemplate.queryForObject(
-                                "SELECT COUNT(1) FROM market_minute WHERE symbol = ?", Integer.class, code);
-                        LocalDateTime maxMinute = jdbcTemplate.query(
-                                "SELECT MAX(trade_time) FROM market_minute WHERE symbol = ?",
+                        Integer oneMinCnt = jdbcTemplate.queryForObject(
+                                "SELECT COUNT(1) FROM market_1min WHERE symbol = ?", Integer.class, code);
+                        LocalDateTime maxOneMin = jdbcTemplate.query(
+                                "SELECT MAX(trade_time) FROM market_1min WHERE symbol = ?",
                                 rs -> rs.next() ? rs.getObject(1, LocalDateTime.class) : null,
                                 code);
+                        LocalDate maxDay = maxOneMin == null ? null : maxOneMin.toLocalDate();
 
                         boolean bad = false;
-                        if (dailyCnt == null || dailyCnt <= 0 || maxDaily == null) {
+                        if (oneMinCnt == null || oneMinCnt <= 0 || maxOneMin == null) {
                             bad = true;
-                            log.warn("[data-validate] {} 日线为空", code);
+                            log.warn("[data-validate] {} 1分钟为空", code);
                         } else {
-                            long lagDays = ChronoUnit.DAYS.between(maxDaily, today);
+                            long lagDays = ChronoUnit.DAYS.between(maxDay, today);
                             if (lagDays > DAILY_STALE_DAYS) {
                                 bad = true;
-                                log.warn("[data-validate] {} 日线滞后 {} 天 (last={})", code, lagDays, maxDaily);
+                                log.warn("[data-validate] {} 1分钟覆盖日滞后 {} 天 (last={})",
+                                        code, lagDays, maxDay);
                             }
-                        }
-                        if (minuteCnt == null || minuteCnt <= 0 || maxMinute == null) {
-                            bad = true;
-                            log.warn("[data-validate] {} 分钟线为空", code);
-                        } else {
-                            long lagHours = ChronoUnit.HOURS.between(maxMinute, now);
+                            long lagHours = ChronoUnit.HOURS.between(maxOneMin, now);
                             if (lagHours > MINUTE_STALE_HOURS) {
                                 bad = true;
-                                log.warn("[data-validate] {} 分钟线滞后 {} 小时 (last={})",
-                                        code, lagHours, maxMinute);
+                                log.warn("[data-validate] {} 1分钟滞后 {} 小时 (last={})",
+                                        code, lagHours, maxOneMin);
                             }
                         }
                         if (bad) {
                             warn++;
                         } else {
-                            log.debug("[data-validate] {} ok daily={}@{} minute={}@{}",
-                                    code, dailyCnt, maxDaily, minuteCnt, maxMinute);
+                            log.debug("[data-validate] {} ok 1min={}@{}", code, oneMinCnt, maxOneMin);
                         }
                         // TODO(api): 抽样对比外部 API 最新 OHLC / 成交量
                     } catch (Exception e) {

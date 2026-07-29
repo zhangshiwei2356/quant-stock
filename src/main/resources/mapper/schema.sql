@@ -1,5 +1,5 @@
 -- ============================================================
--- Quant Stock 核心表结构（日线 + 5分钟 + 因子 + 交易 + 回测）
+-- Quant Stock 核心表结构（1分钟原始层 + 兼容旧日线/5分钟表 + 因子 + 交易 + 回测）
 -- 库名：quant_stock  |  MySQL 5.7+ / 8.0+
 -- 股票代码统一使用 6 位裸码（000001），与现有 Java 一致
 -- ============================================================
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS `stock_basic` (
   KEY `idx_market` (`market`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='股票基本信息表';
 
--- ---------- 模块二：行情（日线 + 5分钟缓存 + 1分钟原始层） ----------
+-- ---------- 模块二：行情（1分钟原始层为唯一真相源；日线/5分钟表仅兼容保留，应用不再读写） ----------
 CREATE TABLE IF NOT EXISTS `market_daily` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
   `symbol` VARCHAR(10) NOT NULL COMMENT '股票代码',
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS `market_daily` (
   `limit_down` DECIMAL(10,4) DEFAULT NULL,
   UNIQUE KEY `idx_symbol_date` (`symbol`, `trade_date`),
   KEY `idx_date` (`trade_date`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='日线行情表(前复权)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='日线行情表(兼容保留,应用已停用)';
 
 CREATE TABLE IF NOT EXISTS `market_minute` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS `market_minute` (
   `amount` DECIMAL(16,4) DEFAULT NULL,
   UNIQUE KEY `idx_symbol_time` (`symbol`, `trade_time`),
   KEY `idx_time` (`trade_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='5分钟线行情表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='5分钟线行情表(兼容保留,应用已停用)';
 
 CREATE TABLE IF NOT EXISTS `market_1min` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS `market_1min` (
   `amount` DECIMAL(16,4) DEFAULT NULL COMMENT '成交额(元)',
   UNIQUE KEY `idx_symbol_time` (`symbol`, `trade_time`),
   KEY `idx_time` (`trade_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='1分钟线原始行情表(唯一明细层)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='1分钟线原始行情表(唯一物理真相源)';
 
 -- ---------- 模块三：因子缓存 ----------
 CREATE TABLE IF NOT EXISTS `factor_daily` (

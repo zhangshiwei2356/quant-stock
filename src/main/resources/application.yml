@@ -44,15 +44,12 @@ quant:
   pool-score-min: 45
   pool-min-list-days: 60
   pool-min-avg-amount20: 0
-  # db：优先读 MySQL market_daily / market_minute；启动空库时从 classpath JSON 导入
+  # db：读 MySQL market_1min（更大周期内存聚合）；空库启动从 classpath 灌 1 分钟种子
   market-mode: db
   # 单活策略 id（maCross=金叉默认；holdNothing=永不交易占位，用于切换验证）
   active-strategy: maCross
   mock-bar-days: 15
   db-enabled: true
-  # auto=1min 足够时按需聚合；prefer_1min=不足即不回退；legacy=只读日线/5分钟旧表
-  kline-source: auto
-  min-1min-bars: 240
 
   # ---- 策略过滤 ----
   trend-filter-enabled: false

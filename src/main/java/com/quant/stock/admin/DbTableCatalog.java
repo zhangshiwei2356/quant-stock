@@ -74,18 +74,18 @@ public final class DbTableCatalog {
                 "维护可交易/可浏览标的的基础档案（代码、简称、市场、行业、上市状态等）。",
                 "本地初始化 / Mock 导入 / 后续可对接交易所或第三方证券基础信息 API。",
                 "行情浏览全市场列表、盘后目标池扫描 universe、个股展示名称；status=0 的标的通常排除在扫描外。");
-        add(m, "market_daily", "日线行情", "行情", "id DESC",
-                "存储前复权日线 OHLCV 及涨跌停价等，是日频回测与盘后分析的主行情源。",
-                "MockKline 本地生成；生产环境由行情采集任务写入（当前部分采集任务为占位）。",
-                "个股/组合日线回测、盘后目标池扫描打分、因子计算输入、K 线图表展示。");
-        add(m, "market_minute", "5分钟行情", "行情", "id DESC",
-                "存储 5 分钟级 K 线，支撑分钟周期回测与实盘分钟扫描。",
-                "Mock 分钟线生成或收盘后由日线聚合/行情源拉取写入。",
-                "分钟回测、scan-and-trade 实盘分钟分析、分钟因子计算。");
-        add(m, "market_1min", "1分钟行情(原始层)", "行情", "id DESC",
-                "存储 1 分钟级原始 K 线（唯一明细层），供双写迁移与未来 5 分钟聚合源。",
-                "行情采集双写任务写入（阶段 0 仅建表与 Mapper，读写路径后续任务接入）。",
-                "原始 1 分钟查询、批量 upsert；运维中心数据表浏览字段 symbol,trade_time,open,high,low,close,volume,amount。");
+        add(m, "market_daily", "日线行情(兼容停用)", "行情", "id DESC",
+                "历史日线物理表；应用主路径已停用读写，日线由 market_1min 内存聚合。",
+                "旧 Mock/批量脚本可能仍有残留行；新写入请走 market_1min。",
+                "运维浏览兼容；回测/图表不再以此表为真相源。");
+        add(m, "market_minute", "5分钟行情(兼容停用)", "行情", "id DESC",
+                "历史 5 分钟物理表；应用主路径已停用读写，5 分钟由 market_1min 内存聚合。",
+                "旧 Mock/采集可能仍有残留行；新写入请走 market_1min。",
+                "运维浏览兼容；回测/扫描不再以此表为真相源。");
+        add(m, "market_1min", "1分钟行情(唯一真相源)", "行情", "id DESC",
+                "唯一物理行情层：1 分钟 OHLCV；5/15/30/60/日/周/月均由此聚合。",
+                "TDX 回填脚本 fetch_min1_tdx.py、收盘清算/采集落库、空库 Mock 种子。",
+                "K 线查询、回测、scan-and-trade、因子计算（日线由 1 分钟聚合后写入 factor_daily）。");
         add(m, "factor_daily", "日频因子缓存", "因子", "id DESC",
                 "缓存日频技术指标（MA/RSI/ATR 等）；入池粗筛可读最新行（ma5>ma20 / ma60向上 / 放量）。",
                 "MockDataImporter 导入或后续因子任务写入。",

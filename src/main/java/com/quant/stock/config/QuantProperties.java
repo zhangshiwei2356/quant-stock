@@ -67,10 +67,6 @@ public class QuantProperties {
     private int mockBarDays = 30;
     /** 是否启用 MySQL 与 MyBatis（false 时走 classpath 模拟数据） */
     private boolean dbEnabled = false;
-    /** K线数据源：auto=足够1分钟时聚合，否则旧表回退；prefer_1min=不足即空；legacy=只读旧表 */
-    private String klineSource = "auto";
-    /** auto/prefer_1min 下认定有足够 1 分钟 K 线的最少根数 */
-    private int min1minBars = 240;
 
     /** 策略过滤 */
     private boolean trendFilterEnabled = true;

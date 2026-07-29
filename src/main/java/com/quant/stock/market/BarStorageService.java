@@ -16,7 +16,7 @@ import java.util.List;
 
 /**
  * K线分表存储（legacy stock_bar_*）：仅兼容旧库读路径。
- * 新写入真相源为 {@link CoreMarketBarService}（market_daily / market_minute）。
+ * 新写入真相源为 {@link CoreMarketBarService}（仅 {@code market_1min}）。
  */
 @Slf4j
 @Service

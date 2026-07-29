@@ -1057,8 +1057,8 @@ public class StrategyTask {
     }
 
     /**
-     * 收盘清算与 K 线落库：权益日结 + 分钟写入 market_minute + 聚合成日线 market_daily。
-     * 更大周期由查询时内存聚合，不再写 legacy stock_bar_*。
+     * 收盘清算与 K 线落库：权益日结 + 1 分钟写入 {@code market_1min}。
+     * 更大周期由查询时内存聚合，不再写日线/5 分钟旧表或 legacy stock_bar_*。
      * <p>
      * TODO(api): 真实行情拉取（与 market-collect 同源）；当前 fetch 为 db/mock 回退。
      *
@@ -1096,19 +1096,18 @@ public class StrategyTask {
             log.info("收盘清算开始 tradeDay={}, 模拟现金={}, 权益={}, 持仓={}",
                     tradeDay, simCash, closeEquity, tradeGatewayService.queryPositions());
             if (coreMarketBarService == null) {
-                log.info("未启用核心行情表(quant.db-enabled=false)，跳过分钟/日线落库");
+                log.info("未启用核心行情表(quant.db-enabled=false)，跳过 1 分钟落库");
                 return true;
             }
             // TODO(api): 接入真实行情后再做可靠增量拉取
             for (String code : resolveSettleCodes()) {
                 try {
                     marketDataService.fetchAndPersistMinute(code);
-                    coreMarketBarService.upsertDailyFromMinutes(code, tradeDay);
                 } catch (Exception e) {
                     log.warn("收盘落库失败 code={}: {}", code, e.getMessage());
                 }
             }
-            log.info("收盘清算/日线聚合完成 tradeDay={}", tradeDay);
+            log.info("收盘清算/1分钟落库完成 tradeDay={}", tradeDay);
             return true;
         } finally {
             redisLockUtil.unlock("strategy-scan");

@@ -204,20 +204,20 @@ sequenceDiagram
 ## 模拟数据 / 行情表
 
 - 种子目录：`src/main/resources/data/kline/`（仅导入用）
-- 演示股：模拟五只 + **公开接口批量约 100 只近一年日线**（`scripts/fetch_stocks_batch.py` → `market_daily`；清单见 `scripts/batch100_universe.json`）；日线回测可用
-- 区间：模拟样本约 `2025-07-17` ~ `2026-07-17`；批量扩展约近一年至接口最新交易日
-- **物理表**：`market_1min`（原始 1 分钟）、`market_minute`（5 分钟缓存/回退）、`market_daily`（日线缓存/回退）
-- **读路径（双写过渡）**：`quant.kline-source` 默认 **`auto`**（`count(market_1min) ≥ quant.min-1min-bars` 时从 1 分钟聚合查询，否则读 `market_daily` / `market_minute`）；`prefer_1min` 不足即空；`legacy` 永不读 `market_1min`。`min-1min-bars` 默认 **240**（约 1 交易日）
-- 1 分钟回填：`python scripts/fetch_min1_tdx.py --from-pool`（活动目标池）或 `--codes 600036 --sleep 0.2`；默认写原始层并聚合更新 5 分钟/日线，`--skip-cache` 仅写原始层。未传 `--codes` 且未加 `--from-pool` 时也会尝试活动 `trade_pool`；TDX 公开节点通常可取约 90 个交易日，实际深度以节点为准。
+- 演示股：模拟五只（空库启动灌 `market_1min`）；目标池可用 `scripts/fetch_min1_tdx.py --from-pool` 回填约 90 交易日 1 分钟
+- 区间：模拟样本约 `2025-07-17` ~ `2026-07-17`；TDX 1 分钟公开节点通常约 90 个交易日（以节点为准）
+- **物理真相源**：仅 `market_1min`；5/15/30/60/日/周/月一律内存聚合。`market_daily` / `market_minute` 表结构保留兼容，**应用主路径不再读写**
+- 1 分钟回填：`python scripts/fetch_min1_tdx.py --from-pool` 或 `--codes 600036 --sleep 0.2`（只写 `market_1min`）
 - 回测历史/分析：`bt_backtest_record` / `bt_backtest_analysis`（亦可落盘 `quant.history-dir`）
-- 重新生成模拟种子：`mvn -q compile exec:java -Dexec.mainClass=com.quant.stock.market.mock.MockKlineDataGenerator`；批量扩展：`python scripts/fetch_stocks_batch.py`
+- 重新生成模拟种子：`mvn -q compile exec:java -Dexec.mainClass=com.quant.stock.market.mock.MockKlineDataGenerator`
 
 ### 主要库表
 
 | 表 | 用途 |
 |----|------|
 | `stock_basic` | 标的档案 |
-| `market_1min` / `market_minute` / `market_daily` | 原始 1 分钟 / 5 分钟缓存·回退 / 日线缓存·回退 |
+| `market_1min` | **唯一**物理行情（1 分钟）；更大周期查询时聚合 |
+| `market_daily` / `market_minute` | 兼容保留（应用已停用读写） |
 | `trade_pool` / `trade_pool_report` | 唯一目标池与报告 |
 | `trade_orders` / `trade_positions` / `trade_position_lots` / `trade_cashflows` | 模拟委托、持仓、批次、日结 |
 | `risk_control_log` | 风控日志 |
@@ -236,8 +236,7 @@ sequenceDiagram
 | `QUANT_RATE_LIMIT` / `quant.rate-limit-per-minute` | 回测/组合/批量每 IP 每分钟上限（默认 30，≤0 关闭） |
 | `quant.schedule.enabled` | 定时总闸（默认 true；各任务以库表为准） |
 | `quant.trade-mode` | `sim`（默认）本地模拟、即时 FILLED 并记账，不连柜台；`sdk` 先 SUBMITTED（占资/占仓），`sync-orders` 推进 FILLED 后再落账（当前为桩） |
-| `quant.market-mode` | `db`（默认）读本地行情表；`json` 读 classpath JSON；`sdk` 走 `KlineSdkClient`（多为桩，宽睿 MDS 未接主路径） |
-| `quant.kline-source` / `quant.min-1min-bars` | 默认 `auto` / `240`；见上文「读路径（双写过渡）」 |
+| `quant.market-mode` | `db`（默认）读 `market_1min`（更大周期内存聚合）；`json` 读 classpath JSON；`sdk` 走 `KlineSdkClient`（多为桩，宽睿 MDS 未接主路径） |
 
 ---
 
@@ -288,7 +287,8 @@ sequenceDiagram
 - **唯一目标池**：`pool-rebuild` / `after-market-batch-scan` 扫描后覆盖；启用其一会自动关闭另一（互斥）
 - `scan-and-trade`：只扫池内活跃标的 + 本地模拟账本
 - 已实现：`scan-and-trade` / `pool-rebuild` / `after-market-batch-scan` / `settle-after-close` / `data-validate` / `sync-orders` / `position-pnl-sync`
-  - `settle-after-close`：权益日记最近交易日；分钟落 `market_minute`，再聚日线写 `market_daily`（更大周期查询时内存聚合）
+  - `settle-after-close`：权益日记最近交易日；刷新/落库 `market_1min`（更大周期查询时内存聚合）
+  - `data-validate`：检查 `market_1min` 覆盖与滞后（不再看日线/5 分钟旧表）
   - `sync-orders`：本地桩将 `SUBMITTED→FILLED` 并改仓；`trade-mode=sdk` 时策略在 sync 后才落现金/批次
   - `position-pnl-sync`：本地成本 + 最新价浮盈日志
 - 页面标「未实现」（缺外部 API）：`market-collect`

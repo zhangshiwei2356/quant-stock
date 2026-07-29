@@ -70,8 +70,8 @@ public final class ScheduleJobGuide {
                 "按全市场股票列表拉取/刷新本地 K 线（日线、分钟），保证后续扫描与回测有行情可用。",
                 "遍历 stock_basic / 配置 universe 中的全部标的。",
                 "默认 FIXED_RATE 约 30 秒；建议仅在交易时段开启。",
-                "写入或更新 market_daily / market_minute（视数据源实现而定）；规划先落 market_1min。",
-                "当前为占位骨架：真实行情 API 未接入时走本地 mock/已有库数据回退；页面标「未实现」。未来采集路径优先写入 market_1min。"
+                "写入或更新 market_1min（唯一物理真相源）；更大周期查询时内存聚合。",
+                "真实行情 API 未接入时走本地 mock/已有 market_1min 回退；页面标「未实现」。"
         ));
         m.put("scan-and-trade", new Detail(
                 "实盘分钟级扫描：对唯一目标池标的计算信号，并按策略规则模拟下单/调仓。",
@@ -100,7 +100,7 @@ public final class ScheduleJobGuide {
                 "默认工作日 15:30（CRON）。",
                 "写入 trade_cashflows（权益日表）、更新 system_config(sim.cash)；聚合依赖本地/已有行情。",
                 "本地日结已实现；真实行情增量拉取仍待外部行情 API（见「能力与待办」）。"
-                        + " K 线聚合：有 1min 则优先聚日线，否则 5min→日线。"
+                        + " K 线：刷新/落库 market_1min，更大周期查询时聚合。"
         ));
         m.put("pool-rebuild", new Detail(
                 "全市场扫描：按策略条件筛选可入选标的，覆盖唯一目标池，并生成分析报告落库。",
@@ -117,11 +117,11 @@ public final class ScheduleJobGuide {
                 "已实现。扫描后覆盖唯一目标池；与 pool-rebuild 启用其一即可。"
         ));
         m.put("data-validate", new Detail(
-                "数据质量校验：检查各标的日线/分钟线是否为空或明显滞后，并输出告警日志。",
-                "全市场 universe 的 market_daily / market_minute。",
+                "数据质量校验：检查各标的 market_1min 是否为空或明显滞后，并输出告警日志。",
+                "全市场 universe 的 market_1min。",
                 "默认工作日 17:00（CRON）。",
                 "只读检查，默认不改业务表；问题写入日志。",
-                "未实现外部对账：当前仅本地滞后/空数据检查；与外部行情 OHLC 抽样对账待 API。"
+                "未实现外部对账：当前仅本地 1 分钟滞后/空数据检查；与外部行情 OHLC 抽样对账待 API。"
         ));
         GUIDE = Collections.unmodifiableMap(m);
     }
