@@ -138,8 +138,8 @@ sequenceDiagram
 
 | 二级菜单 | 功能 |
 |----------|------|
-| 回测工作台 | 选股、周期、区间（空=全量）、初始资金 → 运行回测，K 线信号 + 权益 |
-| 批量扫描 | 股票池批量摘要，可筛「仅可买入」 |
+| 回测工作台 | **仅从目标池**选股；周期、区间（空=全量）、初始资金 → 运行回测，K 线信号 + 权益 |
+| 批量扫描 | 配置标的列表批量摘要，可筛「仅可买入」（仍读 yml `stock-codes`，非目标池） |
 | 回测历史 | 落盘记录与分析；可跨股查看 |
 
 引擎：`BackTestEngine`（次日开盘撮合、止损/移动止盈、金字塔、T+1 分档、账户熔断）。
@@ -148,7 +148,7 @@ sequenceDiagram
 
 | 二级菜单 | 功能 |
 |----------|------|
-| 回测工作台 | 多选成分股、共享资金池、强制日 K |
+| 回测工作台 | **仅从目标池**多选成分股、共享资金池、强制日 K |
 | 回测历史 | 组合历史与分析 |
 
 引擎：`PortfolioBackTestEngine`；展示权益、成交流水、分股表现。
@@ -162,6 +162,7 @@ sequenceDiagram
 
 - 盘后任务 `pool-rebuild` / `after-market-batch-scan` 自动覆盖 `trade_pool`
 - 打分：均线趋势 / MA60 / ADX / 动量 / ATR / 流动性（默认 ≥ `pool-score-min`）
+- **个股/组合回测工作台选股只读本池**（行情浏览仍为全市场）
 
 ### 5. 账户概览
 
@@ -203,18 +204,20 @@ sequenceDiagram
 ## 模拟数据 / 行情表
 
 - 种子目录：`src/main/resources/data/kline/`（仅导入用）
-- 演示股：600036 招商银行、000001 平安银行、300059 东方财富
-- 区间：约 `2025-07-17` ~ `2026-07-17`
-- **物理表**：`market_daily`（日线）、`market_minute`（5 分钟）
+- 演示股：模拟五只 + **公开接口批量约 100 只近一年日线**（`scripts/fetch_stocks_batch.py` → `market_daily`；清单见 `scripts/batch100_universe.json`）；日线回测可用
+- 区间：模拟样本约 `2025-07-17` ~ `2026-07-17`；批量扩展约近一年至接口最新交易日
+- **物理表**：`market_1min`（原始 1 分钟）、`market_minute`（5 分钟缓存/回退）、`market_daily`（日线缓存/回退）
+- **读路径（双写过渡）**：`quant.kline-source` 默认 **`auto`**（`count(market_1min) ≥ quant.min-1min-bars` 时从 1 分钟聚合查询，否则读 `market_daily` / `market_minute`）；`prefer_1min` 不足即空；`legacy` 永不读 `market_1min`。`min-1min-bars` 默认 **240**（约 1 交易日）
+- 1 分钟回填：`python scripts/fetch_min1_tdx.py --from-pool`（活动目标池）或 `--codes 600036 --sleep 0.2`；默认写原始层并聚合更新 5 分钟/日线，`--skip-cache` 仅写原始层。未传 `--codes` 且未加 `--from-pool` 时也会尝试活动 `trade_pool`；TDX 公开节点通常可取约 90 个交易日，实际深度以节点为准。
 - 回测历史/分析：`bt_backtest_record` / `bt_backtest_analysis`（亦可落盘 `quant.history-dir`）
-- 重新生成种子：`mvn -q compile exec:java -Dexec.mainClass=com.quant.stock.market.mock.MockKlineDataGenerator`
+- 重新生成模拟种子：`mvn -q compile exec:java -Dexec.mainClass=com.quant.stock.market.mock.MockKlineDataGenerator`；批量扩展：`python scripts/fetch_stocks_batch.py`
 
 ### 主要库表
 
 | 表 | 用途 |
 |----|------|
 | `stock_basic` | 标的档案 |
-| `market_daily` / `market_minute` | 日线 / 5 分钟 |
+| `market_1min` / `market_minute` / `market_daily` | 原始 1 分钟 / 5 分钟缓存·回退 / 日线缓存·回退 |
 | `trade_pool` / `trade_pool_report` | 唯一目标池与报告 |
 | `trade_orders` / `trade_positions` / `trade_position_lots` / `trade_cashflows` | 模拟委托、持仓、批次、日结 |
 | `risk_control_log` | 风控日志 |
@@ -234,6 +237,7 @@ sequenceDiagram
 | `quant.schedule.enabled` | 定时总闸（默认 true；各任务以库表为准） |
 | `quant.trade-mode` | `sim`（默认）本地模拟、即时 FILLED 并记账，不连柜台；`sdk` 先 SUBMITTED（占资/占仓），`sync-orders` 推进 FILLED 后再落账（当前为桩） |
 | `quant.market-mode` | `db`（默认）读本地行情表；`json` 读 classpath JSON；`sdk` 走 `KlineSdkClient`（多为桩，宽睿 MDS 未接主路径） |
+| `quant.kline-source` / `quant.min-1min-bars` | 默认 `auto` / `240`；见上文「读路径（双写过渡）」 |
 
 ---
 
@@ -295,7 +299,7 @@ sequenceDiagram
 
 ## 策略与风控（已实现）
 
-- **单活策略可切换**：`quant.active-strategy` 默认 **`maCross`**（均线金叉死叉 + MA60/放量/ADX/RSI 过滤，实现仍在 `MaCrossStrategy`，不静默改规则）。回测/扫池/`StrategyTask` 共用 `StrategyRegistry.active()` 与一套账本/目标池。新策略：新建 `@Component` 继承 `BaseStrategy` 后改配置即可；占位 `holdNothing` 永不交易。运维「运行参数」展示当前策略；**个股/组合回测工作台可选策略下拉**（仅当次回测传 `strategyId`，不改纸面扫描激活策略）
+- **单活策略可切换**：`quant.active-strategy` 默认 **`maCross`**（读全局 quant 过滤；实现仍在 `MaCrossStrategy`，不静默改规则）。另有对照画像 **`maCrossTrend` / `maCrossVolume` / `maCrossBalanced` / `maCrossStrict`**（固定过滤包，不读 yml 过滤开关）+ `holdNothing`。回测工作台下拉切换 `strategyId` 做对比；扫池/纸面仍用配置激活。多策略增强待办见「能力与待办」一（附）
 - 止损：相对综合成本的 ATR + 权益硬止损；移动止盈盘后上移；**跳空穿价按开盘价**成交（盘中触及按止损价）
 - 组合相关监控：成分日收益两两相关（回看 60 日，均值≥0.75 告警）；组合回测结果字段 `correlation`；`GET /api/account/correlation`
 - **T+1 分档**：仅非当日买入批次可卖/可止损

@@ -27,6 +27,20 @@ public abstract class BaseStrategy {
     }
 
     /**
+     * 回测/运维下拉展示名；默认等于 {@link #name()}。
+     */
+    public String uiLabel() {
+        return name();
+    }
+
+    /**
+     * 可选参数画像摘要（对照策略可覆写）。
+     */
+    public String profileSummary() {
+        return "";
+    }
+
+    /**
      * 基于已闭合 K 线计算当前信号。
      *
      * @param stockCode  标的

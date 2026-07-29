@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * 统一K线查询入口：对外按 BarPeriod 路由，屏蔽存储细节。
  * <p>
- * 查询优先级：MySQL(market_daily/minute) → Redis → 旧分表 → classpath JSON → mock/sdk
+ * 查询优先级：MySQL(market_1min 自动聚合 / market_daily / market_minute) → Redis → 旧分表 → classpath JSON → mock/sdk
  */
 @Slf4j
 @Service

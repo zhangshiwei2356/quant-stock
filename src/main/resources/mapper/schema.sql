@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS `stock_basic` (
   KEY `idx_market` (`market`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='股票基本信息表';
 
--- ---------- 模块二：行情（仅日线 + 5分钟） ----------
+-- ---------- 模块二：行情（日线 + 5分钟缓存 + 1分钟原始层） ----------
 CREATE TABLE IF NOT EXISTS `market_daily` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
   `symbol` VARCHAR(10) NOT NULL COMMENT '股票代码',
@@ -54,6 +54,20 @@ CREATE TABLE IF NOT EXISTS `market_minute` (
   UNIQUE KEY `idx_symbol_time` (`symbol`, `trade_time`),
   KEY `idx_time` (`trade_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='5分钟线行情表';
+
+CREATE TABLE IF NOT EXISTS `market_1min` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `symbol` VARCHAR(10) NOT NULL COMMENT '股票代码',
+  `trade_time` DATETIME NOT NULL COMMENT '1分钟K起始时间',
+  `open` DECIMAL(10,4) NOT NULL,
+  `high` DECIMAL(10,4) NOT NULL,
+  `low` DECIMAL(10,4) NOT NULL,
+  `close` DECIMAL(10,4) NOT NULL,
+  `volume` BIGINT NOT NULL COMMENT '成交量(股)',
+  `amount` DECIMAL(16,4) DEFAULT NULL COMMENT '成交额(元)',
+  UNIQUE KEY `idx_symbol_time` (`symbol`, `trade_time`),
+  KEY `idx_time` (`trade_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='1分钟线原始行情表(唯一明细层)';
 
 -- ---------- 模块三：因子缓存 ----------
 CREATE TABLE IF NOT EXISTS `factor_daily` (

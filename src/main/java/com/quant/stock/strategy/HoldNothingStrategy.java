@@ -18,6 +18,16 @@ public class HoldNothingStrategy extends BaseStrategy {
     }
 
     @Override
+    public String uiLabel() {
+        return "永不交易占位（holdNothing）";
+    }
+
+    @Override
+    public String profileSummary() {
+        return "无买卖信号；用于切换验证";
+    }
+
+    @Override
     public TradeSignal calcSignal(String stockCode, List<BarDTO> closedBars) {
         return TradeSignal.none(stockCode);
     }

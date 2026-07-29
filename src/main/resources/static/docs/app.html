@@ -10,7 +10,7 @@
 
 <h4>默认行情 / 交易模式</h4>
 <ul>
-  <li><b><code>quant.market-mode=db</code>（行情从哪来）</b>：K 线读本地 MySQL（<code>market_daily</code> / <code>market_minute</code>）；空库启动会自动灌入演示种子。可选 <code>json</code>（classpath JSON，偏开发）、<code>sdk</code>（外部行情客户端，当前多为桩；宽睿 MDS 尚未接入主路径）</li>
+  <li><b><code>quant.market-mode=db</code>（行情从哪来）</b>：K 线读本地 MySQL（原始层 <code>market_1min</code>，缓存/回退 <code>market_minute</code> / <code>market_daily</code>）；<code>quant.kline-source=auto</code>（默认）且 1 分钟根数 ≥ <code>min-1min-bars</code>（默认 240）时非日线周期由 1 分钟聚合，否则回退日线/5 分钟表。空库启动会自动灌入演示种子。可选 <code>json</code>（classpath JSON，偏开发）、<code>sdk</code>（外部行情客户端，当前多为桩；宽睿 MDS 尚未接入主路径）</li>
   <li><b><code>quant.trade-mode=sim</code>（单怎么成交）</b>：本地模拟账本——下单即时 <code>FILLED</code> 并改现金/持仓，可持久化；<strong>不连券商柜台</strong>。可选 <code>sdk</code>：先 <code>SUBMITTED</code> 占资/占仓，由 <code>sync-orders</code> 再推进成交（当前仍为本地桩；宽睿 OES 尚未替换）</li>
   <li>二者组合含义：默认开箱即用「库内行情 + 本地模拟成交」，可回测/扫池/纸面账户，无需宽睿或券商账号</li>
 </ul>
@@ -26,9 +26,9 @@
 <h4>功能模块</h4>
 <ul>
   <li><b>行情浏览</b>：全市场模糊选股、多周期 K 线与指标</li>
-  <li><b>个股回测</b>：回测工作台（含策略下拉，仅本次）/ 批量扫描 / 回测历史</li>
-  <li><b>组合回测</b>：回测工作台（含策略下拉，仅本次）/ 回测历史（共享资金池日 K）</li>
-  <li><b>目标池</b>：当前池 / 扫描历史；盘后或手动扫描覆盖唯一池；移出≠卖出</li>
+  <li><b>个股回测</b>：回测工作台<strong>仅从目标池选股</strong>（含策略下拉，仅本次）/ 批量扫描（配置列表）/ 回测历史</li>
+  <li><b>组合回测</b>：回测工作台<strong>仅从目标池多选</strong>（含策略下拉，仅本次）/ 回测历史（共享资金池日 K）</li>
+  <li><b>目标池</b>：当前池 / 扫描历史；盘后或手动扫描覆盖唯一池；移出≠卖出；也是回测选股来源</li>
   <li><b>账户概览</b>：资金 · 持仓（T+1 批次）· 委托 · 日结 · 风控事件</li>
   <li><b>运维中心</b>：任务管理 / 数据健康 / 运行参数（任务种子默认全关）</li>
   <li><b>数据表</b>：白名单表分页只读</li>
@@ -37,15 +37,15 @@
 
 <h4>模拟数据与默认参数</h4>
 <ul>
-  <li>演示股：600036 / 000001 / 300059；约 2025-07-17 ~ 2026-07-17</li>
-  <li>物理表：<code>market_daily</code>、<code>market_minute</code>；回测：<code>bt_backtest_*</code></li>
+  <li>演示股：模拟五只 + 公开接口批量约 <b>100</b> 只近一年日线（行情可选；个股/组合回测从目标池选；脚本 <code>fetch_stocks_batch.py</code>）</li>
+  <li>物理表：<code>market_1min</code>（原始）、<code>market_minute</code> / <code>market_daily</code>（5 分钟/日线缓存与回退）；<strong>1 分钟原始层双写过渡</strong>：无足够 <code>market_1min</code> 时查询仍走日线/5 分钟。灌数：<code>python scripts/fetch_min1_tdx.py --from-pool</code> 或 <code>--codes 600036</code>（TDX 公开节点约 90 个交易日）</li>
   <li>回测区间默认留空 = 全量 K 线；初始资金默认 <b>100000</b></li>
   <li>页头主题默认<strong>日间</strong>（夜盘 / 银河 / 极光可切换并记住）</li>
 </ul>
 
 <h4>策略与风控摘要</h4>
 <ul>
-  <li><b>单活策略</b>：默认 <code>quant.active-strategy=maCross</code>（金叉）；回测/扫池/纸面共用注册表与一套账本；工作台可下拉换策略（仅当次回测）；不静默改金叉规则</li>
+  <li><b>单活策略</b>：默认 <code>maCross</code>（读全局过滤）；对照画像 <code>maCrossTrend/Volume/Balanced/Strict</code> 可在回测下拉对比；纸面仍用配置激活</li>
   <li>金叉可配 MA60 / 放量 / ADX / RSI；综合成本止损、移动止盈；T+1 分档；金字塔 50/30/20</li>
   <li>撮合：日 K 下一根开盘；分钟 ≥ 次日 09:45；涨跌停主板 10% / 创科 20%</li>
   <li>单笔 ADV 参与率硬顶默认 10%（<code>quant.max-participation-adv</code>）；回测结果带配置指纹</li>

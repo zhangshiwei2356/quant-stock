@@ -9,17 +9,17 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 5 分钟行情持久化实体，对应表 {@code market_minute}。
+ * 1 分钟行情持久化实体，对应表 {@code market_1min}。
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class MarketMinuteDO {
+public class Market1MinDO {
     private Long id;
     /** 股票代码 */
     private String symbol;
-    /** bar 起始时刻 */
+    /** 1 分钟 bar 起始时刻 */
     private LocalDateTime tradeTime;
     private BigDecimal open;
     private BigDecimal high;
@@ -28,7 +28,7 @@ public class MarketMinuteDO {
     private Long volume;
     private BigDecimal amount;
 
-    /** 转为分钟/5 分钟 {@link BarDTO} */
+    /** 转为 1 分钟 {@link BarDTO} */
     public BarDTO toBarDTO() {
         return BarDTO.builder()
                 .code(symbol)
@@ -38,12 +38,12 @@ public class MarketMinuteDO {
                 .low(low)
                 .close(close)
                 .volume(volume == null ? BigDecimal.ZERO : BigDecimal.valueOf(volume))
-                .periodMinutes(5)
+                .periodMinutes(1)
                 .build();
     }
 
-    /** 由 {@link BarDTO} 构造分钟行 */
-    public static MarketMinuteDO fromBarDTO(BarDTO bar) {
+    /** 由 {@link BarDTO} 构造 1 分钟行 */
+    public static Market1MinDO fromBarDTO(BarDTO bar) {
         if (bar == null) {
             return null;
         }
@@ -51,7 +51,7 @@ public class MarketMinuteDO {
         if (bar.getVolume() != null) {
             vol = bar.getVolume().longValue();
         }
-        return MarketMinuteDO.builder()
+        return Market1MinDO.builder()
                 .symbol(bar.getCode())
                 .tradeTime(bar.getBarBegin())
                 .open(bar.getOpen())

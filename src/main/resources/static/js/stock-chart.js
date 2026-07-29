@@ -13,8 +13,10 @@
   var lastSingleEquity = null;
   var lastSingleKlinePayload = null;
   var poolNames = {};
-  /** 全市场标的缓存：[{code,name}]，供工作台模糊选股 */
+  /** 全市场标的缓存：[{code,name}]，供行情浏览模糊选股 */
   var universeList = [];
+  /** 目标池标的缓存：供个股/组合回测选股（不含全市场） */
+  var tradePoolList = [];
   var PICKER_LIMIT = 60;
   /** 组合回测已选成分股代码（有序） */
   var portfolioSelected = [];
@@ -351,7 +353,7 @@
   }
 
   function selectPortfolioTopN(n) {
-    portfolioSelected = universeList.slice(0, n || 3).map(function (it) { return it.code; });
+    portfolioSelected = (tradePoolList || []).slice(0, n || 3).map(function (it) { return it.code; });
     syncPortfolioCodes();
     renderStockPicker('portfolio');
   }
@@ -363,14 +365,20 @@
   }
 
   function syncPortfolioCodes() {
-    portfolioSelected = portfolioSelected.filter(function (c) { return !!poolNames[c]; });
+    var allowed = {};
+    (tradePoolList || []).forEach(function (it) { if (it && it.code) allowed[it.code] = true; });
+    portfolioSelected = portfolioSelected.filter(function (c) { return !!allowed[c]; });
     $('#portfolioCodes').val(portfolioSelected.join(','));
     $('#pfSelectedCountNum').text(String(portfolioSelected.length));
     var $bar = $('#pfChipsBar');
     var $chips = $('#pfChips').empty();
     if (!portfolioSelected.length) {
       $bar.addClass('empty');
-      $chips.append($('<span class="pf-chips-empty"/>').text('尚未选择 · 在上方列表点击添加'));
+      $chips.append($('<span class="pf-chips-empty"/>').text(
+        (tradePoolList || []).length
+          ? '尚未选择 · 在上方列表点击添加'
+          : '目标池为空 · 请先在「目标池」扫描更新'
+      ));
     } else {
       $bar.removeClass('empty');
       portfolioSelected.forEach(function (code) {
@@ -650,11 +658,13 @@
     return String(q || '').trim().toLowerCase().replace(/\s+/g, '');
   }
 
-  /** 代码/名称模糊匹配（包含、前缀优先） */
-  function filterUniverse(q, limit) {
+  /** 代码/名称模糊匹配（包含、前缀优先）；mode=single|portfolio 用目标池，其余用全市场 */
+  function filterUniverse(q, limit, mode) {
     limit = limit || PICKER_LIMIT;
     var query = normalizeStockQuery(q);
-    var list = universeList || [];
+    var list = (mode === 'single' || mode === 'portfolio')
+      ? (tradePoolList || [])
+      : (universeList || []);
     if (!query) {
       return list.slice(0, limit);
     }
@@ -682,15 +692,22 @@
     var q = isPool ? $('#poolStockQ').val() : (isPf ? $('#pfStockQ').val() : $('#singleStockQ').val());
     var $list = isPool ? $('#poolStockResults') : (isPf ? $('#pfStockResults') : $('#singleStockResults'));
     var $hint = isPool ? $('#poolStockMatchHint') : (isPf ? $('#pfStockMatchHint') : $('#singleStockMatchHint'));
-    var matched = filterUniverse(q, PICKER_LIMIT);
-    var total = universeList.length;
+    var matched = filterUniverse(q, PICKER_LIMIT, mode);
+    var total = (mode === 'single' || mode === 'portfolio')
+      ? (tradePoolList || []).length
+      : (universeList || []).length;
     var query = normalizeStockQuery(q);
     $hint.text(query
       ? ('匹配 ' + matched.length + (matched.length >= PICKER_LIMIT ? '+' : '') + ' / 共 ' + total)
       : ('展示前 ' + matched.length + ' / 共 ' + total + ' · 输入可筛选'));
     $list.empty();
     if (!matched.length) {
-      $list.append($('<li class="stock-picker-empty"/>').text(total ? '无匹配标的' : '暂无股票数据'));
+      var emptyMsg = total
+        ? '无匹配标的'
+        : ((mode === 'single' || mode === 'portfolio')
+          ? '目标池为空，请先在「目标池」扫描更新'
+          : '暂无股票数据');
+      $list.append($('<li class="stock-picker-empty"/>').text(emptyMsg));
       return;
     }
     matched.forEach(function (it) {
@@ -714,8 +731,44 @@
   }
 
   function refreshUniverseCounts() {
-    var n = universeList.length;
-    $('#poolUniverseCount, #singleUniverseCount, #pfUniverseCount').text(String(n));
+    $('#poolUniverseCount').text(String((universeList || []).length));
+    $('#singleUniverseCount, #pfUniverseCount').text(String((tradePoolList || []).length));
+  }
+
+  /** 用目标池 items 刷新回测选股列表 */
+  function applyTradePoolForBacktest(items) {
+    tradePoolList = [];
+    var codes = [];
+    (items || []).forEach(function (it) {
+      var code = it && it.code;
+      if (!code) return;
+      var name = it.name || code;
+      poolNames[code] = name;
+      tradePoolList.push({ code: code, name: name });
+      codes.push(code);
+    });
+    portfolioSelected = portfolioSelected.filter(function (c) {
+      return codes.indexOf(c) >= 0;
+    });
+    if (!portfolioSelected.length && codes.length) {
+      portfolioSelected = codes.slice(0, Math.min(3, codes.length));
+    }
+    if (singleCode && codes.indexOf(singleCode) < 0) {
+      if (codes.length) {
+        selectSingleStock(codes[0], { silent: true });
+      } else {
+        singleCode = '';
+        $('#stockCode').val('');
+        $('#singleSelectedCode').text('未选择');
+        $('#singleSelectedName').text('目标池为空，请先扫描更新');
+      }
+    } else if (!singleCode && codes.length) {
+      selectSingleStock(codes[0], { silent: true });
+    }
+    refreshUniverseCounts();
+    renderStockPicker('single');
+    renderStockPicker('portfolio');
+    syncPortfolioCodes();
   }
 
   function openPoolStock(code) {
@@ -892,6 +945,7 @@
       var count = data && data.count != null ? data.count : items.length;
       $('#sidePoolCount, #tpPoolBadge').text(String(count));
       $('#tpPoolHint').text('目标池 ' + count + ' / 上限 ' + maxFinal);
+      applyTradePoolForBacktest(items);
 
       var $tb = $('#tpPoolBody').empty();
       if (!items.length) {
@@ -926,7 +980,6 @@
     $.getJSON('/api/stock/pool', function (list) {
       var codes = [];
       universeList = [];
-      poolNames = {};
       (list || []).forEach(function (item) {
         var code = typeof item === 'string' ? item : item.code;
         var name = typeof item === 'string' ? item : (item.name || item.code);
@@ -935,30 +988,26 @@
         universeList.push({ code: code, name: name });
         codes.push(code);
       });
-      portfolioSelected = portfolioSelected.filter(function (c) { return !!poolNames[c]; });
-      if (!portfolioSelected.length) {
-        portfolioSelected = codes.slice(0, 3);
-      }
       refreshUniverseCounts();
       renderStockPicker('pool');
-      renderStockPicker('single');
-      renderStockPicker('portfolio');
-      syncPortfolioCodes();
-      if (codes.length) {
+      if (codes.length && !activePoolCode) {
         openPoolStock(codes[0]);
-        selectSingleStock(codes[0], { silent: true });
       }
-      // 侧栏目标池计数
-      $.getJSON('/api/stock/trade-pool').done(function (data) {
-        var n = data && data.count != null ? data.count : ((data && data.items) || []).length;
-        $('#sidePoolCount').text(String(n || 0));
-      }).fail(function (xhr) {
-        var msg = (xhr && xhr.responseJSON && xhr.responseJSON.message) || '目标池数量加载失败';
-        toast(msg, 'err');
-      });
     }).fail(function (xhr) {
       var msg = (xhr && xhr.responseJSON && xhr.responseJSON.message) || '股票池加载失败';
       toast(msg, 'err');
+    }).always(function () {
+      // 个股/组合回测选股只读目标池（与行情全市场解耦）
+      $.getJSON('/api/stock/trade-pool').done(function (data) {
+        var items = (data && data.items) || [];
+        var n = data && data.count != null ? data.count : items.length;
+        $('#sidePoolCount').text(String(n || 0));
+        applyTradePoolForBacktest(items);
+      }).fail(function (xhr) {
+        var msg = (xhr && xhr.responseJSON && xhr.responseJSON.message) || '目标池加载失败';
+        toast(msg, 'err');
+        applyTradePoolForBacktest([]);
+      });
     });
   }
 
@@ -1775,10 +1824,10 @@
   }
 
   var knowledgeTopics = [
-    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260728-bt-strategy' },
+    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260728-macross-profiles' },
     { id: 'readme', group: 'app', title: '项目 README', src: '/api/docs/readme' },
-    { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260728-bt-strategy' },
-    { id: 'memo', group: 'app', title: '能力与待办', src: '/docs/memo.html?v=20260728-bt-strategy' },
+    { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260728-macross-profiles' },
+    { id: 'memo', group: 'app', title: '能力与待办', src: '/docs/memo.html?v=20260728-macross-profiles' },
     { id: 'kuangrui', group: 'app', title: '宽睿文档梳理', src: '/docs/kuangrui.html?v=20260727-kuangrui-it' },
     { id: 'ashare', group: 'stock', title: 'A股基础', src: '/docs/ashare.html?v=20260720-nav-rename' },
     { id: 'session', group: 'stock', title: '交易时间', src: '/docs/session.html?v=20260720-nav-rename' },
@@ -4189,7 +4238,11 @@
       if (id && id === active) {
         label = label + ' · 配置默认';
       }
-      $sel.append($('<option/>').val(id).text(label));
+      var $opt = $('<option/>').val(id).text(label);
+      if (s.summary) {
+        $opt.attr('title', s.summary);
+      }
+      $sel.append($opt);
     });
     if (active) {
       $sel.val(active);

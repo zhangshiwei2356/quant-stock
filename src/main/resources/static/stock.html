@@ -299,7 +299,7 @@
     <div id="viewSingle" class="workspace-view" hidden>
       <section class="panel" id="singlePanelWorkspace">
         <h3>回测标的 <span class="trade-pool-count" id="singleUniverseCount">0</span></h3>
-        <p class="hint">输入代码或名称模糊筛选；点击选定回测标的。</p>
+        <p class="hint">仅从「目标池」选股；代码/名称模糊筛选后点击选定。池空请先到目标池「扫描更新」。</p>
         <div class="stock-picker" id="singleStockPicker">
           <div class="stock-picker-bar">
             <input type="search" id="singleStockQ" class="stock-picker-input" placeholder="搜索：600036 / 招商 / 银行" autocomplete="off"/>
@@ -966,7 +966,7 @@
     <div id="viewPortfolio" class="workspace-view" hidden>
       <section class="panel" id="pfPanelWorkspace">
         <h3>组合成分 <span class="trade-pool-count" id="pfUniverseCount">0</span></h3>
-        <p class="hint">搜索后点击切换勾选；下方标签可移除。建议至少 2 只。</p>
+        <p class="hint">仅从「目标池」多选；搜索后点击勾选，标签可移除。建议至少 2 只；池空请先扫描更新。</p>
         <div class="stock-picker" id="pfStockPicker">
           <div class="stock-picker-bar">
             <input type="search" id="pfStockQ" class="stock-picker-input" placeholder="搜索：600036 / 招商 / 银行" autocomplete="off"/>
@@ -1091,6 +1091,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260728-bt-strategy"></script>
+<script src="/js/stock-chart.js?v=20260728-bt-tradepool"></script>
 </body>
 </html>

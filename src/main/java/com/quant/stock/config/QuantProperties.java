@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 public class QuantProperties {
 
     /** 默认关注标的，逗号分隔代码列表 */
-    private String stockCodes = "600036,000001,300059";
+    private String stockCodes = "600036,000001,300059,601318,000858,600519,000568,002415,600276,601166";
     /** 单票最大仓位占权益比例 */
     private BigDecimal maxSinglePosition = new BigDecimal("0.3");
     /** 组合总仓位占权益硬顶 */
@@ -67,6 +67,10 @@ public class QuantProperties {
     private int mockBarDays = 30;
     /** 是否启用 MySQL 与 MyBatis（false 时走 classpath 模拟数据） */
     private boolean dbEnabled = false;
+    /** K线数据源：auto=足够1分钟时聚合，否则旧表回退；prefer_1min=不足即空；legacy=只读旧表 */
+    private String klineSource = "auto";
+    /** auto/prefer_1min 下认定有足够 1 分钟 K 线的最少根数 */
+    private int min1minBars = 240;
 
     /** 策略过滤 */
     private boolean trendFilterEnabled = true;

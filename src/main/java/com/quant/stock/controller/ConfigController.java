@@ -51,26 +51,16 @@ public class ConfigController {
             Map<String, Object> row = new LinkedHashMap<String, Object>();
             row.put("id", s.name());
             row.put("fingerprintId", s.fingerprintId());
-            row.put("label", strategyLabel(s.name()));
+            row.put("label", s.uiLabel());
+            if (s.profileSummary() != null && !s.profileSummary().isEmpty()) {
+                row.put("summary", s.profileSummary());
+            }
             list.add(row);
         }
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.put("activeStrategy", strategyRegistry.active().name());
         m.put("strategies", list);
-        m.put("hint", "回测可选其它策略；纸面扫描仍用 quant.active-strategy");
+        m.put("hint", "回测可选其它策略/画像；纸面扫描仍用 quant.active-strategy");
         return m;
-    }
-
-    private static String strategyLabel(String id) {
-        if (id == null) {
-            return "";
-        }
-        if ("maCross".equalsIgnoreCase(id)) {
-            return "均线金叉（maCross）";
-        }
-        if ("holdNothing".equalsIgnoreCase(id)) {
-            return "永不交易占位（holdNothing）";
-        }
-        return id;
     }
 }

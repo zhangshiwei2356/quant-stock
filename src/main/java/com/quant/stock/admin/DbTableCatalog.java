@@ -82,6 +82,10 @@ public final class DbTableCatalog {
                 "存储 5 分钟级 K 线，支撑分钟周期回测与实盘分钟扫描。",
                 "Mock 分钟线生成或收盘后由日线聚合/行情源拉取写入。",
                 "分钟回测、scan-and-trade 实盘分钟分析、分钟因子计算。");
+        add(m, "market_1min", "1分钟行情(原始层)", "行情", "id DESC",
+                "存储 1 分钟级原始 K 线（唯一明细层），供双写迁移与未来 5 分钟聚合源。",
+                "行情采集双写任务写入（阶段 0 仅建表与 Mapper，读写路径后续任务接入）。",
+                "原始 1 分钟查询、批量 upsert；运维中心数据表浏览字段 symbol,trade_time,open,high,low,close,volume,amount。");
         add(m, "factor_daily", "日频因子缓存", "因子", "id DESC",
                 "缓存日频技术指标（MA/RSI/ATR 等）；入池粗筛可读最新行（ma5>ma20 / ma60向上 / 放量）。",
                 "MockDataImporter 导入或后续因子任务写入。",

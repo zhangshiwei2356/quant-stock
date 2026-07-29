@@ -1,36 +1,511 @@
 {
-	"description":"五只股票近一年模拟K线（原始1分钟 + 预聚合多周期）",
-	"start":"2025-07-17",
-	"end":"2026-07-17",
-	"generatedAt":"2026-07-19 22:32:53",
-	"stocks":[
+	"description": "模拟种子 + 公开接口批量扩展日线（约100只）；MIN_5 合成仅落库",
+	"start": "2025-07-17",
+	"end": "2026-07-17",
+	"generatedAt": "2026-07-19 22:32:53",
+	"stocks": [
 		{
-			"code":"600036",
-			"name":"招商银行",
-			"basePrice":"35.00"
+			"code": "600036",
+			"name": "招商银行",
+			"basePrice": "39.00"
 		},
 		{
-			"code":"000001",
-			"name":"平安银行",
-			"basePrice":"11.50"
+			"code": "000001",
+			"name": "平安银行",
+			"basePrice": "11.11"
 		},
 		{
-			"code":"300059",
-			"name":"东方财富",
-			"basePrice":"18.80"
+			"code": "300059",
+			"name": "东方财富",
+			"basePrice": "19.65"
 		},
 		{
-			"code":"601318",
-			"name":"中国平安",
-			"basePrice":"45.00"
+			"code": "601318",
+			"name": "中国平安",
+			"basePrice": "53.41"
 		},
 		{
-			"code":"000858",
-			"name":"五粮液",
-			"basePrice":"128.00"
+			"code": "000858",
+			"name": "五粮液",
+			"basePrice": "73.90"
+		},
+		{
+			"code": "600519",
+			"name": "贵州茅台",
+			"basePrice": "1289.50"
+		},
+		{
+			"code": "000568",
+			"name": "泸州老窖",
+			"basePrice": "83.73"
+		},
+		{
+			"code": "002415",
+			"name": "海康威视",
+			"basePrice": "36.99"
+		},
+		{
+			"code": "600276",
+			"name": "恒瑞医药",
+			"basePrice": "53.60"
+		},
+		{
+			"code": "601166",
+			"name": "兴业银行",
+			"basePrice": "18.30"
+		},
+		{
+			"code": "600030",
+			"name": "中信证券",
+			"basePrice": "28.26"
+		},
+		{
+			"code": "600887",
+			"name": "伊利股份",
+			"basePrice": "26.06"
+		},
+		{
+			"code": "601398",
+			"name": "工商银行",
+			"basePrice": "7.73"
+		},
+		{
+			"code": "601288",
+			"name": "农业银行",
+			"basePrice": "6.72"
+		},
+		{
+			"code": "601988",
+			"name": "中国银行",
+			"basePrice": "6.00"
+		},
+		{
+			"code": "601328",
+			"name": "交通银行",
+			"basePrice": "7.01"
+		},
+		{
+			"code": "600000",
+			"name": "浦发银行",
+			"basePrice": "9.05"
+		},
+		{
+			"code": "600016",
+			"name": "民生银行",
+			"basePrice": "3.53"
+		},
+		{
+			"code": "601601",
+			"name": "中国太保",
+			"basePrice": "31.62"
+		},
+		{
+			"code": "601628",
+			"name": "中国人寿",
+			"basePrice": "39.73"
+		},
+		{
+			"code": "600048",
+			"name": "保利发展",
+			"basePrice": "5.01"
+		},
+		{
+			"code": "600104",
+			"name": "上汽集团",
+			"basePrice": "10.44"
+		},
+		{
+			"code": "600309",
+			"name": "万华化学",
+			"basePrice": "74.15"
+		},
+		{
+			"code": "600585",
+			"name": "海螺水泥",
+			"basePrice": "17.75"
+		},
+		{
+			"code": "600690",
+			"name": "海尔智家",
+			"basePrice": "21.87"
+		},
+		{
+			"code": "600809",
+			"name": "山西汾酒",
+			"basePrice": "123.06"
+		},
+		{
+			"code": "600900",
+			"name": "长江电力",
+			"basePrice": "28.35"
+		},
+		{
+			"code": "601012",
+			"name": "隆基绿能",
+			"basePrice": "12.64"
+		},
+		{
+			"code": "601088",
+			"name": "中国神华",
+			"basePrice": "44.83"
+		},
+		{
+			"code": "601225",
+			"name": "陕西煤业",
+			"basePrice": "24.56"
+		},
+		{
+			"code": "601857",
+			"name": "中国石油",
+			"basePrice": "10.90"
+		},
+		{
+			"code": "600028",
+			"name": "中国石化",
+			"basePrice": "5.15"
+		},
+		{
+			"code": "601668",
+			"name": "中国建筑",
+			"basePrice": "4.63"
+		},
+		{
+			"code": "601186",
+			"name": "中国铁建",
+			"basePrice": "6.49"
+		},
+		{
+			"code": "601390",
+			"name": "中国中铁",
+			"basePrice": "4.52"
+		},
+		{
+			"code": "601766",
+			"name": "中国中车",
+			"basePrice": "5.92"
+		},
+		{
+			"code": "600031",
+			"name": "三一重工",
+			"basePrice": "19.40"
+		},
+		{
+			"code": "600406",
+			"name": "国电南瑞",
+			"basePrice": "23.90"
+		},
+		{
+			"code": "600438",
+			"name": "通威股份",
+			"basePrice": "11.17"
+		},
+		{
+			"code": "600893",
+			"name": "航发动力",
+			"basePrice": "35.15"
+		},
+		{
+			"code": "601888",
+			"name": "中国中免",
+			"basePrice": "54.44"
+		},
+		{
+			"code": "603259",
+			"name": "药明康德",
+			"basePrice": "124.66"
+		},
+		{
+			"code": "603288",
+			"name": "海天味业",
+			"basePrice": "36.02"
+		},
+		{
+			"code": "603501",
+			"name": "韦尔股份",
+			"basePrice": "95.31"
+		},
+		{
+			"code": "603986",
+			"name": "兆易创新",
+			"basePrice": "434.03"
+		},
+		{
+			"code": "000002",
+			"name": "万科A",
+			"basePrice": "3.13"
+		},
+		{
+			"code": "000063",
+			"name": "中兴通讯",
+			"basePrice": "35.25"
+		},
+		{
+			"code": "000100",
+			"name": "TCL科技",
+			"basePrice": "5.10"
+		},
+		{
+			"code": "000157",
+			"name": "中联重科",
+			"basePrice": "7.46"
+		},
+		{
+			"code": "000166",
+			"name": "申万宏源",
+			"basePrice": "4.66"
+		},
+		{
+			"code": "000333",
+			"name": "美的集团",
+			"basePrice": "84.13"
+		},
+		{
+			"code": "000338",
+			"name": "潍柴动力",
+			"basePrice": "28.45"
+		},
+		{
+			"code": "000538",
+			"name": "云南白药",
+			"basePrice": "51.12"
+		},
+		{
+			"code": "000596",
+			"name": "古井贡酒",
+			"basePrice": "87.75"
+		},
+		{
+			"code": "000625",
+			"name": "长安汽车",
+			"basePrice": "7.26"
+		},
+		{
+			"code": "000651",
+			"name": "格力电器",
+			"basePrice": "40.39"
+		},
+		{
+			"code": "000725",
+			"name": "京东方A",
+			"basePrice": "5.97"
+		},
+		{
+			"code": "000768",
+			"name": "中航西飞",
+			"basePrice": "20.75"
+		},
+		{
+			"code": "000776",
+			"name": "广发证券",
+			"basePrice": "21.90"
+		},
+		{
+			"code": "000786",
+			"name": "北新建材",
+			"basePrice": "19.40"
+		},
+		{
+			"code": "000876",
+			"name": "新希望",
+			"basePrice": "6.83"
+		},
+		{
+			"code": "000895",
+			"name": "双汇发展",
+			"basePrice": "25.06"
+		},
+		{
+			"code": "000938",
+			"name": "紫光股份",
+			"basePrice": "41.47"
+		},
+		{
+			"code": "000977",
+			"name": "浪潮信息",
+			"basePrice": "85.00"
+		},
+		{
+			"code": "001979",
+			"name": "招商蛇口",
+			"basePrice": "6.85"
+		},
+		{
+			"code": "002001",
+			"name": "新和成",
+			"basePrice": "29.86"
+		},
+		{
+			"code": "002027",
+			"name": "分众传媒",
+			"basePrice": "5.15"
+		},
+		{
+			"code": "002049",
+			"name": "紫光国微",
+			"basePrice": "66.00"
+		},
+		{
+			"code": "002050",
+			"name": "三花智控",
+			"basePrice": "36.03"
+		},
+		{
+			"code": "002142",
+			"name": "宁波银行",
+			"basePrice": "31.89"
+		},
+		{
+			"code": "002230",
+			"name": "科大讯飞",
+			"basePrice": "39.73"
+		},
+		{
+			"code": "002236",
+			"name": "大华股份",
+			"basePrice": "16.73"
+		},
+		{
+			"code": "002241",
+			"name": "歌尔股份",
+			"basePrice": "22.87"
+		},
+		{
+			"code": "002271",
+			"name": "东方雨虹",
+			"basePrice": "11.33"
+		},
+		{
+			"code": "002304",
+			"name": "洋河股份",
+			"basePrice": "39.70"
+		},
+		{
+			"code": "002352",
+			"name": "顺丰控股",
+			"basePrice": "33.76"
+		},
+		{
+			"code": "002371",
+			"name": "北方华创",
+			"basePrice": "770.00"
+		},
+		{
+			"code": "002460",
+			"name": "赣锋锂业",
+			"basePrice": "50.08"
+		},
+		{
+			"code": "002466",
+			"name": "天齐锂业",
+			"basePrice": "45.21"
+		},
+		{
+			"code": "002475",
+			"name": "立讯精密",
+			"basePrice": "62.89"
+		},
+		{
+			"code": "002594",
+			"name": "比亚迪",
+			"basePrice": "92.40"
+		},
+		{
+			"code": "002714",
+			"name": "牧原股份",
+			"basePrice": "39.33"
+		},
+		{
+			"code": "002812",
+			"name": "恩捷股份",
+			"basePrice": "53.55"
+		},
+		{
+			"code": "002821",
+			"name": "凯莱英",
+			"basePrice": "162.95"
+		},
+		{
+			"code": "003816",
+			"name": "中国广核",
+			"basePrice": "4.03"
+		},
+		{
+			"code": "300015",
+			"name": "爱尔眼科",
+			"basePrice": "8.62"
+		},
+		{
+			"code": "300033",
+			"name": "同花顺",
+			"basePrice": "218.55"
+		},
+		{
+			"code": "300122",
+			"name": "智飞生物",
+			"basePrice": "12.48"
+		},
+		{
+			"code": "300124",
+			"name": "汇川技术",
+			"basePrice": "59.48"
+		},
+		{
+			"code": "300142",
+			"name": "沃森生物",
+			"basePrice": "12.36"
+		},
+		{
+			"code": "300274",
+			"name": "阳光电源",
+			"basePrice": "116.21"
+		},
+		{
+			"code": "300308",
+			"name": "中际旭创",
+			"basePrice": "1076.94"
+		},
+		{
+			"code": "300316",
+			"name": "晶盛机电",
+			"basePrice": "39.96"
+		},
+		{
+			"code": "300347",
+			"name": "泰格医药",
+			"basePrice": "48.99"
+		},
+		{
+			"code": "300408",
+			"name": "三环集团",
+			"basePrice": "111.57"
+		},
+		{
+			"code": "300433",
+			"name": "蓝思科技",
+			"basePrice": "36.63"
+		},
+		{
+			"code": "300442",
+			"name": "润泽科技",
+			"basePrice": "66.28"
+		},
+		{
+			"code": "300450",
+			"name": "先导智能",
+			"basePrice": "33.51"
+		},
+		{
+			"code": "300498",
+			"name": "温氏股份",
+			"basePrice": "13.88"
+		},
+		{
+			"code": "300750",
+			"name": "宁德时代",
+			"basePrice": "400.00"
 		}
 	],
-	"periods":[
+	"periods": [
 		"MIN_1",
 		"MIN_5",
 		"MIN_15",
@@ -40,5 +515,8 @@
 		"WEEK",
 		"MONTH"
 	],
-	"note":"字段采用紧凑数组 [t,o,h,l,c,v]；MySQL 导入用 DAY + MIN_5"
+	"note": "字段 [t,o,h,l,c,v]；MySQL 导入用 DAY + MIN_5；扩展股 source=eastmoney",
+	"extendedAt": "2026-07-28 02:13:41",
+	"batchExtendedAt": "2026-07-28 02:30:46",
+	"batchCount": 100
 }

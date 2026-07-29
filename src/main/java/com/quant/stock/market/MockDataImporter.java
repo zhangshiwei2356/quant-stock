@@ -7,6 +7,7 @@ import com.quant.stock.mapper.FactorDailyMapper;
 import com.quant.stock.mapper.MarketDailyMapper;
 import com.quant.stock.mapper.MarketMinuteMapper;
 import com.quant.stock.mapper.StockBasicMapper;
+import com.quant.stock.market.dto.BarDTO;
 import com.quant.stock.market.dto.FactorDailyDO;
 import com.quant.stock.market.dto.MarketDailyDO;
 import com.quant.stock.market.dto.MarketMinuteDO;
@@ -33,7 +34,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 启动时若 market_daily 为空，则从 classpath:data/kline 导入 DAY + MIN_5 模拟数据。
+ * 启动时若 market_daily 为空，则从 classpath:data/kline 导入 DAY + MIN_5 模拟数据；
+ * 若存在 MIN_1.json 且库内尚无 market_1min，则可选导入 1 分钟层。
  */
 @Slf4j
 @Component
@@ -49,6 +51,7 @@ public class MockDataImporter {
     private final MarketDailyMapper marketDailyMapper;
     private final MarketMinuteMapper marketMinuteMapper;
     private final FactorDailyMapper factorDailyMapper;
+    private final CoreMarketBarService coreMarketBarService;
 
     /** 应用就绪后触发：空库则导入 classpath 模拟行情种子。 */
     @EventListener(ApplicationReadyEvent.class)
@@ -84,12 +87,22 @@ public class MockDataImporter {
             boolean hasMinute = marketMinuteMapper.countBySymbol(code) > 0;
             if (hasDaily && hasMinute) {
                 upsertBasic(code, name);
+                importMinute1IfNeeded(resolver, code);
                 continue;
+            }
+            // 仅有日线且无 MIN_5.json：视为「日线扩展样本」已覆盖（批量公开接口场景）
+            if (hasDaily && !hasMinute) {
+                Resource minRes = resolver.getResource(BASE + code + "/MIN_5.json");
+                if (!minRes.exists()) {
+                    upsertBasic(code, name);
+                    continue;
+                }
             }
             log.info("增量导入模拟行情 symbol={} ...", code);
             upsertBasic(code, name);
             importDaily(resolver, code);
             importMinute(resolver, code);
+            importMinute1IfNeeded(resolver, code);
             computeFactors(code);
             imported++;
             log.info("导入完成 symbol={}", code);
@@ -195,6 +208,46 @@ public class MockDataImporter {
             marketMinuteMapper.batchUpsert(batch);
         }
         log.info("market_minute 写入 {} bars={}", code, bars.size());
+    }
+
+    /** 可选：classpath 有 MIN_1.json 且 market_1min 为空时写入 1 分钟 K。 */
+    private void importMinute1IfNeeded(PathMatchingResourcePatternResolver resolver, String code)
+            throws Exception {
+        if (coreMarketBarService.hasOneMin(code)) {
+            return;
+        }
+        JSONArray bars = loadBarsArray(resolver, code, "MIN_1");
+        if (bars == null || bars.isEmpty()) {
+            return;
+        }
+        List<BarDTO> dtos = new ArrayList<BarDTO>(bars.size());
+        for (int i = 0; i < bars.size(); i++) {
+            JSONArray row = bars.getJSONArray(i);
+            LocalDateTime t = LocalDateTime.parse(row.getString(0), FMT);
+            BigDecimal open = bd(row.get(1));
+            BigDecimal high = bd(row.get(2));
+            BigDecimal low = bd(row.get(3));
+            BigDecimal close = bd(row.get(4));
+            long volume = row.getLongValue(5);
+            dtos.add(BarDTO.builder()
+                    .code(code)
+                    .barBegin(t)
+                    .periodMinutes(1)
+                    .open(open)
+                    .high(high)
+                    .low(low)
+                    .close(close)
+                    .volume(BigDecimal.valueOf(volume))
+                    .build());
+            if (dtos.size() >= BATCH) {
+                coreMarketBarService.saveMinutes1(dtos);
+                dtos.clear();
+            }
+        }
+        if (!dtos.isEmpty()) {
+            coreMarketBarService.saveMinutes1(dtos);
+        }
+        log.info("market_1min 写入 {} bars={}", code, bars.size());
     }
 
     private void computeFactors(String code) {
