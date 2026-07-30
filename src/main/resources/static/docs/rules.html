@@ -64,8 +64,8 @@
       <code>GET /api/account/alerts</code>；硬拦截仍由仓位与熔断逻辑执行</li>
   <li><b>信号漂移（P0-90）</b>：滚动胜率（闭环回合）+ MA5/MA20 价差 vs 次日收益<strong>代理</strong> IC（真因子 IC 不可用）；低于阈连续确认后 CRITICAL；
       <code>auto-retire-on-signal-drift</code> 默认 false；<code>GET /api/account/signal-drift</code>；不改金叉、不报复满仓</li>
-  <li><b>多源对账闸（P0-107）</b>：主源日线 vs 分钟聚合日线收盘分歧；超 <code>data-reconcile-max-close-diff-pct</code>（默认 2%）告警；
-      <code>data-reconcile-block-on-diverge</code> 默认 false；开启后阻断新开；<code>GET/POST /api/ops/data-reconcile*</code>；外部源仍待 API</li>
+  <li><b>行情自洽闸（P0-107）</b>：检查 <code>market_1min</code> 空/滞后/稀疏日/OHLC；超阈告警；
+      <code>data-reconcile-block-on-diverge</code> 默认 false；开启后阻断新开；<code>GET/POST /api/ops/data-reconcile*</code>；外部双源仍待 API</li>
   <li><b>结构突变（P0-120）</b>：双窗收益均值差/波动；超阈确认后仓位×0.5 并挂漂移；<code>GET /api/account/structural-break</code>；不改金叉</li>
   <li><b>ST as-of（P0-101）</b>：优先 <code>st_status_hist</code> 日切；无行回退 <code>stock_basic.is_st</code>（有前视风险）；
       <code>st-open-filter-enabled</code> 默认 true 禁开；涨跌幅按 as-of ST 规则；<strong>财报公告时钟本地无数据</strong>，事件沙箱不进金叉</li>

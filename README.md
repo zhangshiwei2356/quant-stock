@@ -175,7 +175,7 @@ sequenceDiagram
 |------|------|
 | 任务管理 | `sys_schedule_job` 启停 / cron / 立即执行（种子默认全关） |
 | 数据健康 | 本地空数据与滞后检查 |
-| 运行参数 | `QuantProperties` + 配置键中文说明 |
+| 运行参数 | `QuantProperties` + 配置键中文说明；已注册策略表与纸面激活切换 |
 
 总闸：`quant.schedule.enabled`（默认 true）。
 
@@ -261,7 +261,7 @@ sequenceDiagram
 | GET `/api/account/stress` | 预注册压力情景状态 |
 | GET `/api/account/signal-drift` | 信号漂移（滚动胜率/IC） |
 | GET `/api/account/structural-break` | 结构突变监控 |
-| GET/POST `/api/ops/data-reconcile*` | 多源对账闸（日线 vs 分钟聚合） |
+| GET/POST `/api/ops/data-reconcile*` | `market_1min` 自洽闸（空/滞后/稀疏日/OHLC） |
 | GET/POST `/api/ops/st-pit` | ST as-of 日切；财报时钟边界说明 |
 | GET/POST `/api/ops/industry-reclass*` | 行业 reclass as-of 日志 |
 | GET `/api/account/turnover` | 换手门禁（日成交额/权益） |
@@ -273,7 +273,8 @@ sequenceDiagram
 | POST `/api/account/orders/{id}/partial-fill?qty=` | 本地部成桩 |
 | POST `/api/account/orders/{id}/replace?price=&volume=` | 改价=撤补（新单队尾） |
 | GET/PUT/POST `/api/schedule/**` | 定时任务 |
-| GET `/api/ops/data-health` · `/params` | 数据健康 / 运行参数 |
+| GET `/api/ops/data-health` · `/params` · `/strategies` | 数据健康 / 运行参数 / 已注册策略 |
+| POST `/api/ops/active-strategy` | 纸面激活策略热切换（须 `confirm:true`） |
 | GET `/api/db/tables` · `/tables/{name}` | 表白名单浏览 |
 | GET `/api/docs/pdf/{stock\|app}` | 文档 PDF |
 | GET `/api/docs/readme` | README HTML 片段 |
@@ -324,8 +325,8 @@ sequenceDiagram
 - 禁空头：`ShortSellPolicy.allowShort=false`（无配置开关）；卖出≤持仓；`GET /api/account/short-policy`
 - 限价保护边界：`GET /api/account/order-protect`（五档/L2=`UNAVAILABLE`）
 - 执行降频边界：组合回测已对齐 AUM+POV；`GET /api/account/execution-cap`（TWAP=`UNAVAILABLE`）
-- 多源对账：日线↔分钟聚合；`externalVendorSource=UNAVAILABLE`；行业 reclass：`externalIndustrySource=UNAVAILABLE`
-- 多源对账闸：日线 vs 分钟聚合收盘分歧；`data-reconcile-block-on-diverge` 默认 **false**（只告警）；`GET/POST /api/ops/data-reconcile*`；外部行情对账仍待 API
+- 行情自洽闸：检查 `market_1min` 空/滞后/稀疏日/OHLC；`data-reconcile-block-on-diverge` 默认 **false**；`GET/POST /api/ops/data-reconcile*`；外部双源仍 `UNAVAILABLE`
+- 运维可查看已注册策略并热切换纸面激活：`GET /api/ops/strategies`、`POST /api/ops/active-strategy`
 - 扩容降频：权益超 `capacity-aum-base`（默认 10万）时收紧 ADV 参与率；`pov-max-bar-volume-pct` 默认 0.10（当根量 POV 切片）
 - 结构突变：双窗收益均值差；确认后降仓×0.5 并挂漂移；`GET /api/account/structural-break`（不改金叉）
 - ST as-of：`st_status_hist` 日切优先；`st-open-filter-enabled` 默认 true 禁开 ST；财报公告时钟本地无数据（边界已声明）

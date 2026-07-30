@@ -35,10 +35,10 @@
     <b>本期不加新策略实现</b>（如隔日高开复合策略仅作路线图参考，代码侧暂不落地）。
   </p>
   <ol>
-    <li><b>多策略注册与发现体验</b> — 待办 · 已有 <code>StrategyRegistry</code> + 回测下拉；待补：运维页只读「已注册策略」列表/说明；新策略约定（独立 <code>BaseStrategy</code>、稳定 id、不改金叉类）写进运维提示</li>
+    <li><b>多策略注册与发现面板</b> — 已落地 · 运维「运行参数」展示已注册策略表；约定：独立 <code>BaseStrategy</code>、稳定 id、不改金叉类</li>
     <li><b>策略相关参数页面可调</b> — 待办 · 运维「运行参数」由只读升级为<strong>白名单可写</strong>；优先共用过滤/仓位/止损类 <code>quant.*</code>；落现有 <code>system_config</code> 并回写生效配置；改后刷新 <code>configFingerprint</code></li>
     <li><b>按策略隔离的参数包</b> — 待办 · 策略少时用 <code>system_config</code> 键前缀（如 <code>strategy.maCross.*</code>）；策略多/要版本审计时再评估表 <code>strategy_param</code> 或 JSON profile；回测「用全局 / 本次覆盖」分流</li>
-    <li><b>全局激活策略的安全切换</b> — 待办 · 运维可选改 <code>quant.active-strategy</code>（权限+确认）；明确对挂单/仓位/目标池的影响；默认仍 yml；与回测下拉（仅本次）职责分离</li>
+    <li><b>全局激活策略的安全切换</b> — 已落地 · 运维确认后 <code>POST /api/ops/active-strategy</code>；写 <code>system_config</code> 并热更新；影响纸面扫描，不影响回测下拉</li>
     <li><b>分钟级/多分支策略引擎适配</b> — 待办 · 现主路径偏日线金叉 bar 循环；要支持时段分支、持仓日态机、分分支绩效等，需策略侧态机 + 分钟回测/纸面适配；缺指数/竞价/封单等数据时显式 <code>UNAVAILABLE</code> 或开关关闭，不静默假撮合</li>
     <li><b>候选策略入库（仅规划，不实现）</b> — 待办 · 「全时段隔日高开套利复合策略」（早盘/盘中/尾盘三分支、隔日持有最长 2 日等）文档已备；待多策略能力与数据条件就绪后再单独立项接入，<strong>禁止</strong>塞进 <code>MaCrossStrategy</code></li>
     <li><b>明确不做（本阶段）</b> — 多策略并行分账本、信号合成冲突裁决、按策略拆目标池、运维「CRUD 编辑买卖公式」菜单</li>
@@ -77,7 +77,7 @@
     <li><b>回测部成对齐</b> — 已落地 · <code>backtest-fill-ratio</code> 默认 1；残量挂单；<code>GET /api/account/partial-fill</code></li>
     <li><b>压力情景库</b> — 已落地 · 预注册 ADV 断崖/一字板/相关尖峰等；<code>GET /api/account/stress</code>；不改金叉</li>
     <li><b>信号漂移监控</b> — 已落地（可落部分）· 滚动胜率+MA价差代理 IC；默认不自动退役；<code>GET /api/account/signal-drift</code></li>
-    <li><b>多源对账闸</b> — 已落地（本地）· 日线 vs 分钟聚合；<code>/api/ops/data-reconcile</code>；默认不阻断；外部行情对账仍待 API</li>
+    <li><b>行情自洽闸</b> — 已落地 · 检查 <code>market_1min</code> 空/滞后/稀疏日/OHLC；<code>/api/ops/data-reconcile</code>；默认不阻断；外部双源仍待 API</li>
     <li><b>扩容降频 + POV</b> — 已落地 · <code>capacity-aum-base</code> 收紧 ADV；<code>pov-max-bar-volume-pct</code> 当根量切片</li>
     <li><b>结构突变监控</b> — 已落地 · 双窗突变分→降仓+挂漂移；<code>GET /api/account/structural-break</code></li>
     <li><b>ST as-of 日切</b> — 已落地（局部）· 表 <code>st_status_hist</code> + 禁开；无历史行时回退现状态；财报时钟仍缺</li>

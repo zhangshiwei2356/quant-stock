@@ -1,7 +1,6 @@
 package com.quant.stock.admin;
 
 import com.quant.stock.config.QuantProperties;
-import com.quant.stock.market.BarAggregateUtil;
 import com.quant.stock.market.BarPeriod;
 import com.quant.stock.market.MarketDataService;
 import com.quant.stock.market.dto.BarDTO;
@@ -11,22 +10,27 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * 多源对账闸（P0-107）：主源日线 vs 分钟聚合日线 OHLC 分歧。
- * 超阈可阻断新开；不改金叉。外部券商源仍待 API。
+ * 行情自洽闸（原 P0-107 多源对账）：在仅 {@code market_1min} 真相源下，
+ * 检查 1 分钟覆盖/滞后/稀疏日/OHLC 合法性；外部双源仍 {@code UNAVAILABLE}。
  */
 @Service
 public class DataReconcileGateService {
+
+    /** 单交易日 1 分钟根数低于该值视为稀疏（完整日约 240） */
+    static final int MIN_BARS_PER_DAY = 120;
+    /** OHLC 抽检最多根数 */
+    private static final int OHLC_SAMPLE_LIMIT = 800;
 
     private final QuantProperties props;
     private final MarketDataService marketDataService;
@@ -47,12 +51,12 @@ public class DataReconcileGateService {
         this.poolBridge = poolBridge;
     }
 
-    /** 是否因对账分歧阻断新开 */
+    /** 是否因自洽失败阻断新开 */
     public boolean blockNewOpen() {
         return props.isDataReconcileGateEnabled() && gateOpenBlocked.get();
     }
 
-    /** 返回最近一次对账结果摘要（含闸状态） */
+    /** 返回最近一次自洽检查摘要（含闸状态） */
     public Map<String, Object> lastReport() {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.putAll(lastReport);
@@ -60,25 +64,22 @@ public class DataReconcileGateService {
         m.put("blockNewOpen", blockNewOpen());
         m.put("maxCloseDiffPct", props.getDataReconcileMaxCloseDiffPct());
         m.put("lastRunAt", lastRunAt == null ? null : lastRunAt.toString());
-        m.put("primarySource", lastReport.getOrDefault("primarySource", "DAY_KLINE"));
-        m.put("secondarySource", lastReport.getOrDefault("secondarySource", "MINUTE_AGG_DAY"));
+        m.put("primarySource", lastReport.getOrDefault("primarySource", "MARKET_1MIN"));
+        m.put("secondarySource", lastReport.getOrDefault("secondarySource", "SELF_CONSISTENCY"));
         m.put("externalVendorSource", "UNAVAILABLE");
-        m.put("hint", "主源=日线表/日K；校验源=分钟聚合日线；外部 vendor 对账仍待 API");
+        m.put("hint", lastReport.getOrDefault("hint",
+                "自洽检查 market_1min（空/滞后/稀疏日/OHLC）；外部双源仍待 API"));
         return m;
     }
 
     /**
-     * 对给定代码列表（空则经桥接取目标池/universe）执行主源日线 vs 分钟聚合日线对账。
+     * 对给定代码列表（空则经桥接取目标池/universe）执行 1 分钟自洽检查。
      */
     public Map<String, Object> reconcile(List<String> codes) {
         List<String> universe = codes;
         if (universe == null || universe.isEmpty()) {
             TradePoolServiceBridge bridge = poolBridge.getIfAvailable();
             universe = bridge == null ? new ArrayList<String>() : bridge.activeOrUniverseCodes();
-        }
-        BigDecimal maxDiff = props.getDataReconcileMaxCloseDiffPct();
-        if (maxDiff == null || maxDiff.compareTo(BigDecimal.ZERO) <= 0) {
-            maxDiff = new BigDecimal("0.02");
         }
         int sampleDays = Math.max(3, props.getDataReconcileSampleDays());
         List<Map<String, Object>> divergences = new ArrayList<Map<String, Object>>();
@@ -90,7 +91,7 @@ public class DataReconcileGateService {
                 continue;
             }
             checked++;
-            Map<String, Object> one = reconcileOne(code, sampleDays, maxDiff);
+            Map<String, Object> one = checkOne(code, sampleDays);
             if (Boolean.TRUE.equals(one.get("diverged"))) {
                 divergeCodes++;
                 divergences.add(one);
@@ -106,11 +107,11 @@ public class DataReconcileGateService {
         if (block) {
             riskAlertService.emit(LocalDate.now(), null, "DATA_RECONCILE_GATE", AlertSeverity.CRITICAL,
                     BigDecimal.valueOf(divergeCodes),
-                    "主源/分钟聚合分歧 " + divergeCodes + " 只，阻断新开");
+                    "1分钟自洽失败 " + divergeCodes + " 只，阻断新开");
         } else if (divergeCodes > 0) {
             riskAlertService.emit(LocalDate.now(), null, "DATA_RECONCILE_WARN", AlertSeverity.WARN,
                     BigDecimal.valueOf(divergeCodes),
-                    "主源/分钟聚合分歧 " + divergeCodes + " 只（未阻断）");
+                    "1分钟自洽失败 " + divergeCodes + " 只（未阻断）");
         }
 
         Map<String, Object> m = new LinkedHashMap<String, Object>();
@@ -118,74 +119,120 @@ public class DataReconcileGateService {
         m.put("checked", checked);
         m.put("divergeCodeCount", divergeCodes);
         m.put("blockNewOpen", block);
-        m.put("maxCloseDiffPct", maxDiff);
         m.put("sampleDays", sampleDays);
+        m.put("minBarsPerDay", MIN_BARS_PER_DAY);
+        m.put("maxCloseDiffPct", props.getDataReconcileMaxCloseDiffPct());
+        m.put("maxCloseDiffPctUsed", false);
         m.put("divergences", divergences);
-        m.put("primarySource", "DAY_KLINE");
-        m.put("secondarySource", "MINUTE_AGG_DAY");
+        m.put("primarySource", "MARKET_1MIN");
+        m.put("secondarySource", "SELF_CONSISTENCY");
+        m.put("hint", "自洽检查 market_1min（空/滞后/稀疏日/OHLC）；"
+                + "data-reconcile-max-close-diff-pct 保留兼容但未用于价差；外部双源 UNAVAILABLE");
         lastReport = m;
         return lastReport();
     }
 
-    private Map<String, Object> reconcileOne(String code, int sampleDays, BigDecimal maxDiff) {
+    private Map<String, Object> checkOne(String code, int sampleDays) {
         Map<String, Object> row = new LinkedHashMap<String, Object>();
         row.put("code", code);
         row.put("diverged", false);
+        List<String> issues = new ArrayList<String>();
         try {
-            List<BarDTO> daily = marketDataService.getKline(code, BarPeriod.DAY, null, null);
-            List<BarDTO> minutes = marketDataService.getKline(code, BarPeriod.MIN_5, null, null);
-            if (daily == null || daily.size() < sampleDays || minutes == null || minutes.isEmpty()) {
-                row.put("skip", "样本不足");
+            List<BarDTO> ones = marketDataService.getKline(code, BarPeriod.MIN_1, null, null);
+            if (ones == null || ones.isEmpty()) {
+                issues.add("1分钟为空");
+                row.put("diverged", true);
+                row.put("issues", issues);
                 return row;
             }
-            List<BarDTO> agg = BarAggregateUtil.aggregate(minutes, BarAggregateUtil.Period.DAY);
-            if (agg == null || agg.isEmpty()) {
-                row.put("skip", "分钟无法聚合");
-                return row;
-            }
-            Map<LocalDate, BarDTO> byDay = new HashMap<LocalDate, BarDTO>();
-            for (BarDTO b : agg) {
-                if (b != null && b.getBarBegin() != null) {
-                    byDay.put(b.getBarBegin().toLocalDate(), b);
+            row.put("oneMinCount", ones.size());
+            BarDTO last = ones.get(ones.size() - 1);
+            LocalDate lastDay = last.getBarBegin() == null ? null : last.getBarBegin().toLocalDate();
+            row.put("maxOneMin", last.getBarBegin() == null ? null : last.getBarBegin().toString());
+            if (lastDay != null) {
+                long lagDays = ChronoUnit.DAYS.between(lastDay, LocalDate.now());
+                row.put("lagDays", lagDays);
+                if (lagDays > sampleDays) {
+                    issues.add("覆盖滞后" + lagDays + "天(阈=" + sampleDays + ")");
                 }
             }
-            int compared = 0;
-            BigDecimal maxAbs = BigDecimal.ZERO;
-            List<Map<String, Object>> samples = new ArrayList<Map<String, Object>>();
-            for (int i = daily.size() - 1; i >= 0 && compared < sampleDays; i--) {
-                BarDTO d = daily.get(i);
-                if (d == null || d.getBarBegin() == null || d.getClose() == null) {
+
+            Map<LocalDate, Integer> byDay = new TreeMap<LocalDate, Integer>();
+            for (BarDTO b : ones) {
+                if (b == null || b.getBarBegin() == null) {
                     continue;
                 }
-                LocalDate day = d.getBarBegin().toLocalDate();
-                BarDTO a = byDay.get(day);
-                if (a == null || a.getClose() == null || d.getClose().compareTo(BigDecimal.ZERO) <= 0) {
-                    continue;
-                }
-                BigDecimal diff = a.getClose().subtract(d.getClose())
-                        .divide(d.getClose(), 6, RoundingMode.HALF_UP).abs();
-                compared++;
-                if (diff.compareTo(maxAbs) > 0) {
-                    maxAbs = diff;
-                }
-                if (diff.compareTo(maxDiff) > 0) {
+                LocalDate d = b.getBarBegin().toLocalDate();
+                Integer c = byDay.get(d);
+                byDay.put(d, c == null ? 1 : c.intValue() + 1);
+            }
+            List<LocalDate> days = new ArrayList<LocalDate>(byDay.keySet());
+            int from = Math.max(0, days.size() - sampleDays);
+            List<Map<String, Object>> sparse = new ArrayList<Map<String, Object>>();
+            for (int i = from; i < days.size(); i++) {
+                LocalDate d = days.get(i);
+                int n = byDay.get(d);
+                if (n < MIN_BARS_PER_DAY) {
                     Map<String, Object> s = new LinkedHashMap<String, Object>();
-                    s.put("day", day.toString());
-                    s.put("primaryClose", d.getClose());
-                    s.put("secondaryClose", a.getClose());
-                    s.put("absDiffPct", diff);
-                    samples.add(s);
+                    s.put("day", d.toString());
+                    s.put("bars", n);
+                    sparse.add(s);
                 }
             }
-            row.put("comparedDays", compared);
-            row.put("maxAbsDiffPct", maxAbs);
-            row.put("samples", samples);
-            boolean diverged = !samples.isEmpty();
+            row.put("sparseDays", sparse);
+            if (!sparse.isEmpty()) {
+                issues.add("稀疏日" + sparse.size() + "个(日根数<" + MIN_BARS_PER_DAY + ")");
+            }
+
+            int ohlcBad = 0;
+            int sampled = 0;
+            int start = Math.max(0, ones.size() - OHLC_SAMPLE_LIMIT);
+            for (int i = start; i < ones.size(); i++) {
+                BarDTO b = ones.get(i);
+                sampled++;
+                if (!ohlcOk(b)) {
+                    ohlcBad++;
+                }
+            }
+            row.put("ohlcSampled", sampled);
+            row.put("ohlcBad", ohlcBad);
+            if (ohlcBad > 0) {
+                issues.add("OHLC非法" + ohlcBad + "根");
+            }
+
+            boolean diverged = !issues.isEmpty();
             row.put("diverged", diverged);
+            row.put("issues", issues);
         } catch (Exception e) {
+            row.put("diverged", true);
             row.put("skip", e.getMessage());
+            issues.add("校验异常: " + e.getMessage());
+            row.put("issues", issues);
         }
         return row;
+    }
+
+    static boolean ohlcOk(BarDTO b) {
+        if (b == null || b.getOpen() == null || b.getHigh() == null
+                || b.getLow() == null || b.getClose() == null) {
+            return false;
+        }
+        if (b.getOpen().compareTo(BigDecimal.ZERO) <= 0
+                || b.getHigh().compareTo(BigDecimal.ZERO) <= 0
+                || b.getLow().compareTo(BigDecimal.ZERO) <= 0
+                || b.getClose().compareTo(BigDecimal.ZERO) <= 0) {
+            return false;
+        }
+        if (b.getHigh().compareTo(b.getLow()) < 0) {
+            return false;
+        }
+        if (b.getHigh().compareTo(b.getOpen().max(b.getClose())) < 0) {
+            return false;
+        }
+        if (b.getLow().compareTo(b.getOpen().min(b.getClose())) > 0) {
+            return false;
+        }
+        return true;
     }
 
     /**

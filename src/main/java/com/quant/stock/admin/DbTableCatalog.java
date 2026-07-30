@@ -119,9 +119,9 @@ public final class DbTableCatalog {
                 "回测分析流程生成后写入。",
                 "页面展开「分析报告」时读取展示。");
         add(m, "bar_aggregate_meta", "聚合元数据(兼容)", "行情兼容", "stock_code ASC, period ASC",
-                "旧版分表聚合进度元数据，标记各周期最后聚合时间。",
-                "K 线聚合任务维护；新逻辑以 market_* 为主。",
-                "兼容旧聚合流程，避免重复聚合；新部署可逐步弱化依赖。");
+                "旧版分表聚合进度元数据（兼容）；主路径已只用 market_1min 内存聚合。",
+                "历史遗留；新部署可不依赖。",
+                "仅 legacy BarStorageService 可能读写；运维可浏览。");
         add(m, "trade_pool_report", "目标池入选分析报告", "目标池", "id DESC",
                 "盘后扫描入选时生成的完整分析快照（JSON+摘要），供行展开回看。",
                 "pool-rebuild / after-market-batch-scan / 手动扫描时由 TradePoolService 写入。",

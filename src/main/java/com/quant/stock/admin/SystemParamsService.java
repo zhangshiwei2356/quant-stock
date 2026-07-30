@@ -27,6 +27,7 @@ public class SystemParamsService {
         m.put("sim.risk.state", "模拟账户风控快照（峰值/熔断/水下日）");
         m.put("sim.retirement", "策略退役状态快照");
         m.put("sim.books.meta", "模拟挂买/挂卖与金字塔元数据");
+        m.put("quant.active-strategy", "纸面激活策略（运维热切换）");
         SYSTEM_CONFIG_LABELS = Collections.unmodifiableMap(m);
     }
 
@@ -42,7 +43,7 @@ public class SystemParamsService {
     public Map<String, Object> view() {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.put("dbEnabled", props.isDbEnabled());
-        m.put("hint", "只读展示当前生效配置（中文说明 + 配置项键名）；修改请改 application.yml / 环境变量或 system_config（部分键）。");
+        m.put("hint", "只读展示当前生效配置；纸面激活策略可在下方「已注册策略」热切换（写入 system_config）。");
         m.put("groups", buildGroups());
         m.put("systemConfig", loadSystemConfig());
         return m;
@@ -55,7 +56,7 @@ public class SystemParamsService {
                 kv("dbEnabled", "启用 MySQL", props.isDbEnabled(), "false 时行情/账本等不落库"),
                 kv("marketMode", "行情模式", props.getMarketMode(), "db / json / sdk"),
                 kv("activeStrategy", "当前策略", props.getActiveStrategy(),
-                        "单活策略 id；默认 maCross（金叉）；holdNothing=永不交易占位"),
+                        "纸面单活策略；可在运维页切换并写入 system_config"),
                 kv("stockCodes", "默认股票池", props.getStockCodes(), "演示用代码列表"),
                 kv("feeRate", "佣金费率", props.getFeeRate(), "双边佣金比例"),
                 kv("slipPoint", "基础滑点", props.getSlipPoint(), "回测撮合滑点"),

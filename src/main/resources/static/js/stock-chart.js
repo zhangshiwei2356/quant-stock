@@ -3574,7 +3574,69 @@
       });
   }
 
+  function loadOpsStrategies() {
+    $.getJSON('/api/ops/strategies')
+      .done(function (data) {
+        if (data.hint) $('#opsStrategyHint').text(data.hint);
+        var active = data.activeStrategy || '';
+        var list = data.strategies || [];
+        var $tb = $('#opsStrategyBody').empty();
+        if (!list.length) {
+          $tb.html('<tr><td colspan="5" class="empty-state">无已注册策略</td></tr>');
+          return;
+        }
+        list.forEach(function (s) {
+          var id = s.id || '';
+          var isActive = id === active;
+          var btn = isActive
+            ? '<span class="muted">—</span>'
+            : ('<button type="button" class="secondary ops-strategy-activate" data-id="'
+              + escHtml(id) + '">激活</button>');
+          $tb.append(
+            '<tr>'
+            + '<td>' + (isActive ? '<span class="tag-buy">激活</span>' : '—') + '</td>'
+            + '<td class="mono"><b>' + escHtml(id) + '</b></td>'
+            + '<td>' + escHtml(s.label || id) + '</td>'
+            + '<td class="muted">' + escHtml(s.summary || s.fingerprintId || '') + '</td>'
+            + '<td>' + btn + '</td>'
+            + '</tr>'
+          );
+        });
+      })
+      .fail(function (xhr) {
+        var msg = (xhr.responseJSON && xhr.responseJSON.message) || '加载策略列表失败';
+        $('#opsStrategyBody').html('<tr><td colspan="5" class="empty-state">' + escHtml(msg) + '</td></tr>');
+      });
+  }
+
+  function activateOpsStrategy(strategyId) {
+    if (!strategyId) return;
+    var ok = window.confirm(
+      '确认将纸面激活策略切换为「' + strategyId + '」？\n'
+      + '仅影响纸面扫描/扫池，不影响回测下拉「仅本次」。'
+    );
+    if (!ok) return;
+    $.ajax({
+      url: '/api/ops/active-strategy',
+      method: 'POST',
+      contentType: 'application/json',
+      data: JSON.stringify({ strategyId: strategyId, confirm: true })
+    }).done(function (data) {
+      if (data && data.ok) {
+        toast(data.message || ('已切换为 ' + strategyId), 'ok');
+        loadOpsStrategies();
+        loadSysParams();
+      } else {
+        toast((data && data.message) || '切换失败', 'err');
+      }
+    }).fail(function (xhr) {
+      var msg = (xhr.responseJSON && xhr.responseJSON.message) || '切换失败';
+      toast(msg, 'err');
+    });
+  }
+
   function loadSysParams() {
+    loadOpsStrategies();
     $.getJSON('/api/ops/params')
       .done(function (data) {
         if (data.hint) $('#paramsHint').text(data.hint);
@@ -3640,7 +3702,7 @@
     postOrderAction('/api/ops/data-reconcile/run')
       .done(function (data) {
         renderReconcile(data);
-        toast('对账闸已执行', 'ok');
+        toast('行情自洽检查已执行', 'ok');
       })
       .fail(function (xhr) {
         var msg = (xhr.responseJSON && xhr.responseJSON.message) || '对账执行失败';
@@ -3651,6 +3713,9 @@
       });
   });
   $('#btnParamsRefresh').on('click', loadSysParams);
+  $(document).on('click', '.ops-strategy-activate', function () {
+    activateOpsStrategy(String($(this).data('id') || ''));
+  });
 
   $('#acctOrderBody').on('click', '.btn-order-cancel', function () {
     var id = $(this).attr('data-id');

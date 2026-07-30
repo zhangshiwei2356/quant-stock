@@ -595,6 +595,18 @@
         <div class="toolbar" style="margin-top:8px;">
           <button type="button" id="btnParamsRefresh" class="secondary">刷新</button>
         </div>
+        <h4 style="margin:16px 0 8px;">已注册策略 <span class="field-hint">纸面激活可切换</span></h4>
+        <p class="hint" id="opsStrategyHint">切换只影响纸面扫描/扫池，不影响回测下拉「仅本次」。</p>
+        <div class="table-wrap" style="max-height:none;margin-bottom:12px;">
+          <table class="tp-table">
+            <thead>
+            <tr><th>状态</th><th>id</th><th>名称</th><th>说明</th><th></th></tr>
+            </thead>
+            <tbody id="opsStrategyBody">
+            <tr><td colspan="5" class="empty-state">加载中…</td></tr>
+            </tbody>
+          </table>
+        </div>
         <div id="paramsGroups" class="result-groups params-groups" style="margin-top:12px;"></div>
         <h4 style="margin:20px 0 8px;">动态配置 <span class="field-hint">system_config</span></h4>
         <div class="table-wrap" style="max-height:none;">

@@ -1,5 +1,6 @@
 package com.quant.stock.controller;
 
+import com.quant.stock.admin.ActiveStrategyService;
 import com.quant.stock.admin.DataHealthService;
 import com.quant.stock.admin.DataReconcileGateService;
 import com.quant.stock.admin.IndustryReclassService;
@@ -9,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -19,7 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * 运维只读：数据健康、运行参数。
+ * 运维：数据健康、运行参数、对账闸、激活策略切换。
  */
 @RestController
 @RequestMapping("/api/ops")
@@ -29,6 +31,7 @@ public class OpsController {
     private final ObjectProvider<DataHealthService> dataHealthProvider;
     private final SystemParamsService systemParamsService;
     private final DataReconcileGateService dataReconcileGateService;
+    private final ActiveStrategyService activeStrategyService;
     private final ObjectProvider<StPitService> stPitProvider;
     private final ObjectProvider<IndustryReclassService> industryReclassProvider;
 
@@ -54,13 +57,33 @@ public class OpsController {
         return systemParamsService.view();
     }
 
-    /** 多源对账闸最近结果（P0-107） */
+    /** 已注册策略 + 当前纸面激活 id */
+    @GetMapping("/strategies")
+    public Map<String, Object> strategies() {
+        return activeStrategyService.listView();
+    }
+
+    /**
+     * 切换纸面激活策略。body: {@code strategyId}, {@code confirm:true}。
+     */
+    @PostMapping("/active-strategy")
+    public Map<String, Object> switchActiveStrategy(@RequestBody Map<String, Object> body) {
+        Object rawId = body == null ? null : body.get("strategyId");
+        String id = rawId == null ? null : String.valueOf(rawId).trim();
+        if (id != null && (id.isEmpty() || "null".equalsIgnoreCase(id))) {
+            id = null;
+        }
+        boolean confirm = body != null && Boolean.TRUE.equals(body.get("confirm"));
+        return activeStrategyService.switchActive(id, confirm);
+    }
+
+    /** 行情自洽闸最近结果（原 P0-107；现检查 market_1min） */
     @GetMapping("/data-reconcile")
     public Map<String, Object> dataReconcile() {
         return dataReconcileGateService.lastReport();
     }
 
-    /** 立即跑一轮日线 vs 分钟聚合对账 */
+    /** 立即跑一轮 market_1min 自洽检查 */
     @PostMapping("/data-reconcile/run")
     public Map<String, Object> dataReconcileRun() {
         return dataReconcileGateService.reconcile(null);
