@@ -103,9 +103,9 @@ public final class DbTableCatalog {
                 "收盘清算或回测过程按交易日汇总写入。",
                 "权益曲线、回撤监控、账户级风控阈值判断。");
         add(m, "system_config", "系统动态配置", "配置与风控", "id DESC",
-                "键值型动态参数，可在不改代码的情况下调整部分运行参数。",
-                "schema 初始化种子 + 运维/页面后续可写。",
-                "运行时读取覆盖默认配置（如阈值类参数）。");
+                "键值型动态参数；含纸面激活策略与 quant.prop.* 白名单运行参数覆盖。",
+                "schema 初始化种子 + 运维「运行参数」热写 / 策略切换。",
+                "启动加载 quant.prop.*；纸面策略与过滤/仓位/止损等热生效。");
         add(m, "risk_control_log", "风控触发日志", "配置与风控", "id DESC",
                 "记录风控规则触发详情与采取的动作，便于审计。",
                 "策略/风控模块在触发规则时写入。",
@@ -118,10 +118,6 @@ public final class DbTableCatalog {
                 "与回测记录关联的分析事件与文字摘要（买卖点解读等）。",
                 "回测分析流程生成后写入。",
                 "页面展开「分析报告」时读取展示。");
-        add(m, "bar_aggregate_meta", "聚合元数据(兼容)", "行情兼容", "stock_code ASC, period ASC",
-                "旧版分表聚合进度元数据（兼容）；主路径已只用 market_1min 内存聚合。",
-                "历史遗留；新部署可不依赖。",
-                "仅 legacy BarStorageService 可能读写；运维可浏览。");
         add(m, "trade_pool_report", "目标池入选分析报告", "目标池", "id DESC",
                 "盘后扫描入选时生成的完整分析快照（JSON+摘要），供行展开回看。",
                 "pool-rebuild / after-market-batch-scan / 手动扫描时由 TradePoolService 写入。",

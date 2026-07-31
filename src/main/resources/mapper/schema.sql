@@ -206,15 +206,8 @@ CREATE TABLE IF NOT EXISTS `bt_backtest_analysis` (
   KEY `idx_kind_code` (`kind`, `stock_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='回测分析数据表';
 
--- 兼容旧版分表（可选保留，新逻辑以 market_* 为准）
-CREATE TABLE IF NOT EXISTS `bar_aggregate_meta` (
-  `stock_code`      varchar(10)  NOT NULL,
-  `period`          varchar(16)  NOT NULL,
-  `last_agg_time`   datetime     DEFAULT NULL,
-  `source_max_time` datetime     DEFAULT NULL,
-  `updated_at`      datetime     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`stock_code`, `period`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='聚合元数据(兼容)';
+-- 已删除 legacy 分表聚合元数据（主路径仅 market_1min 内存聚合）
+DROP TABLE IF EXISTS `bar_aggregate_meta`;
 
 -- ---------- 模块：交易目标池（盘后扫描自动覆盖） ----------
 CREATE TABLE IF NOT EXISTS `trade_pool_report` (

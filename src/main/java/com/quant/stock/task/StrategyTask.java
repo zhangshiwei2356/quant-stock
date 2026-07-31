@@ -1058,7 +1058,7 @@ public class StrategyTask {
 
     /**
      * 收盘清算与 K 线落库：权益日结 + 1 分钟写入 {@code market_1min}。
-     * 更大周期由查询时内存聚合，不再写日线/5 分钟旧表或 legacy stock_bar_*。
+     * 更大周期由查询时内存聚合，不再写日线/5 分钟旧表。
      * <p>
      * TODO(api): 真实行情拉取（与 market-collect 同源）；当前 fetch 为 db/mock 回退。
      *

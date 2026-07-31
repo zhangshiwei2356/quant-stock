@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * 统一K线查询入口：对外按 BarPeriod 路由，屏蔽存储细节。
  * <p>
- * 查询优先级：MySQL {@code market_1min}（更大周期内存聚合）→ Redis → 旧分表 → classpath JSON → mock/sdk
+ * 查询优先级：MySQL {@code market_1min}（更大周期内存聚合）→ Redis → classpath JSON → mock/sdk
  */
 @Slf4j
 @Service
@@ -40,10 +40,6 @@ public class MarketDataService {
     /** 启用 quant.db-enabled=true 后注入：核心 1 分钟行情表 */
     @Autowired(required = false)
     private CoreMarketBarService coreMarketBarService;
-
-    /** 兼容旧 stock_bar_* 分表 */
-    @Autowired(required = false)
-    private BarStorageService barStorageService;
 
     public MarketDataService(QuantProperties quantProperties, JsonBarDataStore jsonBarDataStore,
                              KlineSdkClient klineSdkClient) {
@@ -87,30 +83,7 @@ public class MarketDataService {
             return filterByTime(BarAggregateUtil.filterClosedBars(cached), start, end);
         }
 
-        // 1) 兼容旧分表
-        if (barStorageService != null) {
-            try {
-                List<BarDTO> fromTable = barStorageService.loadBars(code, period, start, end);
-                if (fromTable != null && !fromTable.isEmpty()) {
-                    List<BarDTO> closed = BarAggregateUtil.filterClosedBars(fromTable);
-                    putCache(code, period, closed);
-                    return closed;
-                }
-                if (!period.isRaw()) {
-                    List<BarDTO> minute = barStorageService.loadBars(code, BarPeriod.MIN_1, start, end);
-                    if (minute != null && !minute.isEmpty()) {
-                        List<BarDTO> agg = BarAggregateUtil.aggregate(minute, period.getAggregatePeriod());
-                        List<BarDTO> closed = BarAggregateUtil.filterClosedBars(agg);
-                        putCache(code, period, closed);
-                        return closed;
-                    }
-                }
-            } catch (Exception e) {
-                log.warn("分表查询失败，降级 code={} period={}: {}", code, period, e.getMessage());
-            }
-        }
-
-        // 2) classpath JSON（仅作兜底；正式环境以 MySQL 为准）
+        // 1) classpath JSON（仅作兜底；正式环境以 MySQL 为准）
         if (jsonBarDataStore.available() && !"db".equalsIgnoreCase(quantProperties.getMarketMode())) {
             List<BarDTO> fromJson = jsonBarDataStore.getBars(code, period, start, end);
             if (fromJson != null && !fromJson.isEmpty()) {
@@ -125,7 +98,7 @@ public class MarketDataService {
             }
         }
 
-        // 3) mock / sdk（生成真 1 分钟，再按需聚合）
+        // 2) mock / sdk（生成真 1 分钟，再按需聚合）
         List<BarDTO> oneMinBars = loadOneMinBarsInternal(code);
         oneMinBars = filterByTime(oneMinBars, start, end);
         if (period == BarPeriod.MIN_1 || period.isRaw()) {

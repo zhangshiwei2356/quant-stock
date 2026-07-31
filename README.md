@@ -175,7 +175,7 @@ sequenceDiagram
 |------|------|
 | 任务管理 | `sys_schedule_job` 启停 / cron / 立即执行（种子默认全关） |
 | 数据健康 | 本地空数据与滞后检查 |
-| 运行参数 | `QuantProperties` + 配置键中文说明；已注册策略表与纸面激活切换 |
+| 运行参数 | 白名单参数可写（`POST /api/ops/params` → `system_config` 的 `quant.prop.*` 热生效）；只读项仍展示；已注册策略表与纸面激活切换 |
 
 总闸：`quant.schedule.enabled`（默认 true）。
 
@@ -206,7 +206,7 @@ sequenceDiagram
 - 种子目录：`src/main/resources/data/kline/`（仅导入用）
 - 演示股：模拟五只（空库启动灌 `market_1min`）；目标池可用 `scripts/fetch_min1_tdx.py --from-pool` 回填约 90 交易日 1 分钟
 - 区间：模拟样本约 `2025-07-17` ~ `2026-07-17`；TDX 1 分钟公开节点通常约 90 个交易日（以节点为准）
-- **物理真相源**：仅 `market_1min`；5/15/30/60/日/周/月一律内存聚合（已删除 `market_daily` / `market_minute`）
+- **物理真相源**：仅 `market_1min`；5/15/30/60/日/周/月一律内存聚合（已删除 `market_daily` / `market_minute` 与 legacy `stock_bar_*` / `bar_aggregate_meta`）
 - 1 分钟回填：`python scripts/fetch_min1_tdx.py --from-pool` 或 `--codes 600036 --sleep 0.2`
 - 回测历史/分析：`bt_backtest_record` / `bt_backtest_analysis`（亦可落盘 `quant.history-dir`）
 - 重新生成模拟种子：`mvn -q compile exec:java -Dexec.mainClass=com.quant.stock.market.mock.MockKlineDataGenerator`
@@ -273,7 +273,8 @@ sequenceDiagram
 | POST `/api/account/orders/{id}/partial-fill?qty=` | 本地部成桩 |
 | POST `/api/account/orders/{id}/replace?price=&volume=` | 改价=撤补（新单队尾） |
 | GET/PUT/POST `/api/schedule/**` | 定时任务 |
-| GET `/api/ops/data-health` · `/params` · `/strategies` | 数据健康 / 运行参数 / 已注册策略 |
+| GET `/api/ops/data-health` · `/params` · `/strategies` | 数据健康 / 运行参数（含可写标记） / 已注册策略 |
+| POST `/api/ops/params` | 白名单运行参数热写（`updates` + `confirm:true`） |
 | POST `/api/ops/active-strategy` | 纸面激活策略热切换（须 `confirm:true`） |
 | GET `/api/db/tables` · `/tables/{name}` | 表白名单浏览 |
 | GET `/api/docs/pdf/{stock\|app}` | 文档 PDF |
@@ -344,7 +345,6 @@ sequenceDiagram
 
 - `KlineSdkClient` / `NoopKlineSdkClient` — 行情 SDK（`market-mode=sdk`）
 - `TradeGatewayService` — 券商 SDK（`trade-mode=sdk` 桩；真对接见宽睿 OES/MDS 资料）
-- `BarStorageService#rebuildPeriod` — 聚合表修复
 
 ---
 

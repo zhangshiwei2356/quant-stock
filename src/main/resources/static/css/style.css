@@ -2070,6 +2070,27 @@ button.loading::before {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+.params-edit-wrap,
+.params-bool {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+.params-edit[type="text"] {
+  min-width: 96px;
+  max-width: 160px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.params-writable-tag {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent);
+  opacity: 0.9;
+  white-space: nowrap;
+}
 .tp-table td.muted {
   color: var(--muted);
   font-size: 12px;

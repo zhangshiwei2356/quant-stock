@@ -3,7 +3,9 @@ package com.quant.stock.market;
 import com.quant.stock.market.BarAggregateUtil.Period;
 
 /**
- * K线周期枚举：查询层对外统一使用，内部映射到分表与聚合逻辑
+ * K线周期枚举：查询层对外统一使用，内部映射到聚合逻辑。
+ * <p>
+ * 主路径只读 {@code market_1min} 并内存聚合；{@code tableName} 仅为历史/JSON 元数据字段，不再对应分表读写。
  */
 public enum BarPeriod {
     MIN_1("stock_bar_1min", null),
@@ -15,6 +17,8 @@ public enum BarPeriod {
     WEEK("stock_bar_week", Period.WEEK),
     MONTH("stock_bar_month", Period.MONTH);
 
+    /** @deprecated 旧分表名残留；仅 API/JSON 元数据展示，无存储路由 */
+    @Deprecated
     private final String tableName;
     private final Period aggregatePeriod;
 
@@ -23,7 +27,12 @@ public enum BarPeriod {
         this.aggregatePeriod = aggregatePeriod;
     }
 
-    /** 对应 legacy 分表名（如 {@code stock_bar_5min}） */
+    /**
+     * 历史表名标签（如 {@code stock_bar_5min}）。
+     *
+     * @deprecated 分表路径已删除；勿再用于 Mapper 路由
+     */
+    @Deprecated
     public String getTableName() {
         return tableName;
     }

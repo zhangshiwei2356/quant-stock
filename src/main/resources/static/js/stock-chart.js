@@ -3635,53 +3635,141 @@
     });
   }
 
+  function renderParamsValue(it) {
+    var key = it.key || '';
+    var val = it.value == null ? '' : String(it.value);
+    if (!it.writable) {
+      return $('<span class="value mono"/>').text(val === '' ? '—' : val);
+    }
+    if (it.type === 'bool') {
+      var checked = /^(true|1|yes|on)$/i.test(val);
+      return $('<label class="params-bool"/>')
+        .append($('<input type="checkbox" class="params-edit"/>')
+          .attr('data-key', key)
+          .attr('data-type', 'bool')
+          .prop('checked', checked))
+        .append($('<span class="params-writable-tag"/>').text('可写'));
+    }
+    return $('<span class="params-edit-wrap"/>')
+      .append($('<input type="text" class="params-edit mono"/>')
+        .attr('data-key', key)
+        .attr('data-type', it.type || 'decimal')
+        .val(val))
+      .append($('<span class="params-writable-tag"/>').text('可写'));
+  }
+
+  function collectWritableParams() {
+    var updates = {};
+    $('#paramsGroups .params-edit').each(function () {
+      var $el = $(this);
+      var key = String($el.data('key') || '');
+      if (!key) return;
+      if ($el.is(':checkbox')) {
+        updates[key] = $el.is(':checked') ? 'true' : 'false';
+      } else {
+        updates[key] = String($el.val() == null ? '' : $el.val()).trim();
+      }
+    });
+    return updates;
+  }
+
+  function saveSysParams() {
+    var updates = collectWritableParams();
+    var keys = Object.keys(updates);
+    if (!keys.length) {
+      toast('没有可写参数可保存', 'info');
+      return;
+    }
+    var ok = window.confirm(
+      '确认保存 ' + keys.length + ' 项白名单参数？\n'
+      + '将写入 system_config（quant.prop.*）并立即生效；配置指纹会更新。'
+    );
+    if (!ok) return;
+    var $btn = $('#btnParamsSave');
+    if ($btn.prop('disabled')) return;
+    $btn.prop('disabled', true).addClass('is-loading');
+    $.ajax({
+      url: '/api/ops/params',
+      method: 'POST',
+      contentType: 'application/json',
+      data: JSON.stringify({ updates: updates, confirm: true })
+    }).done(function (data) {
+      if (data && data.ok) {
+        toast(data.message || '已保存', 'ok');
+        if (data.view) {
+          renderSysParamsView(data.view);
+        } else {
+          loadSysParams();
+        }
+      } else {
+        toast((data && data.message) || '保存失败', 'err');
+        if (data && data.view) renderSysParamsView(data.view);
+      }
+    }).fail(function (xhr) {
+      var msg = (xhr.responseJSON && xhr.responseJSON.message) || '保存失败';
+      toast(msg, 'err');
+    }).always(function () {
+      $btn.prop('disabled', false).removeClass('is-loading');
+    });
+  }
+
+  function renderSysParamsView(data) {
+    if (!data) return;
+    if (data.hint) $('#paramsHint').text(data.hint);
+    if (data.configFingerprint) {
+      $('#paramsFpHint').text('指纹 ' + data.configFingerprint);
+    } else {
+      $('#paramsFpHint').text('');
+    }
+    var $g = $('#paramsGroups').empty();
+    (data.groups || []).forEach(function (grp) {
+      var $sec = $('<div class="result-group"/>');
+      $sec.append($('<div class="result-group-title"/>').text(grp.title || ''));
+      (grp.items || []).forEach(function (it) {
+        var label = it.label || it.key || '';
+        var key = it.key || '';
+        var $lab = $('<span class="label params-kv-label"/>');
+        $lab.append($('<span class="params-kv-cn"/>').text(label));
+        if (key && key !== label) {
+          $lab.append($('<span class="params-kv-key mono"/>').text(key));
+        }
+        if (it.note) {
+          $lab.append($('<span class="params-kv-note"/>').attr('title', it.note).text(it.note));
+        }
+        $sec.append(
+          $('<div class="result-kv params-kv"/>')
+            .append($lab)
+            .append(renderParamsValue(it))
+        );
+      });
+      $g.append($sec);
+    });
+    var cfgs = data.systemConfig || [];
+    var $tb = $('#paramsCfgBody').empty();
+    if (!cfgs.length) {
+      $tb.html('<tr><td colspan="5" class="empty-state">无 system_config 或未启用数据库</td></tr>');
+      return;
+    }
+    cfgs.forEach(function (c) {
+      var label = c.label || c.description || c.key || '';
+      var note = (c.description && c.description !== label) ? c.description : '';
+      $tb.append(
+        '<tr>'
+        + '<td>' + escHtml(label) + '</td>'
+        + '<td class="mono">' + escHtml(c.key) + '</td>'
+        + '<td class="mono">' + escHtml(c.value == null ? '—' : String(c.value)) + '</td>'
+        + '<td class="muted">' + escHtml(note) + '</td>'
+        + '<td class="mono">' + escHtml(c.updatedAt || '—') + '</td>'
+        + '</tr>'
+      );
+    });
+  }
+
   function loadSysParams() {
     loadOpsStrategies();
     $.getJSON('/api/ops/params')
       .done(function (data) {
-        if (data.hint) $('#paramsHint').text(data.hint);
-        var $g = $('#paramsGroups').empty();
-        (data.groups || []).forEach(function (grp) {
-          var $sec = $('<div class="result-group"/>');
-          $sec.append($('<div class="result-group-title"/>').text(grp.title || ''));
-          (grp.items || []).forEach(function (it) {
-            var label = it.label || it.key || '';
-            var key = it.key || '';
-            var $lab = $('<span class="label params-kv-label"/>');
-            $lab.append($('<span class="params-kv-cn"/>').text(label));
-            if (key && key !== label) {
-              $lab.append($('<span class="params-kv-key mono"/>').text(key));
-            }
-            if (it.note) {
-              $lab.append($('<span class="params-kv-note"/>').attr('title', it.note).text(it.note));
-            }
-            $sec.append(
-              $('<div class="result-kv params-kv"/>')
-                .append($lab)
-                .append($('<span class="value mono"/>').text(it.value == null ? '—' : String(it.value)))
-            );
-          });
-          $g.append($sec);
-        });
-        var cfgs = data.systemConfig || [];
-        var $tb = $('#paramsCfgBody').empty();
-        if (!cfgs.length) {
-          $tb.html('<tr><td colspan="5" class="empty-state">无 system_config 或未启用数据库</td></tr>');
-          return;
-        }
-        cfgs.forEach(function (c) {
-          var label = c.label || c.description || c.key || '';
-          var note = (c.description && c.description !== label) ? c.description : '';
-          $tb.append(
-            '<tr>'
-            + '<td>' + escHtml(label) + '</td>'
-            + '<td class="mono">' + escHtml(c.key) + '</td>'
-            + '<td class="mono">' + escHtml(c.value == null ? '—' : String(c.value)) + '</td>'
-            + '<td class="muted">' + escHtml(note) + '</td>'
-            + '<td class="mono">' + escHtml(c.updatedAt || '—') + '</td>'
-            + '</tr>'
-          );
-        });
+        renderSysParamsView(data);
       })
       .fail(function (xhr) {
         var msg = (xhr.responseJSON && xhr.responseJSON.message) || '加载运行参数失败';
@@ -3713,6 +3801,7 @@
       });
   });
   $('#btnParamsRefresh').on('click', loadSysParams);
+  $('#btnParamsSave').on('click', saveSysParams);
   $(document).on('click', '.ops-strategy-activate', function () {
     activateOpsStrategy(String($(this).data('id') || ''));
   });

@@ -51,10 +51,30 @@ public class OpsController {
         return svc.check();
     }
 
-    /** 运行参数与配置指纹只读视图。 */
+    /** 运行参数与配置指纹视图（含白名单可写标记）。 */
     @GetMapping("/params")
     public Map<String, Object> params() {
         return systemParamsService.view();
+    }
+
+    /**
+     * 白名单参数热写。body: {@code updates} map + {@code confirm:true}。
+     */
+    @PostMapping("/params")
+    public Map<String, Object> updateParams(@RequestBody Map<String, Object> body) {
+        Map<String, Object> updates = null;
+        if (body != null && body.get("updates") instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> u = (Map<String, Object>) body.get("updates");
+            updates = u;
+        } else if (body != null && body.get("updates") != null) {
+            Map<String, Object> err = new LinkedHashMap<String, Object>();
+            err.put("ok", false);
+            err.put("message", "updates 须为对象");
+            return err;
+        }
+        boolean confirm = body != null && Boolean.TRUE.equals(body.get("confirm"));
+        return systemParamsService.update(updates, confirm);
     }
 
     /** 已注册策略 + 当前纸面激活 id */

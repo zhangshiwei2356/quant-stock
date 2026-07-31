@@ -591,9 +591,11 @@
     <div id="viewSysParams" class="workspace-view" hidden>
       <section class="panel">
         <h3>运行参数</h3>
-        <p class="hint" id="paramsHint">当前生效配置只读视图（中文说明对照配置项键名；yml / QuantProperties + system_config）。</p>
+        <p class="hint" id="paramsHint">白名单参数可编辑（写入 system_config 的 quant.prop.* 并热生效）；其余只读。激活策略请用上方策略表。</p>
         <div class="toolbar" style="margin-top:8px;">
           <button type="button" id="btnParamsRefresh" class="secondary">刷新</button>
+          <button type="button" id="btnParamsSave" class="primary">保存可写参数</button>
+          <span class="field-hint" id="paramsFpHint"></span>
         </div>
         <h4 style="margin:16px 0 8px;">已注册策略 <span class="field-hint">纸面激活可切换</span></h4>
         <p class="hint" id="opsStrategyHint">切换只影响纸面扫描/扫池，不影响回测下拉「仅本次」。</p>
