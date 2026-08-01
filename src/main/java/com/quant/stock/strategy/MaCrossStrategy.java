@@ -1,5 +1,6 @@
 package com.quant.stock.strategy;
 
+import com.quant.stock.admin.ParamsScope;
 import com.quant.stock.config.QuantProperties;
 import com.quant.stock.market.dto.BarDTO;
 import com.quant.stock.strategy.dto.TradeSignal;
@@ -106,27 +107,28 @@ public class MaCrossStrategy extends BaseStrategy {
      * 金叉买入被过滤时的原因；通过则返回 null。
      */
     public String rejectReason(IndicatorSignalUtil.IndicatorBundle ind, int i) {
-        if (quantProperties.isTrendFilterEnabled() && !ind.isTrendUp(i)) {
+        QuantProperties qp = ParamsScope.current(quantProperties);
+        if (qp.isTrendFilterEnabled() && !ind.isTrendUp(i)) {
             return "大周期MA60未向上";
         }
-        if (quantProperties.isVolumeFilterEnabled()
-                && !ind.isVolumeConfirm(i, quantProperties.getVolumeConfirmRatio().doubleValue())) {
+        if (qp.isVolumeFilterEnabled()
+                && !ind.isVolumeConfirm(i, qp.getVolumeConfirmRatio().doubleValue())) {
             return "无量金叉";
         }
-        if (quantProperties.isAdxFilterEnabled()
+        if (qp.isAdxFilterEnabled()
                 && !ind.isAdxTradable(i,
-                quantProperties.getAdxMin().doubleValue(),
-                quantProperties.getAdxChopMax().doubleValue())) {
+                qp.getAdxMin().doubleValue(),
+                qp.getAdxChopMax().doubleValue())) {
             return "ADX震荡市或强度不足";
         }
-        if (quantProperties.getRsiBuyMax() != null
-                && quantProperties.getRsiBuyMax().compareTo(new BigDecimal("100")) < 0
+        if (qp.getRsiBuyMax() != null
+                && qp.getRsiBuyMax().compareTo(new BigDecimal("100")) < 0
                 && !Double.isNaN(ind.rsi14[i])
-                && BigDecimal.valueOf(ind.rsi14[i]).compareTo(quantProperties.getRsiBuyMax()) >= 0) {
+                && BigDecimal.valueOf(ind.rsi14[i]).compareTo(qp.getRsiBuyMax()) >= 0) {
             return "RSI过高";
         }
         if (!Double.isNaN(ind.atr14[i])
-                && BigDecimal.valueOf(ind.atr14[i]).compareTo(quantProperties.getAtrMinThreshold()) <= 0) {
+                && BigDecimal.valueOf(ind.atr14[i]).compareTo(qp.getAtrMinThreshold()) <= 0) {
             return "ATR过低";
         }
         return null;

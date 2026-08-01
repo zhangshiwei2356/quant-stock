@@ -1,5 +1,6 @@
 package com.quant.stock.risk;
 
+import com.quant.stock.admin.ParamsScope;
 import com.quant.stock.config.QuantProperties;
 import lombok.Getter;
 
@@ -51,6 +52,10 @@ public class AccountRiskState {
 
     public AccountRiskState(QuantProperties props) {
         this.props = props;
+    }
+
+    private QuantProperties p() {
+        return ParamsScope.current(props);
     }
 
     /** 历史峰值权益 */
@@ -199,13 +204,13 @@ public class AccountRiskState {
         }
 
         BigDecimal dd = drawdown(equity);
-        if (dd.compareTo(props.getDrawdownHaltPct()) >= 0) {
+        if (dd.compareTo(p().getDrawdownHaltPct()) >= 0) {
             halted = true;
             if (haltReason == null) {
                 haltReason = HALT_DEPTH;
             }
         }
-        int durationHalt = props.getDrawdownDurationHaltDays();
+        int durationHalt = p().getDrawdownDurationHaltDays();
         if (durationHalt > 0 && underwaterTradingDays.get() >= durationHalt) {
             halted = true;
             if (haltReason == null) {
@@ -230,7 +235,7 @@ public class AccountRiskState {
             return;
         }
         int n = consecutiveLosses.incrementAndGet();
-        if (n >= props.getConsecutiveLossLimit()) {
+        if (n >= p().getConsecutiveLossLimit()) {
             blockOpenThrough.set(tradeDay);
             consecutiveLosses.set(0);
         }
@@ -255,7 +260,7 @@ public class AccountRiskState {
         BigDecimal start = dayStartEquity.get();
         if (start != null && start.compareTo(BigDecimal.ZERO) > 0 && equity != null) {
             BigDecimal dayLoss = start.subtract(equity).divide(start, 6, RoundingMode.HALF_UP);
-            if (dayLoss.compareTo(props.getDailyLossLimitPct()) >= 0) {
+            if (dayLoss.compareTo(p().getDailyLossLimitPct()) >= 0) {
                 return false;
             }
         }
@@ -265,13 +270,13 @@ public class AccountRiskState {
     /** 根据峰值回撤与持续期返回仓位系数（0 / 0.5 / 1） */
     public BigDecimal positionScale(BigDecimal equity) {
         BigDecimal dd = drawdown(equity);
-        if (halted || dd.compareTo(props.getDrawdownHaltPct()) >= 0) {
+        if (halted || dd.compareTo(p().getDrawdownHaltPct()) >= 0) {
             return BigDecimal.ZERO;
         }
-        if (dd.compareTo(props.getDrawdownReducePct()) >= 0) {
+        if (dd.compareTo(p().getDrawdownReducePct()) >= 0) {
             return new BigDecimal("0.5");
         }
-        int durationReduce = props.getDrawdownDurationReduceDays();
+        int durationReduce = p().getDrawdownDurationReduceDays();
         if (durationReduce > 0 && underwaterTradingDays.get() >= durationReduce) {
             return new BigDecimal("0.5");
         }

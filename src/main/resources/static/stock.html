@@ -591,10 +591,14 @@
     <div id="viewSysParams" class="workspace-view" hidden>
       <section class="panel">
         <h3>运行参数</h3>
-        <p class="hint" id="paramsHint">白名单参数可编辑（写入 system_config 的 quant.prop.* 并热生效）；其余只读。激活策略请用上方策略表。</p>
+        <p class="hint" id="paramsHint">全局可写 → system_config；策略包稀疏覆盖 → strategy_param。纸面/回测按策略叠层生效。</p>
         <div class="toolbar" style="margin-top:8px;">
+          <label class="field-inline">参数策略
+            <select id="paramsStrategySelect"></select>
+          </label>
           <button type="button" id="btnParamsRefresh" class="secondary">刷新</button>
-          <button type="button" id="btnParamsSave" class="primary">保存可写参数</button>
+          <button type="button" id="btnParamsSave" class="primary">保存全局</button>
+          <button type="button" id="btnStrategyParamsSave" class="primary">保存策略包</button>
           <span class="field-hint" id="paramsFpHint"></span>
         </div>
         <h4 style="margin:16px 0 8px;">已注册策略 <span class="field-hint">纸面激活可切换</span></h4>

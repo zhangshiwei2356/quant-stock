@@ -3,6 +3,7 @@ package com.quant.stock.controller;
 import com.quant.stock.admin.ActiveStrategyService;
 import com.quant.stock.admin.DataHealthService;
 import com.quant.stock.admin.DataReconcileGateService;
+import com.quant.stock.admin.EffectiveParamsService;
 import com.quant.stock.admin.IndustryReclassService;
 import com.quant.stock.admin.SystemParamsService;
 import com.quant.stock.risk.StPitService;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -30,6 +32,7 @@ public class OpsController {
 
     private final ObjectProvider<DataHealthService> dataHealthProvider;
     private final SystemParamsService systemParamsService;
+    private final EffectiveParamsService effectiveParamsService;
     private final DataReconcileGateService dataReconcileGateService;
     private final ActiveStrategyService activeStrategyService;
     private final ObjectProvider<StPitService> stPitProvider;
@@ -51,14 +54,14 @@ public class OpsController {
         return svc.check();
     }
 
-    /** 运行参数与配置指纹视图（含白名单可写标记）。 */
+    /** 运行参数视图：可选 strategyId 展示该策略稀疏包与生效预览。 */
     @GetMapping("/params")
-    public Map<String, Object> params() {
-        return systemParamsService.view();
+    public Map<String, Object> params(@RequestParam(value = "strategyId", required = false) String strategyId) {
+        return systemParamsService.view(strategyId);
     }
 
     /**
-     * 白名单参数热写。body: {@code updates} map + {@code confirm:true}。
+     * 全局白名单热写（quant.prop.*）。body: {@code updates} + {@code confirm:true}。
      */
     @PostMapping("/params")
     public Map<String, Object> updateParams(@RequestBody Map<String, Object> body) {
@@ -75,6 +78,41 @@ public class OpsController {
         }
         boolean confirm = body != null && Boolean.TRUE.equals(body.get("confirm"));
         return systemParamsService.update(updates, confirm);
+    }
+
+    /**
+     * 策略稀疏参数包。body: strategyId, updates?, clearKeys?, confirm:true, version?
+     */
+    @PostMapping("/strategy-params")
+    public Map<String, Object> updateStrategyParams(@RequestBody Map<String, Object> body) {
+        String strategyId = body == null || body.get("strategyId") == null
+                ? null : String.valueOf(body.get("strategyId")).trim();
+        Map<String, Object> updates = null;
+        if (body != null && body.get("updates") instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> u = (Map<String, Object>) body.get("updates");
+            updates = u;
+        }
+        List<String> clearKeys = null;
+        if (body != null && body.get("clearKeys") instanceof List) {
+            @SuppressWarnings("unchecked")
+            List<String> ck = (List<String>) body.get("clearKeys");
+            clearKeys = ck;
+        }
+        boolean confirm = body != null && Boolean.TRUE.equals(body.get("confirm"));
+        Integer version = null;
+        if (body != null && body.get("version") != null) {
+            try {
+                version = Integer.valueOf(String.valueOf(body.get("version")));
+            } catch (Exception ignored) {
+                // leave null
+            }
+        }
+        Map<String, Object> out = effectiveParamsService.saveSparse(strategyId, updates, clearKeys, confirm, version);
+        if (Boolean.TRUE.equals(out.get("ok")) || out.get("view") == null) {
+            out.put("view", systemParamsService.view(strategyId));
+        }
+        return out;
     }
 
     /** 已注册策略 + 当前纸面激活 id */

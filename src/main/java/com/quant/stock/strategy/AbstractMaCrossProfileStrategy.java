@@ -1,7 +1,11 @@
 package com.quant.stock.strategy;
 
+import com.quant.stock.admin.EffectiveParamsService;
+import com.quant.stock.admin.ParamsScope;
+import com.quant.stock.config.QuantProperties;
 import com.quant.stock.market.dto.BarDTO;
 import com.quant.stock.strategy.dto.TradeSignal;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -10,8 +14,16 @@ import java.util.Map;
 /**
  * 金叉买卖逻辑副本：规则与 {@link MaCrossStrategy} 相同，过滤阈值来自固定 {@link MaCrossFilterProfile}，
  * 不读取全局 quant 过滤开关，便于多画像对照回测；原版策略类保持不动。
+ * <p>
+ * 若该策略 id 存在 {@code strategy_param} 稀疏包，则过滤改读生效快照（全局⊕稀疏）。
  */
 public abstract class AbstractMaCrossProfileStrategy extends BaseStrategy {
+
+    @Autowired
+    private EffectiveParamsService effectiveParamsService;
+
+    @Autowired
+    private QuantProperties quantProperties;
 
     protected abstract MaCrossFilterProfile profile();
 
@@ -90,6 +102,31 @@ public abstract class AbstractMaCrossProfileStrategy extends BaseStrategy {
     }
 
     public String rejectReason(IndicatorSignalUtil.IndicatorBundle ind, int i) {
+        if (effectiveParamsService != null && effectiveParamsService.hasSparse(name())) {
+            QuantProperties qp = ParamsScope.current(effectiveParamsService.resolve(name()));
+            if (qp.isTrendFilterEnabled() && !ind.isTrendUp(i)) {
+                return "大周期MA60未向上";
+            }
+            if (qp.isVolumeFilterEnabled()
+                    && !ind.isVolumeConfirm(i, qp.getVolumeConfirmRatio().doubleValue())) {
+                return "无量金叉";
+            }
+            if (qp.isAdxFilterEnabled()
+                    && !ind.isAdxTradable(i, qp.getAdxMin().doubleValue(), qp.getAdxChopMax().doubleValue())) {
+                return "ADX震荡市或强度不足";
+            }
+            if (qp.getRsiBuyMax() != null
+                    && qp.getRsiBuyMax().compareTo(new BigDecimal("100")) < 0
+                    && !Double.isNaN(ind.rsi14[i])
+                    && BigDecimal.valueOf(ind.rsi14[i]).compareTo(qp.getRsiBuyMax()) >= 0) {
+                return "RSI过高";
+            }
+            if (!Double.isNaN(ind.atr14[i])
+                    && BigDecimal.valueOf(ind.atr14[i]).compareTo(qp.getAtrMinThreshold()) <= 0) {
+                return "ATR过低";
+            }
+            return null;
+        }
         MaCrossFilterProfile p = profile();
         if (p.isTrendFilterEnabled() && !ind.isTrendUp(i)) {
             return "大周期MA60未向上";

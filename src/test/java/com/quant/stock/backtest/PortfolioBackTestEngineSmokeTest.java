@@ -1,5 +1,7 @@
 package com.quant.stock.backtest;
 
+import com.quant.stock.admin.EffectiveParamsService;
+import com.quant.stock.admin.QuantPropertiesCopy;
 import com.quant.stock.backtest.dto.BackTestQueryDTO;
 import com.quant.stock.backtest.dto.PortfolioResultDTO;
 import com.quant.stock.calendar.TradingCalendar;
@@ -27,6 +29,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -52,8 +55,12 @@ class PortfolioBackTestEngineSmokeTest {
         when(mds.getKline(eq("600519"), eq(BarPeriod.DAY), any(), any()))
                 .thenReturn(syntheticUptrendDays("600519", 120));
 
+        EffectiveParamsService eps = mock(EffectiveParamsService.class);
+        when(eps.resolve(anyString())).thenAnswer(inv -> QuantPropertiesCopy.copy(props));
+        when(eps.hasSparse(anyString())).thenReturn(false);
         PortfolioBackTestEngine engine = new PortfolioBackTestEngine(
                 props,
+                eps,
                 mds,
                 new PositionAmountUtil(props),
                 new TradeCostModel(props),

@@ -20,6 +20,8 @@ import com.quant.stock.risk.OpenFilterService;
 import com.quant.stock.risk.RiskAlertService;
 import com.quant.stock.risk.RiskControlService;
 import com.quant.stock.admin.DataReconcileGateService;
+import com.quant.stock.admin.EffectiveParamsService;
+import com.quant.stock.admin.ParamsScope;
 import com.quant.stock.risk.SignalDriftMonitor;
 import com.quant.stock.risk.StopFillPrice;
 import com.quant.stock.risk.StrategyRetirementService;
@@ -72,6 +74,7 @@ public class StrategyTask {
     private static final int PENDING_BUY_EXPIRE_DAYS = 5;
 
     private final QuantProperties quantProperties;
+    private final EffectiveParamsService effectiveParamsService;
     private final MarketDataService marketDataService;
     private final StrategyRegistry strategyRegistry;
     private final RiskControlService riskControlService;
@@ -110,6 +113,7 @@ public class StrategyTask {
     private final Map<String, Integer> reservedSellVol = new ConcurrentHashMap<String, Integer>();
 
     public StrategyTask(QuantProperties quantProperties,
+                        EffectiveParamsService effectiveParamsService,
                         MarketDataService marketDataService,
                         StrategyRegistry strategyRegistry,
                         RiskControlService riskControlService,
@@ -131,6 +135,7 @@ public class StrategyTask {
                         TurnoverGuardService turnoverGuardService,
                         IcDecayMonitor icDecayMonitor) {
         this.quantProperties = quantProperties;
+        this.effectiveParamsService = effectiveParamsService;
         this.marketDataService = marketDataService;
         this.strategyRegistry = strategyRegistry;
         this.riskControlService = riskControlService;
@@ -151,6 +156,10 @@ public class StrategyTask {
         this.dataReconcileGateService = dataReconcileGateService;
         this.turnoverGuardService = turnoverGuardService;
         this.icDecayMonitor = icDecayMonitor;
+    }
+
+    private QuantProperties p() {
+        return ParamsScope.current(quantProperties);
     }
 
     /** 应用启动：恢复账本、风控与运行时状态。 */
@@ -209,7 +218,7 @@ public class StrategyTask {
             if (order.getSide() == OrderDTO.Side.BUY) {
                 BigDecimal fee = tradeCostModel.buyFee(amount);
                 PendingFill pending = PendingFill.buy(order.getStockCode(), remain, deal, amount, fee, day,
-                        false, quantProperties.getBaseAtr(), markEquity(null));
+                        false, p().getBaseAtr(), markEquity(null));
                 pendingFills.put(order.getOrderId(), pending);
                 reserveBuy(pending);
             } else {
@@ -353,6 +362,19 @@ public class StrategyTask {
             return false;
         }
         try {
+            QuantProperties effective = effectiveParamsService.resolve(strategyRegistry.active().name());
+            return ParamsScope.call(effective, new java.util.concurrent.Callable<Boolean>() {
+                @Override
+                public Boolean call() {
+                    return doScanAndTrade();
+                }
+            });
+        } finally {
+            redisLockUtil.unlock("strategy-scan");
+        }
+    }
+
+    private boolean doScanAndTrade() {
             List<String> targets = resolveLiveScanCodes();
             if (targets.isEmpty()) {
                 log.warn("目标池为空，跳过分钟扫描（请先执行盘后扫描写入目标池）");
@@ -382,7 +404,7 @@ public class StrategyTask {
                 fillPending(code, book, bars, i, tradeDay, open);
 
                 // Step2: 老仓止损
-                if (book.pos.hasPosition() && quantProperties.isStopLossEnabled()
+                if (book.pos.hasPosition() && p().isStopLossEnabled()
                         && book.pos.canSellStops(tradeDay)) {
                     book.pos.updateHighest(high);
                     int sellable = (book.pos.sellableShares(tradeDay) / 100) * 100;
@@ -396,8 +418,8 @@ public class StrategyTask {
                             } else {
                                 BigDecimal atr = atrAt(ind, i);
                                 book.pos.raiseStopByCost(atr, markEquity(close),
-                                        quantProperties.getAtrStopMultiplier(),
-                                        quantProperties.getHardStopCapitalPct());
+                                        p().getAtrStopMultiplier(),
+                                        p().getHardStopCapitalPct());
                             }
                         }
                     }
@@ -449,11 +471,11 @@ public class StrategyTask {
                     curExit = ExitPriority.ACCOUNT_HALT;
                 }
 
-                if (book.pos.hasPosition() && quantProperties.getMaxHoldTradingDays() > 0
+                if (book.pos.hasPosition() && p().getMaxHoldTradingDays() > 0
                         && ExitPriority.TIME_STOP.canRegisterOrPreempt(
                         book.stoppedOutToday, book.pendingSell, curExit)) {
                     int held = tradingCalendar.tradingDaysAfter(book.pos.getEarliestOpenDate(), tradeDay);
-                    if (held >= quantProperties.getMaxHoldTradingDays()) {
+                    if (held >= p().getMaxHoldTradingDays()) {
                         book.pendingSell = true;
                         book.pendingSellReason = ExitPriority.TIME_STOP.getLabel();
                         book.pendingSellSignalDay = tradeDay;
@@ -473,12 +495,12 @@ public class StrategyTask {
                         && posScale.compareTo(BigDecimal.ZERO) > 0
                         && openFilterService.canOpen(code, bars, i)) {
                     BigDecimal atr = atrAt(ind, i);
-                    if (atr.compareTo(quantProperties.getAtrMinThreshold()) > 0) {
+                    if (atr.compareTo(p().getAtrMinThreshold()) > 0) {
                         book.targetFullVol = positionAmountUtil.calcBuyVolume(availableCash(), close, atr, posScale);
                         long advBuy = IndicatorSignalUtil.avgVolume(bars, i, 20);
                         long barVol = barVolume(bars, i);
                         book.targetFullVol = capParticipation(book.targetFullVol, advBuy, equity, barVol);
-                        int first = quantProperties.isPyramidEnabled()
+                        int first = p().isPyramidEnabled()
                                 ? positionAmountUtil.pyramidSlice(book.targetFullVol, 0) : book.targetFullVol;
                         first = capParticipation(first, advBuy, equity, barVol);
                         if (first >= 100) {
@@ -487,12 +509,12 @@ public class StrategyTask {
                             book.pendingBuySignalDay = tradeDay;
                         }
                     }
-                } else if (book.pos.hasPosition() && quantProperties.isPyramidEnabled()
+                } else if (book.pos.hasPosition() && p().isPyramidEnabled()
                         && book.pyramidStage >= 1 && book.pyramidStage < 3
                         && book.pendingBuyVol == null
                         && !book.pos.isAddedToday()
                         && close.compareTo(book.pos.getAvgCost()
-                        .multiply(BigDecimal.ONE.add(quantProperties.getPyramidAddPct()))) >= 0
+                        .multiply(BigDecimal.ONE.add(p().getPyramidAddPct()))) >= 0
                         && ind.ma5[i] > ind.ma20[i]
                         && strategyRetirementService.allowNewOpen()
                         && accountRiskState.allowNewOpen(tradeDay, equity)
@@ -519,19 +541,16 @@ public class StrategyTask {
                 }
 
                 // 非 nextBar：当根撮合（配置关闭时）
-                if (!quantProperties.isNextBarOpenFill()) {
+                if (!p().isNextBarOpenFill()) {
                     fillPendingSameBar(code, book, bars, i, tradeDay, close);
                 }
 
-                if (book.pos.hasPosition() && quantProperties.isTrailingStopEnabled()) {
-                    book.pos.raiseTrailingStop(atrAt(ind, i), quantProperties.getTrailingAtrMultiplier());
+                if (book.pos.hasPosition() && p().isTrailingStopEnabled()) {
+                    book.pos.raiseTrailingStop(atrAt(ind, i), p().getTrailingAtrMultiplier());
                 }
             }
             persistRuntimeState();
             return true;
-        } finally {
-            redisLockUtil.unlock("strategy-scan");
-        }
     }
 
     private void fillPending(String code, LiveBook book, List<BarDTO> bars, int i,
@@ -637,7 +656,7 @@ public class StrategyTask {
             return;
         }
         BigDecimal deal = tradeCostModel.buyPrice(base, bars, i, vol);
-        if (quantProperties.isLimitPriceProtectEnabled()) {
+        if (p().isLimitPriceProtectEnabled()) {
             deal = LimitPriceProtect.clampBuy(deal, openFilterService.prevTradingDayClose(bars, i),
                     code, openFilterService.isSt(code, tradeDay));
         }
@@ -688,7 +707,7 @@ public class StrategyTask {
         }
         BigDecimal avg = book.pos.getAvgCost();
         BigDecimal deal = tradeCostModel.sellPrice(base, bars, i, vol);
-        if (quantProperties.isLimitPriceProtectEnabled()) {
+        if (p().isLimitPriceProtectEnabled()) {
             deal = LimitPriceProtect.clampSell(deal, openFilterService.prevTradingDayClose(bars, i),
                     code, openFilterService.isSt(code, tradeDay));
         }
@@ -980,7 +999,7 @@ public class StrategyTask {
         simCash = simCash.subtract(sliceAmt).subtract(sliceFee);
         book.pos.addBuy(qty, p.deal, sliceFee, exec);
         book.pos.raiseStopByCost(p.atr, p.equity,
-                quantProperties.getAtrStopMultiplier(), quantProperties.getHardStopCapitalPct());
+                p().getAtrStopMultiplier(), p().getHardStopCapitalPct());
         if (p.pyramid && p.remainingVol == p.vol) {
             book.pyramidStage++;
         } else if (!p.pyramid) {
@@ -1027,10 +1046,10 @@ public class StrategyTask {
         } else {
             book.pos.removeShares(qty);
             book.pos.raiseStopByCost(p.atr != null && p.atr.compareTo(BigDecimal.ZERO) > 0
-                            ? p.atr : quantProperties.getBaseAtr(),
+                            ? p.atr : p().getBaseAtr(),
                     p.equity != null && p.equity.compareTo(BigDecimal.ZERO) > 0
                             ? p.equity : markEquity(null),
-                    quantProperties.getAtrStopMultiplier(), quantProperties.getHardStopCapitalPct());
+                    p().getAtrStopMultiplier(), p().getHardStopCapitalPct());
             book.pendingSell = true;
             if (book.pendingSellSignalDay == null) {
                 book.pendingSellSignalDay = p.tradeDay;
@@ -1140,7 +1159,7 @@ public class StrategyTask {
         if (tradePoolService != null) {
             return tradePoolService.listActiveCodes();
         }
-        return quantProperties.stockCodeList();
+        return p().stockCodeList();
     }
 
     /** 收盘聚合：候选池 ∪ 当前持仓 */
@@ -1154,7 +1173,7 @@ public class StrategyTask {
             codes.addAll(pos.keySet());
         }
         if (codes.isEmpty()) {
-            codes.addAll(quantProperties.stockCodeList());
+            codes.addAll(p().stockCodeList());
         }
         return new ArrayList<String>(codes);
     }
@@ -1252,9 +1271,9 @@ public class StrategyTask {
 
     private int capParticipation(int vol, long adv20, BigDecimal equity, long barVol) {
         BigDecimal eff = CapacityThrottle.effectiveMaxParticipation(
-                quantProperties.getMaxParticipationAdv(), equity, quantProperties.getCapacityAumBase());
+                p().getMaxParticipationAdv(), equity, p().getCapacityAumBase());
         int capped = ParticipationCap.capVolume(vol, adv20, eff);
-        return CapacityThrottle.povCapVolume(capped, barVol, quantProperties.getPovMaxBarVolumePct());
+        return CapacityThrottle.povCapVolume(capped, barVol, p().getPovMaxBarVolumePct());
     }
 
     private static long barVolume(List<BarDTO> bars, int i) {
@@ -1308,7 +1327,7 @@ public class StrategyTask {
 
     private BigDecimal atrAt(IndicatorSignalUtil.IndicatorBundle ind, int i) {
         if (ind == null || i < 0 || Double.isNaN(ind.atr14[i])) {
-            return quantProperties.getBaseAtr();
+            return p().getBaseAtr();
         }
         return BigDecimal.valueOf(ind.atr14[i]);
     }

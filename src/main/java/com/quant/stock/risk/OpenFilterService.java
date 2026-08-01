@@ -1,5 +1,6 @@
 package com.quant.stock.risk;
 
+import com.quant.stock.admin.ParamsScope;
 import com.quant.stock.backtest.FillTimingHelper;
 import com.quant.stock.config.QuantProperties;
 import com.quant.stock.mapper.StockBasicMapper;
@@ -29,6 +30,10 @@ import java.util.Set;
 public class OpenFilterService {
 
     private final QuantProperties props;
+
+    private QuantProperties p() {
+        return ParamsScope.current(props);
+    }
 
     @Autowired(required = false)
     private StockBasicMapper stockBasicMapper;
@@ -91,19 +96,19 @@ public class OpenFilterService {
         if (isSuspended(cur)) {
             return false;
         }
-        if (props.isStOpenFilterEnabled() && isSt(stockCode, cur.getBarBegin() == null
+        if (p().isStOpenFilterEnabled() && isSt(stockCode, cur.getBarBegin() == null
                 ? null : cur.getBarBegin().toLocalDate())) {
             return false;
         }
         long avgVol = IndicatorSignalUtil.avgVolume(bars, index, 20);
-        if (avgVol < props.getMinAvgVolume20()) {
+        if (avgVol < p().getMinAvgVolume20()) {
             return false;
         }
-        if (!props.isMarketCapFilterEnabled()) {
+        if (!p().isMarketCapFilterEnabled()) {
             return true;
         }
         BigDecimal mktCapYi = estimateMarketCapYi(stockCode, cur.getClose());
-        return mktCapYi.compareTo(props.getMinMarketCapYi()) >= 0;
+        return mktCapYi.compareTo(p().getMinMarketCapYi()) >= 0;
     }
 
     /** 挂单撮合时点通过且满足开仓过滤 */
@@ -120,12 +125,12 @@ public class OpenFilterService {
             return false;
         }
         LocalTime time = t.toLocalTime();
-        if (props.isQuietOpenEnabled()
+        if (p().isQuietOpenEnabled()
                 && !time.isBefore(LocalTime.of(9, 30))
                 && time.isBefore(FillTimingHelper.EFFECTIVE_OPEN)) {
             return true;
         }
-        return props.isQuietCloseEnabled()
+        return p().isQuietCloseEnabled()
                 && !time.isBefore(LocalTime.of(14, 45))
                 && !time.isAfter(LocalTime.of(15, 0));
     }
@@ -260,7 +265,7 @@ public class OpenFilterService {
     }
 
     private BigDecimal resolveSharesYi(String code) {
-        Map<String, BigDecimal> map = props.getFloatSharesYi();
+        Map<String, BigDecimal> map = p().getFloatSharesYi();
         if (map != null && code != null && map.containsKey(code)) {
             BigDecimal v = map.get(code);
             if (v != null && v.compareTo(BigDecimal.ZERO) > 0) {

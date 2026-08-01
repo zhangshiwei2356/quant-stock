@@ -29,7 +29,13 @@ class SystemParamsServiceTest {
         @SuppressWarnings("unchecked")
         ObjectProvider<JdbcTemplate> jdbc = mock(ObjectProvider.class);
         when(jdbc.getIfAvailable()).thenReturn(null);
-        service = new SystemParamsService(props, jdbc);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<EffectiveParamsService> eps = mock(ObjectProvider.class);
+        when(eps.getIfAvailable()).thenReturn(null);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<com.quant.stock.strategy.StrategyRegistry> reg = mock(ObjectProvider.class);
+        when(reg.getIfAvailable()).thenReturn(null);
+        service = new SystemParamsService(props, jdbc, eps, reg);
     }
 
     @Test

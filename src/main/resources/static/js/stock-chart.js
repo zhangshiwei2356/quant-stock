@@ -3635,27 +3635,38 @@
     });
   }
 
+  var paramsSparseVersion = null;
+
   function renderParamsValue(it) {
     var key = it.key || '';
-    var val = it.value == null ? '' : String(it.value);
+    var val = it.effectiveValue != null ? String(it.effectiveValue)
+      : (it.value == null ? '' : String(it.value));
     if (!it.writable) {
       return $('<span class="value mono"/>').text(val === '' ? '—' : val);
     }
+    var $wrap = $('<span class="params-edit-wrap"/>');
     if (it.type === 'bool') {
       var checked = /^(true|1|yes|on)$/i.test(val);
-      return $('<label class="params-bool"/>')
+      $wrap.append($('<label class="params-bool"/>')
         .append($('<input type="checkbox" class="params-edit"/>')
           .attr('data-key', key)
           .attr('data-type', 'bool')
-          .prop('checked', checked))
-        .append($('<span class="params-writable-tag"/>').text('可写'));
-    }
-    return $('<span class="params-edit-wrap"/>')
-      .append($('<input type="text" class="params-edit mono"/>')
+          .prop('checked', checked)));
+    } else {
+      $wrap.append($('<input type="text" class="params-edit mono"/>')
         .attr('data-key', key)
         .attr('data-type', it.type || 'decimal')
-        .val(val))
-      .append($('<span class="params-writable-tag"/>').text('可写'));
+        .val(val));
+    }
+    if (it.overridden) {
+      $wrap.append($('<span class="params-override-tag"/>').text('覆盖'));
+      $wrap.append($('<button type="button" class="secondary params-clear-override"/>')
+        .attr('data-key', key)
+        .text('清除'));
+    } else {
+      $wrap.append($('<span class="params-writable-tag"/>').text('可写'));
+    }
+    return $wrap;
   }
 
   function collectWritableParams() {
@@ -3673,6 +3684,10 @@
     return updates;
   }
 
+  function currentParamsStrategyId() {
+    return String($('#paramsStrategySelect').val() || '').trim();
+  }
+
   function saveSysParams() {
     var updates = collectWritableParams();
     var keys = Object.keys(updates);
@@ -3681,8 +3696,8 @@
       return;
     }
     var ok = window.confirm(
-      '确认保存 ' + keys.length + ' 项白名单参数？\n'
-      + '将写入 system_config（quant.prop.*）并立即生效；配置指纹会更新。'
+      '确认保存 ' + keys.length + ' 项到全局 quant.prop.*？\n'
+      + '不影响各策略稀疏包；配置指纹会更新。'
     );
     if (!ok) return;
     var $btn = $('#btnParamsSave');
@@ -3695,31 +3710,100 @@
       data: JSON.stringify({ updates: updates, confirm: true })
     }).done(function (data) {
       if (data && data.ok) {
-        toast(data.message || '已保存', 'ok');
-        if (data.view) {
-          renderSysParamsView(data.view);
-        } else {
-          loadSysParams();
-        }
+        toast(data.message || '全局已保存', 'ok');
+        loadSysParams();
       } else {
         toast((data && data.message) || '保存失败', 'err');
-        if (data && data.view) renderSysParamsView(data.view);
       }
     }).fail(function (xhr) {
-      var msg = (xhr.responseJSON && xhr.responseJSON.message) || '保存失败';
-      toast(msg, 'err');
+      toast((xhr.responseJSON && xhr.responseJSON.message) || '保存失败', 'err');
     }).always(function () {
       $btn.prop('disabled', false).removeClass('is-loading');
     });
   }
 
+  function saveStrategyParams() {
+    var sid = currentParamsStrategyId();
+    if (!sid) {
+      toast('请先选择策略', 'info');
+      return;
+    }
+    var updates = collectWritableParams();
+    var keys = Object.keys(updates);
+    if (!keys.length) {
+      toast('没有可写参数可写入策略包', 'info');
+      return;
+    }
+    var ok = window.confirm(
+      '确认将当前表单 ' + keys.length + ' 项写入策略包「' + sid + '」？\n'
+      + '稀疏覆盖叠在全局之上；仅影响该策略纸面/回测。'
+    );
+    if (!ok) return;
+    var $btn = $('#btnStrategyParamsSave');
+    if ($btn.prop('disabled')) return;
+    $btn.prop('disabled', true).addClass('is-loading');
+    var body = { strategyId: sid, updates: updates, confirm: true };
+    if (paramsSparseVersion != null) body.version = paramsSparseVersion;
+    $.ajax({
+      url: '/api/ops/strategy-params',
+      method: 'POST',
+      contentType: 'application/json',
+      data: JSON.stringify(body)
+    }).done(function (data) {
+      if (data && data.ok) {
+        toast(data.message || '策略包已保存', 'ok');
+        if (data.view) renderSysParamsView(data.view);
+        else loadSysParams();
+      } else {
+        toast((data && data.message) || '策略包保存失败', 'err');
+        if (data && data.view) renderSysParamsView(data.view);
+      }
+    }).fail(function (xhr) {
+      toast((xhr.responseJSON && xhr.responseJSON.message) || '策略包保存失败', 'err');
+    }).always(function () {
+      $btn.prop('disabled', false).removeClass('is-loading');
+    });
+  }
+
+  function clearStrategyOverride(key) {
+    var sid = currentParamsStrategyId();
+    if (!sid || !key) return;
+    if (!window.confirm('清除策略「' + sid + '」对 ' + key + ' 的覆盖，恢复继承全局？')) return;
+    var body = { strategyId: sid, clearKeys: [key], confirm: true };
+    if (paramsSparseVersion != null) body.version = paramsSparseVersion;
+    $.ajax({
+      url: '/api/ops/strategy-params',
+      method: 'POST',
+      contentType: 'application/json',
+      data: JSON.stringify(body)
+    }).done(function (data) {
+      if (data && data.ok) {
+        toast('已清除覆盖', 'ok');
+        if (data.view) renderSysParamsView(data.view);
+        else loadSysParams();
+      } else {
+        toast((data && data.message) || '清除失败', 'err');
+      }
+    }).fail(function () { toast('清除失败', 'err'); });
+  }
+
   function renderSysParamsView(data) {
     if (!data) return;
     if (data.hint) $('#paramsHint').text(data.hint);
-    if (data.configFingerprint) {
-      $('#paramsFpHint').text('指纹 ' + data.configFingerprint);
-    } else {
-      $('#paramsFpHint').text('');
+    paramsSparseVersion = data.sparseVersion == null ? null : data.sparseVersion;
+    var fp = data.configFingerprint || '';
+    var sid = data.strategyId || '';
+    $('#paramsFpHint').text(fp ? ('生效指纹 ' + fp + (sid ? ' · ' + sid : '')) : '');
+    var $sel = $('#paramsStrategySelect');
+    if ($sel.length && (data.strategies || []).length) {
+      var cur = sid || $sel.val();
+      $sel.empty();
+      (data.strategies || []).forEach(function (s) {
+        var id = s.id || '';
+        var lab = (s.label || id) + (s.hasSparse ? ' ·有包' : '');
+        $sel.append($('<option/>').val(id).text(lab));
+      });
+      if (cur) $sel.val(cur);
     }
     var $g = $('#paramsGroups').empty();
     (data.groups || []).forEach(function (grp) {
@@ -3732,6 +3816,9 @@
         $lab.append($('<span class="params-kv-cn"/>').text(label));
         if (key && key !== label) {
           $lab.append($('<span class="params-kv-key mono"/>').text(key));
+        }
+        if (it.globalValue != null && it.writable) {
+          $lab.append($('<span class="params-kv-note"/>').text('全局 ' + it.globalValue));
         }
         if (it.note) {
           $lab.append($('<span class="params-kv-note"/>').attr('title', it.note).text(it.note));
@@ -3767,7 +3854,9 @@
 
   function loadSysParams() {
     loadOpsStrategies();
-    $.getJSON('/api/ops/params')
+    var sid = currentParamsStrategyId();
+    var url = '/api/ops/params' + (sid ? ('?strategyId=' + encodeURIComponent(sid)) : '');
+    $.getJSON(url)
       .done(function (data) {
         renderSysParamsView(data);
       })
@@ -3802,6 +3891,11 @@
   });
   $('#btnParamsRefresh').on('click', loadSysParams);
   $('#btnParamsSave').on('click', saveSysParams);
+  $('#btnStrategyParamsSave').on('click', saveStrategyParams);
+  $('#paramsStrategySelect').on('change', loadSysParams);
+  $(document).on('click', '.params-clear-override', function () {
+    clearStrategyOverride(String($(this).data('key') || ''));
+  });
   $(document).on('click', '.ops-strategy-activate', function () {
     activateOpsStrategy(String($(this).data('id') || ''));
   });

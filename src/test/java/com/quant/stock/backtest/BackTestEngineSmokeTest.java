@@ -1,5 +1,7 @@
 package com.quant.stock.backtest;
 
+import com.quant.stock.admin.EffectiveParamsService;
+import com.quant.stock.admin.QuantPropertiesCopy;
 import com.quant.stock.backtest.dto.BackTestResult;
 import com.quant.stock.calendar.TradingCalendar;
 import com.quant.stock.config.ConfigFingerprint;
@@ -12,6 +14,10 @@ import com.quant.stock.strategy.StrategyRegistry;
 import com.quant.stock.trade.TradeCostModel;
 import com.quant.stock.util.PositionAmountUtil;
 import org.junit.jupiter.api.Test;
+
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -44,8 +50,10 @@ class BackTestEngineSmokeTest {
         OpenFilterService openFilter = new OpenFilterService(props);
         StrategyRegistry registry = new StrategyRegistry(
                 Arrays.asList(new MaCrossStrategy(props), new HoldNothingStrategy()), props);
+        EffectiveParamsService eps = mockEffectiveParams(props);
         BackTestEngine engine = new BackTestEngine(
                 props,
+                eps,
                 new PositionAmountUtil(props),
                 registry,
                 new TradeCostModel(props),
@@ -80,6 +88,7 @@ class BackTestEngineSmokeTest {
                 Arrays.asList(new MaCrossStrategy(props), new HoldNothingStrategy()), props);
         BackTestEngine engine = new BackTestEngine(
                 props,
+                mockEffectiveParams(props),
                 new PositionAmountUtil(props),
                 registry,
                 new TradeCostModel(props),
@@ -89,6 +98,13 @@ class BackTestEngineSmokeTest {
                 new BigDecimal("100000"));
         assertNotNull(result);
         assertTrue(result.getTotalTradeNum() == null || result.getTotalTradeNum() == 0);
+    }
+
+    private static EffectiveParamsService mockEffectiveParams(final QuantProperties props) {
+        EffectiveParamsService eps = mock(EffectiveParamsService.class);
+        when(eps.resolve(anyString())).thenAnswer(inv -> QuantPropertiesCopy.copy(props));
+        when(eps.hasSparse(anyString())).thenReturn(false);
+        return eps;
     }
 
     private static List<BarDTO> syntheticUptrendDays(String code, int days) {

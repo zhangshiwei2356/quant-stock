@@ -145,6 +145,15 @@ CREATE TABLE IF NOT EXISTS `system_config` (
   UNIQUE KEY `idx_key` (`config_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统动态配置表';
 
+CREATE TABLE IF NOT EXISTS `strategy_param` (
+  `strategy_id` VARCHAR(64) NOT NULL COMMENT '注册策略 id',
+  `params_json` TEXT COMMENT '稀疏白名单 JSON',
+  `version` INT NOT NULL DEFAULT 0,
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `updated_by` VARCHAR(64) DEFAULT 'ops',
+  PRIMARY KEY (`strategy_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='策略稀疏参数包';
+
 CREATE TABLE IF NOT EXISTS `risk_control_log` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
   `account_id` VARCHAR(32) NOT NULL DEFAULT 'LIVE',

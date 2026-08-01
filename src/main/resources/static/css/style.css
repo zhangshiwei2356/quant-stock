@@ -2091,6 +2091,16 @@ button.loading::before {
   opacity: 0.9;
   white-space: nowrap;
 }
+.params-override-tag {
+  font-size: 10px;
+  font-weight: 600;
+  color: #b45309;
+  white-space: nowrap;
+}
+.params-clear-override {
+  padding: 2px 8px;
+  font-size: 11px;
+}
 .tp-table td.muted {
   color: var(--muted);
   font-size: 12px;

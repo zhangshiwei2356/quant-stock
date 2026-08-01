@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.stock.mapper.StrategyParamMapper">
+
+    <resultMap id="StrategyParamMap" type="com.quant.stock.admin.dto.StrategyParamDO">
+        <id column="strategy_id" property="strategyId"/>
+        <result column="params_json" property="paramsJson"/>
+        <result column="version" property="version"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="updated_by" property="updatedBy"/>
+    </resultMap>
+
+    <select id="selectByStrategyId" resultMap="StrategyParamMap">
+        SELECT strategy_id, params_json, version, updated_at, updated_by
+        FROM strategy_param
+        WHERE strategy_id = #{strategyId}
+        LIMIT 1
+    </select>
+
+    <insert id="upsert">
+        INSERT INTO strategy_param (strategy_id, params_json, version, updated_by)
+        VALUES (#{strategyId}, #{paramsJson}, 0, #{updatedBy})
+        ON DUPLICATE KEY UPDATE
+            params_json = VALUES(params_json),
+            updated_by = VALUES(updated_by),
+            version = version + 1,
+            updated_at = CURRENT_TIMESTAMP
+    </insert>
+</mapper>

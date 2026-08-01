@@ -175,7 +175,7 @@ sequenceDiagram
 |------|------|
 | 任务管理 | `sys_schedule_job` 启停 / cron / 立即执行（种子默认全关） |
 | 数据健康 | 本地空数据与滞后检查 |
-| 运行参数 | 白名单参数可写（`POST /api/ops/params` → `system_config` 的 `quant.prop.*` 热生效）；只读项仍展示；已注册策略表与纸面激活切换 |
+| 运行参数 | 全局白名单可写（`quant.prop.*`）+ **按策略稀疏参数包**（表 `strategy_param`）；运维可选策略编辑；纸面/回测按 strategyId 三层叠层生效 |
 
 总闸：`quant.schedule.enabled`（默认 true）。
 
@@ -273,8 +273,9 @@ sequenceDiagram
 | POST `/api/account/orders/{id}/partial-fill?qty=` | 本地部成桩 |
 | POST `/api/account/orders/{id}/replace?price=&volume=` | 改价=撤补（新单队尾） |
 | GET/PUT/POST `/api/schedule/**` | 定时任务 |
-| GET `/api/ops/data-health` · `/params` · `/strategies` | 数据健康 / 运行参数（含可写标记） / 已注册策略 |
-| POST `/api/ops/params` | 白名单运行参数热写（`updates` + `confirm:true`） |
+| GET `/api/ops/data-health` · `/params` · `/strategies` | 数据健康 / 运行参数（`?strategyId=` 含稀疏/生效预览） / 已注册策略 |
+| POST `/api/ops/params` | 全局白名单热写（`quant.prop.*`，`confirm:true`） |
+| POST `/api/ops/strategy-params` | 策略稀疏包热写（`strategyId` + `updates`/`clearKeys` + `confirm:true`） |
 | POST `/api/ops/active-strategy` | 纸面激活策略热切换（须 `confirm:true`） |
 | GET `/api/db/tables` · `/tables/{name}` | 表白名单浏览 |
 | GET `/api/docs/pdf/{stock\|app}` | 文档 PDF |

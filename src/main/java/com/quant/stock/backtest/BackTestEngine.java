@@ -1,5 +1,7 @@
 package com.quant.stock.backtest;
 
+import com.quant.stock.admin.EffectiveParamsService;
+import com.quant.stock.admin.ParamsScope;
 import com.quant.stock.backtest.dto.BackTestResult;
 import com.quant.stock.backtest.dto.BackTradeRecord;
 import com.quant.stock.calendar.TradingCalendar;
@@ -56,15 +58,20 @@ public class BackTestEngine {
     private static final int PENDING_BUY_EXPIRE_DAYS = 5;
 
     private final QuantProperties props;
+    private final EffectiveParamsService effectiveParamsService;
     private final PositionAmountUtil positionAmountUtil;
     private final StrategyRegistry strategyRegistry;
     private final TradeCostModel tradeCostModel;
     private final OpenFilterService openFilterService;
     private final TradingCalendar tradingCalendar;
 
+    private QuantProperties p() {
+        return ParamsScope.current(props);
+    }
+
     /** 使用默认费率与当前激活策略运行单股回测 */
     public BackTestResult run(String stockCode, List<BarDTO> closedBars, BigDecimal initCapital) {
-        return run(stockCode, closedBars, initCapital, props.getFeeRate(), props.getSlipPoint(), null);
+        return run(stockCode, closedBars, initCapital, p().getFeeRate(), p().getSlipPoint(), null);
     }
 
     /**
@@ -77,9 +84,21 @@ public class BackTestEngine {
         if (strategy == null) {
             strategy = strategyRegistry.active();
         }
+        final BaseStrategy strat = strategy;
+        QuantProperties effective = effectiveParamsService.resolve(strat.name());
+        return ParamsScope.call(effective, new java.util.concurrent.Callable<BackTestResult>() {
+            @Override
+            public BackTestResult call() {
+                return runScoped(stockCode, closedBars, initCapital, feeRate, slipPoint, strat);
+            }
+        });
+    }
+
+    private BackTestResult runScoped(String stockCode, List<BarDTO> closedBars, BigDecimal initCapital,
+                                     BigDecimal feeRate, BigDecimal slipPoint, BaseStrategy strategy) {
         String strategyId = strategy.fingerprintId();
-        final BigDecimal commissionRate = feeRate != null ? feeRate : props.getFeeRate();
-        String fingerprint = ConfigFingerprint.of(props, strategyId, commissionRate);
+        final BigDecimal commissionRate = feeRate != null ? feeRate : p().getFeeRate();
+        String fingerprint = ConfigFingerprint.of(p(), strategyId, commissionRate);
         if (closedBars == null || closedBars.size() < 65 || initCapital == null) {
             BackTestResult empty = BackTestResult.empty(stockCode, initCapital == null ? BigDecimal.ZERO : initCapital);
             empty.setConfigFingerprint(fingerprint);
@@ -91,7 +110,7 @@ public class BackTestEngine {
         }
 
         IndicatorSignalUtil.IndicatorBundle ind = IndicatorSignalUtil.precompute(closedBars);
-        AccountRiskState accountRiskState = new AccountRiskState(props);
+        AccountRiskState accountRiskState = new AccountRiskState(p());
         accountRiskState.reset(initCapital);
 
         BigDecimal cash = initCapital;
@@ -154,7 +173,7 @@ public class BackTestEngine {
             BigDecimal posScale = resolvePosScale(accountRiskState, equity, closedBars, i);
 
             // ---- Step1: 撮合挂单（先卖后买） ----
-            boolean fillWindow = props.isNextBarOpenFill()
+            boolean fillWindow = p().isNextBarOpenFill()
                     && FillTimingHelper.canFillPendingOnBar(closedBars, i);
 
             if (fillWindow && pendingSell && pos.hasPosition()
@@ -192,7 +211,7 @@ public class BackTestEngine {
                         if (vol < 100) {
                             Map<String, Object> rd = new LinkedHashMap<String, Object>();
                             rd.put("原因", "参与率硬顶后不足1手");
-                            rd.put("maxParticipationAdv", props.getMaxParticipationAdv());
+                            rd.put("maxParticipationAdv", p().getMaxParticipationAdv());
                             analysis.reject(stockCode, bar.getBarBegin(), "卖单暂缓",
                                     "ADV参与率硬顶后不足1手，挂单保留", rd);
                         } else {
@@ -272,7 +291,7 @@ public class BackTestEngine {
                 if (allow) {
                     int rawVol = vol;
                     int requestVol = FillVolumeScale.scaleToLot(rawVol, posScale);
-                    vol = PartialFillSim.fillVolume(requestVol, props.getBacktestFillRatio());
+                    vol = PartialFillSim.fillVolume(requestVol, p().getBacktestFillRatio());
                     if (vol >= 100) {
                         BigDecimal deal = protectBuyDeal(stockCode, tradeCostModel.buyPrice(open, closedBars, i, vol),
                                 closedBars, i);
@@ -284,8 +303,8 @@ public class BackTestEngine {
                             cash = cash.subtract(amount).subtract(fee);
                             pos.addBuy(vol, deal, fee, tradeDay);
                             BigDecimal atr = atrAt(ind, i);
-                            pos.raiseStopByCost(atr, equity, props.getAtrStopMultiplier(),
-                                    props.getHardStopCapitalPct());
+                            pos.raiseStopByCost(atr, equity, p().getAtrStopMultiplier(),
+                                    p().getHardStopCapitalPct());
                             pos.updateHighest(high);
                             trades.add(record(stockCode, "BUY", bar, deal, vol, fee, amount));
                             buyMarks.add(mark(bar, deal));
@@ -298,7 +317,7 @@ public class BackTestEngine {
                             bd.put("佣金", fee);
                             bd.put("金字塔加仓", isPyramid);
                             bd.put("止损价", pos.getStopPrice());
-                            bd.put("backtestFillRatio", props.getBacktestFillRatio());
+                            bd.put("backtestFillRatio", p().getBacktestFillRatio());
                             bd.put("数量公式", "挂单股×仓位系数×部成比例后取整手；满仓目标=资金×单只上限30%×ATR调节×仓位系数");
                             String fillNote = vol < requestVol ? "；部成残量保留挂单" : "";
                             analysis.fillBuy(stockCode, bar.getBarBegin(),
@@ -348,7 +367,7 @@ public class BackTestEngine {
             posScale = resolvePosScale(accountRiskState, equity, closedBars, i);
 
             // ---- Step2: 仅老仓止损（分档 T+1） ----
-            if (pos.hasPosition() && props.isStopLossEnabled() && pos.canSellStops(tradeDay)
+            if (pos.hasPosition() && p().isStopLossEnabled() && pos.canSellStops(tradeDay)
                     && !openFilterService.isSuspended(bar)) {
                 pos.updateHighest(high);
                 int sellable = (pos.sellableShares(tradeDay) / 100) * 100;
@@ -389,7 +408,7 @@ public class BackTestEngine {
                     } else {
                         // 部分止损：保留今仓，按剩余仓位重算止损线
                         pos.raiseStopByCost(atrAt(ind, i), markEquity(cash, pos, close),
-                                props.getAtrStopMultiplier(), props.getHardStopCapitalPct());
+                                p().getAtrStopMultiplier(), p().getHardStopCapitalPct());
                     }
                 }
             } else if (pos.hasPosition()) {
@@ -417,18 +436,18 @@ public class BackTestEngine {
             }
 
             // ---- Step3b: 最大持仓日（时间止损）----
-            if (pos.hasPosition() && props.getMaxHoldTradingDays() > 0
+            if (pos.hasPosition() && p().getMaxHoldTradingDays() > 0
                     && ExitPriority.TIME_STOP.canRegisterOrPreempt(stoppedOutToday, pendingSell, curExit)) {
                 LocalDate openDay = pos.getEarliestOpenDate();
                 int held = tradingCalendar.tradingDaysAfter(openDay, tradeDay);
-                if (held >= props.getMaxHoldTradingDays()) {
+                if (held >= p().getMaxHoldTradingDays()) {
                     pendingSell = true;
                     pendingSellReason = ExitPriority.TIME_STOP.getLabel();
                     pendingSellSignalDay = tradeDay;
                     Map<String, Object> td = new LinkedHashMap<String, Object>();
                     td.put("开仓日", openDay == null ? null : openDay.toString());
                     td.put("持仓交易日", held);
-                    td.put("阈值", props.getMaxHoldTradingDays());
+                    td.put("阈值", p().getMaxHoldTradingDays());
                     td.put("退出优先级", ExitPriority.TIME_STOP.getRank());
                     analysis.risk(stockCode, bar.getBarBegin(), "持仓达最大交易日，挂时间止损清仓", td);
                 }
@@ -442,12 +461,12 @@ public class BackTestEngine {
                     && accountRiskState.allowNewOpen(tradeDay, equity)
                     && posScale.compareTo(BigDecimal.ZERO) > 0) {
                 BigDecimal atr = atrAt(ind, i);
-                if (atr.compareTo(props.getAtrMinThreshold()) > 0
+                if (atr.compareTo(p().getAtrMinThreshold()) > 0
                         && openFilterService.canOpen(stockCode, closedBars, i)) {
                     targetFullVol = positionAmountUtil.calcBuyVolume(cash, close, atr, posScale);
                     long advBuy = IndicatorSignalUtil.avgVolume(closedBars, i, 20);
                     targetFullVol = capVol(targetFullVol, advBuy, equity, closedBars, i);
-                    int first = props.isPyramidEnabled()
+                    int first = p().isPyramidEnabled()
                             ? positionAmountUtil.pyramidSlice(targetFullVol, 0) : targetFullVol;
                     first = capVol(first, advBuy, equity, closedBars, i);
                     if (first >= 100) {
@@ -458,20 +477,20 @@ public class BackTestEngine {
                         sd.put("满仓目标股数", targetFullVol);
                         sd.put("挂单股数", first);
                         sd.put("ADV20", advBuy);
-                        sd.put("maxParticipationAdv", props.getMaxParticipationAdv());
-                        sd.put("金字塔开启", props.isPyramidEnabled());
-                        sd.put("数量公式", props.isPyramidEnabled()
+                        sd.put("maxParticipationAdv", p().getMaxParticipationAdv());
+                        sd.put("金字塔开启", p().isPyramidEnabled());
+                        sd.put("数量公式", p().isPyramidEnabled()
                                 ? "满仓目标=可用资金×单只上限30%×ATR调节(0.2~1.5)×仓位系数，整手；再×ADV参与率硬顶；首批=满仓目标×50%"
                                 : "满仓目标=可用资金×单只上限30%×ATR调节(0.2~1.5)×仓位系数，整手；再×ADV参与率硬顶");
                         analysis.signalBuy(stockCode, bar.getBarBegin(),
                                 "金叉且通过开仓过滤，挂次日有效开盘买单", sd);
                     }
                 }
-            } else if (pos.hasPosition() && props.isPyramidEnabled()
+            } else if (pos.hasPosition() && p().isPyramidEnabled()
                     && pyramidStage >= 1 && pyramidStage < 3
                     && pendingBuyVol == null
                     && !pos.isAddedToday()
-                    && close.compareTo(pos.getAvgCost().multiply(BigDecimal.ONE.add(props.getPyramidAddPct()))) >= 0
+                    && close.compareTo(pos.getAvgCost().multiply(BigDecimal.ONE.add(p().getPyramidAddPct()))) >= 0
                     && ind.ma5[i] > ind.ma20[i]
                     && accountRiskState.allowNewOpen(tradeDay, equity)
                     && posScale.compareTo(BigDecimal.ZERO) > 0) {
@@ -490,7 +509,7 @@ public class BackTestEngine {
                     pd.put("满仓目标股数", targetFullVol);
                     pd.put("挂单股数", slice);
                     pd.put("ADV20", advAdd);
-                    pd.put("maxParticipationAdv", props.getMaxParticipationAdv());
+                    pd.put("maxParticipationAdv", p().getMaxParticipationAdv());
                     pd.put("综合成本", pos.getAvgCost());
                     pd.put("数量公式", pyramidStage == 1
                             ? "第2批=满仓目标×30%，成交后占档"
@@ -513,11 +532,11 @@ public class BackTestEngine {
             }
 
             // 非 nextBar 兼容：当根收盘撮合
-            if (!props.isNextBarOpenFill()) {
+            if (!p().isNextBarOpenFill()) {
                 if (pendingBuyVol != null && pendingBuyVol >= 100) {
                     int requestVol = pendingBuyVol;
                     boolean isPyramid = pendingBuyPyramid;
-                    int vol = PartialFillSim.fillVolume(requestVol, props.getBacktestFillRatio());
+                    int vol = PartialFillSim.fillVolume(requestVol, p().getBacktestFillRatio());
                     if (vol >= 100) {
                         BigDecimal deal = protectBuyDeal(stockCode,
                                 tradeCostModel.buyPrice(close, closedBars, i, vol), closedBars, i);
@@ -526,8 +545,8 @@ public class BackTestEngine {
                         if (amount.add(fee).compareTo(cash) <= 0) {
                             cash = cash.subtract(amount).subtract(fee);
                             pos.addBuy(vol, deal, fee, tradeDay);
-                            pos.raiseStopByCost(atrAt(ind, i), equity, props.getAtrStopMultiplier(),
-                                    props.getHardStopCapitalPct());
+                            pos.raiseStopByCost(atrAt(ind, i), equity, p().getAtrStopMultiplier(),
+                                    p().getHardStopCapitalPct());
                             trades.add(record(stockCode, "BUY", bar, deal, vol, fee, amount));
                             buyMarks.add(mark(bar, deal));
                             logLastTrade(analysis, trades, isPyramid ? "金字塔加仓成交；当根收盘撮合" : "金叉首开成交；当根收盘撮合");
@@ -593,8 +612,8 @@ public class BackTestEngine {
             equity = markEquity(cash, pos, close);
 
             // ---- Step5: 盘后更新 trail；日末固化昨收权益 ----
-            if (pos.hasPosition() && props.isTrailingStopEnabled()) {
-                pos.raiseTrailingStop(atrAt(ind, i), props.getTrailingAtrMultiplier());
+            if (pos.hasPosition() && p().isTrailingStopEnabled()) {
+                pos.raiseTrailingStop(atrAt(ind, i), p().getTrailingAtrMultiplier());
             }
             boolean dayEnd = (i == closedBars.size() - 1)
                     || !closedBars.get(i + 1).getBarBegin().toLocalDate().equals(tradeDay);
@@ -694,7 +713,7 @@ public class BackTestEngine {
 
     private BigDecimal atrAt(IndicatorSignalUtil.IndicatorBundle ind, int i) {
         if (Double.isNaN(ind.atr14[i])) {
-            return props.getBaseAtr();
+            return p().getBaseAtr();
         }
         return BigDecimal.valueOf(ind.atr14[i]);
     }
@@ -714,13 +733,13 @@ public class BackTestEngine {
     private BigDecimal resolvePosScale(AccountRiskState risk, BigDecimal equity,
                                        List<BarDTO> bars, int index) {
         BigDecimal scale = risk.positionScale(equity);
-        if (props.isStressScenarioEnabled()
-                && StressScenarioService.isAdvCliff(bars, index, props.getStressAdvCliffRatio())) {
+        if (p().isStressScenarioEnabled()
+                && StressScenarioService.isAdvCliff(bars, index, p().getStressAdvCliffRatio())) {
             scale = scale.multiply(new BigDecimal("0.5"));
         }
-        if (props.isStructuralBreakEnabled()
+        if (p().isStructuralBreakEnabled()
                 && StructuralBreakMonitor.crossesThreshold(bars, index,
-                props.getStructuralBreakWindow(), props.getStructuralBreakThreshold())) {
+                p().getStructuralBreakWindow(), p().getStructuralBreakThreshold())) {
             scale = scale.multiply(new BigDecimal("0.5"));
         }
         return scale;
@@ -728,7 +747,7 @@ public class BackTestEngine {
 
     private BigDecimal effAdv(BigDecimal equity) {
         return CapacityThrottle.effectiveMaxParticipation(
-                props.getMaxParticipationAdv(), equity, props.getCapacityAumBase());
+                p().getMaxParticipationAdv(), equity, p().getCapacityAumBase());
     }
 
     private int capVol(int vol, long adv20, BigDecimal equity, List<BarDTO> bars, int index) {
@@ -737,11 +756,11 @@ public class BackTestEngine {
             barVol = bars.get(index).getVolume().longValue();
         }
         int capped = ParticipationCap.capVolume(vol, adv20, effAdv(equity));
-        return CapacityThrottle.povCapVolume(capped, barVol, props.getPovMaxBarVolumePct());
+        return CapacityThrottle.povCapVolume(capped, barVol, p().getPovMaxBarVolumePct());
     }
 
     private BigDecimal protectBuyDeal(String code, BigDecimal deal, List<BarDTO> bars, int index) {
-        if (!props.isLimitPriceProtectEnabled() || deal == null) {
+        if (!p().isLimitPriceProtectEnabled() || deal == null) {
             return deal;
         }
         BigDecimal prev = openFilterService.prevTradingDayClose(bars, index);
@@ -751,7 +770,7 @@ public class BackTestEngine {
     }
 
     private BigDecimal protectSellDeal(String code, BigDecimal deal, List<BarDTO> bars, int index) {
-        if (!props.isLimitPriceProtectEnabled() || deal == null) {
+        if (!p().isLimitPriceProtectEnabled() || deal == null) {
             return deal;
         }
         BigDecimal prev = openFilterService.prevTradingDayClose(bars, index);

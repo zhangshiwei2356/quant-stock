@@ -106,6 +106,10 @@ public final class DbTableCatalog {
                 "键值型动态参数；含纸面激活策略与 quant.prop.* 白名单运行参数覆盖。",
                 "schema 初始化种子 + 运维「运行参数」热写 / 策略切换。",
                 "启动加载 quant.prop.*；纸面策略与过滤/仓位/止损等热生效。");
+        add(m, "strategy_param", "策略稀疏参数包", "配置与风控", "strategy_id ASC",
+                "按注册策略 id 存放稀疏白名单 JSON；叠在全局 quant.prop.* 之上。",
+                "运维「运行参数」按策略保存；无行表示完全继承全局。",
+                "纸面/回测 resolve(strategyId) 生效快照；version 乐观锁。");
         add(m, "risk_control_log", "风控触发日志", "配置与风控", "id DESC",
                 "记录风控规则触发详情与采取的动作，便于审计。",
                 "策略/风控模块在触发规则时写入。",

@@ -1,5 +1,6 @@
 package com.quant.stock.risk;
 
+import com.quant.stock.admin.ParamsScope;
 import com.quant.stock.calendar.TradingCalendar;
 import com.quant.stock.config.QuantProperties;
 import com.quant.stock.market.BarAggregateUtil;
@@ -28,6 +29,10 @@ public class RiskControlService {
     private final LiveAccountRiskState accountRiskState;
     private final TradingCalendar tradingCalendar;
     private final StrategyRetirementService strategyRetirementService;
+
+    private QuantProperties p() {
+        return ParamsScope.current(quantProperties);
+    }
 
     /** 是否在 A 股交易时段且非静默期 */
     public boolean isTradingTime(LocalDateTime now) {
@@ -95,7 +100,7 @@ public class RiskControlService {
         }
         int held = positions == null ? 0 : positions.getOrDefault(stockCode, 0);
         BigDecimal singleMv = price.multiply(BigDecimal.valueOf(held + volume));
-        BigDecimal maxSingle = equity.multiply(quantProperties.getMaxSinglePosition())
+        BigDecimal maxSingle = equity.multiply(p().getMaxSinglePosition())
                 .multiply(accountRiskState.positionScale(equity));
         return singleMv.compareTo(maxSingle) <= 0;
     }
