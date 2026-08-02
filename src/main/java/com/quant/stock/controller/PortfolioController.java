@@ -7,6 +7,7 @@ import com.quant.stock.backtest.dto.BackTestAnalysisRecord;
 import com.quant.stock.backtest.dto.BackTestQueryDTO;
 import com.quant.stock.backtest.dto.PortfolioBacktestHistoryRecord;
 import com.quant.stock.backtest.dto.PortfolioResultDTO;
+import com.quant.stock.strategy.StrategyRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,12 +32,14 @@ public class PortfolioController {
     private final PortfolioBackTestEngine portfolioBackTestEngine;
     private final BackTestHistoryStore backTestHistoryStore;
     private final BackTestAnalysisStore backTestAnalysisStore;
+    private final StrategyRegistry strategyRegistry;
 
     /** 提交组合回测请求并写入历史与分析记录。 */
     @PostMapping("/run")
     public PortfolioResultDTO run(@RequestBody BackTestQueryDTO query) {
         PortfolioResultDTO result = portfolioBackTestEngine.run(query);
-        PortfolioBacktestHistoryRecord hist = backTestHistoryStore.appendPortfolio(query, result);
+        String resolvedId = strategyRegistry.resolve(query == null ? null : query.getStrategyId()).name();
+        PortfolioBacktestHistoryRecord hist = backTestHistoryStore.appendPortfolio(query, result, resolvedId);
         if (hist != null) {
             backTestAnalysisStore.appendPortfolio(hist.getId(), hist.getSavedAt(), query, result);
         }

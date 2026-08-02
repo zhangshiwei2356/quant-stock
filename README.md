@@ -211,7 +211,7 @@ sequenceDiagram
 - 区间：模拟样本约 `2025-07-17` ~ `2026-07-17`；TDX 1 分钟公开节点通常约 90 个交易日（以节点为准）
 - **物理真相源**：仅 `market_1min`；5/15/30/60/日/周/月一律内存聚合（已删除 `market_daily` / `market_minute` 与 legacy `stock_bar_*` / `bar_aggregate_meta`）
 - 1 分钟回填：`python scripts/fetch_min1_tdx.py --from-pool` 或 `--codes 600036 --sleep 0.2`
-- 回测历史/分析：`bt_backtest_record` / `bt_backtest_analysis`（亦可落盘 `quant.history-dir`）
+- 回测历史/分析：`bt_backtest_record` / `bt_backtest_analysis`（亦可落盘 `quant.history-dir`）；落库时写入注册策略 `strategy_id`
 - 重新生成模拟种子：`mvn -q compile exec:java -Dexec.mainClass=com.quant.stock.market.mock.MockKlineDataGenerator`
 
 ### 主要库表
@@ -224,7 +224,7 @@ sequenceDiagram
 | `trade_orders` / `trade_positions` / `trade_position_lots` / `trade_cashflows` | 模拟委托、持仓、批次、日结 |
 | `risk_control_log` | 风控日志 |
 | `sys_schedule_job` | 定时任务 |
-| `bt_backtest_record` / `bt_backtest_analysis` | 回测历史与分析 |
+| `bt_backtest_record` / `bt_backtest_analysis` | 回测历史与分析（`strategy_id` 为注册策略 id） |
 | `system_config` | 动态配置（含模拟现金等） |
 
 ---

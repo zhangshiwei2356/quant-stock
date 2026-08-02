@@ -35,11 +35,13 @@ public class SingleBacktestHistoryRecord {
     private List<BackTradeRecord> trades;
     /** 策略相关配置指纹（P0-93） */
     private String configFingerprint;
+    /** 注册策略 id */
+    private String strategyId;
 
     /** 由 {@link BackTestResult} 构建历史记录（不含权益曲线） */
     public static SingleBacktestHistoryRecord fromResult(String id, String savedAt,
                                                          String period, String backStart, String backEnd,
-                                                         BackTestResult result) {
+                                                         BackTestResult result, String strategyId) {
         List<BackTradeRecord> tradeList = result.getTrades() == null
                 ? new ArrayList<BackTradeRecord>() : result.getTrades();
         return SingleBacktestHistoryRecord.builder()
@@ -58,6 +60,7 @@ public class SingleBacktestHistoryRecord {
                 .tradeStats(BackTestTradeStats.from(tradeList, result.getInitCapital(), result.getFinalAsset()))
                 .trades(tradeList)
                 .configFingerprint(result.getConfigFingerprint())
+                .strategyId(strategyId)
                 .build();
     }
 }

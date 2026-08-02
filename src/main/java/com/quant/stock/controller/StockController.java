@@ -172,9 +172,10 @@ public class StockController {
 
         if ("session".equals(engineNorm)) {
             BaseStrategy resolved = strategyRegistry.resolve(strategyId);
+            String resolvedId = resolved.name();
             if (!(resolved instanceof SessionStrategy)) {
                 throw new IllegalArgumentException("engine=session 需要实现 SessionStrategy 的策略，当前="
-                        + resolved.name());
+                        + resolvedId);
             }
             final java.util.Map<String, String> ov = overrides;
             final BaseStrategy strat = resolved;
@@ -191,7 +192,7 @@ public class StockController {
                 result.setEngine("session");
             }
             SingleBacktestHistoryRecord hist = backTestHistoryStore.appendSingle(
-                    BarPeriod.MIN_1.name(), startStr, endStr, result);
+                    BarPeriod.MIN_1.name(), startStr, endStr, result, resolvedId);
             if (hist != null) {
                 backTestAnalysisStore.appendSingle(
                         hist.getId(), hist.getSavedAt(), BarPeriod.MIN_1.name(), startStr, endStr, result);
@@ -207,13 +208,15 @@ public class StockController {
         }
         List<BarDTO> bars = marketDataService.getKline(code, barPeriod, backStart, backEnd);
         BigDecimal fee = feeRate != null ? feeRate : null;
+        BaseStrategy resolved = strategyRegistry.resolve(strategyId);
+        String resolvedId = resolved.name();
         BackTestResult result = backTestEngine.run(code, bars, capital, fee, quantProperties.getSlipPoint(),
-                strategyRegistry.resolve(strategyId), overrides);
+                resolved, overrides);
         if (result.getEngine() == null) {
             result.setEngine("classic");
         }
         SingleBacktestHistoryRecord hist = backTestHistoryStore.appendSingle(
-                barPeriod.name(), startStr, endStr, result);
+                barPeriod.name(), startStr, endStr, result, resolvedId);
         if (hist != null) {
             backTestAnalysisStore.appendSingle(
                     hist.getId(), hist.getSavedAt(), barPeriod.name(), startStr, endStr, result);

@@ -74,14 +74,15 @@ public class BackTestHistoryStore {
 
     /** 持久化单股回测结果并返回历史视图 */
     public SingleBacktestHistoryRecord appendSingle(String period, String backStart, String backEnd,
-                                                    BackTestResult result) {
+                                                    BackTestResult result, String strategyId) {
         if (result == null) {
             return null;
         }
         String id = UUID.randomUUID().toString().replace("-", "");
         String savedAt = LocalDateTime.now().format(FMT);
+        String sid = emptyToNull(strategyId);
         SingleBacktestHistoryRecord rec = SingleBacktestHistoryRecord.fromResult(
-                id, savedAt, period, emptyToNull(backStart), emptyToNull(backEnd), result);
+                id, savedAt, period, emptyToNull(backStart), emptyToNull(backEnd), result, sid);
         if (backtestRecordMapper == null) {
             log.warn("未启用 MySQL，单股回测历史未持久化 id={}", id);
             return rec;
@@ -103,20 +104,23 @@ public class BackTestHistoryStore {
                 .tradeStatsJson(JSON.toJSONString(rec.getTradeStats()))
                 .tradesJson(JSON.toJSONString(rec.getTrades()))
                 .configFingerprint(result.getConfigFingerprint())
+                .strategyId(sid)
                 .build();
         backtestRecordMapper.insert(row);
         return rec;
     }
 
     /** 持久化组合回测结果 */
-    public PortfolioBacktestHistoryRecord appendPortfolio(BackTestQueryDTO query, PortfolioResultDTO result) {
+    public PortfolioBacktestHistoryRecord appendPortfolio(BackTestQueryDTO query, PortfolioResultDTO result,
+                                                          String strategyId) {
         if (result == null) {
             return null;
         }
         String id = UUID.randomUUID().toString().replace("-", "");
         String savedAt = LocalDateTime.now().format(FMT);
+        String sid = emptyToNull(strategyId);
         PortfolioBacktestHistoryRecord rec = PortfolioBacktestHistoryRecord.fromResult(
-                id, savedAt, query, result);
+                id, savedAt, query, result, sid);
         if (backtestRecordMapper == null) {
             log.warn("未启用 MySQL，组合回测历史未持久化 id={}", id);
             return rec;
@@ -142,9 +146,47 @@ public class BackTestHistoryStore {
                 .tradesJson(JSON.toJSONString(rec.getTrades()))
                 .stockResultsJson(JSON.toJSONString(rec.getStockResults()))
                 .configFingerprint(result.getConfigFingerprint())
+                .strategyId(sid)
                 .build();
         backtestRecordMapper.insert(row);
         return rec;
+    }
+
+    /**
+     * 按策略 id 查摘要历史（不含 trades / stock_results）。
+     * {@code kind} 为 null/blank/ALL 时不过滤类型。
+     */
+    public List<?> listSummaryByStrategy(String strategyId, String kind) {
+        if (backtestRecordMapper == null || !StringUtils.hasText(strategyId)) {
+            return Collections.emptyList();
+        }
+        String kindFilter = StringUtils.hasText(kind) ? kind.trim() : null;
+        List<BtBacktestRecordDO> rows = backtestRecordMapper.selectSummaryByStrategyId(
+                strategyId.trim(), kindFilter);
+        List<Object> out = new ArrayList<Object>();
+        for (BtBacktestRecordDO r : rows) {
+            if ("PORTFOLIO".equalsIgnoreCase(r.getKind())) {
+                out.add(toPortfolio(r));
+            } else {
+                out.add(toSingle(r));
+            }
+        }
+        return out;
+    }
+
+    /** 按 recordId 取全量单股或组合历史视图；不存在返回 null。 */
+    public Object getByRecordId(String recordId) {
+        if (backtestRecordMapper == null || !StringUtils.hasText(recordId)) {
+            return null;
+        }
+        BtBacktestRecordDO r = backtestRecordMapper.selectByRecordId(recordId.trim());
+        if (r == null) {
+            return null;
+        }
+        if ("PORTFOLIO".equalsIgnoreCase(r.getKind())) {
+            return toPortfolio(r);
+        }
+        return toSingle(r);
     }
 
     /** 按标的过滤单股历史（空则全部） */
@@ -213,6 +255,7 @@ public class BackTestHistoryStore {
                 .tradeStats(stats)
                 .trades(trades)
                 .configFingerprint(r.getConfigFingerprint())
+                .strategyId(r.getStrategyId())
                 .build();
     }
 
@@ -244,6 +287,7 @@ public class BackTestHistoryStore {
                 .stockResults(stockResults == null ? new ArrayList<SingleStockBackResult>() : stockResults)
                 .trades(trades)
                 .configFingerprint(r.getConfigFingerprint())
+                .strategyId(r.getStrategyId())
                 .build();
     }
 

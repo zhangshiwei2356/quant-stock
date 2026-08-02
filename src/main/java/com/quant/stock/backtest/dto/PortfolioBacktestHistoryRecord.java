@@ -35,11 +35,14 @@ public class PortfolioBacktestHistoryRecord {
     private List<BackTradeRecord> trades;
     /** 策略相关配置指纹（P0-93） */
     private String configFingerprint;
+    /** 注册策略 id */
+    private String strategyId;
 
     /** 由组合回测结果构建历史记录 */
     public static PortfolioBacktestHistoryRecord fromResult(String id, String savedAt,
                                                             BackTestQueryDTO query,
-                                                            PortfolioResultDTO result) {
+                                                            PortfolioResultDTO result,
+                                                            String strategyId) {
         List<String> codes = query == null || query.getStockCodeList() == null
                 ? new ArrayList<String>() : new ArrayList<String>(query.getStockCodeList());
         String start = query != null && query.getBackStart() != null
@@ -65,6 +68,7 @@ public class PortfolioBacktestHistoryRecord {
                         ? new ArrayList<SingleStockBackResult>() : result.getStockResults())
                 .trades(tradeList)
                 .configFingerprint(result.getConfigFingerprint())
+                .strategyId(strategyId)
                 .build();
     }
 }
