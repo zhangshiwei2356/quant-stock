@@ -184,7 +184,7 @@ sequenceDiagram
 
 ### 7. 数据表
 
-白名单表分页只读浏览（`DbTableCatalog`）。
+白名单表分页只读浏览（`DbTableCatalog`）。列表与详情附带 **磁盘占用**（`information_schema` 的 DATA/INDEX；InnoDB 约为已分配空间）：侧栏显示总量徽章，工具栏摘要与表说明展开区显示数据/索引分项。
 
 ### 8. 量化知识 / 应用说明
 
@@ -280,7 +280,7 @@ sequenceDiagram
 | POST `/api/ops/params` | 全局白名单热写（`quant.prop.*`，`confirm:true`） |
 | POST `/api/ops/strategy-params` | 策略稀疏包热写（`strategyId` + `updates`/`clearKeys` + `confirm:true`） |
 | POST `/api/ops/active-strategy` | 纸面激活策略热切换（须 `confirm:true`） |
-| GET `/api/db/tables` · `/tables/{name}` | 表白名单浏览 |
+| GET `/api/db/tables` · `/tables/{name}` | 表白名单浏览（含 `rowCount` / `dataBytes` / `indexBytes` / `totalBytes`） |
 | GET `/api/docs/pdf/{stock\|app}` | 文档 PDF |
 | GET `/api/docs/readme` | README HTML 片段 |
 

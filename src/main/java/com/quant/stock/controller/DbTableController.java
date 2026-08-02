@@ -28,7 +28,7 @@ public class DbTableController {
 
     private final ObjectProvider<DbTableBrowseService> browseServiceProvider;
 
-    /** 列出白名单内数据表及行数（未开库时仅返回目录元数据）。 */
+    /** 列出白名单内数据表及行数、磁盘占用（未开库时仅返回目录元数据）。 */
     @GetMapping("/tables")
     public Map<String, Object> tables() {
         DbTableBrowseService svc = browseServiceProvider.getIfAvailable();
@@ -73,6 +73,10 @@ public class DbTableController {
             m.put("source", def.getSource());
             m.put("usage", def.getUsage());
             m.put("rowCount", null);
+            m.put("dataBytes", null);
+            m.put("indexBytes", null);
+            m.put("freeBytes", null);
+            m.put("totalBytes", null);
             m.put("exists", false);
             list.add(m);
         }

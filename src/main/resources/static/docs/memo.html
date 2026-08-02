@@ -62,7 +62,7 @@
     <li><b>账户概览</b> — 已落地 · 资金权益 / 当前持仓（批次 T+1）/ 委托记录 / 权益日结 / 风控事件 / 风控日报</li>
     <li><b>唯一目标池</b> — 已落地 · 「当前池」手动「扫描更新」或定时 <code>pool-rebuild</code> / <code>after-market-batch-scan</code>；「扫描历史」可查看批次，亦可手动扫描；移出≠卖出；漏斗 + Markdown 报告</li>
     <li><b>运维中心</b> — 已落地 · 任务管理（库表动态调度）/ 数据健康（本地空与滞后）/ 运行参数（白名单可写 + 中文说明对照配置键）</li>
-    <li><b>数据表</b> — 已落地 · MySQL 白名单分页只读浏览</li>
+    <li><b>数据表</b> — 已落地 · MySQL 白名单分页只读浏览；列表/详情展示 information_schema 磁盘占用（数据/索引）</li>
     <li><b>回测工作台</b> — 已落地 · 行情全市场选股；个股/组合回测<strong>仅从目标池</strong>选股；个股二级：回测工作台 / 批量扫描（yml 列表）/ 回测历史；组合二级：回测工作台 / 回测历史；结果含 <code>configFingerprint</code> / <code>atrRisk</code></li>
     <li><b>ADV 参与率硬顶</b> — 已落地 · <code>quant.max-participation-adv</code> 默认 0.10；买入/死叉卖受限，止损与熔断卖不受限</li>
     <li><b>退出优先级契约</b> — 已落地 · <code>ExitPriority</code>（止损 &gt; 熔断挂卖 &gt; 时间止损 &gt; 死叉）；见交易规则</li>

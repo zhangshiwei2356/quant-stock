@@ -3100,6 +3100,32 @@
 
   var dbTableState = { name: '', page: 1, size: 20, pages: 0, total: 0 };
 
+  /** 字节 → 可读（B / KB / MB / GB） */
+  function formatBytes(n) {
+    if (n == null || n === '' || isNaN(Number(n))) return '—';
+    n = Number(n);
+    if (n < 0) n = 0;
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(n < 10 * 1024 ? 1 : 0) + ' KB';
+    if (n < 1024 * 1024 * 1024) {
+      var mb = n / (1024 * 1024);
+      return mb.toFixed(mb < 10 ? 2 : 1) + ' MB';
+    }
+    return (n / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+  }
+
+  function formatDiskBreakdown(data) {
+    data = data || {};
+    if (data.totalBytes == null && data.dataBytes == null) return '';
+    var total = formatBytes(data.totalBytes != null ? data.totalBytes
+      : (Number(data.dataBytes || 0) + Number(data.indexBytes || 0)));
+    var detail = '数据 ' + formatBytes(data.dataBytes) + ' / 索引 ' + formatBytes(data.indexBytes);
+    if (data.freeBytes != null && Number(data.freeBytes) > 0) {
+      detail += ' / 可回收 ' + formatBytes(data.freeBytes);
+    }
+    return { total: total, detail: detail };
+  }
+
   function loadDbTablesMenu() {
     var $menu = $('#dbtablesMenu').empty();
     $.getJSON('/api/db/tables').done(function (data) {
@@ -3110,15 +3136,25 @@
       }
       tables.forEach(function (t) {
         var countTxt = t.rowCount != null ? String(t.rowCount) : '—';
+        var sizeTxt = t.totalBytes != null ? formatBytes(t.totalBytes) : '';
+        var tipParts = [];
+        if (t.rowCount != null) tipParts.push(t.rowCount + ' 行');
+        var disk = formatDiskBreakdown(t);
+        if (disk) tipParts.push('磁盘约 ' + disk.total + '（' + disk.detail + '）');
+        if (t.exists === false) tipParts.push('表可能尚未创建');
+        var sizeHtml = sizeTxt
+          ? ' <span class="db-tbl-size" title="磁盘约占用（information_schema）">' + escHtml(sizeTxt) + '</span>'
+          : '';
         var $li = $('<li role="button" tabindex="0"/>')
           .attr('data-table', t.name)
+          .attr('title', tipParts.join(' · ') || t.name)
           .html(
             '<span class="db-tbl-title">' + escHtml(t.title || t.name)
-            + ' <span class="trade-pool-count">' + escHtml(countTxt) + '</span></span>'
-            + '<span class="db-tbl-name">' + escHtml(t.name) + '</span>'
+            + ' <span class="trade-pool-count" title="行数">' + escHtml(countTxt) + '</span></span>'
+            + '<span class="db-tbl-name">' + escHtml(t.name) + sizeHtml + '</span>'
           );
         if (t.exists === false) {
-          $li.css('opacity', '0.55').attr('title', '表可能尚未创建');
+          $li.css('opacity', '0.55');
         }
         $menu.append($li);
       });
@@ -3174,7 +3210,16 @@
         $('#dbTableTitle').text((data.title || name) + ' · ' + name);
         $('#dbTableHint').text('只读分页浏览 · 表结构见下方字段中文说明');
         renderDbTableMeta(data);
-        $('#dbTableSummary').text('共 ' + dbTableState.total + ' 行 · 第 ' + dbTableState.page + ' / ' + Math.max(1, dbTableState.pages) + ' 页');
+        var disk = formatDiskBreakdown(data);
+        var summary = '共 ' + dbTableState.total + ' 行';
+        if (disk) {
+          summary += ' · 磁盘约 ' + disk.total + '（' + disk.detail + '）';
+        }
+        summary += ' · 第 ' + dbTableState.page + ' / ' + Math.max(1, dbTableState.pages) + ' 页';
+        $('#dbTableSummary').text(summary)
+          .attr('title', disk
+            ? '磁盘占用来自 information_schema；InnoDB 约为已分配空间，与行数无严格正比'
+            : '');
         var cols = normalizeDbColumns(data.columns || []);
         if (!cols.length) {
           $('#dbTableHead').html('<tr><th>—</th></tr>');
@@ -3233,8 +3278,12 @@
     $('#dbMetaSource').text(data.source || '—');
     $('#dbMetaUsage').text(data.usage || '—');
     $('#dbMetaOrder').text(data.orderBy || '—');
-    // 一行简略：模块 · 功能说明（超出省略）
-    $('#dbMetaSummary').text(module + ' · ' + purpose);
+    var disk = formatDiskBreakdown(data);
+    $('#dbMetaDisk').text(disk ? (disk.total + '（' + disk.detail + '）') : '—');
+    // 一行简略：模块 · 功能说明（有磁盘时附总占用）
+    var summaryLine = module + ' · ' + purpose;
+    if (disk) summaryLine += ' · ' + disk.total;
+    $('#dbMetaSummary').text(summaryLine);
     $('#dbTableMeta').prop('hidden', false);
     setDbMetaExpanded(false);
   }
@@ -3243,7 +3292,7 @@
     $('#dbTableMeta').prop('hidden', true);
     setDbMetaExpanded(false);
     $('#dbMetaSummary').text('—');
-    $('#dbMetaModule, #dbMetaPurpose, #dbMetaSource, #dbMetaUsage, #dbMetaOrder').text('—');
+    $('#dbMetaModule, #dbMetaPurpose, #dbMetaSource, #dbMetaUsage, #dbMetaOrder, #dbMetaDisk').text('—');
   }
 
   function updateDbPager(total, page, size, pages) {

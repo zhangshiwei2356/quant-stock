@@ -38,38 +38,38 @@ html[data-theme="night"] {
 }
 
 html[data-theme="day"] {
-  /* 浅色科技：冷灰蓝底 + 电青强调 */
-  --bg-0: #e8eef6;
-  --bg-1: #f2f6fb;
-  --bg-2: #e4ebf4;
-  --panel: rgba(255, 255, 255, 0.86);
+  /* 日间纸面：干净浅灰底 + 克制蓝灰强调（告别电青游动粒子感） */
+  --bg-0: #f6f8fc;
+  --bg-1: #eef2f7;
+  --bg-2: #e8edf4;
+  --panel: rgba(255, 255, 255, 0.92);
   --panel-solid: #ffffff;
-  --header-bg: rgba(248, 251, 255, 0.88);
-  --border: #cfdcec;
-  --border-focus: #0ea5e9;
-  --text: #152033;
-  --muted: #5a6d86;
-  --accent: #0284c7;
-  --accent-deep: #0369a1;
-  --buy: #0d9488;
+  --header-bg: rgba(255, 255, 255, 0.9);
+  --border: #d8e0ea;
+  --border-focus: #3b82c4;
+  --text: #1a2332;
+  --muted: #64748b;
+  --accent: #2563a8;
+  --accent-deep: #1e4f86;
+  --buy: #0f766e;
   --sell: #dc2626;
   --warn: #c2410c;
-  --row-alt: rgba(14, 165, 233, 0.03);
-  --row-hover: rgba(14, 165, 233, 0.08);
-  --shadow: 0 8px 24px rgba(15, 40, 70, 0.08);
-  --chart-bg: rgba(240, 246, 252, 0.92);
-  --table-head: #eaf1f8;
-  --glow-a: rgba(14, 165, 233, 0.12);
-  --glow-b: rgba(56, 189, 248, 0.08);
-  --accent-soft: rgba(14, 165, 233, 0.12);
+  --row-alt: rgba(37, 99, 168, 0.03);
+  --row-hover: rgba(37, 99, 168, 0.07);
+  --shadow: 0 6px 20px rgba(30, 45, 70, 0.06);
+  --chart-bg: rgba(248, 250, 252, 0.96);
+  --table-head: #eef2f7;
+  --glow-a: rgba(148, 163, 184, 0.14);
+  --glow-b: rgba(186, 210, 235, 0.1);
+  --accent-soft: rgba(37, 99, 168, 0.1);
   --input-bg: #ffffff;
-  --input-bg-focus: #f3f6fb;
+  --input-bg-focus: #f8fafc;
   --input-border-hover: #b8c5d6;
-  --focus-ring: rgba(47, 111, 237, 0.22);
+  --focus-ring: rgba(37, 99, 168, 0.2);
   --btn-secondary: #5b6b7c;
   --btn-secondary-hover: #4a5868;
   --panel-border-hover: #b8c5d6;
-  --table-border: rgba(213, 222, 232, 0.9);
+  --table-border: rgba(216, 224, 234, 0.95);
 }
 
 /* 银河：青绿 UI + Three.js 3D 银河星空背景 */
@@ -2323,12 +2323,37 @@ button.loading::before {
   font-size: 12px;
 }
 #dbtablesMenu .db-tbl-name {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
   color: var(--muted);
   font-size: 11px;
   font-family: Consolas, "Courier New", monospace;
 }
+#dbtablesMenu .db-tbl-size {
+  display: inline-block;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-family: inherit;
+  line-height: 1.55;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 14%, transparent);
+  white-space: nowrap;
+}
 #dbtablesMenu li.active .db-tbl-title {
   color: var(--text);
+}
+#dbtablesMenu li.active .db-tbl-size {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+#dbTableSummary {
+  max-width: min(720px, 100%);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 tr.tp-pend-row.active {

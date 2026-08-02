@@ -1,7 +1,7 @@
 /**
  * 多主题动态背景（无第三方依赖）
  * - night / matrix：夜盘深色 + 慢速代码雨
- * - day / interact：日间浅色 + 鼠标跟随拖尾 + 点击爆炸
+ * - day / interact：日间浅色柔光氛围（无彗星拖尾，避免游动粒子感）
  * - forest / wave：背景由 starfield-bg.js（Three.js 银河）负责，界面名「银河」
  * - cosmos：粒子连线 + 流星 + 极光带，界面名「极光」
  * pointer-events:none，交互监听挂在 window，不挡点击。
@@ -59,64 +59,50 @@
       tailMax: 44,
       layers: true
     },
-    /* 日间浅色 · 科技感交互粒子（电青网络 / 利落拖尾 / HUD） */
+    /* 日间 · 纸面柔光：慢漂移光斑，无拖尾/连线/准星（干净可读） */
     day: {
-      mode: 'interact', count: 64, speed: 1.45,
-      bg: '232, 239, 247', trail: 0.2,
-      particle: [47, 130, 246],
-      glow: [56, 189, 248, 0.06],
-      follow: 0.16, explode: true,
-      comet: true, trailLen: 26, rainbow: false,
-      soft: true, tech: true,
-      trailAlpha: 0.7,
-      glowScale: 2.8,
-      headScale: 0.9,
-      connect: 118, line: '56, 189, 248', lineAlpha: 0.2,
-      grid: true, gridStep: 56,
-      palette: [
-        [47, 130, 246],
-        [14, 165, 233],
-        [6, 182, 212],
-        [56, 189, 248],
-        [99, 102, 241],
-        [34, 211, 238]
-      ],
-      aurora: true, auroraSpeed: 0.0011,
+      mode: 'ambient', count: 22, speed: 0.22,
+      bg: '246, 248, 252', trail: 1,
+      particle: [148, 163, 184],
+      glow: [186, 210, 235, 0.1],
+      follow: 0, explode: false,
+      comet: false, soft: true, tech: false,
+      connect: 0, grid: false,
+      aurora: true, auroraSpeed: 0.00035,
       auroraColors: [
-        [56, 189, 248, 0.09],
-        [47, 130, 246, 0.07],
-        [34, 211, 238, 0.05],
-        [99, 102, 241, 0.04]
+        [186, 210, 235, 0.14],
+        [214, 225, 240, 0.1],
+        [200, 218, 236, 0.08],
+        [232, 238, 246, 0.06]
+      ],
+      palette: [
+        [148, 163, 184],
+        [125, 155, 190],
+        [160, 175, 195],
+        [130, 160, 200]
       ]
     },
     /* 兼容旧主题 key：与 day 相同 */
     interact: {
-      mode: 'interact', count: 64, speed: 1.45,
-      bg: '232, 239, 247', trail: 0.2,
-      particle: [47, 130, 246],
-      glow: [56, 189, 248, 0.06],
-      follow: 0.16, explode: true,
-      comet: true, trailLen: 26, rainbow: false,
-      soft: true, tech: true,
-      trailAlpha: 0.7,
-      glowScale: 2.8,
-      headScale: 0.9,
-      connect: 118, line: '56, 189, 248', lineAlpha: 0.2,
-      grid: true, gridStep: 56,
-      palette: [
-        [47, 130, 246],
-        [14, 165, 233],
-        [6, 182, 212],
-        [56, 189, 248],
-        [99, 102, 241],
-        [34, 211, 238]
-      ],
-      aurora: true, auroraSpeed: 0.0011,
+      mode: 'ambient', count: 22, speed: 0.22,
+      bg: '246, 248, 252', trail: 1,
+      particle: [148, 163, 184],
+      glow: [186, 210, 235, 0.1],
+      follow: 0, explode: false,
+      comet: false, soft: true, tech: false,
+      connect: 0, grid: false,
+      aurora: true, auroraSpeed: 0.00035,
       auroraColors: [
-        [56, 189, 248, 0.09],
-        [47, 130, 246, 0.07],
-        [34, 211, 238, 0.05],
-        [99, 102, 241, 0.04]
+        [186, 210, 235, 0.14],
+        [214, 225, 240, 0.1],
+        [200, 218, 236, 0.08],
+        [232, 238, 246, 0.06]
+      ],
+      palette: [
+        [148, 163, 184],
+        [125, 155, 190],
+        [160, 175, 195],
+        [130, 160, 200]
       ]
     },
     /* 银河：Canvas 侧停用，由 QuantStarfieldBg 绘制（保留 key 防误调） */
@@ -261,6 +247,14 @@
       this.vy *= 0.85;
     }
     if (c.stars) this.radius = Math.random() * 2.4 + 0.5;
+    if (this.mode === 'ambient') {
+      // 大而淡的光斑，缓慢漂移，无拖尾
+      this.radius = 18 + Math.random() * 42;
+      this.vx = (Math.random() - 0.5) * (c.speed || 0.22) * 1.2;
+      this.vy = (Math.random() - 0.5) * (c.speed || 0.22) * 1.2;
+      this.trailLen = 0;
+      this.alpha = 0.04 + Math.random() * 0.06;
+    }
     if (this.mode === 'interact') {
       if (c.tech) {
         this.radius = Math.random() * 1.15 + 0.7;
@@ -283,7 +277,23 @@
   };
 
   Particle.prototype.update = function (c, time) {
-    if (mouse.active) {
+    if (this.mode === 'ambient') {
+      // 柔和布朗漂移：只改向，不加速甩尾
+      this.vx += Math.sin(time * 0.00035 + this.phase) * 0.002;
+      this.vy += Math.cos(time * 0.00028 + this.phase * 1.3) * 0.002;
+      var lim = (c.speed || 0.22) * 1.8;
+      this.vx = Math.max(-lim, Math.min(lim, this.vx));
+      this.vy = Math.max(-lim, Math.min(lim, this.vy));
+      this.x += this.vx;
+      this.y += this.vy;
+      if (this.x < -this.radius) this.x = width + this.radius;
+      if (this.x > width + this.radius) this.x = -this.radius;
+      if (this.y < -this.radius) this.y = height + this.radius;
+      if (this.y > height + this.radius) this.y = -this.radius;
+      return;
+    }
+
+    if (mouse.active && (c.follow == null || c.follow > 0)) {
       var mdx = mouse.x - this.x;
       var mdy = mouse.y - this.y;
       var md = Math.sqrt(mdx * mdx + mdy * mdy) || 1;
@@ -440,6 +450,22 @@
   };
 
   Particle.prototype.draw = function (c, time) {
+    var p = this.color || c.particle;
+    if (this.mode === 'ambient') {
+      var breathe = 0.85 + 0.15 * Math.sin(time * 0.0008 * this.pulse + this.phase);
+      var ar = this.radius * breathe;
+      var aa = (this.alpha != null ? this.alpha : 0.06) * breathe;
+      var ag = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, ar);
+      ag.addColorStop(0, rgba(p, aa));
+      ag.addColorStop(0.45, rgba(p, aa * 0.35));
+      ag.addColorStop(1, rgba(p, 0));
+      ctx.beginPath();
+      ctx.fillStyle = ag;
+      ctx.arc(this.x, this.y, ar, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
+
     var flicker = 0.55 + 0.45 * Math.sin(time * 0.008 * this.pulse + this.phase);
     if (c.firefly) {
       flicker = 0.25 + 0.75 * (0.5 + 0.5 * Math.sin(time * 0.012 * this.pulse + this.phase));
@@ -447,7 +473,6 @@
     if (c.soft) flicker = 0.7 + 0.3 * flicker; // 减弱闪烁幅度
     var headScale = c.headScale != null ? c.headScale : 1;
     var r = this.radius * headScale * (c.pulseGlow ? (0.85 + 0.35 * flicker) : 1);
-    var p = this.color || c.particle;
     var soft = !!c.soft;
 
     if (this.mode === 'interact' && this.trail.length > 1) {
@@ -700,8 +725,13 @@
     }
 
     var count = c.count || 80;
-    if (width < 768) count = Math.max(40, Math.floor(count * 0.5));
-    var mode = c.mode === 'interact' ? 'interact' : 'net';
+    if (width < 768) {
+      count = c.mode === 'ambient'
+        ? Math.max(12, Math.floor(count * 0.65))
+        : Math.max(40, Math.floor(count * 0.5));
+    }
+    var mode = c.mode === 'interact' ? 'interact'
+      : (c.mode === 'ambient' ? 'ambient' : 'net');
     for (var p = 0; p < count; p++) {
       particles.push(new Particle(c, mode));
     }
@@ -945,7 +975,33 @@
     }
   }
 
+  function drawAmbient(c, time) {
+    // 每帧清底，避免残影拖出「蝌蚪」轨迹
+    ctx.fillStyle = 'rgb(' + c.bg + ')';
+    ctx.fillRect(0, 0, width, height);
+    if (c.glow) {
+      var vg = ctx.createRadialGradient(
+        width * 0.5, height * 0.28, 0,
+        width * 0.5, height * 0.45, Math.max(width, height) * 0.75
+      );
+      vg.addColorStop(0, rgba(c.glow, c.glow[3]));
+      vg.addColorStop(1, rgba(c.glow, 0));
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, width, height);
+    }
+    drawAurora(c, time);
+    var i;
+    for (i = 0; i < particles.length; i++) {
+      particles[i].update(c, time);
+      particles[i].draw(c, time);
+    }
+  }
+
   function drawNetOrInteract(c, time) {
+    if (c.mode === 'ambient') {
+      drawAmbient(c, time);
+      return;
+    }
     drawTrailBase(c);
     drawTechGrid(c, time);
     drawAurora(c, time);

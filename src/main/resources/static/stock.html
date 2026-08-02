@@ -18,11 +18,11 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css?v=20260722-readme"/>
+  <link rel="stylesheet" href="/css/style.css?v=20260802-db-disk"/>
   <script src="/js/jquery.min.js"></script>
   <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/echarts.min.js"></script>
-  <script src="/js/particle-bg.js?v=20260720-theme-day"></script>
+  <script src="/js/particle-bg.js?v=20260802-day-ambient"></script>
   <script src="/js/starfield-bg.js?v=20260718-milkyway"></script>
 </head>
 <body>
@@ -701,6 +701,10 @@
               <span class="db-meta-tag">默认排序</span>
               <span id="dbMetaOrder" class="db-meta-text mono">—</span>
             </div>
+            <div class="db-meta-row">
+              <span class="db-meta-tag">磁盘占用</span>
+              <span id="dbMetaDisk" class="db-meta-text mono" title="来自 information_schema；InnoDB 约为已分配空间">—</span>
+            </div>
           </div>
         </div>
         <div class="toolbar" style="margin-top:8px;">
@@ -1189,6 +1193,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260728-bt-tradepool"></script>
+<script src="/js/stock-chart.js?v=20260802-db-disk"></script>
 </body>
 </html>

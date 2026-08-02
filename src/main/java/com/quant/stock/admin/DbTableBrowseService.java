@@ -146,12 +146,14 @@ public class DbTableBrowseService {
 
     private final JdbcTemplate jdbcTemplate;
 
-    /** 白名单表列表及行数、是否存在 */
+    /** 白名单表列表及行数、磁盘占用、是否存在 */
     public List<Map<String, Object>> listTables() {
+        Map<String, Map<String, Long>> sizeByTable = loadAllTableSizes();
         List<Map<String, Object>> list = new ArrayList<Map<String, Object>>();
         for (TableDef def : DbTableCatalog.all()) {
             Map<String, Object> m = new LinkedHashMap<String, Object>();
             m.putAll(tableMeta(def));
+            putDiskSize(m, sizeByTable.get(def.getName()));
             try {
                 Long cnt = jdbcTemplate.queryForObject("SELECT COUNT(1) FROM `" + def.getName() + "`", Long.class);
                 m.put("rowCount", cnt == null ? 0L : cnt);
@@ -200,6 +202,7 @@ public class DbTableBrowseService {
             throw new IllegalArgumentException("表不存在或不可访问: " + def.getName() + " (" + e.getMessage() + ")");
         }
 
+        Map<String, Long> disk = loadTableSize(def.getName());
         Map<String, String> commentByCol = loadColumnComments(def.getName());
         String sql = "SELECT * FROM `" + def.getName() + "` ORDER BY " + def.getOrderBy()
                 + " LIMIT " + s + " OFFSET " + offset;
@@ -237,6 +240,7 @@ public class DbTableBrowseService {
         long pages = s == 0 ? 0 : (total + s - 1) / s;
         Map<String, Object> out = new LinkedHashMap<String, Object>();
         out.putAll(tableMeta(def));
+        putDiskSize(out, disk);
         out.put("page", p);
         out.put("size", s);
         out.put("total", total);
@@ -244,6 +248,87 @@ public class DbTableBrowseService {
         out.put("columns", columns);
         out.put("rows", rows);
         return out;
+    }
+
+    /**
+     * 写入磁盘占用字段（字节；来自 information_schema，InnoDB 约为已分配空间）。
+     * keys: dataBytes / indexBytes / freeBytes / totalBytes
+     */
+    private static void putDiskSize(Map<String, Object> target, Map<String, Long> disk) {
+        if (disk == null || disk.isEmpty()) {
+            target.put("dataBytes", null);
+            target.put("indexBytes", null);
+            target.put("freeBytes", null);
+            target.put("totalBytes", null);
+            return;
+        }
+        long data = disk.get("data") == null ? 0L : disk.get("data");
+        long index = disk.get("index") == null ? 0L : disk.get("index");
+        long free = disk.get("free") == null ? 0L : disk.get("free");
+        target.put("dataBytes", data);
+        target.put("indexBytes", index);
+        target.put("freeBytes", free);
+        target.put("totalBytes", data + index);
+    }
+
+    /** 当前库全部白名单表的 DATA/INDEX/FREE 长度（一次查询）。 */
+    private Map<String, Map<String, Long>> loadAllTableSizes() {
+        Map<String, Map<String, Long>> map = new HashMap<String, Map<String, Long>>();
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                    "SELECT TABLE_NAME, DATA_LENGTH, INDEX_LENGTH, DATA_FREE "
+                            + "FROM information_schema.TABLES "
+                            + "WHERE TABLE_SCHEMA = DATABASE()");
+            for (Map<String, Object> row : rows) {
+                Object name = row.get("TABLE_NAME");
+                if (name == null) {
+                    continue;
+                }
+                map.put(String.valueOf(name), toSizeMap(row));
+            }
+        } catch (Exception e) {
+            log.warn("批量读取表磁盘占用失败: {}", e.getMessage());
+        }
+        return map;
+    }
+
+    private Map<String, Long> loadTableSize(String table) {
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                    "SELECT DATA_LENGTH, INDEX_LENGTH, DATA_FREE "
+                            + "FROM information_schema.TABLES "
+                            + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?",
+                    table);
+            if (rows.isEmpty()) {
+                return Collections.emptyMap();
+            }
+            return toSizeMap(rows.get(0));
+        } catch (Exception e) {
+            log.warn("读取表磁盘占用失败 {}: {}", table, e.getMessage());
+            return Collections.emptyMap();
+        }
+    }
+
+    private static Map<String, Long> toSizeMap(Map<String, Object> row) {
+        Map<String, Long> m = new LinkedHashMap<String, Long>();
+        m.put("data", toLong(row.get("DATA_LENGTH")));
+        m.put("index", toLong(row.get("INDEX_LENGTH")));
+        m.put("free", toLong(row.get("DATA_FREE")));
+        return m;
+    }
+
+    private static long toLong(Object v) {
+        if (v == null) {
+            return 0L;
+        }
+        if (v instanceof Number) {
+            return ((Number) v).longValue();
+        }
+        try {
+            return Long.parseLong(String.valueOf(v));
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
     }
 
     private Map<String, Object> toColumnMeta(String name, String dbComment) {
