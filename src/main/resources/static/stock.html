@@ -18,7 +18,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css?v=20260802-db-disk"/>
+  <link rel="stylesheet" href="/css/style.css?v=20260802-strategy-eval"/>
   <script src="/js/jquery.min.js"></script>
   <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/echarts.min.js"></script>
@@ -174,10 +174,25 @@
           </div>
         </div>
 
+        <div class="side-nav" data-nav="strategy">
+          <button type="button" class="side-nav-toggle" data-body="strategyBody" data-mode="strategy"
+                  data-intro="/docs/nav-strategy.html" data-intro-title="策略管理" aria-expanded="false">
+            <span class="nav-idx">07</span>
+            <span class="nav-label">策略管理</span>
+            <span class="chevron">▸</span>
+          </button>
+          <div id="strategyBody" class="side-nav-body">
+            <p class="hint">二级：策略评估（回测历史与整体评价）</p>
+            <ul id="strategyMenu" class="side-nav-menu">
+              <li data-strategy-panel="eval" role="button" tabindex="0">策略评估</li>
+            </ul>
+          </div>
+        </div>
+
         <div class="side-nav" data-nav="dbtables">
           <button type="button" class="side-nav-toggle" data-body="dbtablesBody" data-mode="dbtables"
                   data-intro="/docs/nav-dbtables.html" data-intro-title="数据表" aria-expanded="false">
-            <span class="nav-idx">07</span>
+            <span class="nav-idx">08</span>
             <span class="nav-label">数据表</span>
             <span class="chevron">▸</span>
           </button>
@@ -195,7 +210,7 @@
         <div class="side-nav" data-nav="stock-knowledge">
           <button type="button" class="side-nav-toggle" data-body="stockKnowledgeMenu" data-mode="doc"
                   data-intro="/docs/nav-stock-knowledge.html" data-intro-title="量化知识" aria-expanded="false">
-            <span class="nav-idx">08</span>
+            <span class="nav-idx">09</span>
             <span class="nav-label">量化知识</span>
             <span class="chevron">▸</span>
           </button>
@@ -205,7 +220,7 @@
         <div class="side-nav" data-nav="app-related">
           <button type="button" class="side-nav-toggle" data-body="appRelatedMenu" data-mode="doc"
                   data-intro="/docs/nav-app-related.html" data-intro-title="应用说明" aria-expanded="false">
-            <span class="nav-idx">09</span>
+            <span class="nav-idx">10</span>
             <span class="nav-label">应用说明</span>
             <span class="chevron">▸</span>
           </button>
@@ -666,6 +681,48 @@
             <tr><td colspan="5" class="empty-state">加载中…</td></tr>
             </tbody>
           </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- 策略管理 · 策略评估 -->
+    <div id="viewStrategy" class="workspace-view" hidden>
+      <section class="panel">
+        <h3>策略评估</h3>
+        <p class="hint">按策略查看回测历史与整体评价；改参/激活请到运维中心</p>
+        <div class="strategy-eval-layout">
+          <aside id="strategyList" class="strategy-list" aria-label="策略列表"></aside>
+          <div class="strategy-eval-main">
+            <div id="strategyEvalCards" class="strategy-eval-cards"></div>
+            <div class="toolbar strategy-kind-toolbar" style="margin-top:10px;">
+              <span class="field-hint">类型</span>
+              <button type="button" class="secondary strategy-kind-btn active" data-kind="ALL">全部</button>
+              <button type="button" class="secondary strategy-kind-btn" data-kind="SINGLE">单股</button>
+              <button type="button" class="secondary strategy-kind-btn" data-kind="PORTFOLIO">组合</button>
+              <span class="field-hint" id="strategyHistMeta"></span>
+            </div>
+            <div class="table-wrap" style="margin-top:12px;max-height:none;">
+              <table class="tp-table">
+                <thead>
+                <tr>
+                  <th>保存时间</th>
+                  <th>类型</th>
+                  <th>标的</th>
+                  <th>区间</th>
+                  <th>初始资金</th>
+                  <th>期末资产</th>
+                  <th>收益率</th>
+                  <th>回撤</th>
+                  <th>胜率</th>
+                  <th>买/卖次数</th>
+                </tr>
+                </thead>
+                <tbody id="strategyHistoryBody">
+                <tr><td colspan="10" class="empty-state">请选择左侧策略</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </section>
     </div>
@@ -1193,6 +1250,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260802-db-disk"></script>
+<script src="/js/stock-chart.js?v=20260802-strategy-eval"></script>
 </body>
 </html>

@@ -2313,7 +2313,7 @@
   }
 
   function hideAllWorkspaceViews() {
-    $('#viewHome, #viewNavIntro, #viewPool, #viewSingle, #viewPortfolio, #viewTradePool, #viewTpHistory, #viewDbTable, #viewSchedule, #viewDataHealth, #viewSysParams, #viewAcctFunds, #viewAcctPositions, #viewAcctOrders, #viewAcctCashflows, #viewAcctRiskLogs, #viewAcctRiskDash, #viewAcctPaperGap').prop('hidden', true);
+    $('#viewHome, #viewNavIntro, #viewPool, #viewSingle, #viewPortfolio, #viewTradePool, #viewTpHistory, #viewDbTable, #viewSchedule, #viewStrategy, #viewDataHealth, #viewSysParams, #viewAcctFunds, #viewAcctPositions, #viewAcctOrders, #viewAcctCashflows, #viewAcctRiskLogs, #viewAcctRiskDash, #viewAcctPaperGap').prop('hidden', true);
     $('body').removeClass('home-theme-peek');
     $('#btnExpandHome').prop('hidden', true);
   }
@@ -2440,6 +2440,310 @@
       loadScheduleJobs();
     }
     resizeCharts();
+  }
+
+  var strategyEvalState = {
+    strategies: [],
+    selectedId: '',
+    kind: 'ALL',
+    enabled: true,
+    unknownCount: 0
+  };
+  var STRATEGY_HIST_COLSPAN = 10;
+
+  function setStrategyMenuActive(panel) {
+    $('#strategyMenu li').removeClass('active');
+    if (panel) {
+      $('#strategyMenu li[data-strategy-panel="' + panel + '"]').addClass('active');
+    }
+  }
+
+  function showStrategyEval() {
+    lastWorkspaceMode = 'strategy';
+    $('body').removeClass('mode-doc');
+    $('#knowledgePanel').prop('hidden', true);
+    $('.side-nav-menu li').removeClass('active');
+    hideAllWorkspaceViews();
+    setSideNavOpen('strategyBody');
+    setStrategyMenuActive('eval');
+    $('#viewStrategy').prop('hidden', false);
+    loadStrategyOverview();
+    resizeCharts();
+  }
+
+  function renderStrategyList(strategies, selectedId) {
+    var $list = $('#strategyList').empty();
+    if (!strategies || !strategies.length) {
+      $list.append($('<div class="hint"/>').text('暂无注册策略'));
+      return;
+    }
+    strategies.forEach(function (s) {
+      var id = s.strategyId || s.displayName || '';
+      var $item = $('<div class="strategy-list-item" role="button" tabindex="0"/>')
+        .attr('data-strategy-id', id);
+      if (id && id === selectedId) $item.addClass('active');
+      var $name = $('<span class="strategy-list-name"/>').text(s.displayName || id || '—');
+      $item.append($name);
+      if (s.active) {
+        $item.append($('<span class="strategy-active-badge"/>').text('激活'));
+      }
+      $list.append($item);
+    });
+  }
+
+  function renderStrategyCards(s) {
+    var $cards = $('#strategyEvalCards').empty();
+    if (!s) {
+      $cards.append($('<div class="hint"/>').text('请选择左侧策略'));
+      return;
+    }
+    function card(label, value, sub) {
+      var $c = $('<div class="strategy-eval-card"/>');
+      $c.append($('<div class="label"/>').text(label));
+      $c.append($('<div class="value"/>').text(value == null || value === '' ? '—' : String(value)));
+      if (sub) $c.append($('<div class="sub"/>').text(sub));
+      return $c;
+    }
+    $cards.append(card('运行次数', s.runCount != null ? s.runCount : 0,
+      strategyEvalState.enabled === false ? '数据库未启用，聚合为 0' : null));
+    $cards.append(card('平均收益率', pct(s.avgTotalRate)));
+    $cards.append(card('中位收益率', pct(s.medianTotalRate)));
+    $cards.append(card('平均回撤', pct(s.avgMaxDrawdown)));
+    $cards.append(card('最近收益', pct(s.lastTotalRate),
+      s.lastSavedAt ? ('最近：' + fmtDateTimeDisplay(s.lastSavedAt)) : '暂无回测'));
+    if (strategyEvalState.unknownCount > 0) {
+      $cards.append(card('未归属记录', strategyEvalState.unknownCount, '旧行无 strategy_id'));
+    }
+  }
+
+  function findStrategyById(id) {
+    var list = strategyEvalState.strategies || [];
+    for (var i = 0; i < list.length; i++) {
+      if (String(list[i].strategyId || '') === String(id || '')) return list[i];
+    }
+    return null;
+  }
+
+  function strategyTargetText(r) {
+    if (!r) return '—';
+    if (String(r.kind || '').toUpperCase() === 'PORTFOLIO') {
+      var codes = r.stockCodes;
+      if (Array.isArray(codes) && codes.length) {
+        return codes.length <= 3 ? codes.join(',') : (codes.slice(0, 3).join(',') + '…+' + (codes.length - 3));
+      }
+      return '组合';
+    }
+    return r.stockCode || '—';
+  }
+
+  function renderStrategyHistory(rows) {
+    var $tb = $('#strategyHistoryBody').empty();
+    collapseHistoryAnalysis($tb);
+    rows = rows || [];
+    $('#strategyHistMeta').text('共 ' + rows.length + ' 条');
+    if (!rows.length) {
+      $tb.append($('<tr/>').append(
+        $('<td colspan="' + STRATEGY_HIST_COLSPAN + '" class="empty-state"/>')
+          .text('该策略暂无回测记录')
+      ));
+      return;
+    }
+    rows.forEach(function (r) {
+      var s = resolveTradeStats(r);
+      var kind = String(r.kind || '').toUpperCase();
+      var kindLabel = kind === 'PORTFOLIO' ? '组合' : (kind === 'SINGLE' ? '单股' : (r.kind || '—'));
+      var $tr = $('<tr class="history-row"/>')
+        .css('cursor', 'pointer')
+        .attr('data-id', r.id || '');
+      $tr.append($('<td/>').text(fmtDateTimeDisplay(r.savedAt)))
+        .append($('<td/>').text(kindLabel))
+        .append($('<td/>').html('<b>' + escHtml(strategyTargetText(r)) + '</b>'))
+        .append($('<td/>').text(formatRange(r.backStart, r.backEnd)))
+        .append($('<td/>').text(num(r.initCapital)))
+        .append($('<td/>').text(num(r.finalAsset)))
+        .append($('<td/>').text(pct(r.totalRate)))
+        .append($('<td/>').text(pct(r.maxDrawdown != null ? r.maxDrawdown : r.maxDrawDown)))
+        .append($('<td/>').text(pct(r.winRate)))
+        .append($('<td/>').text((s.buyCount || 0) + ' / ' + (s.sellCount || 0)));
+      $tb.append($tr);
+    });
+  }
+
+  function loadStrategyHistory(strategyId) {
+    var id = String(strategyId || strategyEvalState.selectedId || '').trim();
+    var $tb = $('#strategyHistoryBody');
+    if (!id) {
+      $tb.html('<tr><td colspan="' + STRATEGY_HIST_COLSPAN + '" class="empty-state">请选择左侧策略</td></tr>');
+      $('#strategyHistMeta').text('');
+      return;
+    }
+    collapseHistoryAnalysis($tb);
+    $tb.html('<tr><td colspan="' + STRATEGY_HIST_COLSPAN + '" class="empty-state">加载中…</td></tr>');
+    var kind = strategyEvalState.kind || 'ALL';
+    $.getJSON('/api/strategy/' + encodeURIComponent(id) + '/history', { kind: kind })
+      .done(function (rows) {
+        if (String(strategyEvalState.selectedId || '') !== id) return;
+        renderStrategyHistory(rows || []);
+      })
+      .fail(function (xhr) {
+        if (String(strategyEvalState.selectedId || '') !== id) return;
+        var msg = (xhr && xhr.responseJSON && (xhr.responseJSON.message || xhr.responseJSON.error))
+          || '策略历史加载失败';
+        $tb.html('<tr><td colspan="' + STRATEGY_HIST_COLSPAN + '" class="empty-state">'
+          + escHtml(msg) + '</td></tr>');
+        $('#strategyHistMeta').text('');
+        toast(msg, 'err');
+      });
+  }
+
+  function selectStrategy(strategyId) {
+    var id = String(strategyId || '').trim();
+    if (!id) return;
+    strategyEvalState.selectedId = id;
+    renderStrategyList(strategyEvalState.strategies, id);
+    renderStrategyCards(findStrategyById(id));
+    loadStrategyHistory(id);
+  }
+
+  function loadStrategyOverview() {
+    $('#strategyList').html('<div class="hint">加载策略…</div>');
+    $('#strategyEvalCards').empty();
+    $('#strategyHistoryBody').html(
+      '<tr><td colspan="' + STRATEGY_HIST_COLSPAN + '" class="empty-state">加载中…</td></tr>'
+    );
+    $.getJSON('/api/strategy/overview')
+      .done(function (data) {
+        data = data || {};
+        strategyEvalState.enabled = data.enabled !== false;
+        strategyEvalState.unknownCount = Number(data.unknownCount || 0);
+        strategyEvalState.strategies = data.strategies || [];
+        var preferred = strategyEvalState.selectedId;
+        var pick = null;
+        var list = strategyEvalState.strategies;
+        if (preferred) {
+          pick = findStrategyById(preferred);
+        }
+        if (!pick) {
+          for (var i = 0; i < list.length; i++) {
+            if (list[i].active) { pick = list[i]; break; }
+          }
+        }
+        if (!pick && list.length) pick = list[0];
+        renderStrategyList(list, pick ? pick.strategyId : '');
+        if (pick) {
+          selectStrategy(pick.strategyId);
+        } else {
+          strategyEvalState.selectedId = '';
+          renderStrategyCards(null);
+          $('#strategyHistoryBody').html(
+            '<tr><td colspan="' + STRATEGY_HIST_COLSPAN + '" class="empty-state">暂无注册策略</td></tr>'
+          );
+          $('#strategyHistMeta').text('');
+        }
+      })
+      .fail(function (xhr) {
+        var msg = (xhr && xhr.responseJSON && (xhr.responseJSON.message || xhr.responseJSON.error))
+          || '策略概览加载失败';
+        $('#strategyList').html('<div class="hint">' + escHtml(msg) + '</div>');
+        $('#strategyEvalCards').empty();
+        $('#strategyHistoryBody').html(
+          '<tr><td colspan="' + STRATEGY_HIST_COLSPAN + '" class="empty-state">'
+          + escHtml(msg) + '</td></tr>'
+        );
+        toast(msg, 'err');
+      });
+  }
+
+  function renderStrategyDetailPanel(detail, $panel, $tb) {
+    var openId = $panel.attr('data-open-id');
+    $panel.empty();
+    if (openId) $panel.attr('data-open-id', openId);
+
+    var $head = $('<div class="analysis-detail-head"/>');
+    $head.append($('<span/>').html('<b>回测详情</b>'));
+    var $collapse = $('<button type="button" class="secondary analysis-collapse-btn"/>').text('收起');
+    $collapse.on('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      collapseHistoryAnalysis($tb);
+    });
+    $head.append($collapse);
+    $panel.append($head);
+
+    if (!detail || !detail.id) {
+      $panel.append($('<p class="hint"/>').text('未找到该回测记录详情。'));
+      return;
+    }
+
+    var s = resolveTradeStats(detail);
+    $panel.append($('<p/>').html(
+      '<b>成交统计</b>：买/卖 ' + (s.buyCount || 0) + '/' + (s.sellCount || 0)
+      + ' 次 · 手 ' + (s.buyLots || 0) + '/' + (s.sellLots || 0)
+      + ' · 买入额 ' + num(s.buyAmount)
+      + ' · 卖出额 ' + num(s.sellAmount)
+      + ' · 费用 ' + num(s.totalFee)
+      + ' · 盈亏 ' + pnlText(s.totalPnl)
+    ));
+    if (detail.configFingerprint) {
+      $panel.append($('<p class="hint"/>').text('指纹：' + detail.configFingerprint));
+    }
+
+    var analysis = detail.analysis;
+    if (!analysis) {
+      $panel.append($('<p class="hint"/>').text('未找到与该回测记录对应的分析（旧记录可能无分析，请重新回测）。'));
+      return;
+    }
+    $panel.append($('<p/>').html('<b>摘要</b>：' + (analysis.summary || '-')));
+    var events = analysis.events || [];
+    if (!events.length) {
+      $panel.append($('<p class="hint"/>').text('无事件明细'));
+      return;
+    }
+    var $ul = $('<ol/>');
+    events.forEach(function (ev) {
+      var dataStr = '';
+      if (ev.data && typeof ev.data === 'object') {
+        var parts = [];
+        Object.keys(ev.data).forEach(function (k) {
+          parts.push(k + '=' + ev.data[k]);
+        });
+        dataStr = parts.join('；');
+      }
+      var codeTxt = ev.stockCode ? ('[' + ev.stockCode + '] ') : '';
+      $ul.append($('<li/>').html(
+        '<b>' + (ev.time || '') + '</b> ' + codeTxt +
+        '<code>' + (ev.type || '') + '</code> ' + (ev.title || '') +
+        '<br/>原因：' + (ev.reason || '-') +
+        (dataStr ? ('<br/><span class="hint">数据：' + dataStr + '</span>') : '')
+      ));
+    });
+    $panel.append($ul);
+  }
+
+  function showStrategyHistoryDetail($tr) {
+    var $tb = $('#strategyHistoryBody');
+    var id = String($tr.attr('data-id') || '');
+    var $panel = ensureInlineAnalysisRow($tr, STRATEGY_HIST_COLSPAN);
+    if (!id) {
+      $panel.html('<p class="hint">该记录无 id，无法加载详情。</p>');
+      return;
+    }
+    $panel.attr('data-open-id', id).html('<p class="hint">加载详情中…</p>');
+    $.getJSON('/api/strategy/history/' + encodeURIComponent(id))
+      .done(function (detail) {
+        if (!$panel.closest('tbody').length) return;
+        if (String($panel.attr('data-open-id') || '') !== id) return;
+        if (!$tr.hasClass('active')) return;
+        renderStrategyDetailPanel(detail, $panel, $tb);
+      })
+      .fail(function (xhr) {
+        if (!$panel.closest('tbody').length) return;
+        if (String($panel.attr('data-open-id') || '') !== id) return;
+        var msg = (xhr && xhr.responseJSON && (xhr.responseJSON.message || xhr.responseJSON.error))
+          || '加载详情失败';
+        $panel.attr('data-open-id', id).html('<p class="hint">' + escHtml(msg) + '</p>');
+        toast(msg, 'err');
+      });
   }
 
   function showAccountPanel(panel) {
@@ -3048,7 +3352,7 @@
   }
 
   /**
-   * @param {string} mode pool|single|portfolio|tradepool|dbtables|schedule|account
+   * @param {string} mode pool|single|portfolio|tradepool|dbtables|schedule|strategy|account
    * @param {{expandNav?: boolean, panel?: string, table?: string}} [options]
    */
   function showMode(mode, options) {
@@ -3087,6 +3391,9 @@
       return;
     } else if (lastWorkspaceMode === 'schedule') {
       showSchedulePanel(options.panel || lastSchedulePanel || 'jobs');
+      return;
+    } else if (lastWorkspaceMode === 'strategy') {
+      showStrategyEval();
       return;
     } else {
       lastWorkspaceMode = 'pool';
@@ -3616,6 +3923,10 @@
       showSchedulePanel($(this).attr('data-schedule-panel') || 'jobs');
       return;
     }
+    if (mode === 'strategy') {
+      showStrategyEval();
+      return;
+    }
     if (mode === 'single') {
       showMode('single', { panel: $(this).attr('data-single-panel') || 'workspace' });
       return;
@@ -3647,6 +3958,53 @@
       e.preventDefault();
       $(this).trigger('click');
     }
+  });
+
+  $('#strategyMenu').on('click', 'li[data-strategy-panel]', function () {
+    showStrategyEval();
+  });
+
+  $('#strategyMenu').on('keydown', 'li[data-strategy-panel]', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      $(this).trigger('click');
+    }
+  });
+
+  $('#strategyList').on('click', '.strategy-list-item', function () {
+    selectStrategy($(this).attr('data-strategy-id'));
+  });
+
+  $('#strategyList').on('keydown', '.strategy-list-item', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      $(this).trigger('click');
+    }
+  });
+
+  $('#viewStrategy').on('click', '.strategy-kind-btn', function () {
+    var kind = String($(this).attr('data-kind') || 'ALL').toUpperCase();
+    if (kind !== 'SINGLE' && kind !== 'PORTFOLIO') kind = 'ALL';
+    strategyEvalState.kind = kind;
+    $('#viewStrategy .strategy-kind-btn').removeClass('active');
+    $(this).addClass('active');
+    if (strategyEvalState.selectedId) {
+      loadStrategyHistory(strategyEvalState.selectedId);
+    }
+  });
+
+  $('#strategyHistoryBody').on('click', 'tr.history-row', function (e) {
+    if ($(e.target).closest('button, a, input, label').length) return;
+    var $tb = $('#strategyHistoryBody');
+    var $tr = $(this);
+    var expanded = $tr.hasClass('active') || $tr.attr('data-expanded') === '1';
+    if (expanded) {
+      collapseHistoryAnalysis($tb);
+      return;
+    }
+    collapseHistoryAnalysis($tb);
+    $tr.addClass('active').attr('data-expanded', '1');
+    showStrategyHistoryDetail($tr);
   });
 
   $('#acctPosBody').on('click', 'tr.acct-pos-row', function () {
