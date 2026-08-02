@@ -22,4 +22,14 @@ public interface BacktestRecordMapper {
 
     /** 按 kind 清空该类型的全部回测历史。 */
     int deleteAllByKind(@Param("kind") String kind);
+
+    /** 按注册策略 id 查询摘要列表（不含 trades/stock_results JSON）。 */
+    List<BtBacktestRecordDO> selectSummaryByStrategyId(@Param("strategyId") String strategyId,
+                                                       @Param("kind") String kind);
+
+    /** 按 record_id 查询全列。 */
+    BtBacktestRecordDO selectByRecordId(@Param("recordId") String recordId);
+
+    /** 统计 strategy_id 为空或空串的记录数。 */
+    long countUnknownStrategy();
 }

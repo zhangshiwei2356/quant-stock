@@ -23,18 +23,19 @@
         <result column="trades_json" property="tradesJson"/>
         <result column="stock_results_json" property="stockResultsJson"/>
         <result column="config_fingerprint" property="configFingerprint"/>
+        <result column="strategy_id" property="strategyId"/>
     </resultMap>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO bt_backtest_record
         (record_id, kind, saved_at, stock_code, stock_codes_json, period, back_start, back_end,
          init_capital, final_asset, total_rate, max_drawdown, total_trade_num, win_rate,
-         trade_stats_json, trades_json, stock_results_json, config_fingerprint)
+         trade_stats_json, trades_json, stock_results_json, config_fingerprint, strategy_id)
         VALUES
         (#{recordId}, #{kind}, #{savedAt}, #{stockCode}, #{stockCodesJson}, #{period},
          #{backStart}, #{backEnd}, #{initCapital}, #{finalAsset}, #{totalRate}, #{maxDrawdown},
          #{totalTradeNum}, #{winRate}, #{tradeStatsJson}, #{tradesJson}, #{stockResultsJson},
-         #{configFingerprint})
+         #{configFingerprint}, #{strategyId})
     </insert>
 
     <select id="selectByKind" resultMap="RecMap">
@@ -53,4 +54,25 @@
     <delete id="deleteAllByKind">
         DELETE FROM bt_backtest_record WHERE kind = #{kind}
     </delete>
+
+    <select id="selectSummaryByStrategyId" resultMap="RecMap">
+        SELECT id, record_id, kind, saved_at, stock_code, stock_codes_json, period, back_start, back_end,
+               init_capital, final_asset, total_rate, max_drawdown, total_trade_num, win_rate,
+               trade_stats_json, config_fingerprint, strategy_id, created_at
+        FROM bt_backtest_record
+        WHERE strategy_id = #{strategyId}
+        <if test="kind != null and kind != '' and kind != 'ALL'">
+            AND kind = #{kind}
+        </if>
+        ORDER BY saved_at DESC, id DESC
+    </select>
+
+    <select id="selectByRecordId" resultMap="RecMap">
+        SELECT * FROM bt_backtest_record WHERE record_id = #{recordId}
+    </select>
+
+    <select id="countUnknownStrategy" resultType="long">
+        SELECT COUNT(1) FROM bt_backtest_record
+        WHERE strategy_id IS NULL OR strategy_id = ''
+    </select>
 </mapper>

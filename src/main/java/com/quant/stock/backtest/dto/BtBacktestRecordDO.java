@@ -45,4 +45,6 @@ public class BtBacktestRecordDO {
     private String stockResultsJson;
     /** 策略相关配置指纹（P0-93） */
     private String configFingerprint;
+    /** 注册策略 id */
+    private String strategyId;
 }

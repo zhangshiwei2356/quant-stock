@@ -188,10 +188,12 @@ CREATE TABLE IF NOT EXISTS `bt_backtest_record` (
   `trades_json` LONGTEXT DEFAULT NULL COMMENT '成交明细JSON',
   `stock_results_json` LONGTEXT DEFAULT NULL COMMENT '组合分股结果JSON',
   `config_fingerprint` VARCHAR(64) DEFAULT NULL COMMENT '策略配置指纹 P0-93',
+  `strategy_id` VARCHAR(64) DEFAULT NULL COMMENT '注册策略 id',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY `uk_record_id` (`record_id`),
   KEY `idx_kind_code` (`kind`, `stock_code`),
-  KEY `idx_saved_at` (`saved_at`)
+  KEY `idx_saved_at` (`saved_at`),
+  KEY `idx_strategy_saved` (`strategy_id`, `saved_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='回测历史记录表';
 
 CREATE TABLE IF NOT EXISTS `bt_backtest_analysis` (

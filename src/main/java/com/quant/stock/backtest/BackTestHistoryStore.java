@@ -61,6 +61,15 @@ public class BackTestHistoryStore {
         ensureColumn(jdbc, "bt_backtest_record", "config_fingerprint",
                 "ALTER TABLE `bt_backtest_record` ADD COLUMN `config_fingerprint` VARCHAR(64) DEFAULT NULL "
                         + "COMMENT '策略配置指纹 P0-93' AFTER `stock_results_json`");
+        ensureColumn(jdbc, "bt_backtest_record", "strategy_id",
+                "ALTER TABLE `bt_backtest_record` ADD COLUMN `strategy_id` VARCHAR(64) DEFAULT NULL "
+                        + "COMMENT '注册策略 id' AFTER `config_fingerprint`");
+        try {
+            jdbc.execute("CREATE INDEX idx_strategy_saved ON bt_backtest_record (strategy_id, saved_at)");
+            log.info("已补齐索引 bt_backtest_record.idx_strategy_saved");
+        } catch (Exception e) {
+            log.debug("索引 idx_strategy_saved 已存在或创建跳过: {}", e.getMessage());
+        }
     }
 
     /** 持久化单股回测结果并返回历史视图 */
