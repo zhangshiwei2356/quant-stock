@@ -1,5 +1,6 @@
 package com.quant.stock.trade;
 
+import com.quant.stock.admin.ParamsScope;
 import com.quant.stock.config.QuantProperties;
 import com.quant.stock.market.dto.BarDTO;
 import lombok.RequiredArgsConstructor;
@@ -19,18 +20,23 @@ public class TradeCostModel {
 
     private final QuantProperties props;
 
+    private QuantProperties p() {
+        return ParamsScope.current(props);
+    }
+
     /**
      * 按近 20 日均量档位选取滑点率（大/中/小盘）。
      */
     public BigDecimal slipRate(List<BarDTO> bars, int index) {
         long avgVol = avgVolume(bars, index, 20);
-        if (avgVol >= props.getVolLargeThreshold()) {
-            return props.getSlipLarge();
+        QuantProperties q = p();
+        if (avgVol >= q.getVolLargeThreshold()) {
+            return q.getSlipLarge();
         }
-        if (avgVol >= props.getVolMidThreshold()) {
-            return props.getSlipMid();
+        if (avgVol >= q.getVolMidThreshold()) {
+            return q.getSlipMid();
         }
-        return props.getSlipSmall();
+        return q.getSlipSmall();
     }
 
     /**
@@ -53,20 +59,20 @@ public class TradeCostModel {
 
     /** 买入佣金（默认费率，含最低 5 元）。 */
     public BigDecimal buyFee(BigDecimal amount) {
-        return buyFee(amount, props.getFeeRate());
+        return buyFee(amount, p().getFeeRate());
     }
 
     /**
      * 买入佣金（指定费率，含最低 5 元）。
      */
     public BigDecimal buyFee(BigDecimal amount, BigDecimal feeRate) {
-        BigDecimal rate = feeRate == null ? props.getFeeRate() : feeRate;
+        BigDecimal rate = feeRate == null ? p().getFeeRate() : feeRate;
         return commissionWithFloor(amount, rate).setScale(2, RoundingMode.HALF_UP);
     }
 
     /** 卖出：佣金（含最低 5 元）+ 印花税（无成交日则用配置税率） */
     public BigDecimal sellFee(BigDecimal amount) {
-        return sellFee(amount, props.getFeeRate(), null);
+        return sellFee(amount, p().getFeeRate(), null);
     }
 
     /**
@@ -78,11 +84,11 @@ public class TradeCostModel {
 
     /** 卖出费用；印花税按成交日 as-of（P0-104） */
     public BigDecimal sellFee(BigDecimal amount, BigDecimal feeRate, LocalDate tradeDay) {
-        BigDecimal rate = feeRate == null ? props.getFeeRate() : feeRate;
+        BigDecimal rate = feeRate == null ? p().getFeeRate() : feeRate;
         BigDecimal commission = commissionWithFloor(amount, rate);
         BigDecimal stampRate = tradeDay != null
                 ? StampTaxAsOf.rateOn(tradeDay, null)
-                : StampTaxAsOf.rateOn(null, props.getStampTaxRate());
+                : StampTaxAsOf.rateOn(null, p().getStampTaxRate());
         BigDecimal stamp = amount.multiply(stampRate);
         return commission.add(stamp).setScale(2, RoundingMode.HALF_UP);
     }
@@ -100,7 +106,7 @@ public class TradeCostModel {
     private BigDecimal impactRate(List<BarDTO> bars, int index, int volume) {
         long avgVol = Math.max(1L, avgVolume(bars, index, 20));
         double ratio = (double) volume / (double) avgVol;
-        return props.getImpactCoeff().multiply(BigDecimal.valueOf(ratio))
+        return p().getImpactCoeff().multiply(BigDecimal.valueOf(ratio))
                 .min(new BigDecimal("0.02"));
     }
 

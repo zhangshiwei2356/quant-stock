@@ -4,6 +4,7 @@ import com.quant.stock.backtest.PositionState;
 import com.quant.stock.backtest.dto.AnalysisEvent;
 import com.quant.stock.backtest.dto.BackTestResult;
 import com.quant.stock.backtest.dto.BackTradeRecord;
+import com.quant.stock.admin.ParamsScope;
 import com.quant.stock.config.ConfigFingerprint;
 import com.quant.stock.config.QuantProperties;
 import com.quant.stock.market.BarPeriod;
@@ -50,6 +51,10 @@ public class SessionBackTestEngine {
     private final TradeCostModel tradeCostModel;
     private final PositionAmountUtil positionAmountUtil;
 
+    private QuantProperties p() {
+        return ParamsScope.current(props);
+    }
+
     public BackTestResult run(String stockCode, LocalDateTime start, LocalDateTime end,
                               BigDecimal initCapital, SessionStrategy strategy, boolean failOnMissingDep) {
         if (strategy == null) {
@@ -57,11 +62,13 @@ public class SessionBackTestEngine {
         }
         BigDecimal capital = initCapital == null ? new BigDecimal("100000") : initCapital;
         List<BarDTO> bars = marketDataService.getKline(stockCode, BarPeriod.MIN_1, start, end);
-        SessionWindows windows = SessionWindows.from(props);
-        QuantProperties.Session sessCfg = props.getSession() == null ? new QuantProperties.Session() : props.getSession();
+        QuantProperties cfg = p();
+        SessionWindows windows = SessionWindows.from(cfg);
+        QuantProperties.Session sessCfg = cfg.getSession() == null ? new QuantProperties.Session() : cfg.getSession();
         boolean matchingEnabled = sessCfg.isMatchingEnabled();
         String fillMode = sessCfg.getFillMode() == null ? "BAR_CLOSE" : sessCfg.getFillMode().trim();
-        String fingerprint = sessionFingerprint(strategy.sessionId(), failOnMissingDep, windows, matchingEnabled, fillMode);
+        String fingerprint = sessionFingerprint(cfg, strategy.sessionId(), failOnMissingDep, windows,
+                matchingEnabled, fillMode);
 
         if (bars == null || bars.size() < MIN_BARS) {
             BackTestResult empty = BackTestResult.empty(stockCode, capital);
@@ -308,12 +315,12 @@ public class SessionBackTestEngine {
         BigDecimal base = bar.getClose();
         int vol = intent.getVolume();
         if (vol <= 0) {
-            vol = positionAmountUtil.calcBuyVolume(cash, base, props.getBaseAtr());
+            vol = positionAmountUtil.calcBuyVolume(cash, base, p().getBaseAtr());
         }
         vol = (vol / 100) * 100;
         if (!intent.isBypassParticipationCap()) {
             long adv = avgVol(bars, index, 20);
-            vol = ParticipationCap.capVolume(vol, adv, props.getMaxParticipationAdv());
+            vol = ParticipationCap.capVolume(vol, adv, p().getMaxParticipationAdv());
         }
         if (vol < 100) {
             events.add(ev(ctx, "REJECT_BUY", "量不足一手或 ADV 帽拒绝；" + nullToEmpty(intent.getReason())));
@@ -321,7 +328,7 @@ public class SessionBackTestEngine {
         }
         BigDecimal deal = tradeCostModel.buyPrice(base, bars, index, vol);
         BigDecimal prev = prevClose(bars, index);
-        if (props.isLimitPriceProtectEnabled()) {
+        if (p().isLimitPriceProtectEnabled()) {
             if (LimitPriceProtect.shouldRejectBuy(base, prev, ctx.getStockCode(), false)) {
                 events.add(ev(ctx, "REJECT_BUY", "涨停拒买；" + nullToEmpty(intent.getReason())));
                 return cash;
@@ -329,7 +336,7 @@ public class SessionBackTestEngine {
             deal = LimitPriceProtect.clampBuy(deal, prev, ctx.getStockCode(), false);
         }
         BigDecimal amount = deal.multiply(BigDecimal.valueOf(vol));
-        BigDecimal fee = tradeCostModel.buyFee(amount, props.getFeeRate());
+        BigDecimal fee = tradeCostModel.buyFee(amount, p().getFeeRate());
         BigDecimal need = amount.add(fee);
         if (need.compareTo(cash) > 0) {
             int afford = cash.subtract(fee.max(new BigDecimal("5")))
@@ -341,7 +348,7 @@ public class SessionBackTestEngine {
             }
             vol = afford;
             amount = deal.multiply(BigDecimal.valueOf(vol));
-            fee = tradeCostModel.buyFee(amount, props.getFeeRate());
+            fee = tradeCostModel.buyFee(amount, p().getFeeRate());
             need = amount.add(fee);
         }
         cash = cash.subtract(need);
@@ -379,7 +386,7 @@ public class SessionBackTestEngine {
         }
         if (!intent.isBypassParticipationCap()) {
             long adv = avgVol(bars, index, 20);
-            vol = ParticipationCap.capVolume(vol, adv, props.getMaxParticipationAdv());
+            vol = ParticipationCap.capVolume(vol, adv, p().getMaxParticipationAdv());
             if (vol < 100) {
                 events.add(ev(ctx, "REJECT_SELL", "ADV 帽拒绝卖出；" + nullToEmpty(intent.getReason())));
                 return cash;
@@ -388,11 +395,11 @@ public class SessionBackTestEngine {
         BigDecimal base = bar.getClose();
         BigDecimal deal = tradeCostModel.sellPrice(base, bars, index, vol);
         BigDecimal prev = prevClose(bars, index);
-        if (props.isLimitPriceProtectEnabled()) {
+        if (p().isLimitPriceProtectEnabled()) {
             deal = LimitPriceProtect.clampSell(deal, prev, ctx.getStockCode(), false);
         }
         BigDecimal amount = deal.multiply(BigDecimal.valueOf(vol));
-        BigDecimal fee = tradeCostModel.sellFee(amount, props.getFeeRate(), ctx.getSessionDay());
+        BigDecimal fee = tradeCostModel.sellFee(amount, p().getFeeRate(), ctx.getSessionDay());
         BigDecimal removedCost = pos.removeShares(vol);
         cash = cash.add(amount).subtract(fee);
         BigDecimal pnl = amount.subtract(fee).subtract(removedCost);
@@ -531,10 +538,11 @@ public class SessionBackTestEngine {
         return out;
     }
 
-    private String sessionFingerprint(String strategyId, boolean failOnMissingDep, SessionWindows windows,
-                                      boolean matchingEnabled, String fillMode) {
-        String classic = ConfigFingerprint.of(props, strategyId == null ? "branchScaffold" : strategyId,
-                props.getFeeRate());
+    private String sessionFingerprint(QuantProperties cfg, String strategyId, boolean failOnMissingDep,
+                                      SessionWindows windows, boolean matchingEnabled, String fillMode) {
+        QuantProperties use = cfg == null ? p() : cfg;
+        String classic = ConfigFingerprint.of(use, strategyId == null ? "branchScaffold" : strategyId,
+                use.getFeeRate());
         String extra = "engine=session|failOnMissingDep=" + failOnMissingDep
                 + "|" + windows.fingerprintPart()
                 + "|match=" + matchingEnabled

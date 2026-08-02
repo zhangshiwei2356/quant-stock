@@ -177,7 +177,7 @@ sequenceDiagram
 |------|------|
 | 任务管理 | `sys_schedule_job` 启停 / cron / 立即执行（种子默认全关） |
 | 数据健康 | 本地空数据与滞后检查 |
-| 运行参数 | 全局白名单可写（`quant.prop.*`）+ **按策略稀疏参数包**（表 `strategy_param`）；运维可选策略编辑；纸面/回测按 strategyId 三层叠层生效 |
+| 运行参数 | 全局白名单可写（`quant.prop.*`）+ **按策略稀疏参数包**（表 `strategy_param`）；回测还可带 **本次临时改参**（`paramOverrides`，不落库） |
 
 总闸：`quant.schedule.enabled`（默认 true）。
 
@@ -249,10 +249,10 @@ sequenceDiagram
 | GET `/api/config/strategies` | 已注册策略列表（回测下拉；不改全局激活） |
 | GET `/api/stock/pool` | 标的/股票池 |
 | GET `/api/kline?code=&period=` | 统一周期 K 线 |
-| GET `/api/backtest/run` | 单只回测；可选 `engine=classic\|session`（默认 classic；`branchScaffold` 默认 session）、`failOnMissingDep` |
+| GET `/api/backtest/run` | 单只回测；可选 `engine=classic\|session`、`failOnMissingDep`、`paramOverrides`（JSON，白名单临时改参，不落库） |
+| POST `/api/portfolio/run` | 组合回测；body 可选 `paramOverrides`（同上） |
 | GET `/api/backtest/history` · `/analysis` | 个股历史与分析 |
 | GET `/api/batch/scanAllStock` | 批量扫描 |
-| POST `/api/portfolio/run` | 组合回测 |
 | GET `/api/portfolio/history` · `/analysis` | 组合历史与分析 |
 | GET `/api/stock/universe` | 全市场 |
 | GET/POST `/api/stock/trade-pool*` | 目标池查询/重建/移出/报告 |

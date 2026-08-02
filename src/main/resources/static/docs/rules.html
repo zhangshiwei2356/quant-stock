@@ -152,6 +152,7 @@
   <li>工作台选股<strong>仅来自目标池</strong>（<code>trade_pool</code>）；池空需先「扫描更新」。行情浏览仍为全市场</li>
   <li>默认周期 <b>DAY</b>；起止时间留空 = 该股全量可用 K 线（由 <code>market_1min</code> 聚合）；非 DAY 周期同样由 1 分钟聚合；页面默认工作台仍为 DAY</li>
   <li>初始资金默认 <b>100000</b>（可改）</li>
+  <li><b>本次临时参数</b>：请求 <code>paramOverrides</code>（白名单同运维可写键）叠在 yml→全局→策略包之上，仅本轮生效、不落库；写入 <code>configFingerprint</code></li>
   <li>K 线 &lt; 65 根 → 返回空结果</li>
   <li>决策顺序：①撮合挂单（先卖后买）→ ②老仓止损/trail → ③账户风控 → ④收盘挂金叉/金字塔/死叉 → ⑤盘后更新 trail</li>
   <li>首开/金叉买单成交：走完整 <code>canExecuteOpenFill</code>；加仓成交：仅拦涨停/停牌</li>

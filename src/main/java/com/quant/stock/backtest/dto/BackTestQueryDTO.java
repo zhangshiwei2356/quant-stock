@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 组合回测请求参数：区间、资金、标的列表与可选费率覆盖。
@@ -37,4 +38,9 @@ public class BackTestQueryDTO {
     private BigDecimal slipPoint;
     /** 策略 id（如 maCross）；空则用 quant.active-strategy */
     private String strategyId;
+    /**
+     * 单次回测临时参数覆盖（白名单键，如 feeRate / atrStopMultiplier）；
+     * 叠在策略包之上，不落库、不影响运维全局。
+     */
+    private Map<String, String> paramOverrides;
 }

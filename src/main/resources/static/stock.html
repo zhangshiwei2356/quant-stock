@@ -349,6 +349,27 @@
           <button id="btnBacktest">执行回测</button>
           <button id="btnBatch" class="secondary">批量扫描</button>
         </div>
+        <details class="panel" id="singleOverridePanel" style="margin-top:10px;padding:10px 12px;">
+          <summary style="cursor:pointer;font-weight:600;">本次临时参数（不落库 · 叠在策略包之上）</summary>
+          <p class="hint" style="margin:6px 0 8px;">留空=不覆盖。白名单键与运维可写参数一致。</p>
+          <div class="toolbar" style="flex-wrap:wrap;gap:8px;">
+            <label class="field">佣金费率
+              <input id="btOvFeeRate" type="text" placeholder="如 0.0003"/>
+            </label>
+            <label class="field">ATR止损倍数
+              <input id="btOvAtrStop" type="text" placeholder="如 2.0"/>
+            </label>
+            <label class="field">单票仓位上限
+              <input id="btOvMaxSingle" type="text" placeholder="如 0.3"/>
+            </label>
+            <label class="field">最大持仓日
+              <input id="btOvMaxHold" type="text" placeholder="0=关"/>
+            </label>
+            <label class="field">RSI买入上限
+              <input id="btOvRsiMax" type="text" placeholder="如 60"/>
+            </label>
+          </div>
+        </details>
         <p id="singleHint" class="hint" style="margin:8px 0 0;"></p>
         <div class="metrics" id="btMetrics" style="margin-top:8px;"></div>
         <div class="metrics" id="singleKlineMeta" style="margin-top:6px;"></div>
@@ -1038,6 +1059,23 @@
           </label>
           <button id="btnPortfolio" class="danger">执行组合回测</button>
         </div>
+        <details class="panel" id="pfOverridePanel" style="margin-top:10px;padding:10px 12px;">
+          <summary style="cursor:pointer;font-weight:600;">本次临时参数（不落库）</summary>
+          <div class="toolbar" style="flex-wrap:wrap;gap:8px;margin-top:8px;">
+            <label class="field">佣金费率
+              <input id="pfOvFeeRate" type="text" placeholder="默认用下方 body.feeRate"/>
+            </label>
+            <label class="field">ATR止损倍数
+              <input id="pfOvAtrStop" type="text" placeholder="如 2.0"/>
+            </label>
+            <label class="field">单票仓位上限
+              <input id="pfOvMaxSingle" type="text" placeholder="如 0.3"/>
+            </label>
+            <label class="field">RSI买入上限
+              <input id="pfOvRsiMax" type="text" placeholder="如 60"/>
+            </label>
+          </div>
+        </details>
         <p id="backTimeHint" class="hint" style="margin:8px 0 0;"></p>
         <p class="hint" style="margin:4px 0 0;">日K共享资金池；完整 T+1/分钟撮合以个股回测为准。</p>
         <div class="metrics" id="pfMetrics" style="margin-top:8px;"></div>

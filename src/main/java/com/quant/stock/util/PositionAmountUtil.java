@@ -1,5 +1,6 @@
 package com.quant.stock.util;
 
+import com.quant.stock.admin.ParamsScope;
 import com.quant.stock.config.QuantProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -16,6 +17,10 @@ public class PositionAmountUtil {
 
     private final QuantProperties quantProperties;
 
+    private QuantProperties p() {
+        return ParamsScope.current(quantProperties);
+    }
+
     /** 按默认仓位系数计算可买整手股数（100 股整数倍）。 */
     public int calcBuyVolume(BigDecimal totalCash, BigDecimal price, BigDecimal currentAtr) {
         return calcBuyVolume(totalCash, price, currentAtr, BigDecimal.ONE);
@@ -27,10 +32,11 @@ public class PositionAmountUtil {
             return 0;
         }
         BigDecimal s = scale == null ? BigDecimal.ONE : scale;
-        BigDecimal maxSingleMoney = totalCash.multiply(quantProperties.getMaxSinglePosition()).multiply(s);
+        QuantProperties q = p();
+        BigDecimal maxSingleMoney = totalCash.multiply(q.getMaxSinglePosition()).multiply(s);
         BigDecimal atr = currentAtr == null || currentAtr.compareTo(BigDecimal.ZERO) <= 0
-                ? quantProperties.getBaseAtr() : currentAtr;
-        BigDecimal atrRate = quantProperties.getBaseAtr().divide(atr, 8, RoundingMode.HALF_UP);
+                ? q.getBaseAtr() : currentAtr;
+        BigDecimal atrRate = q.getBaseAtr().divide(atr, 8, RoundingMode.HALF_UP);
         if (atrRate.compareTo(new BigDecimal("1.5")) > 0) {
             atrRate = new BigDecimal("1.5");
         }
@@ -47,13 +53,14 @@ public class PositionAmountUtil {
         if (fullVolume < 100) {
             return 0;
         }
+        QuantProperties q = p();
         BigDecimal pct;
         if (stage == 0) {
-            pct = quantProperties.getPyramidFirst();
+            pct = q.getPyramidFirst();
         } else if (stage == 1) {
-            pct = quantProperties.getPyramidSecond();
+            pct = q.getPyramidSecond();
         } else {
-            pct = quantProperties.getPyramidThird();
+            pct = q.getPyramidThird();
         }
         int vol = BigDecimal.valueOf(fullVolume).multiply(pct).intValue();
         vol = (vol / 100) * 100;
@@ -65,7 +72,7 @@ public class PositionAmountUtil {
 
     /** 判断加仓后总市值是否不超过总仓位上限比例。 */
     public boolean withinTotalPosition(BigDecimal totalCash, BigDecimal positionMarketValue, BigDecimal addMoney) {
-        BigDecimal max = totalCash.multiply(quantProperties.getMaxTotalPosition());
+        BigDecimal max = totalCash.multiply(p().getMaxTotalPosition());
         return positionMarketValue.add(addMoney).compareTo(max) <= 0;
     }
 }

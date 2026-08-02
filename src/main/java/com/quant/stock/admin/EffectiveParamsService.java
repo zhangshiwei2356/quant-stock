@@ -102,6 +102,15 @@ public class EffectiveParamsService {
 
     /** 全局底 ⊕ 稀疏包 → 生效快照（不写回单例）。 */
     public QuantProperties resolve(String strategyId) {
+        return resolve(strategyId, null);
+    }
+
+    /**
+     * 全局底 ⊕ 稀疏包 ⊕ 单次回测临时覆盖（最高优先，不落库）。
+     *
+     * @param runOverrides 白名单键；可为 null
+     */
+    public QuantProperties resolve(String strategyId, Map<String, String> runOverrides) {
         QuantProperties snap = QuantPropertiesCopy.copy(global);
         Map<String, String> sparse = getSparse(strategyId);
         for (Map.Entry<String, String> e : sparse.entrySet()) {
@@ -113,6 +122,11 @@ public class EffectiveParamsService {
             } catch (Exception ex) {
                 log.warn("忽略非法策略包键 {}={}: {}", e.getKey(), e.getValue(), ex.getMessage());
             }
+        }
+        try {
+            RunParamOverrides.apply(snap, runOverrides);
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("临时参数非法: " + ex.getMessage());
         }
         return snap;
     }

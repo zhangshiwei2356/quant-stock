@@ -78,7 +78,9 @@ public class PortfolioBackTestEngine {
     public PortfolioResultDTO run(BackTestQueryDTO query) {
         BaseStrategy strategy = strategyRegistry.resolve(
                 query != null ? query.getStrategyId() : null);
-        QuantProperties effective = effectiveParamsService.resolve(strategy.name());
+        java.util.Map<String, String> overrides = query == null ? null
+                : com.quant.stock.admin.RunParamOverrides.normalize(query.getParamOverrides());
+        QuantProperties effective = effectiveParamsService.resolve(strategy.name(), overrides);
         return ParamsScope.call(effective, new java.util.concurrent.Callable<PortfolioResultDTO>() {
             @Override
             public PortfolioResultDTO call() {

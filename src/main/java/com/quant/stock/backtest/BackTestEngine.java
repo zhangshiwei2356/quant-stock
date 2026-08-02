@@ -81,11 +81,20 @@ public class BackTestEngine {
      */
     public BackTestResult run(String stockCode, List<BarDTO> closedBars, BigDecimal initCapital,
                               BigDecimal feeRate, BigDecimal slipPoint, BaseStrategy strategy) {
+        return run(stockCode, closedBars, initCapital, feeRate, slipPoint, strategy, null);
+    }
+
+    /**
+     * @param runOverrides 单次回测临时参数（白名单）；叠在策略包之上，不落库
+     */
+    public BackTestResult run(String stockCode, List<BarDTO> closedBars, BigDecimal initCapital,
+                              BigDecimal feeRate, BigDecimal slipPoint, BaseStrategy strategy,
+                              Map<String, String> runOverrides) {
         if (strategy == null) {
             strategy = strategyRegistry.active();
         }
         final BaseStrategy strat = strategy;
-        QuantProperties effective = effectiveParamsService.resolve(strat.name());
+        QuantProperties effective = effectiveParamsService.resolve(strat.name(), runOverrides);
         return ParamsScope.call(effective, new java.util.concurrent.Callable<BackTestResult>() {
             @Override
             public BackTestResult call() {

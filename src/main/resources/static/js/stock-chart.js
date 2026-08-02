@@ -1706,6 +1706,20 @@
     }));
   }
 
+  /** 收集非空临时参数；无有效项返回 null。 */
+  function collectRunOverrides(fieldMap) {
+    var o = {};
+    var n = 0;
+    Object.keys(fieldMap || {}).forEach(function (key) {
+      var v = ($(fieldMap[key]).val() || '').trim();
+      if (v) {
+        o[key] = v;
+        n++;
+      }
+    });
+    return n ? o : null;
+  }
+
   function runBacktest() {
     var code = ($('#stockCode').val() || singleCode || '').trim();
     if (!code) {
@@ -1726,6 +1740,14 @@
     if (backEnd) params.backEnd = backEnd;
     if (strategyId) params.strategyId = strategyId;
     if (sessionEngine) params.engine = 'session';
+    var ov = collectRunOverrides({
+      feeRate: '#btOvFeeRate',
+      atrStopMultiplier: '#btOvAtrStop',
+      maxSinglePosition: '#btOvMaxSingle',
+      maxHoldTradingDays: '#btOvMaxHold',
+      rsiBuyMax: '#btOvRsiMax'
+    });
+    if (ov) params.paramOverrides = JSON.stringify(ov);
     withLoading($('#btnBacktest'), $.getJSON('/api/backtest/run', params)
       .done(function (bt) {
         var eng = bt.engine || (sessionEngine ? 'session' : 'classic');
@@ -1861,6 +1883,13 @@
     };
     var pfStrategyId = ($('#pfStrategyId').val() || '').trim();
     if (pfStrategyId) body.strategyId = pfStrategyId;
+    var pfOv = collectRunOverrides({
+      feeRate: '#pfOvFeeRate',
+      atrStopMultiplier: '#pfOvAtrStop',
+      maxSinglePosition: '#pfOvMaxSingle',
+      rsiBuyMax: '#pfOvRsiMax'
+    });
+    if (pfOv) body.paramOverrides = pfOv;
     clearPortfolioResult();
     withLoading($('#btnPortfolio'), $.ajax({
       url: '/api/portfolio/run',

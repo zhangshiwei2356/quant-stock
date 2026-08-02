@@ -12,6 +12,9 @@ import com.quant.stock.market.JsonBarDataStore;
 import com.quant.stock.market.MarketDataService;
 import com.quant.stock.market.dto.BarDTO;
 import com.quant.stock.pool.TradePoolService;
+import com.quant.stock.admin.EffectiveParamsService;
+import com.quant.stock.admin.ParamsScope;
+import com.quant.stock.admin.RunParamOverrides;
 import com.quant.stock.session.BranchScaffoldStrategy;
 import com.quant.stock.session.SessionBackTestEngine;
 import com.quant.stock.session.SessionStrategy;
@@ -54,6 +57,7 @@ public class StockController {
     private final JsonBarDataStore jsonBarDataStore;
     private final ObjectProvider<TradePoolService> tradePoolServiceProvider;
     private final StrategyRegistry strategyRegistry;
+    private final EffectiveParamsService effectiveParamsService;
 
     /**
      * 浏览/回测用股票列表：优先全市场 stock_basic，其次 json 种子，最后 yml stock-codes。
@@ -151,6 +155,7 @@ public class StockController {
                                       @RequestParam(value = "strategyId", required = false) String strategyId,
                                       @RequestParam(value = "engine", required = false) String engine,
                                       @RequestParam(value = "failOnMissingDep", defaultValue = "false") boolean failOnMissingDep,
+                                      @RequestParam(value = "paramOverrides", required = false) String paramOverrides,
                                       @RequestParam(value = "backStart", required = false)
                                       @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime backStart,
                                       @RequestParam(value = "backEnd", required = false)
@@ -159,6 +164,11 @@ public class StockController {
         BigDecimal capital = initCapital == null ? new BigDecimal("100000") : initCapital;
         String startStr = backStart == null ? null : backStart.format(FMT);
         String endStr = backEnd == null ? null : backEnd.format(FMT);
+        java.util.Map<String, String> overrides = RunParamOverrides.parseJson(paramOverrides);
+        if (feeRate != null) {
+            overrides = new java.util.LinkedHashMap<String, String>(overrides);
+            overrides.put("feeRate", feeRate.toPlainString());
+        }
 
         if ("session".equals(engineNorm)) {
             BaseStrategy resolved = strategyRegistry.resolve(strategyId);
@@ -166,8 +176,17 @@ public class StockController {
                 throw new IllegalArgumentException("engine=session 需要实现 SessionStrategy 的策略，当前="
                         + resolved.name());
             }
-            BackTestResult result = sessionBackTestEngine.run(
-                    code, backStart, backEnd, capital, (SessionStrategy) resolved, failOnMissingDep);
+            final java.util.Map<String, String> ov = overrides;
+            final BaseStrategy strat = resolved;
+            BackTestResult result = ParamsScope.call(
+                    effectiveParamsService.resolve(strat.name(), ov),
+                    new java.util.concurrent.Callable<BackTestResult>() {
+                        @Override
+                        public BackTestResult call() {
+                            return sessionBackTestEngine.run(
+                                    code, backStart, backEnd, capital, (SessionStrategy) strat, failOnMissingDep);
+                        }
+                    });
             if (result.getEngine() == null) {
                 result.setEngine("session");
             }
@@ -187,9 +206,9 @@ public class StockController {
             barPeriod = BarPeriod.DAY;
         }
         List<BarDTO> bars = marketDataService.getKline(code, barPeriod, backStart, backEnd);
-        BigDecimal fee = feeRate != null ? feeRate : quantProperties.getFeeRate();
+        BigDecimal fee = feeRate != null ? feeRate : null;
         BackTestResult result = backTestEngine.run(code, bars, capital, fee, quantProperties.getSlipPoint(),
-                strategyRegistry.resolve(strategyId));
+                strategyRegistry.resolve(strategyId), overrides);
         if (result.getEngine() == null) {
             result.setEngine("classic");
         }
