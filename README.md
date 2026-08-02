@@ -138,11 +138,12 @@ sequenceDiagram
 
 | 二级菜单 | 功能 |
 |----------|------|
-| 回测工作台 | **仅从目标池**选股；周期、区间（空=全量）、初始资金 → 运行回测，K 线信号 + 权益 |
+| 回测工作台 | **仅从目标池**选股；周期、区间（空=全量）、初始资金、策略 → 运行回测，K 线信号 + 权益 |
 | 批量扫描 | 配置标的列表批量摘要，可筛「仅可买入」（仍读 yml `stock-codes`，非目标池） |
 | 回测历史 | 落盘记录与分析；可跨股查看 |
 
-引擎：`BackTestEngine`（次日开盘撮合、止损/移动止盈、金字塔、T+1 分档、账户熔断）。
+引擎默认 `BackTestEngine`（`engine=classic`：次日开盘撮合、止损/移动止盈、金字塔、T+1 分档、账户熔断）。  
+可选旁路 **`SessionBackTestEngine`**（`engine=session` 或策略 `branchScaffold`）：强制 **MIN_1** 三分支（OPEN/MID/CLOSE）骨架 + 持仓日态事件；脚手架**不撮合**；缺 INDEX/竞价/封单时分支 `UNAVAILABLE`（`failOnMissingDep=true` 可整单失败）。金叉主路径不变；纸面未接会话引擎。
 
 ### 3. 组合回测
 
@@ -247,7 +248,7 @@ sequenceDiagram
 | GET `/api/config/strategies` | 已注册策略列表（回测下拉；不改全局激活） |
 | GET `/api/stock/pool` | 标的/股票池 |
 | GET `/api/kline?code=&period=` | 统一周期 K 线 |
-| GET `/api/backtest/run` | 单只回测 |
+| GET `/api/backtest/run` | 单只回测；可选 `engine=classic\|session`（默认 classic；`branchScaffold` 默认 session）、`failOnMissingDep` |
 | GET `/api/backtest/history` · `/analysis` | 个股历史与分析 |
 | GET `/api/batch/scanAllStock` | 批量扫描 |
 | POST `/api/portfolio/run` | 组合回测 |
@@ -301,7 +302,7 @@ sequenceDiagram
 
 ## 策略与风控（已实现）
 
-- **单活策略可切换**：`quant.active-strategy` 默认 **`maCross`**（读全局 quant 过滤；实现仍在 `MaCrossStrategy`，不静默改规则）。另有对照画像 **`maCrossTrend` / `maCrossVolume` / `maCrossBalanced` / `maCrossStrict`**（固定过滤包，不读 yml 过滤开关）+ `holdNothing`。回测工作台下拉切换 `strategyId` 做对比；扫池/纸面仍用配置激活。多策略增强待办见「能力与待办」一（附）
+- **单活策略可切换**：`quant.active-strategy` 默认 **`maCross`**（读全局 quant 过滤；实现仍在 `MaCrossStrategy`，不静默改规则）。另有对照画像 **`maCrossTrend` / `maCrossVolume` / `maCrossBalanced` / `maCrossStrict`**（固定过滤包，不读 yml 过滤开关）+ `holdNothing` + 会话脚手架 **`branchScaffold`**（旁路 session 引擎，无真实成交）。回测工作台下拉切换 `strategyId` 做对比；扫池/纸面仍用配置激活。隔日高开公式仍不实现；见「能力与待办」
 - 止损：相对综合成本的 ATR + 权益硬止损；移动止盈盘后上移；**跳空穿价按开盘价**成交（盘中触及按止损价）
 - 组合相关监控：成分日收益两两相关（回看 60 日，均值≥0.75 告警）；组合回测结果字段 `correlation`；`GET /api/account/correlation`
 - **T+1 分档**：仅非当日买入批次可卖/可止损

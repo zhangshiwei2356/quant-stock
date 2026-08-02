@@ -51,6 +51,15 @@ public class BackTestResult {
     private String configFingerprint;
     /** ATR 止损/定仓一体契约快照（P0-108） */
     private Map<String, Object> atrRisk;
+    /**
+     * 回测引擎：{@code classic}（默认金叉五步）或 {@code session}（分钟三分支旁路）。
+     * 经典路径可空，前端按 classic 展示。
+     */
+    private String engine;
+    /** session 引擎因缺依赖降级的分支名（OPEN/MID/CLOSE） */
+    private List<String> degradedBranches;
+    /** session 引擎原始事件（脚手架/调试）；经典路径为空 */
+    private List<com.quant.stock.session.SessionEvent> sessionEvents;
 
     /** 图表买卖点坐标 */
     @Data
@@ -80,6 +89,9 @@ public class BackTestResult {
                 .analysisEvents(new ArrayList<AnalysisEvent>())
                 .analysisSummary("")
                 .atrRisk(new LinkedHashMap<String, Object>())
+                .engine("classic")
+                .degradedBranches(new ArrayList<String>())
+                .sessionEvents(new ArrayList<com.quant.stock.session.SessionEvent>())
                 .build();
     }
 }

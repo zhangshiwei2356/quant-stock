@@ -26,7 +26,7 @@
 <h4>功能模块</h4>
 <ul>
   <li><b>行情浏览</b>：全市场模糊选股、多周期 K 线与指标</li>
-  <li><b>个股回测</b>：回测工作台<strong>仅从目标池选股</strong>（含策略下拉，仅本次）/ 批量扫描（配置列表）/ 回测历史</li>
+  <li><b>个股回测</b>：回测工作台<strong>仅从目标池选股</strong>（含策略下拉，仅本次；可选 <code>branchScaffold</code> 走分钟三分支旁路引擎）/ 批量扫描（配置列表）/ 回测历史</li>
   <li><b>组合回测</b>：回测工作台<strong>仅从目标池多选</strong>（含策略下拉，仅本次）/ 回测历史（共享资金池日 K）</li>
   <li><b>目标池</b>：当前池 / 扫描历史；盘后或手动扫描覆盖唯一池；移出≠卖出；也是回测选股来源</li>
   <li><b>账户概览</b>：资金 · 持仓（T+1 批次）· 委托 · 日结 · 风控事件</li>
@@ -45,7 +45,7 @@
 
 <h4>策略与风控摘要</h4>
 <ul>
-  <li><b>单活策略</b>：默认 <code>maCross</code>（读全局过滤）；对照画像 <code>maCrossTrend/Volume/Balanced/Strict</code> 可在回测下拉对比；纸面仍用配置激活</li>
+  <li><b>单活策略</b>：默认 <code>maCross</code>（读全局过滤）；对照画像 <code>maCrossTrend/Volume/Balanced/Strict</code> 与脚手架 <code>branchScaffold</code>（session/MIN_1，无撮合）可在回测下拉对比；纸面仍用配置激活，未接会话引擎</li>
   <li>金叉可配 MA60 / 放量 / ADX / RSI；综合成本止损、移动止盈；T+1 分档；金字塔 50/30/20</li>
   <li>撮合：日 K 下一根开盘；分钟 ≥ 次日 09:45；涨跌停主板 10% / 创科 20%</li>
   <li>单笔 ADV 参与率硬顶默认 10%（<code>quant.max-participation-adv</code>）；回测结果带配置指纹</li>

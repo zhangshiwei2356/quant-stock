@@ -36,10 +36,10 @@
   </p>
   <ol>
     <li><b>多策略注册与发现面板</b> — 已落地 · 运维「运行参数」展示已注册策略表；约定：独立 <code>BaseStrategy</code>、稳定 id、不改金叉类</li>
-    <li><b>策略相关参数页面可调</b> — 已落地 · 运维「运行参数」白名单可写（过滤/仓位/止损/金字塔/费率滑点/ADV/涨跌停保护/次 bar 开盘撮合及常用风控阈值）；<code>POST /api/ops/params</code> → <code>system_config(quant.prop.*)</code> 热生效；启动加载覆盖；改后刷新 <code>configFingerprint</code>；按策略隔离参数包仍待办</li>
+    <li><b>策略相关参数页面可调</b> — 已落地 · 运维「运行参数」白名单可写（过滤/仓位/止损/金字塔/费率滑点/ADV/涨跌停保护/次 bar 开盘撮合及常用风控阈值）；<code>POST /api/ops/params</code> → <code>system_config(quant.prop.*)</code> 热生效；启动加载覆盖；改后刷新 <code>configFingerprint</code></li>
     <li><b>按策略隔离的参数包</b> — 已落地 · 表 <code>strategy_param</code> 稀疏 JSON；叠层 yml → <code>quant.prop.*</code> → 策略包；运维可选策略编辑；纸面/回测 <code>ParamsScope</code> 生效快照；画像有包则过滤改读快照；回测「本次表单临时改参」仍不做</li>
     <li><b>全局激活策略的安全切换</b> — 已落地 · 运维确认后 <code>POST /api/ops/active-strategy</code>；写 <code>system_config</code> 并热更新；影响纸面扫描，不影响回测下拉</li>
-    <li><b>分钟级/多分支策略引擎适配</b> — 待办 · 现主路径偏日线金叉 bar 循环；要支持时段分支、持仓日态机、分分支绩效等，需策略侧态机 + 分钟回测/纸面适配；缺指数/竞价/封单等数据时显式 <code>UNAVAILABLE</code> 或开关关闭，不静默假撮合</li>
+    <li><b>分钟级/多分支策略引擎适配</b> — 骨架已落地 · 旁路 <code>SessionBackTestEngine</code> + <code>branchScaffold</code>（OPEN/MID/CLOSE、持仓日态事件、缺 INDEX/竞价/封单 → 分支 <code>UNAVAILABLE</code>）；<code>engine=classic\|session</code>；金叉 <code>BackTestEngine</code> 不变；<strong>隔日高开公式不实现</strong>；纸面/组合回测未接会话引擎；分分支绩效与真实撮合后续</li>
     <li><b>候选策略入库（仅规划，不实现）</b> — 待办 · 「全时段隔日高开套利复合策略」（早盘/盘中/尾盘三分支、隔日持有最长 2 日等）文档已备；待多策略能力与数据条件就绪后再单独立项接入，<strong>禁止</strong>塞进 <code>MaCrossStrategy</code></li>
     <li><b>明确不做（本阶段）</b> — 多策略并行分账本、信号合成冲突裁决、按策略拆目标池、运维「CRUD 编辑买卖公式」菜单</li>
   </ol>

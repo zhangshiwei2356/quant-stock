@@ -1667,23 +1667,40 @@
     var period = $('#barPeriod').val() || 'DAY';
     var backStart = ($('#singleBackStart').val() || '').trim();
     var backEnd = ($('#singleBackEnd').val() || '').trim();
+    var strategyId = ($('#singleStrategyId').val() || '').trim();
+    var sessionEngine = strategyId && strategyId.toLowerCase() === 'branchscaffold';
+    if (sessionEngine) {
+      period = 'MIN_1';
+    }
     var params = { code: code, initCapital: capital, period: period };
     if (backStart) params.backStart = backStart;
     if (backEnd) params.backEnd = backEnd;
-    var strategyId = ($('#singleStrategyId').val() || '').trim();
     if (strategyId) params.strategyId = strategyId;
+    if (sessionEngine) params.engine = 'session';
     withLoading($('#btnBacktest'), $.getJSON('/api/backtest/run', params)
       .done(function (bt) {
+        var eng = bt.engine || (sessionEngine ? 'session' : 'classic');
+        var deg = (bt.degradedBranches && bt.degradedBranches.length)
+          ? bt.degradedBranches.join(',') : '-';
+        var sessHint = eng === 'session'
+          ? (' 引擎<b>session</b> 降级分支<b>' + deg + '</b>')
+          : (' 引擎<b>' + eng + '</b>');
         $('#btMetrics').html(
           '股票<b>' + code + '</b>' +
           ' 期末资产<b>' + num(bt.finalAsset) + '</b>' +
           ' 收益率<b>' + pct(bt.totalRate) + '</b>' +
           ' 最大回撤<b>' + pct(bt.maxDrawDown) + '</b>' +
           ' 交易次数<b>' + (bt.totalTradeNum || 0) + '</b>' +
-          ' 胜率<b>' + pct(bt.winRate) + '</b>'
+          ' 胜率<b>' + pct(bt.winRate) + '</b>' +
+          sessHint +
+          (bt.configFingerprint ? (' 指纹<code style="font-size:11px;">' + bt.configFingerprint + '</code>') : '')
         );
-        toast('回测完成 · 交易 ' + (bt.totalTradeNum || 0) + ' 笔'
-          + (strategyId ? (' · 策略 ' + strategyId) : ''), 'ok');
+        if (eng === 'session' && bt.analysisSummary) {
+          toast('会话回测完成 · ' + bt.analysisSummary, 'ok');
+        } else {
+          toast('回测完成 · 交易 ' + (bt.totalTradeNum || 0) + ' 笔'
+            + (strategyId ? (' · 策略 ' + strategyId) : ''), 'ok');
+        }
         lastBacktestCode = code;
         lastSignalMarks = { buy: bt.buyMarks || [], sell: bt.sellMarks || [] };
         lastSingleEquity = {
@@ -1714,7 +1731,17 @@
           } catch (e) {}
         });
       })
-      .fail(function () { toast('回测失败', 'err'); }));
+      .fail(function (xhr) {
+        var msg = '回测失败';
+        try {
+          if (xhr.responseJSON && xhr.responseJSON.message) {
+            msg = xhr.responseJSON.message;
+          } else if (xhr.responseText) {
+            msg = String(xhr.responseText).substring(0, 220);
+          }
+        } catch (e) {}
+        toast(msg, 'err');
+      }));
   }
 
   function renderBatch(rows) {
