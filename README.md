@@ -182,11 +182,20 @@ sequenceDiagram
 
 总闸：`quant.schedule.enabled`（默认 true）。
 
-### 7. 数据表
+### 7. 策略管理
+
+| 二级 | 功能 |
+|------|------|
+| 策略评估 | 按注册策略聚合回测历史与整体评价（运行次数、均/中位收益与回撤）；历史表可筛全部/单股/组合，点行展开详情（内嵌 analysis） |
+
+- **职责分离**：本菜单只做效果评估；全局/按策略改参、纸面激活切换仍在 **运维中心 → 运行参数**
+- 数据：`GET /api/strategy/overview`、`GET /api/strategy/{id}/history?kind=`、`GET /api/strategy/history/{recordId}`；仅统计落库且带注册 `strategy_id` 的记录（旧空 `strategy_id` 不计入策略聚合，overview 可含 `unknownCount`）
+
+### 8. 数据表
 
 白名单表分页只读浏览（`DbTableCatalog`）。列表与详情附带 **磁盘占用**（`information_schema` 的 DATA/INDEX；InnoDB 约为已分配空间）：侧栏显示总量徽章，工具栏摘要与表说明展开区显示数据/索引分项。
 
-### 8. 量化知识 / 应用说明
+### 9. 量化知识 / 应用说明
 
 - **量化知识**：A 股基础、指标、涨跌停、T+1、成本、仓位、风控、撮合、回测要点等
 - **应用说明**：系统概述 → **项目 README** → 交易规则 → 能力与待办 → 宽睿文档梳理
@@ -199,7 +208,7 @@ sequenceDiagram
 
 - 进入应用先显示**初始化页**（`docs/home.html`）；侧栏一级菜单互斥展开，再点同一菜单收起并回初始化页
 - 展开一级菜单先显示介绍页（`docs/nav-*.html`），再点二级进入工作台/文档
-- 工作台顺序：**行情** → **个股回测** → **组合回测** → **目标池** → **账户** → **运维中心** → **数据表** → **量化知识** → **应用说明**
+- 工作台顺序：**行情** → **个股回测** → **组合回测** → **目标池** → **账户** → **运维中心** → **策略管理** → **数据表** → **量化知识** → **应用说明**
 - 页头主题（`localStorage`）：日间（默认）/ 夜盘 / 银河 / 极光
 
 ---
@@ -334,7 +343,7 @@ sequenceDiagram
 - 限价保护边界：`GET /api/account/order-protect`（五档/L2=`UNAVAILABLE`）
 - 执行降频边界：组合回测已对齐 AUM+POV；`GET /api/account/execution-cap`（TWAP=`UNAVAILABLE`）
 - 行情自洽闸：检查 `market_1min` 空/滞后/稀疏日/OHLC；`data-reconcile-block-on-diverge` 默认 **false**；`GET/POST /api/ops/data-reconcile*`；外部双源仍 `UNAVAILABLE`
-- 运维可查看已注册策略并热切换纸面激活：`GET /api/ops/strategies`、`POST /api/ops/active-strategy`
+- 运维可查看已注册策略并热切换纸面激活：`GET /api/ops/strategies`、`POST /api/ops/active-strategy`（改参/激活在运维；策略效果评估在 **策略管理 → 策略评估**）
 - 扩容降频：权益超 `capacity-aum-base`（默认 10万）时收紧 ADV 参与率；`pov-max-bar-volume-pct` 默认 0.10（当根量 POV 切片）
 - 结构突变：双窗收益均值差；确认后降仓×0.5 并挂漂移；`GET /api/account/structural-break`（不改金叉）
 - ST as-of：`st_status_hist` 日切优先；`st-open-filter-enabled` 默认 true 禁开 ST；财报公告时钟本地无数据（边界已声明）
