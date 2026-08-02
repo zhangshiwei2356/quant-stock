@@ -21,6 +21,13 @@ public class SessionContext {
     private int barIndex;
     private HoldDayState holdState;
     private BigDecimal equity;
+    private BigDecimal cash;
+    @Builder.Default
+    private int positionShares = 0;
+    @Builder.Default
+    private int sellableShares = 0;
+    @Builder.Default
+    private boolean matchingEnabled = true;
     @Builder.Default
     private Set<SessionBranch> degradedBranches = new LinkedHashSet<SessionBranch>();
 

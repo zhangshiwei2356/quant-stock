@@ -281,6 +281,34 @@ public class QuantProperties {
     private Schedule schedule = new Schedule();
 
     /**
+     * 旁路会话引擎（MIN_1 三分支）窗口与撮合开关；不影响经典金叉引擎。
+     */
+    private Session session = new Session();
+
+    /**
+     * 会话引擎配置（前缀 {@code quant.session}）。
+     */
+    @Data
+    public static class Session {
+        /** OPEN 起始（含），HH:mm */
+        private String openStart = "09:30";
+        /** OPEN 结束（不含） */
+        private String openEnd = "10:00";
+        private String midStart = "10:00";
+        private String midEnd = "14:30";
+        private String closeStart = "14:30";
+        private String closeEnd = "15:00";
+        /**
+         * 是否处理策略 {@code pollIntents} 并撮合。默认 true；脚手架不下单意图时仍为 0 成交。
+         */
+        private boolean matchingEnabled = true;
+        /**
+         * 成交价模式：{@code BAR_CLOSE}=当前分钟收盘（会话骨架默认）。
+         */
+        private String fillMode = "BAR_CLOSE";
+    }
+
+    /**
      * 定时任务相关 YAML 片段（总闸与废弃布尔项）。
      * <p>
      * 关键约束：实际 cron 与启停以库表 {@code sys_schedule_job} 为准；{@code enabled=false} 时不注册任何 Spring 触发器。

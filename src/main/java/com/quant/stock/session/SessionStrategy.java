@@ -1,5 +1,6 @@
 package com.quant.stock.session;
 
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -29,9 +30,23 @@ public interface SessionStrategy {
         return EnumSet.allOf(SessionBranch.class);
     }
 
+    /**
+     * 是否每根分钟回调 {@link #onBranchBar}（默认 false：仅分支日首根，避免事件爆炸）。
+     */
+    default boolean tickEveryBar() {
+        return false;
+    }
+
     void onSessionOpen(SessionContext ctx, List<SessionEvent> out);
 
     void onBranchBar(SessionContext ctx, List<SessionEvent> out);
 
     void onSessionClose(SessionContext ctx, List<SessionEvent> out);
+
+    /**
+     * 钩子后拉取下单意图；默认空（脚手架不下单）。引擎在 matchingEnabled 时撮合。
+     */
+    default List<SessionOrderIntent> pollIntents(SessionContext ctx) {
+        return Collections.emptyList();
+    }
 }

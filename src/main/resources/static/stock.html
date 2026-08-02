@@ -392,6 +392,27 @@
           </table>
         </div>
       </section>
+      <section class="panel" id="singleSessionPanel" hidden>
+        <h3>会话引擎 · 分支与事件</h3>
+        <div class="metrics" id="sessionBranchMetrics" style="margin-bottom:8px;"></div>
+        <h4 class="result-table-title">会话事件</h4>
+        <div class="table-wrap" style="max-height:280px;">
+          <table>
+            <thead>
+            <tr>
+              <th>#</th>
+              <th>时间</th>
+              <th>类型</th>
+              <th>分支</th>
+              <th>说明</th>
+            </tr>
+            </thead>
+            <tbody id="sessionEventBody">
+            <tr><td colspan="5" class="empty-state">session 回测后显示分支事件</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
       <section class="panel" id="singlePanelBars">
         <h3>K线明细</h3>
         <p class="hint" style="margin:0 0 8px;">当前回测区间末尾若干根。</p>

@@ -137,6 +137,17 @@ quant:
   # 实验种子（P0-93）：进配置指纹；默认空
   experiment-seed: ""
 
+  # ---- 旁路会话引擎（MIN_1 三分支；不影响经典金叉）----
+  session:
+    open-start: "09:30"
+    open-end: "10:00"
+    mid-start: "10:00"
+    mid-end: "14:30"
+    close-start: "14:30"
+    close-end: "15:00"
+    matching-enabled: true
+    fill-mode: BAR_CLOSE
+
   # ---- 开仓过滤 ----
   quiet-open-enabled: true
   quiet-close-enabled: true

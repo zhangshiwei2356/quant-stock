@@ -158,6 +158,10 @@
   <li>成交股数 = 挂单股 × <b>当前仓位系数</b> 后再取整手</li>
   <li>结果含：权益曲线、买卖点、成交明细、tradeStats、决策分析事件</li>
   <li>历史与分析一一对应，写入 MySQL：<code>bt_backtest_record</code> / <code>bt_backtest_analysis</code></li>
+  <li><b>旁路会话引擎</b>（<code>engine=session</code> 或策略 <code>branchScaffold</code>）：强制 <b>MIN_1</b>；三分支 OPEN/MID/CLOSE（窗口 <code>quant.session.*</code>）；
+      策略可经 <code>pollIntents</code> 下单，撮合子集含佣金/印花税/分级滑点、T+1 可卖、涨跌停夹紧、ADV 参与率；
+      成交价默认 <code>BAR_CLOSE</code>（当根分钟收）；脚手架默认不发意图；结果含 <code>sessionBranchStats</code> / 会话事件表；
+      <strong>不</strong>跑金叉五步时序；纸面/组合未接；隔日高开公式未实现</li>
 </ul>
 
 <h4>九、组合回测（多股共享资金池）</h4>
@@ -253,7 +257,7 @@
   </tbody>
 </table>
 
-<p>配置入口：<code>application.yml</code> 的 <code>quant</code> 段（含 <code>active-strategy</code>）。策略代码：
+<p>配置入口：<code>application.yml</code> 的 <code>quant</code> 段（含 <code>active-strategy</code>、<code>session</code>）。策略代码：
 <code>StrategyRegistry</code> / <code>MaCrossStrategy</code> /
-<code>BackTestEngine</code> / <code>PortfolioBackTestEngine</code> / <code>BatchStockBackTestService</code> / <code>StrategyTask</code> /
+<code>BackTestEngine</code> / <code>SessionBackTestEngine</code> / <code>PortfolioBackTestEngine</code> / <code>BatchStockBackTestService</code> / <code>StrategyTask</code> /
 <code>OpenFilterService</code> / <code>LimitBoardHelper</code> / <code>TradeCostModel</code>。</p>

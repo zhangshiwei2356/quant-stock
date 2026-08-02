@@ -22,7 +22,7 @@ mvn spring-boot:run
 
 浏览器打开：http://localhost:8080/stock.html  
 
-空库启动时会自动从 classpath JSON 导入日线 + 5 分钟模拟数据。默认不连 Redis（配置存在但自动配置已排除）。
+空库启动时会自动从 classpath JSON 导入 **1 分钟**模拟数据到 `market_1min`（优先 `MIN_1.json`，否则由 `MIN_5.json` 拆分）。默认不连 Redis（配置存在但自动配置已排除）。
 
 页面内也可查看本文件：**应用说明 → 项目 README**（服务端实时渲染 `README.md`）。
 
@@ -143,7 +143,7 @@ sequenceDiagram
 | 回测历史 | 落盘记录与分析；可跨股查看 |
 
 引擎默认 `BackTestEngine`（`engine=classic`：次日开盘撮合、止损/移动止盈、金字塔、T+1 分档、账户熔断）。  
-可选旁路 **`SessionBackTestEngine`**（`engine=session` 或策略 `branchScaffold`）：强制 **MIN_1** 三分支（OPEN/MID/CLOSE）骨架 + 持仓日态事件；脚手架**不撮合**；缺 INDEX/竞价/封单时分支 `UNAVAILABLE`（`failOnMissingDep=true` 可整单失败）。金叉主路径不变；纸面未接会话引擎。
+可选旁路 **`SessionBackTestEngine`**（`engine=session` 或策略 `branchScaffold`）：强制 **MIN_1** 三分支（OPEN/MID/CLOSE，窗口见 `quant.session.*`）+ 持仓日态事件 + **撮合子集**（`pollIntents` → 费用/T+1/涨跌停夹紧/ADV；成交价默认 `BAR_CLOSE`；脚手架默认不发意图故 0 成交）+ 分分支绩效（`sessionBranchStats`）与事件表。缺 INDEX/竞价/封单时分支 `UNAVAILABLE`（`failOnMissingDep=true` 可整单失败）。金叉主路径不变；纸面/组合未接会话引擎；隔日高开公式不实现。
 
 ### 3. 组合回测
 

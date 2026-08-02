@@ -60,6 +60,10 @@ public class BackTestResult {
     private List<String> degradedBranches;
     /** session 引擎原始事件（脚手架/调试）；经典路径为空 */
     private List<com.quant.stock.session.SessionEvent> sessionEvents;
+    /**
+     * session 分分支统计：各分支 tick/买卖笔数/金额/已实现盈亏，以及 sessionDays、fillMode 等。
+     */
+    private Map<String, Object> sessionBranchStats;
 
     /** 图表买卖点坐标 */
     @Data
@@ -92,6 +96,7 @@ public class BackTestResult {
                 .engine("classic")
                 .degradedBranches(new ArrayList<String>())
                 .sessionEvents(new ArrayList<com.quant.stock.session.SessionEvent>())
+                .sessionBranchStats(new LinkedHashMap<String, Object>())
                 .build();
     }
 }

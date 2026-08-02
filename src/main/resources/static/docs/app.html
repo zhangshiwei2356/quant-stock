@@ -45,7 +45,7 @@
 
 <h4>策略与风控摘要</h4>
 <ul>
-  <li><b>单活策略</b>：默认 <code>maCross</code>（读全局过滤）；对照画像 <code>maCrossTrend/Volume/Balanced/Strict</code> 与脚手架 <code>branchScaffold</code>（session/MIN_1，无撮合）可在回测下拉对比；纸面仍用配置激活，未接会话引擎</li>
+  <li><b>单活策略</b>：默认 <code>maCross</code>（读全局过滤）；对照画像与脚手架 <code>branchScaffold</code>（session/MIN_1；可撮合但脚手架默认不下单；结果含分支绩效与事件表）可在回测下拉对比；纸面仍用配置激活，未接会话引擎</li>
   <li>金叉可配 MA60 / 放量 / ADX / RSI；综合成本止损、移动止盈；T+1 分档；金字塔 50/30/20</li>
   <li>撮合：日 K 下一根开盘；分钟 ≥ 次日 09:45；涨跌停主板 10% / 创科 20%</li>
   <li>单笔 ADV 参与率硬顶默认 10%（<code>quant.max-participation-adv</code>）；回测结果带配置指纹</li>

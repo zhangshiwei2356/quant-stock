@@ -210,10 +210,59 @@
 
   function setSingleResultPanelsVisible(show) {
     $('#singleEquityPanel, #singleTradePanel').prop('hidden', !show);
+    if (!show) {
+      $('#singleSessionPanel').prop('hidden', true);
+    }
     if (show) {
       setTimeout(function () {
         try { singleEquityChart.resize(); } catch (e) {}
       }, 60);
+    }
+  }
+
+  function renderSessionPanel(bt) {
+    var eng = (bt && bt.engine) || '';
+    var isSession = eng === 'session' || (bt && bt.sessionEvents && bt.sessionEvents.length);
+    if (!isSession) {
+      $('#singleSessionPanel').prop('hidden', true);
+      return;
+    }
+    $('#singleSessionPanel').prop('hidden', false);
+    var st = bt.sessionBranchStats || {};
+    var parts = [];
+    parts.push('天数<b>' + (st.sessionDays != null ? st.sessionDays : '-') + '</b>');
+    parts.push('撮合<b>' + (st.matchingEnabled === false ? '关' : '开') + '</b>');
+    parts.push('成交价<b>' + (st.fillMode || 'BAR_CLOSE') + '</b>');
+    ['OPEN', 'MID', 'CLOSE'].forEach(function (b) {
+      var m = st[b] || {};
+      parts.push(b + ' tick<b>' + (m.branchTicks || 0) + '</b>'
+        + ' 买/卖<b>' + (m.buys || 0) + '/' + (m.sells || 0) + '</b>'
+        + ' 已实现<b>' + num(m.realizedPnl) + '</b>');
+    });
+    if (bt.degradedBranches && bt.degradedBranches.length) {
+      parts.push('降级<b>' + bt.degradedBranches.join(',') + '</b>');
+    }
+    $('#sessionBranchMetrics').html(parts.join(' · '));
+    var $tb = $('#sessionEventBody').empty();
+    var rows = bt.sessionEvents || [];
+    if (!rows.length) {
+      $tb.append($('<tr/>').append($('<td colspan="5" class="empty-state"/>').text('无会话事件')));
+      return;
+    }
+    var cap = Math.min(rows.length, 300);
+    for (var i = 0; i < cap; i++) {
+      var e = rows[i] || {};
+      var $tr = $('<tr/>');
+      $tr.append($('<td/>').text(i + 1));
+      $tr.append($('<td/>').text(e.time || '-'));
+      $tr.append($('<td/>').text(e.type || '-'));
+      $tr.append($('<td/>').text(e.branch || '-'));
+      $tr.append($('<td/>').text(e.detail || ''));
+      $tb.append($tr);
+    }
+    if (rows.length > cap) {
+      $tb.append($('<tr/>').append($('<td colspan="5" class="empty-state"/>')
+        .text('仅展示前 ' + cap + ' 条 / 共 ' + rows.length)));
     }
   }
 
@@ -1710,6 +1759,7 @@
         setSingleResultPanelsVisible(true);
         renderEquityChart(lastSingleEquity, singleEquityChart);
         renderTradeTable(bt);
+        renderSessionPanel(bt);
         loadSingleHistory(code);
         var klineParams = $.extend({ code: code, period: period }, singleRangeParams());
         $.getJSON('/api/kline', klineParams, function (resp) {
