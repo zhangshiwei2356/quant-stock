@@ -3,6 +3,7 @@ package com.quant.stock.strategy;
 import com.quant.stock.backtest.BackTestAnalysisStore;
 import com.quant.stock.backtest.BackTestHistoryStore;
 import com.quant.stock.backtest.dto.BtBacktestRecordDO;
+import com.quant.stock.backtest.dto.SingleBacktestHistoryRecord;
 import com.quant.stock.config.QuantProperties;
 import com.quant.stock.mapper.BacktestRecordMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,7 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -33,6 +36,7 @@ class StrategyEvalServiceTest {
     private BacktestRecordMapper mapper;
     private StrategyRegistry registry;
     private QuantProperties props;
+    private BackTestHistoryStore historyStore;
     private StrategyEvalService service;
 
     @BeforeEach
@@ -49,7 +53,7 @@ class StrategyEvalServiceTest {
         ObjectProvider<BacktestRecordMapper> mapperProvider = mock(ObjectProvider.class);
         when(mapperProvider.getIfAvailable()).thenReturn(mapper);
 
-        BackTestHistoryStore historyStore = mock(BackTestHistoryStore.class);
+        historyStore = mock(BackTestHistoryStore.class);
         BackTestAnalysisStore analysisStore = mock(BackTestAnalysisStore.class);
 
         service = new StrategyEvalService(registry, props, mapperProvider, historyStore, analysisStore);
@@ -112,5 +116,20 @@ class StrategyEvalServiceTest {
         // 未知行的 100% 不得混入 maCross
         assertFalse(((BigDecimal) ma.get("avgTotalRate")).compareTo(bd("1")) == 0
                 || ((BigDecimal) ma.get("avgTotalRate")).compareTo(bd("0.55")) == 0);
+    }
+
+    @Test
+    void history_caseInsensitiveId_queriesCanonicalStrategyId() {
+        SingleBacktestHistoryRecord rec = new SingleBacktestHistoryRecord();
+        rec.setId("s1");
+        rec.setStrategyId("maCross");
+        doReturn(Collections.singletonList(rec))
+                .when(historyStore).listSummaryByStrategy(eq("maCross"), eq(null));
+
+        List<Map<String, Object>> rows = service.history("MaCross", "ALL");
+
+        verify(historyStore).listSummaryByStrategy(eq("maCross"), eq(null));
+        assertEquals(1, rows.size());
+        assertEquals("maCross", rows.get(0).get("strategyId"));
     }
 }

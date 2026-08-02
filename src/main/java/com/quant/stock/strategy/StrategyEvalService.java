@@ -153,9 +153,9 @@ public class StrategyEvalService {
      * {@code kind} null/blank/ALL → 不过滤；否则 SINGLE/PORTFOLIO。
      */
     public List<Map<String, Object>> history(String strategyId, String kind) {
-        requireKnownStrategy(strategyId);
+        String canonicalId = requireKnownStrategy(strategyId);
         String kindNorm = normalizeKind(kind);
-        List<?> list = historyStore.listSummaryByStrategy(strategyId.trim(), kindNorm);
+        List<?> list = historyStore.listSummaryByStrategy(canonicalId, kindNorm);
         List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
         for (Object item : list) {
             out.add(toSummaryMap(item, false));
@@ -185,10 +185,15 @@ public class StrategyEvalService {
         return out;
     }
 
-    private void requireKnownStrategy(String strategyId) {
+    /**
+     * 存在性仅用 {@link StrategyRegistry#contains(String)}；通过后以 {@link StrategyRegistry#resolve(String)}
+     * 的 {@link BaseStrategy#name()} 作为 DB 查询用规范 id（大小写与注册表一致）。
+     */
+    private String requireKnownStrategy(String strategyId) {
         if (!StringUtils.hasText(strategyId) || !strategyRegistry.contains(strategyId)) {
             throw new NoSuchElementException("未知策略: " + strategyId);
         }
+        return strategyRegistry.resolve(strategyId.trim()).name();
     }
 
     /** null/blank/ALL → null（不过滤）；否则大写 SINGLE/PORTFOLIO。 */
