@@ -64,6 +64,7 @@
     <li><b>运维中心</b> — 已落地 · 任务管理（库表动态调度）/ 数据健康（本地空与滞后）/ 运行参数（白名单可写 + 中文说明对照配置键）</li>
     <li><b>数据表</b> — 已落地 · MySQL 白名单分页只读浏览；列表/详情展示 information_schema 磁盘占用（数据/索引）</li>
     <li><b>回测工作台</b> — 已落地 · 行情全市场选股；个股/组合回测<strong>仅从目标池</strong>选股；个股二级：回测工作台 / 批量扫描（yml 列表）/ 回测历史；组合二级：回测工作台 / 回测历史；结果含 <code>configFingerprint</code> / <code>atrRisk</code>；历史落库带注册策略 <code>strategy_id</code></li>
+    <li><b>策略评估 API</b> — 已落地 · <code>StrategyEvalService</code> + <code>GET /api/strategy/overview|/{id}/history|/history/{recordId}</code>；按注册 id 聚合均/中位收益与回撤；空 <code>strategy_id</code> 进 <code>unknownCount</code>；详情内嵌 analysis；前端「策略管理」页待接</li>
     <li><b>ADV 参与率硬顶</b> — 已落地 · <code>quant.max-participation-adv</code> 默认 0.10；买入/死叉卖受限，止损与熔断卖不受限</li>
     <li><b>退出优先级契约</b> — 已落地 · <code>ExitPriority</code>（止损 &gt; 熔断挂卖 &gt; 时间止损 &gt; 死叉）；见交易规则</li>
     <li><b>纸面-实盘对账闸</b> — 已落地（本地）· <code>GET /api/account/paper-live-gap</code>；账户 →「纸面对账」；真券商对账仍待 API</li>

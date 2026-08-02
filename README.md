@@ -255,6 +255,9 @@ sequenceDiagram
 | GET `/api/backtest/history` · `/analysis` | 个股历史与分析 |
 | GET `/api/batch/scanAllStock` | 批量扫描 |
 | GET `/api/portfolio/history` · `/analysis` | 组合历史与分析 |
+| GET `/api/strategy/overview` | 策略评估总览（注册表 + 按 `strategy_id` 聚合；db 关则 `enabled=false`） |
+| GET `/api/strategy/{id}/history?kind=` | 某策略回测摘要（`ALL\|SINGLE\|PORTFOLIO`；未知 id → 404） |
+| GET `/api/strategy/history/{recordId}` | 单条详情（trades + 内嵌 analysis；未知 → 404） |
 | GET `/api/stock/universe` | 全市场 |
 | GET/POST `/api/stock/trade-pool*` | 目标池查询/重建/移出/报告 |
 | GET `/api/account/**` | 账户资金/持仓/委托/日结/风控；页面「风控日报」聚合 alerts/turnover/ic-decay 等 |
