@@ -144,7 +144,7 @@ sequenceDiagram
 
 引擎默认 `BackTestEngine`（`engine=classic`：次日开盘撮合、止损/移动止盈、金字塔、T+1 分档、账户熔断）。  
 可选旁路 **`SessionBackTestEngine`**（`engine=session` 或策略 `branchScaffold`）：强制 **MIN_1** 三分支（OPEN/MID/CLOSE，窗口见 `quant.session.*`）+ 持仓日态事件 + **撮合子集**（`pollIntents` → 费用/T+1/涨跌停夹紧/ADV；`quant.session.fill-mode` 默认 **`AUTO`**：跟随 `next-bar-open-fill`→`NEXT_EFFECTIVE`（挂单，次日且分钟≥09:45 按开盘价）或 `BAR_CLOSE`（当根收盘即时）；脚手架默认不发意图故 0 成交）+ 分分支绩效（`sessionBranchStats`）与事件表。缺 INDEX/竞价/封单时分支 `UNAVAILABLE`（`failOnMissingDep=true` 可整单失败）。
-纸面：`quant.session.paper-enabled=true`（默认）且激活策略实现 `SessionStrategy` 时，`scan-and-trade` 经 `SessionPaperAdaptor` 走会话钩子，意图转为挂买/挂卖后仍走原模拟账本撮合；金叉激活时行为不变。组合 `engine=session` 为等权分账聚合（非共享池）；隔日高开公式不实现。
+纸面：`quant.session.paper-enabled=true`（默认）且激活策略实现 `SessionStrategy` 时，`scan-and-trade` 经 `SessionPaperAdaptor` 走会话钩子，意图转为挂买/挂卖后仍走原模拟账本撮合；金叉激活时行为不变。组合 `engine=session` 经 `SessionPortfolioBackTestEngine` 为 **MIN_1 共享资金池**（统一现金 + `AccountRiskState`/单票总仓，无金叉五步）；隔日高开公式不实现。
 
 ### 3. 组合回测
 
@@ -154,7 +154,7 @@ sequenceDiagram
 | 回测历史 | 组合历史与分析 |
 
 引擎：`PortfolioBackTestEngine`（默认日 K **共享资金池**）。  
-`engine=session` 或策略 `branchScaffold`：MIN_1 **等权分账**旁路（各股独立会话回测后聚合权益/成交，非共享池）；结果含 `engine` / `sessionBranchStats`。
+`engine=session` 或策略 `branchScaffold`：MIN_1 **共享资金池**旁路（并集分钟轴 + 统一现金/账户风控；`sessionBranchStats.mode=SHARED_CASH_SESSION`）；仍无金叉五步。
 
 ### 4. 目标池（唯一池）
 
@@ -251,7 +251,7 @@ sequenceDiagram
 | GET `/api/stock/pool` | 标的/股票池 |
 | GET `/api/kline?code=&period=` | 统一周期 K 线 |
 | GET `/api/backtest/run` | 单只回测；可选 `engine=classic\|session`、`failOnMissingDep`、`paramOverrides`（JSON，白名单临时改参，不落库） |
-| POST `/api/portfolio/run` | 组合回测；可选 `engine`、`paramOverrides`、`failOnMissingDep`（session=等权分账） |
+| POST `/api/portfolio/run` | 组合回测；可选 `engine`、`paramOverrides`、`failOnMissingDep`（session=MIN_1 共享资金池） |
 | GET `/api/backtest/history` · `/analysis` | 个股历史与分析 |
 | GET `/api/batch/scanAllStock` | 批量扫描 |
 | GET `/api/portfolio/history` · `/analysis` | 组合历史与分析 |

@@ -11,8 +11,13 @@ import com.quant.stock.market.MarketDataService;
 import com.quant.stock.market.dto.BarDTO;
 import com.quant.stock.risk.OpenFilterService;
 import com.quant.stock.session.BranchScaffoldStrategy;
-import com.quant.stock.session.SessionBackTestEngine;
+import com.quant.stock.session.SessionContext;
 import com.quant.stock.session.SessionDepProbe;
+import com.quant.stock.session.SessionEvent;
+import com.quant.stock.session.SessionOrderIntent;
+import com.quant.stock.session.SessionPortfolioBackTestEngine;
+import com.quant.stock.session.SessionStrategy;
+import com.quant.stock.session.SessionBranch;
 import com.quant.stock.strategy.HoldNothingStrategy;
 import com.quant.stock.strategy.MaCrossStrategy;
 import com.quant.stock.strategy.StrategyRegistry;
@@ -27,8 +32,11 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -40,7 +48,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * 组合回测冒烟：经典共享资金池 + session 等权分账旁路。
+ * 组合回测冒烟：经典共享资金池 + session 共享资金池旁路。
  */
 class PortfolioBackTestEngineSmokeTest {
 
@@ -78,7 +86,7 @@ class PortfolioBackTestEngineSmokeTest {
     }
 
     @Test
-    void sessionEqualSplitAggregatesTwoLegs() {
+    void sessionSharedCashAggregatesTwoLegs() {
         QuantProperties props = new QuantProperties();
         props.setLimitPriceProtectEnabled(false);
         props.setMaxParticipationAdv(BigDecimal.ZERO);
@@ -100,10 +108,74 @@ class PortfolioBackTestEngineSmokeTest {
         assertNotNull(result.getStockResults());
         assertEquals(2, result.getStockResults().size());
         assertNotNull(result.getSessionBranchStats());
-        assertEquals("EQUAL_SPLIT_SESSION", result.getSessionBranchStats().get("mode"));
-        assertTrue(result.getConfigFingerprint().contains("pfSess"));
+        assertEquals("SHARED_CASH_SESSION", result.getSessionBranchStats().get("mode"));
+        assertTrue(result.getConfigFingerprint().contains("pfSessShared"));
         assertNotNull(result.getAnalysisSummary());
-        assertTrue(result.getAnalysisSummary().contains("equalSplit"));
+        assertTrue(result.getAnalysisSummary().contains("sharedCash"));
+    }
+
+    @Test
+    void sessionSharedCashSecondLegRejectedWhenCashTight() {
+        QuantProperties props = new QuantProperties();
+        props.setLimitPriceProtectEnabled(false);
+        props.setMaxParticipationAdv(BigDecimal.ZERO);
+        props.setMaxSinglePosition(BigDecimal.ONE);
+        props.setMaxTotalPosition(new BigDecimal("10")); // 放宽总仓，逼出共享现金不足
+        QuantProperties.Session sess = new QuantProperties.Session();
+        sess.setFillMode("BAR_CLOSE");
+        sess.setMatchingEnabled(true);
+        props.setSession(sess);
+
+        MarketDataService mds = mock(MarketDataService.class);
+        when(mds.getKline(eq("600036"), eq(BarPeriod.MIN_1), any(), any()))
+                .thenReturn(syntheticSessionMinutes("600036", 3));
+        when(mds.getKline(eq("600519"), eq(BarPeriod.MIN_1), any(), any()))
+                .thenReturn(syntheticSessionMinutes("600519", 3));
+
+        SessionPortfolioBackTestEngine spe = new SessionPortfolioBackTestEngine(
+                mds, new SessionDepProbe(mds), props, new TradeCostModel(props), new PositionAmountUtil(props));
+
+        // 两股同分钟各买 100 股@10 ≈ 各需 ~1000+费；总资金 1500 仅够一腿
+        SessionStrategy buyer = new SessionStrategy() {
+            private final Set<String> fired = new HashSet<String>();
+
+            @Override
+            public String sessionId() {
+                return "cashRace";
+            }
+
+            @Override
+            public void onSessionOpen(SessionContext ctx, List<SessionEvent> out) {
+            }
+
+            @Override
+            public void onBranchBar(SessionContext ctx, List<SessionEvent> out) {
+            }
+
+            @Override
+            public void onSessionClose(SessionContext ctx, List<SessionEvent> out) {
+            }
+
+            @Override
+            public List<SessionOrderIntent> pollIntents(SessionContext ctx) {
+                if (ctx.getBranch() == SessionBranch.OPEN && ctx.getPositionShares() == 0
+                        && fired.add(ctx.getStockCode())) {
+                    return Collections.singletonList(SessionOrderIntent.buy(100, "race-buy"));
+                }
+                return Collections.emptyList();
+            }
+        };
+
+        PortfolioResultDTO result = spe.run(BackTestQueryDTO.builder()
+                .stockCodeList(Arrays.asList("600036", "600519"))
+                .initCapital(new BigDecimal("1500"))
+                .build(), buyer, false);
+
+        assertEquals("SHARED_CASH_SESSION", result.getSessionBranchStats().get("mode"));
+        assertEquals(1, result.getTotalTradeNum().intValue(), "共享池仅应成交一腿买单");
+        assertEquals("600036", result.getTrades().get(0).getStockCode());
+        assertTrue(result.getAnalysisEvents().stream().anyMatch(e ->
+                "REJECT_BUY".equals(e.getType()) && e.getReason() != null && e.getReason().contains("现金不足")));
     }
 
     @Test
@@ -122,7 +194,7 @@ class PortfolioBackTestEngineSmokeTest {
         when(eps.resolve(anyString())).thenAnswer(inv -> QuantPropertiesCopy.copy(props));
         when(eps.resolve(anyString(), any())).thenAnswer(inv -> QuantPropertiesCopy.copy(props));
         when(eps.hasSparse(anyString())).thenReturn(false);
-        SessionBackTestEngine sessionEngine = new SessionBackTestEngine(
+        SessionPortfolioBackTestEngine sessionPortfolio = new SessionPortfolioBackTestEngine(
                 mds, new SessionDepProbe(mds), props, new TradeCostModel(props), new PositionAmountUtil(props));
         return new PortfolioBackTestEngine(
                 props,
@@ -136,7 +208,7 @@ class PortfolioBackTestEngineSmokeTest {
                         new HoldNothingStrategy(),
                         new BranchScaffoldStrategy()), props),
                 new TradingCalendar(),
-                sessionEngine);
+                sessionPortfolio);
     }
 
     private static List<BarDTO> syntheticUptrendDays(String code, int days) {

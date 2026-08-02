@@ -162,13 +162,13 @@
   <li><b>旁路会话引擎</b>（<code>engine=session</code> 或策略 <code>branchScaffold</code>）：强制 <b>MIN_1</b>；三分支 OPEN/MID/CLOSE（窗口 <code>quant.session.*</code>）；
       策略可经 <code>pollIntents</code> 下单，撮合子集含佣金/印花税/分级滑点、T+1 可卖、涨跌停夹紧、ADV 参与率；
       成交模式 <code>quant.session.fill-mode</code> 默认 <code>AUTO</code>（跟随 <code>next-bar-open-fill</code>→<code>NEXT_EFFECTIVE</code>：挂单，次日且≥09:45 开盘；或 <code>BAR_CLOSE</code> 当根收盘即时）；脚手架默认不发意图；结果含 <code>sessionBranchStats</code> / 会话事件表；
-      <strong>不</strong>跑金叉五步时序；纸面：激活策略为 <code>SessionStrategy</code> 且 <code>paper-enabled</code> 时经适配器挂单，仍走模拟账本撮合；组合 session 为等权分账；隔日高开公式未实现</li>
+      <strong>不</strong>跑金叉五步时序；纸面：激活策略为 <code>SessionStrategy</code> 且 <code>paper-enabled</code> 时经适配器挂单，仍走模拟账本撮合；组合 session 为 MIN_1 共享资金池；隔日高开公式未实现</li>
 </ul>
 
 <h4>九、组合回测（多股共享资金池）</h4>
 <ul>
   <li>工作台内<strong>仅从目标池</strong>搜索多选成分股；默认 <b>共用一份现金</b>与同一套账户风控（熔断/连亏/单日亏/仓位系数）</li>
-  <li><b>session 旁路</b>（<code>engine=session</code> / <code>branchScaffold</code>）：初始资金<strong>等权分账</strong>，各股独立 MIN_1 会话回测后聚合权益与成交；<strong>不是</strong>共享资金池；脚手架默认 0 成交</li>
+  <li><b>session 旁路</b>（<code>engine=session</code> / <code>branchScaffold</code>）：MIN_1 并集分钟轴 + <strong>共享现金池</strong>（<code>SessionPortfolioBackTestEngine</code>）+ <code>AccountRiskState</code>（熔断/连亏/单日亏/仓位系数）与单票/总仓上限；撮合同会话子集（含 <code>fill-mode</code>）；<strong>不</strong>跑金叉五步/止损金字塔；脚手架默认 0 成交；结果 <code>mode=SHARED_CASH_SESSION</code></li>
   <li>经典路径强制用 <b>DAY</b> 行情；按各股交易日并集时间轴推进；某股当日无 K 则跳过该股</li>
   <li>单股 K 线不足约 65 根则不进入组合</li>
   <li>每只股票独立：持仓 lot、金字塔档位、挂单、止损/trail、<code>stoppedOutToday</code></li>

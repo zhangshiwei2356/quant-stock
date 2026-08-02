@@ -50,7 +50,7 @@ public class PortfolioResultDTO {
     private Map<String, Object> correlation;
     /** ATR 止损/定仓一体契约快照（P0-108，与单股对齐） */
     private Map<String, Object> atrRisk;
-    /** classic | session；session 为等权分账旁路聚合，非共享资金池 */
+    /** classic | session；session 为 MIN_1 共享资金池（账户风控，无金叉五步） */
     private String engine;
     /** session 路径：各股降级分支并集 */
     private List<String> degradedBranches;
