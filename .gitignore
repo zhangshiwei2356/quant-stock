@@ -7,6 +7,8 @@ target/
 *.log
 .DS_Store
 *.class
+scripts/__pycache__/
+**/__pycache__/
 
 # 回测历史/分析落盘（保留目录占位）
 data/backtest/*.json

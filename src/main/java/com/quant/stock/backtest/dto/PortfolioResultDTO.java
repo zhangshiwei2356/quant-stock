@@ -56,6 +56,8 @@ public class PortfolioResultDTO {
     private List<String> degradedBranches;
     /** session 路径：分分支统计汇总 */
     private Map<String, Object> sessionBranchStats;
+    /** session 路径：各腿会话事件合并（最多约 800 条） */
+    private List<com.quant.stock.session.SessionEvent> sessionEvents;
 
     /** 无有效标的或参数无效时的空结果 */
     public static PortfolioResultDTO empty(BigDecimal init) {
@@ -76,6 +78,7 @@ public class PortfolioResultDTO {
                 .engine("classic")
                 .degradedBranches(new ArrayList<String>())
                 .sessionBranchStats(new LinkedHashMap<String, Object>())
+                .sessionEvents(new ArrayList<com.quant.stock.session.SessionEvent>())
                 .build();
     }
 }

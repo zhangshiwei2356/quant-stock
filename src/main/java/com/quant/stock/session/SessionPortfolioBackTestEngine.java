@@ -13,10 +13,12 @@ import com.quant.stock.config.QuantProperties;
 import com.quant.stock.market.BarPeriod;
 import com.quant.stock.market.MarketDataService;
 import com.quant.stock.market.dto.BarDTO;
+import com.quant.stock.portfolio.PortfolioCorrelationMonitor;
 import com.quant.stock.risk.AccountRiskState;
 import com.quant.stock.risk.LimitPriceProtect;
+import com.quant.stock.risk.StressScenarioService;
+import com.quant.stock.risk.StructuralBreakMonitor;
 import com.quant.stock.trade.FillVolumeScale;
-import com.quant.stock.trade.ParticipationCap;
 import com.quant.stock.trade.TradeCostModel;
 import com.quant.stock.util.PositionAmountUtil;
 import lombok.RequiredArgsConstructor;
@@ -319,14 +321,27 @@ public class SessionPortfolioBackTestEngine {
         branchAgg.put("fillMode", fillMode);
         branchAgg.put("matchingEnabled", matchingEnabled);
         branchAgg.put("sessionDays", sessionDays);
+        branchAgg.put("halted", accountRisk.isHalted());
+        branchAgg.put("haltReason", accountRisk.getHaltReason());
+        List<SessionEvent> sessionEvents = new ArrayList<SessionEvent>();
         List<SingleStockBackResult> stockResults = new ArrayList<SingleStockBackResult>();
         for (Leg leg : legs) {
             winRounds += leg.stats.winRounds;
             closedRounds += leg.stats.closedRounds;
             branchAgg.put(leg.code, leg.stats.toMap(sessionDays, matchingEnabled, fillMode, windows));
             for (SessionEvent e : leg.events) {
+                if (sessionEvents.size() < 800) {
+                    // 事件 detail 带头腿代码，便于组合面板区分
+                    SessionEvent tagged = SessionEvent.builder()
+                            .time(e.getTime())
+                            .type(e.getType())
+                            .branch(e.getBranch())
+                            .detail((e.getDetail() == null ? "" : e.getDetail()) + " [" + leg.code + "]")
+                            .build();
+                    sessionEvents.add(tagged);
+                }
                 if (analysis.size() >= 800) {
-                    break;
+                    continue;
                 }
                 Map<String, Object> data = new LinkedHashMap<String, Object>();
                 data.put("branch", e.getBranch());
@@ -359,6 +374,10 @@ public class SessionPortfolioBackTestEngine {
                 "engine=session sharedCash legs=%d init=%s final=%s trades=%d degraded=%s fill=%s",
                 legs.size(), initCapital, finalAsset, trades.size(), degradedNames, fillMode);
 
+        Map<String, List<BigDecimal>> dayCloses = dailyCloseSeries(legs);
+        Map<String, Object> correlation = PortfolioCorrelationMonitor.report(
+                dayCloses, cfg.getCorrelationLookbackDays(), cfg.getCorrelationWarnThreshold());
+
         return PortfolioResultDTO.builder()
                 .initCapital(initCapital)
                 .finalAsset(finalAsset)
@@ -373,12 +392,44 @@ public class SessionPortfolioBackTestEngine {
                 .analysisEvents(analysis)
                 .analysisSummary(summary)
                 .configFingerprint(fingerprint)
-                .correlation(new LinkedHashMap<String, Object>())
+                .correlation(correlation)
                 .atrRisk(new LinkedHashMap<String, Object>())
                 .engine("session")
                 .degradedBranches(new ArrayList<String>(degradedNames))
                 .sessionBranchStats(branchAgg)
+                .sessionEvents(sessionEvents)
                 .build();
+    }
+
+    /** 由分钟序列取各交易日最后一根收盘，供相关监控按「日收益」计算。 */
+    private static Map<String, List<BigDecimal>> dailyCloseSeries(List<Leg> legs) {
+        Map<String, List<BigDecimal>> out = new LinkedHashMap<String, List<BigDecimal>>();
+        if (legs == null) {
+            return out;
+        }
+        for (Leg leg : legs) {
+            List<BigDecimal> series = new ArrayList<BigDecimal>();
+            LocalDate lastDay = null;
+            BigDecimal lastClose = null;
+            if (leg.bars != null) {
+                for (BarDTO b : leg.bars) {
+                    if (b == null || b.getBarBegin() == null || b.getClose() == null) {
+                        continue;
+                    }
+                    LocalDate d = b.getBarBegin().toLocalDate();
+                    if (lastDay != null && !d.equals(lastDay) && lastClose != null) {
+                        series.add(lastClose);
+                    }
+                    lastDay = d;
+                    lastClose = b.getClose();
+                }
+            }
+            if (lastClose != null) {
+                series.add(lastClose);
+            }
+            out.put(leg.code, series);
+        }
+        return out;
     }
 
     private BigDecimal runSessionClose(Leg leg, BigDecimal cash, List<BackTradeRecord> trades,
@@ -552,7 +603,7 @@ public class SessionPortfolioBackTestEngine {
             leg.events.add(evBar(leg, bar, SessionBranch.OPEN, "REJECT_BUY", "账户禁开；" + nullToEmpty(intent.getReason())));
             return cash;
         }
-        BigDecimal posScale = risk == null ? BigDecimal.ONE : risk.positionScale(equity);
+        BigDecimal posScale = resolvePosScale(risk, equity, leg.bars, index);
         if (posScale.compareTo(BigDecimal.ZERO) <= 0) {
             leg.events.add(evBar(leg, bar, SessionBranch.OPEN, "REJECT_BUY", "仓位系数为0；" + nullToEmpty(intent.getReason())));
             return cash;
@@ -572,12 +623,11 @@ public class SessionPortfolioBackTestEngine {
         }
         vol = (vol / 100) * 100;
         if (!intent.isBypassParticipationCap()) {
-            long adv = avgVol(leg.bars, index, 20);
-            vol = ParticipationCap.capVolume(vol, adv, p().getMaxParticipationAdv());
+            vol = SessionParticipation.capVolume(vol, leg.bars, index, p(), equity, false);
         }
         if (vol < 100) {
             leg.events.add(evBar(leg, bar, SessionBranch.OPEN, "REJECT_BUY",
-                    "量不足一手或 ADV/仓位系数拒绝；" + nullToEmpty(intent.getReason())));
+                    "量不足一手或 ADV/AUM/POV/仓位系数拒绝；" + nullToEmpty(intent.getReason())));
             return cash;
         }
         BigDecimal deal = tradeCostModel.buyPrice(base, leg.bars, index, vol);
@@ -657,11 +707,14 @@ public class SessionPortfolioBackTestEngine {
             return cash;
         }
         if (!intent.isBypassParticipationCap()) {
-            long adv = avgVol(leg.bars, index, 20);
-            vol = ParticipationCap.capVolume(vol, adv, p().getMaxParticipationAdv());
+            BigDecimal eqCap = cash;
+            if (leg.lastMarkPrice != null && leg.pos.hasPosition()) {
+                eqCap = cash.add(leg.lastMarkPrice.multiply(BigDecimal.valueOf(leg.pos.getShares())));
+            }
+            vol = SessionParticipation.capVolume(vol, leg.bars, index, p(), eqCap, false);
             if (vol < 100) {
                 leg.events.add(evBar(leg, bar, SessionBranch.CLOSE, "REJECT_SELL",
-                        "ADV 帽拒绝卖出；" + nullToEmpty(intent.getReason())));
+                        "ADV/AUM/POV 拒绝卖出；" + nullToEmpty(intent.getReason())));
                 return cash;
             }
         }
@@ -716,6 +769,22 @@ public class SessionPortfolioBackTestEngine {
                 .matchingEnabled(matchingEnabled)
                 .degradedBranches(new LinkedHashSet<SessionBranch>(leg.degraded))
                 .build();
+    }
+
+    /** 与经典组合对齐：账户仓位系数 × ADV断崖 × 结构突变 */
+    private BigDecimal resolvePosScale(AccountRiskState risk, BigDecimal equity,
+                                       List<BarDTO> bars, int index) {
+        BigDecimal scale = risk == null ? BigDecimal.ONE : risk.positionScale(equity);
+        if (p().isStressScenarioEnabled()
+                && StressScenarioService.isAdvCliff(bars, index, p().getStressAdvCliffRatio())) {
+            scale = scale.multiply(new BigDecimal("0.5"));
+        }
+        if (p().isStructuralBreakEnabled()
+                && StructuralBreakMonitor.crossesThreshold(bars, index,
+                p().getStructuralBreakWindow(), p().getStructuralBreakThreshold())) {
+            scale = scale.multiply(new BigDecimal("0.5"));
+        }
+        return scale;
     }
 
     private static BigDecimal calcEquity(BigDecimal cash, List<Leg> legs, LocalDateTime t) {
@@ -832,22 +901,6 @@ public class SessionPortfolioBackTestEngine {
             }
         }
         return bars.get(Math.max(0, index - 1)).getClose();
-    }
-
-    private static long avgVol(List<BarDTO> bars, int index, int n) {
-        if (bars == null || index < 0) {
-            return 0L;
-        }
-        int from = Math.max(0, index - n + 1);
-        long sum = 0;
-        int cnt = 0;
-        for (int i = from; i <= index && i < bars.size(); i++) {
-            if (bars.get(i).getVolume() != null) {
-                sum += bars.get(i).getVolume().longValue();
-                cnt++;
-            }
-        }
-        return cnt == 0 ? 0L : sum / cnt;
     }
 
     private static final class PendingOrder {

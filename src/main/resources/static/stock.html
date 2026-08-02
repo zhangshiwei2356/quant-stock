@@ -1077,8 +1077,29 @@
           </div>
         </details>
         <p id="backTimeHint" class="hint" style="margin:8px 0 0;"></p>
-        <p class="hint" style="margin:4px 0 0;">默认日K共享资金池；选 branchScaffold 时为 session 等权分账聚合（非共享池）。</p>
+        <p class="hint" style="margin:4px 0 0;">默认日K共享资金池；选 branchScaffold 时为 session MIN_1 共享资金池（账户风控，无金叉五步）。</p>
         <div class="metrics" id="pfMetrics" style="margin-top:8px;"></div>
+      </section>
+      <section class="panel" id="pfSessionPanel" hidden>
+        <h3>会话引擎 · 共享池分支与事件</h3>
+        <div class="metrics" id="pfSessionMetrics" style="margin-bottom:8px;"></div>
+        <h4 class="result-table-title">会话事件</h4>
+        <div class="table-wrap" style="max-height:280px;">
+          <table>
+            <thead>
+            <tr>
+              <th>#</th>
+              <th>时间</th>
+              <th>类型</th>
+              <th>分支</th>
+              <th>说明</th>
+            </tr>
+            </thead>
+            <tbody id="pfSessionEventBody">
+            <tr><td colspan="5" class="empty-state">session 组合回测后显示事件</td></tr>
+            </tbody>
+          </table>
+        </div>
       </section>
       <section class="panel" id="pfEquityPanel" hidden>
         <h3>权益曲线</h3>

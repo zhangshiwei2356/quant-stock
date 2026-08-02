@@ -12,7 +12,6 @@ import com.quant.stock.market.BarPeriod;
 import com.quant.stock.market.MarketDataService;
 import com.quant.stock.market.dto.BarDTO;
 import com.quant.stock.risk.LimitPriceProtect;
-import com.quant.stock.trade.ParticipationCap;
 import com.quant.stock.trade.TradeCostModel;
 import com.quant.stock.util.PositionAmountUtil;
 import lombok.RequiredArgsConstructor;
@@ -489,12 +488,12 @@ public class SessionBackTestEngine {
             vol = positionAmountUtil.calcBuyVolume(cash, base, p().getBaseAtr());
         }
         vol = (vol / 100) * 100;
+        BigDecimal equityForCap = markEquity(cash, pos, bar);
         if (!intent.isBypassParticipationCap()) {
-            long adv = avgVol(bars, index, 20);
-            vol = ParticipationCap.capVolume(vol, adv, p().getMaxParticipationAdv());
+            vol = SessionParticipation.capVolume(vol, bars, index, p(), equityForCap, false);
         }
         if (vol < 100) {
-            events.add(ev(ctx, "REJECT_BUY", "量不足一手或 ADV 帽拒绝；" + nullToEmpty(intent.getReason())));
+            events.add(ev(ctx, "REJECT_BUY", "量不足一手或 ADV/AUM/POV 拒绝；" + nullToEmpty(intent.getReason())));
             return cash;
         }
         BigDecimal deal = tradeCostModel.buyPrice(base, bars, index, vol);
@@ -563,10 +562,10 @@ public class SessionBackTestEngine {
             return cash;
         }
         if (!intent.isBypassParticipationCap()) {
-            long adv = avgVol(bars, index, 20);
-            vol = ParticipationCap.capVolume(vol, adv, p().getMaxParticipationAdv());
+            BigDecimal equityForCap = markEquity(cash, pos, bar);
+            vol = SessionParticipation.capVolume(vol, bars, index, p(), equityForCap, false);
             if (vol < 100) {
-                events.add(ev(ctx, "REJECT_SELL", "ADV 帽拒绝卖出；" + nullToEmpty(intent.getReason())));
+                events.add(ev(ctx, "REJECT_SELL", "ADV/AUM/POV 拒绝卖出；" + nullToEmpty(intent.getReason())));
                 return cash;
             }
         }
@@ -675,22 +674,6 @@ public class SessionBackTestEngine {
             }
         }
         return bars.get(Math.max(0, index - 1)).getClose();
-    }
-
-    private static long avgVol(List<BarDTO> bars, int index, int n) {
-        if (bars == null || index < 0) {
-            return 0L;
-        }
-        int from = Math.max(0, index - n + 1);
-        long sum = 0;
-        int cnt = 0;
-        for (int i = from; i <= index && i < bars.size(); i++) {
-            if (bars.get(i).getVolume() != null) {
-                sum += bars.get(i).getVolume().longValue();
-                cnt++;
-            }
-        }
-        return cnt == 0 ? 0L : sum / cnt;
     }
 
     private List<AnalysisEvent> toAnalysis(String code, List<SessionEvent> events) {

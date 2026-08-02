@@ -112,6 +112,9 @@ class PortfolioBackTestEngineSmokeTest {
         assertTrue(result.getConfigFingerprint().contains("pfSessShared"));
         assertNotNull(result.getAnalysisSummary());
         assertTrue(result.getAnalysisSummary().contains("sharedCash"));
+        assertNotNull(result.getCorrelation());
+        assertTrue(result.getCorrelation().containsKey("avgCorrelation")
+                || result.getCorrelation().containsKey("hint"));
     }
 
     @Test
@@ -176,6 +179,77 @@ class PortfolioBackTestEngineSmokeTest {
         assertEquals("600036", result.getTrades().get(0).getStockCode());
         assertTrue(result.getAnalysisEvents().stream().anyMatch(e ->
                 "REJECT_BUY".equals(e.getType()) && e.getReason() != null && e.getReason().contains("现金不足")));
+        assertNotNull(result.getSessionEvents());
+        assertTrue(result.getSessionEvents().stream().anyMatch(e -> "REJECT_BUY".equals(e.getType())));
+    }
+
+    @Test
+    void sessionSharedCashHaltSellsAndBlocksNewOpen() {
+        QuantProperties props = new QuantProperties();
+        props.setLimitPriceProtectEnabled(false);
+        props.setMaxParticipationAdv(BigDecimal.ZERO);
+        props.setMaxSinglePosition(BigDecimal.ONE);
+        props.setMaxTotalPosition(new BigDecimal("10"));
+        props.setDrawdownHaltPct(new BigDecimal("0.20"));
+        props.setDrawdownDurationHaltDays(0);
+        QuantProperties.Session sess = new QuantProperties.Session();
+        sess.setFillMode("BAR_CLOSE");
+        sess.setMatchingEnabled(true);
+        props.setSession(sess);
+
+        MarketDataService mds = mock(MarketDataService.class);
+        // D0 价 10 买入；D1 起暴跌至 5 → 回撤触发熔断强平；之后再尝试开仓应拒
+        when(mds.getKline(eq("600036"), eq(BarPeriod.MIN_1), any(), any()))
+                .thenReturn(syntheticCrashMinutes("600036", new BigDecimal("10"), new BigDecimal("5"), 4));
+
+        SessionPortfolioBackTestEngine spe = new SessionPortfolioBackTestEngine(
+                mds, new SessionDepProbe(mds), props, new TradeCostModel(props), new PositionAmountUtil(props));
+
+        SessionStrategy trader = new SessionStrategy() {
+            private boolean boughtOnce;
+
+            @Override
+            public String sessionId() {
+                return "haltDemo";
+            }
+
+            @Override
+            public void onSessionOpen(SessionContext ctx, List<SessionEvent> out) {
+            }
+
+            @Override
+            public void onBranchBar(SessionContext ctx, List<SessionEvent> out) {
+            }
+
+            @Override
+            public void onSessionClose(SessionContext ctx, List<SessionEvent> out) {
+            }
+
+            @Override
+            public List<SessionOrderIntent> pollIntents(SessionContext ctx) {
+                if (ctx.getBranch() == SessionBranch.OPEN && ctx.getPositionShares() == 0) {
+                    if (!boughtOnce) {
+                        boughtOnce = true;
+                        // volume≤0：按仓位工具满仓，便于暴跌触发深度熔断
+                        return Collections.singletonList(SessionOrderIntent.buy(0, "pre-halt-buy"));
+                    }
+                    return Collections.singletonList(SessionOrderIntent.buy(100, "post-halt-buy"));
+                }
+                return Collections.emptyList();
+            }
+        };
+
+        PortfolioResultDTO result = spe.run(BackTestQueryDTO.builder()
+                .stockCodeList(Collections.singletonList("600036"))
+                .initCapital(new BigDecimal("100000"))
+                .build(), trader, false);
+
+        assertEquals(Boolean.TRUE, result.getSessionBranchStats().get("halted"));
+        assertTrue(result.getTrades().stream().anyMatch(t -> "BUY".equals(t.getSide())));
+        assertTrue(result.getTrades().stream().anyMatch(t -> "SELL".equals(t.getSide())),
+                "熔断后应卖出持仓");
+        assertTrue(result.getSessionEvents().stream().anyMatch(e ->
+                "REJECT_BUY".equals(e.getType()) && e.getDetail() != null && e.getDetail().contains("账户禁开")));
     }
 
     @Test
@@ -252,6 +326,26 @@ class PortfolioBackTestEngineSmokeTest {
         }
         while (out.size() < 30) {
             addMin(out, code, d.plusDays(days), LocalTime.of(10, out.size() % 30), px);
+        }
+        return out;
+    }
+
+    /** 首日 highPx，次日起 crashPx，用于熔断验收。 */
+    private static List<BarDTO> syntheticCrashMinutes(String code, BigDecimal highPx, BigDecimal crashPx, int days) {
+        List<BarDTO> out = new ArrayList<BarDTO>();
+        LocalDate d = LocalDate.of(2026, 3, 2);
+        for (int day = 0; day < days; day++) {
+            LocalDate cur = d.plusDays(day);
+            BigDecimal px = day == 0 ? highPx : crashPx;
+            addMin(out, code, cur, LocalTime.of(9, 30), px);
+            addMin(out, code, cur, LocalTime.of(9, 45), px);
+            addMin(out, code, cur, LocalTime.of(10, 30), px);
+            addMin(out, code, cur, LocalTime.of(14, 0), px);
+            addMin(out, code, cur, LocalTime.of(14, 45), px);
+            addMin(out, code, cur, LocalTime.of(14, 59), px);
+        }
+        while (out.size() < 30) {
+            addMin(out, code, d.plusDays(days), LocalTime.of(10, out.size() % 30), crashPx);
         }
         return out;
     }

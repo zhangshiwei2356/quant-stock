@@ -168,7 +168,7 @@
 <h4>九、组合回测（多股共享资金池）</h4>
 <ul>
   <li>工作台内<strong>仅从目标池</strong>搜索多选成分股；默认 <b>共用一份现金</b>与同一套账户风控（熔断/连亏/单日亏/仓位系数）</li>
-  <li><b>session 旁路</b>（<code>engine=session</code> / <code>branchScaffold</code>）：MIN_1 并集分钟轴 + <strong>共享现金池</strong>（<code>SessionPortfolioBackTestEngine</code>）+ <code>AccountRiskState</code>（熔断/连亏/单日亏/仓位系数）与单票/总仓上限；撮合同会话子集（含 <code>fill-mode</code>）；<strong>不</strong>跑金叉五步/止损金字塔；脚手架默认 0 成交；结果 <code>mode=SHARED_CASH_SESSION</code></li>
+  <li><b>session 旁路</b>（<code>engine=session</code> / <code>branchScaffold</code>）：MIN_1 并集分钟轴 + <strong>共享现金池</strong>（<code>SessionPortfolioBackTestEngine</code>）+ <code>AccountRiskState</code>（熔断/连亏/单日亏/仓位系数，含 ADV 断崖与结构突变降仓）与单票/总仓上限；撮合 ADV 经 AUM 收紧 + 当根 POV；熔断后禁开并挂卖持仓；撮合同会话子集（含 <code>fill-mode</code>）；<strong>不</strong>跑金叉五步/止损金字塔；脚手架默认 0 成交；结果 <code>mode=SHARED_CASH_SESSION</code>，含会话事件与相关摘要</li>
   <li>经典路径强制用 <b>DAY</b> 行情；按各股交易日并集时间轴推进；某股当日无 K 则跳过该股</li>
   <li>单股 K 线不足约 65 根则不进入组合</li>
   <li>每只股票独立：持仓 lot、金字塔档位、挂单、止损/trail、<code>stoppedOutToday</code></li>

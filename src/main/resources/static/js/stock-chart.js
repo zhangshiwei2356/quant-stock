@@ -448,6 +448,9 @@
 
   function setPortfolioResultPanelsVisible(show) {
     $('#pfEquityPanel, #pfTradePanel, #pfStockPanel').prop('hidden', !show);
+    if (!show) {
+      $('#pfSessionPanel').prop('hidden', true);
+    }
     if (show) {
       setTimeout(function () {
         try { equityChart.resize(); } catch (e) {}
@@ -460,9 +463,54 @@
     $('#pfTradeSummary').empty().prop('hidden', true);
     $('#pfStockBody').html('<tr><td colspan="10" class="empty-state">回测后按股票汇总</td></tr>');
     $('#pfMetrics').empty();
+    $('#pfSessionMetrics').empty();
+    $('#pfSessionEventBody').html('<tr><td colspan="5" class="empty-state">session 组合回测后显示事件</td></tr>');
+    $('#pfSessionPanel').prop('hidden', true);
     lastEquity = null;
     try { equityChart.clear(); } catch (e) {}
     setPortfolioResultPanelsVisible(false);
+  }
+
+  function renderPortfolioSessionPanel(pf) {
+    var eng = (pf && pf.engine) || '';
+    var st = (pf && pf.sessionBranchStats) || {};
+    var isSession = eng === 'session' || st.mode === 'SHARED_CASH_SESSION'
+      || (pf && pf.sessionEvents && pf.sessionEvents.length);
+    if (!isSession) {
+      $('#pfSessionPanel').prop('hidden', true);
+      return;
+    }
+    $('#pfSessionPanel').prop('hidden', false);
+    var parts = [];
+    parts.push('模式<b>' + (st.mode || 'SHARED_CASH_SESSION') + '</b>');
+    parts.push('腿数<b>' + (st.legs != null ? st.legs : '-') + '</b>');
+    parts.push('天数<b>' + (st.sessionDays != null ? st.sessionDays : '-') + '</b>');
+    parts.push('撮合<b>' + (st.matchingEnabled === false ? '关' : '开') + '</b>');
+    parts.push('成交模式<b>' + (st.fillMode || 'AUTO') + '</b>');
+    if (st.halted) {
+      parts.push('熔断<b class="pnl-neg">' + (st.haltReason || 'YES') + '</b>');
+    }
+    if (pf.degradedBranches && pf.degradedBranches.length) {
+      parts.push('降级<b>' + pf.degradedBranches.join(',') + '</b>');
+    }
+    $('#pfSessionMetrics').html(parts.join(' · '));
+    var $tb = $('#pfSessionEventBody').empty();
+    var rows = pf.sessionEvents || [];
+    if (!rows.length) {
+      $tb.append($('<tr/>').append($('<td colspan="5" class="empty-state"/>').text('无会话事件')));
+      return;
+    }
+    var cap = Math.min(rows.length, 300);
+    for (var i = 0; i < cap; i++) {
+      var e = rows[i] || {};
+      var $tr = $('<tr/>');
+      $tr.append($('<td/>').text(i + 1));
+      $tr.append($('<td/>').text(e.time || '-'));
+      $tr.append($('<td/>').text(e.type || '-'));
+      $tr.append($('<td/>').text(e.branch || '-'));
+      $tr.append($('<td/>').text(e.detail || '-'));
+      $tb.append($tr);
+    }
   }
 
   function renderPortfolioTradeTable(pf) {
@@ -1905,8 +1953,12 @@
           : (' 相关均值<b>' + num(corr.avgCorrelation, 2) + '</b>'
             + (corr.warn ? '<span class="pnl-neg">（高相关告警）</span>' : ''));
         var eng = pf.engine || (pfSession ? 'session' : 'classic');
+        var st = pf.sessionBranchStats || {};
         var engText = eng === 'session'
-          ? ' 引擎<b>session</b>（等权分账）'
+          ? (' 引擎<b>session</b>（共享资金池'
+            + (st.fillMode ? ' · ' + st.fillMode : '')
+            + (st.halted ? ' · 熔断' : '')
+            + '）')
           : ' 引擎<b>' + eng + '</b>';
         $('#pfMetrics').html(
           '成分股<b>' + codes.length + '</b>' +
@@ -1919,6 +1971,7 @@
         );
         lastEquity = pf;
         setPortfolioResultPanelsVisible(true);
+        renderPortfolioSessionPanel(pf);
         renderEquityChart(pf);
         renderPortfolioTradeTable(pf);
         renderPortfolioStockBreakdown(pf);
