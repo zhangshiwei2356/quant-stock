@@ -1052,8 +1052,8 @@
           <label class="field">初始资金 <span id="pfInitCapitalHint" class="field-hint">(10万)</span>
             <input id="pfInitCapital" type="number" value="100000"/>
           </label>
-          <label class="field">策略 <span class="field-hint">（仅本次回测）</span>
-            <select id="pfStrategyId" title="不影响纸面扫描的 quant.active-strategy">
+          <label class="field">策略 <span class="field-hint">（仅本次；branchScaffold=session 等权分账）</span>
+            <select id="pfStrategyId" title="不影响纸面扫描；分支脚手架走 MIN_1 等权分账旁路，非共享资金池">
               <option value="">加载中…</option>
             </select>
           </label>
@@ -1077,7 +1077,7 @@
           </div>
         </details>
         <p id="backTimeHint" class="hint" style="margin:8px 0 0;"></p>
-        <p class="hint" style="margin:4px 0 0;">日K共享资金池；完整 T+1/分钟撮合以个股回测为准。</p>
+        <p class="hint" style="margin:4px 0 0;">默认日K共享资金池；选 branchScaffold 时为 session 等权分账聚合（非共享池）。</p>
         <div class="metrics" id="pfMetrics" style="margin-top:8px;"></div>
       </section>
       <section class="panel" id="pfEquityPanel" hidden>

@@ -50,6 +50,12 @@ public class PortfolioResultDTO {
     private Map<String, Object> correlation;
     /** ATR 止损/定仓一体契约快照（P0-108，与单股对齐） */
     private Map<String, Object> atrRisk;
+    /** classic | session；session 为等权分账旁路聚合，非共享资金池 */
+    private String engine;
+    /** session 路径：各股降级分支并集 */
+    private List<String> degradedBranches;
+    /** session 路径：分分支统计汇总 */
+    private Map<String, Object> sessionBranchStats;
 
     /** 无有效标的或参数无效时的空结果 */
     public static PortfolioResultDTO empty(BigDecimal init) {
@@ -67,6 +73,9 @@ public class PortfolioResultDTO {
                 .analysisEvents(new ArrayList<AnalysisEvent>())
                 .analysisSummary("")
                 .atrRisk(new LinkedHashMap<String, Object>())
+                .engine("classic")
+                .degradedBranches(new ArrayList<String>())
+                .sessionBranchStats(new LinkedHashMap<String, Object>())
                 .build();
     }
 }

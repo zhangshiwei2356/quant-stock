@@ -1883,6 +1883,8 @@
     };
     var pfStrategyId = ($('#pfStrategyId').val() || '').trim();
     if (pfStrategyId) body.strategyId = pfStrategyId;
+    var pfSession = pfStrategyId && pfStrategyId.toLowerCase() === 'branchscaffold';
+    if (pfSession) body.engine = 'session';
     var pfOv = collectRunOverrides({
       feeRate: '#pfOvFeeRate',
       atrStopMultiplier: '#pfOvAtrStop',
@@ -1902,6 +1904,10 @@
         var corrText = corr.avgCorrelation == null ? ''
           : (' 相关均值<b>' + num(corr.avgCorrelation, 2) + '</b>'
             + (corr.warn ? '<span class="pnl-neg">（高相关告警）</span>' : ''));
+        var eng = pf.engine || (pfSession ? 'session' : 'classic');
+        var engText = eng === 'session'
+          ? ' 引擎<b>session</b>（等权分账）'
+          : ' 引擎<b>' + eng + '</b>';
         $('#pfMetrics').html(
           '成分股<b>' + codes.length + '</b>' +
           ' 期末资产<b>' + num(pf.finalAsset) + '</b>' +
@@ -1909,7 +1915,7 @@
           ' 收益率<b>' + pct(pf.totalRate) + '</b>' +
           ' 最大回撤<b>' + pct(pf.maxDrawDown) + '</b>' +
           ' 买/卖<b>' + (stats.buyCount || 0) + '/' + (stats.sellCount || 0) + '</b>' +
-          ' 胜率<b>' + pct(pf.winRate) + '</b>' + corrText
+          ' 胜率<b>' + pct(pf.winRate) + '</b>' + engText + corrText
         );
         lastEquity = pf;
         setPortfolioResultPanelsVisible(true);

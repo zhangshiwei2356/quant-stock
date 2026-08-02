@@ -2,7 +2,9 @@ package com.quant.stock.backtest;
 
 import com.quant.stock.admin.EffectiveParamsService;
 import com.quant.stock.admin.ParamsScope;
+import com.quant.stock.backtest.dto.AnalysisEvent;
 import com.quant.stock.backtest.dto.BackTestQueryDTO;
+import com.quant.stock.backtest.dto.BackTestResult;
 import com.quant.stock.backtest.dto.BackTradeRecord;
 import com.quant.stock.backtest.dto.PortfolioResultDTO;
 import com.quant.stock.backtest.dto.SingleStockBackResult;
@@ -23,6 +25,9 @@ import com.quant.stock.risk.LimitPriceProtect;
 import com.quant.stock.risk.StopFillPrice;
 import com.quant.stock.risk.StressScenarioService;
 import com.quant.stock.risk.StructuralBreakMonitor;
+import com.quant.stock.session.BranchScaffoldStrategy;
+import com.quant.stock.session.SessionBackTestEngine;
+import com.quant.stock.session.SessionStrategy;
 import com.quant.stock.strategy.BaseStrategy;
 import com.quant.stock.strategy.IndicatorSignalUtil;
 import com.quant.stock.strategy.StrategyRegistry;
@@ -43,8 +48,13 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
@@ -66,14 +76,15 @@ public class PortfolioBackTestEngine {
     private final OpenFilterService openFilterService;
     private final StrategyRegistry strategyRegistry;
     private final TradingCalendar tradingCalendar;
+    private final SessionBackTestEngine sessionBackTestEngine;
 
     private QuantProperties p() {
         return ParamsScope.current(props);
     }
 
     /**
-     * 组合回测：拉取多标的日 K、对齐时间轴、共享资金池撮合。
-     * 可选 {@link BackTestQueryDTO#getStrategyId()}，缺省用当前激活策略。
+     * 组合回测：默认日 K 共享资金池；{@code engine=session} 或策略 {@code branchScaffold}
+     * 时为 MIN_1 等权分账旁路（各股独立会话回测后聚合，非共享资金池）。
      */
     public PortfolioResultDTO run(BackTestQueryDTO query) {
         BaseStrategy strategy = strategyRegistry.resolve(
@@ -81,12 +92,254 @@ public class PortfolioBackTestEngine {
         java.util.Map<String, String> overrides = query == null ? null
                 : com.quant.stock.admin.RunParamOverrides.normalize(query.getParamOverrides());
         QuantProperties effective = effectiveParamsService.resolve(strategy.name(), overrides);
+        final String engine = resolveEngine(query, strategy);
         return ParamsScope.call(effective, new java.util.concurrent.Callable<PortfolioResultDTO>() {
             @Override
             public PortfolioResultDTO call() {
-                return runScoped(query, strategy);
+                if ("session".equals(engine)) {
+                    return runSessionScoped(query, strategy);
+                }
+                PortfolioResultDTO r = runScoped(query, strategy);
+                if (r.getEngine() == null) {
+                    r.setEngine("classic");
+                }
+                return r;
             }
         });
+    }
+
+    static String resolveEngine(BackTestQueryDTO query, BaseStrategy strategy) {
+        String raw = query == null ? null : query.getEngine();
+        if (raw != null && !raw.trim().isEmpty()) {
+            String e = raw.trim().toLowerCase(Locale.ROOT);
+            if ("session".equals(e) || "classic".equals(e)) {
+                return e;
+            }
+            throw new IllegalArgumentException("engine 仅支持 classic|session，当前=" + raw);
+        }
+        if (strategy instanceof SessionStrategy
+                || (strategy != null && BranchScaffoldStrategy.ID.equalsIgnoreCase(strategy.name()))) {
+            return "session";
+        }
+        return "classic";
+    }
+
+    /**
+     * session 组合旁路：初始资金等权分给各成分股，各自跑 {@link SessionBackTestEngine}，再聚合权益/成交。
+     */
+    private PortfolioResultDTO runSessionScoped(BackTestQueryDTO query, BaseStrategy strategy) {
+        BigDecimal initCapital = query == null || query.getInitCapital() == null
+                ? new BigDecimal("100000") : query.getInitCapital();
+        BigDecimal commissionRate = query != null && query.getFeeRate() != null
+                ? query.getFeeRate() : p().getFeeRate();
+        String fingerprint = ConfigFingerprint.of(p(), strategy.fingerprintId(), commissionRate)
+                + "|pfSess";
+        if (!(strategy instanceof SessionStrategy)) {
+            throw new IllegalArgumentException("engine=session 需要 SessionStrategy，当前="
+                    + (strategy == null ? "null" : strategy.name()));
+        }
+        if (query == null || query.getStockCodeList() == null || query.getStockCodeList().isEmpty()) {
+            PortfolioResultDTO empty = PortfolioResultDTO.empty(BigDecimal.ZERO);
+            empty.setEngine("session");
+            empty.setConfigFingerprint(fingerprint);
+            return empty;
+        }
+        List<String> codes = new ArrayList<String>();
+        for (String c : query.getStockCodeList()) {
+            if (c != null && !c.trim().isEmpty()) {
+                codes.add(c.trim());
+            }
+        }
+        if (codes.isEmpty()) {
+            PortfolioResultDTO empty = PortfolioResultDTO.empty(initCapital);
+            empty.setEngine("session");
+            empty.setConfigFingerprint(fingerprint);
+            return empty;
+        }
+        boolean failDep = query.getFailOnMissingDep() != null && query.getFailOnMissingDep().booleanValue();
+        int n = codes.size();
+        BigDecimal slice = initCapital.divide(BigDecimal.valueOf(n), 2, RoundingMode.DOWN);
+        BigDecimal allocated = BigDecimal.ZERO;
+        List<BackTestResult> parts = new ArrayList<BackTestResult>();
+        List<SingleStockBackResult> stockResults = new ArrayList<SingleStockBackResult>();
+        List<BackTradeRecord> trades = new ArrayList<BackTradeRecord>();
+        List<AnalysisEvent> analysis = new ArrayList<AnalysisEvent>();
+        Set<String> degraded = new LinkedHashSet<String>();
+        Map<String, TreeMap<String, BigDecimal>> equityByCode = new LinkedHashMap<String, TreeMap<String, BigDecimal>>();
+        Map<String, Object> branchAgg = new LinkedHashMap<String, Object>();
+        branchAgg.put("mode", "EQUAL_SPLIT_SESSION");
+        branchAgg.put("legs", n);
+
+        for (int i = 0; i < n; i++) {
+            String code = codes.get(i);
+            BigDecimal cap = (i == n - 1) ? initCapital.subtract(allocated) : slice;
+            allocated = allocated.add(cap);
+            BackTestResult one = sessionBackTestEngine.run(
+                    code, query.getBackStart(), query.getBackEnd(), cap,
+                    (SessionStrategy) strategy, failDep);
+            parts.add(one);
+            stockResults.add(SingleStockBackResult.builder()
+                    .stockCode(code)
+                    .totalRate(one.getTotalRate())
+                    .maxDrawDown(one.getMaxDrawDown())
+                    .totalTradeNum(one.getTotalTradeNum())
+                    .winRate(one.getWinRate())
+                    .finalAsset(one.getFinalAsset())
+                    .build());
+            if (one.getTrades() != null) {
+                trades.addAll(one.getTrades());
+            }
+            if (one.getAnalysisEvents() != null) {
+                analysis.addAll(one.getAnalysisEvents());
+            }
+            if (one.getDegradedBranches() != null) {
+                degraded.addAll(one.getDegradedBranches());
+            }
+            TreeMap<String, BigDecimal> series = new TreeMap<String, BigDecimal>();
+            List<String> times = one.getEquityTimes();
+            List<BigDecimal> curve = one.getEquityCurve();
+            if (times != null && curve != null) {
+                int m = Math.min(times.size(), curve.size());
+                for (int t = 0; t < m; t++) {
+                    if (times.get(t) != null && curve.get(t) != null) {
+                        series.put(times.get(t), curve.get(t));
+                    }
+                }
+            }
+            equityByCode.put(code, series);
+            if (one.getSessionBranchStats() != null) {
+                branchAgg.put(code, one.getSessionBranchStats());
+            }
+        }
+
+        trades.sort(new Comparator<BackTradeRecord>() {
+            @Override
+            public int compare(BackTradeRecord a, BackTradeRecord b) {
+                if (a == null || a.getTradeTime() == null) {
+                    return 1;
+                }
+                if (b == null || b.getTradeTime() == null) {
+                    return -1;
+                }
+                return a.getTradeTime().compareTo(b.getTradeTime());
+            }
+        });
+
+        List<String> equityTimes = new ArrayList<String>();
+        List<BigDecimal> equityCurve = new ArrayList<BigDecimal>();
+        mergeEquityForwardFill(equityByCode, equityTimes, equityCurve);
+
+        BigDecimal finalAsset = initCapital;
+        if (!equityCurve.isEmpty()) {
+            finalAsset = equityCurve.get(equityCurve.size() - 1);
+        } else {
+            finalAsset = BigDecimal.ZERO;
+            for (BackTestResult one : parts) {
+                if (one.getFinalAsset() != null) {
+                    finalAsset = finalAsset.add(one.getFinalAsset());
+                }
+            }
+        }
+        BigDecimal totalRate = initCapital.signum() == 0 ? BigDecimal.ZERO
+                : finalAsset.subtract(initCapital).divide(initCapital, 6, RoundingMode.HALF_UP);
+        BigDecimal maxDd = maxDrawdownOf(equityCurve);
+        BigDecimal winRate = weightedWinRate(parts);
+
+        String summary = String.format(Locale.ROOT,
+                "engine=session equalSplit legs=%d init=%s final=%s trades=%d degraded=%s",
+                n, initCapital, finalAsset, trades.size(), degraded);
+
+        return PortfolioResultDTO.builder()
+                .initCapital(initCapital)
+                .finalAsset(finalAsset)
+                .totalRate(totalRate)
+                .maxDrawDown(maxDd)
+                .totalTradeNum(trades.size())
+                .winRate(winRate)
+                .equityTimes(equityTimes)
+                .equityCurve(equityCurve)
+                .stockResults(stockResults)
+                .trades(trades)
+                .analysisEvents(analysis.size() > 800 ? analysis.subList(0, 800) : analysis)
+                .analysisSummary(summary)
+                .configFingerprint(fingerprint)
+                .correlation(new LinkedHashMap<String, Object>())
+                .atrRisk(new LinkedHashMap<String, Object>())
+                .engine("session")
+                .degradedBranches(new ArrayList<String>(degraded))
+                .sessionBranchStats(branchAgg)
+                .build();
+    }
+
+    private static BigDecimal weightedWinRate(List<BackTestResult> parts) {
+        BigDecimal wSum = BigDecimal.ZERO;
+        int weight = 0;
+        if (parts == null) {
+            return BigDecimal.ZERO;
+        }
+        for (BackTestResult one : parts) {
+            if (one == null || one.getWinRate() == null) {
+                continue;
+            }
+            int t = one.getTotalTradeNum() == null ? 0 : one.getTotalTradeNum().intValue();
+            int w = Math.max(t, 1);
+            wSum = wSum.add(one.getWinRate().multiply(BigDecimal.valueOf(w)));
+            weight += w;
+        }
+        if (weight <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return wSum.divide(BigDecimal.valueOf(weight), 4, RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal maxDrawdownOf(List<BigDecimal> curve) {
+        if (curve == null || curve.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal peak = curve.get(0);
+        BigDecimal maxDd = BigDecimal.ZERO;
+        for (BigDecimal eq : curve) {
+            if (eq == null) {
+                continue;
+            }
+            if (eq.compareTo(peak) > 0) {
+                peak = eq;
+            }
+            if (peak.signum() > 0) {
+                BigDecimal dd = peak.subtract(eq).divide(peak, 6, RoundingMode.HALF_UP);
+                if (dd.compareTo(maxDd) > 0) {
+                    maxDd = dd;
+                }
+            }
+        }
+        return maxDd;
+    }
+
+    private static void mergeEquityForwardFill(Map<String, TreeMap<String, BigDecimal>> byCode,
+                                               List<String> outTimes, List<BigDecimal> outCurve) {
+        TreeSet<String> all = new TreeSet<String>();
+        for (TreeMap<String, BigDecimal> s : byCode.values()) {
+            all.addAll(s.keySet());
+        }
+        Map<String, BigDecimal> last = new HashMap<String, BigDecimal>();
+        for (String code : byCode.keySet()) {
+            last.put(code, BigDecimal.ZERO);
+        }
+        for (String t : all) {
+            BigDecimal sum = BigDecimal.ZERO;
+            for (Map.Entry<String, TreeMap<String, BigDecimal>> e : byCode.entrySet()) {
+                BigDecimal v = e.getValue().get(t);
+                if (v != null) {
+                    last.put(e.getKey(), v);
+                }
+                BigDecimal cur = last.get(e.getKey());
+                if (cur != null) {
+                    sum = sum.add(cur);
+                }
+            }
+            outTimes.add(t);
+            outCurve.add(sum);
+        }
     }
 
     private PortfolioResultDTO runScoped(BackTestQueryDTO query, BaseStrategy strategy) {

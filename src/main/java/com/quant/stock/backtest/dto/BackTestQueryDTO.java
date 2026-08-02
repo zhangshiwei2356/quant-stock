@@ -43,4 +43,11 @@ public class BackTestQueryDTO {
      * 叠在策略包之上，不落库、不影响运维全局。
      */
     private Map<String, String> paramOverrides;
+    /**
+     * 引擎：{@code classic}（默认共享资金池日 K）或 {@code session}（MIN_1 等权分账聚合）。
+     * 空则：策略为 {@code branchScaffold} 时 session，否则 classic。
+     */
+    private String engine;
+    /** session 引擎：缺依赖是否整单失败；默认 false */
+    private Boolean failOnMissingDep;
 }

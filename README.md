@@ -153,7 +153,8 @@ sequenceDiagram
 | 回测工作台 | **仅从目标池**多选成分股、共享资金池、强制日 K |
 | 回测历史 | 组合历史与分析 |
 
-引擎：`PortfolioBackTestEngine`；展示权益、成交流水、分股表现。
+引擎：`PortfolioBackTestEngine`（默认日 K **共享资金池**）。  
+`engine=session` 或策略 `branchScaffold`：MIN_1 **等权分账**旁路（各股独立会话回测后聚合权益/成交，非共享池）；结果含 `engine` / `sessionBranchStats`。
 
 ### 4. 目标池（唯一池）
 
@@ -250,7 +251,7 @@ sequenceDiagram
 | GET `/api/stock/pool` | 标的/股票池 |
 | GET `/api/kline?code=&period=` | 统一周期 K 线 |
 | GET `/api/backtest/run` | 单只回测；可选 `engine=classic\|session`、`failOnMissingDep`、`paramOverrides`（JSON，白名单临时改参，不落库） |
-| POST `/api/portfolio/run` | 组合回测；body 可选 `paramOverrides`（同上） |
+| POST `/api/portfolio/run` | 组合回测；可选 `engine`、`paramOverrides`、`failOnMissingDep`（session=等权分账） |
 | GET `/api/backtest/history` · `/analysis` | 个股历史与分析 |
 | GET `/api/batch/scanAllStock` | 批量扫描 |
 | GET `/api/portfolio/history` · `/analysis` | 组合历史与分析 |
