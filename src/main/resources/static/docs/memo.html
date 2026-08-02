@@ -40,7 +40,7 @@
     <li><b>按策略隔离的参数包</b> — 已落地 · 表 <code>strategy_param</code> 稀疏 JSON；叠层 yml → <code>quant.prop.*</code> → 策略包；运维可选策略编辑；纸面/回测 <code>ParamsScope</code> 生效快照；画像有包则过滤改读快照</li>
     <li><b>回测本次表单临时改参</b> — 已落地 · 个股 <code>paramOverrides</code> JSON / 组合 body 字段；白名单同运维可写键；叠在策略包之上、不落库；费用/仓位工具读 <code>ParamsScope</code></li>
     <li><b>全局激活策略的安全切换</b> — 已落地 · 运维确认后 <code>POST /api/ops/active-strategy</code>；写 <code>system_config</code> 并热更新；影响纸面扫描，不影响回测下拉</li>
-    <li><b>分钟级/多分支策略引擎适配</b> — 回测/纸面/组合旁路已落地 · <code>SessionBackTestEngine</code> / <code>SessionPaperAdaptor</code>；组合 <code>engine=session</code> 为 <b>等权分账</b>聚合（非共享资金池）；脚手架不下单；金叉经典路径不变；<strong>隔日高开公式不实现</strong></li>
+    <li><b>分钟级/多分支策略引擎适配</b> — 回测/纸面/组合旁路已落地 · <code>SessionBackTestEngine</code> / <code>SessionPaperAdaptor</code>；成交默认 <code>fill-mode=AUTO</code>（对齐经典次日≥09:45 开盘，可切 <code>BAR_CLOSE</code>）；组合 <code>engine=session</code> 为 <b>等权分账</b>聚合（非共享资金池）；脚手架不下单；金叉经典路径不变；<strong>隔日高开公式不实现</strong></li>
     <li><b>候选策略入库（仅规划，不实现）</b> — 待办 · 「全时段隔日高开套利复合策略」（早盘/盘中/尾盘三分支、隔日持有最长 2 日等）文档已备；待多策略能力与数据条件就绪后再单独立项接入，<strong>禁止</strong>塞进 <code>MaCrossStrategy</code></li>
     <li><b>明确不做（本阶段）</b> — 多策略并行分账本、信号合成冲突裁决、按策略拆目标池、运维「CRUD 编辑买卖公式」菜单</li>
   </ol>

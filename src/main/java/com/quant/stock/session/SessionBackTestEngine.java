@@ -5,6 +5,7 @@ import com.quant.stock.backtest.dto.AnalysisEvent;
 import com.quant.stock.backtest.dto.BackTestResult;
 import com.quant.stock.backtest.dto.BackTradeRecord;
 import com.quant.stock.admin.ParamsScope;
+import com.quant.stock.backtest.FillTimingHelper;
 import com.quant.stock.config.ConfigFingerprint;
 import com.quant.stock.config.QuantProperties;
 import com.quant.stock.market.BarPeriod;
@@ -44,6 +45,27 @@ public class SessionBackTestEngine {
 
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final int MIN_BARS = 30;
+    private static final int PENDING_BUY_EXPIRE_DAYS = 5;
+
+    /** 会话挂单（NEXT_EFFECTIVE 模式）。 */
+    private static final class PendingOrder {
+        final SessionOrderIntent.Side side;
+        final int volume;
+        final LocalDate signalDay;
+        final SessionBranch signalBranch;
+        final String reason;
+        final boolean bypassCap;
+
+        PendingOrder(SessionOrderIntent.Side side, int volume, LocalDate signalDay,
+                     SessionBranch signalBranch, String reason, boolean bypassCap) {
+            this.side = side;
+            this.volume = volume;
+            this.signalDay = signalDay;
+            this.signalBranch = signalBranch;
+            this.reason = reason;
+            this.bypassCap = bypassCap;
+        }
+    }
 
     private final MarketDataService marketDataService;
     private final SessionDepProbe depProbe;
@@ -66,7 +88,8 @@ public class SessionBackTestEngine {
         SessionWindows windows = SessionWindows.from(cfg);
         QuantProperties.Session sessCfg = cfg.getSession() == null ? new QuantProperties.Session() : cfg.getSession();
         boolean matchingEnabled = sessCfg.isMatchingEnabled();
-        String fillMode = sessCfg.getFillMode() == null ? "BAR_CLOSE" : sessCfg.getFillMode().trim();
+        String fillMode = resolveFillMode(cfg, sessCfg);
+        boolean nextEffective = isNextEffective(fillMode);
         String fingerprint = sessionFingerprint(cfg, strategy.sessionId(), failOnMissingDep, windows,
                 matchingEnabled, fillMode);
 
@@ -118,6 +141,8 @@ public class SessionBackTestEngine {
         int closedRounds = 0;
         List<String> equityTimes = new ArrayList<String>();
         List<BigDecimal> equityCurve = new ArrayList<BigDecimal>();
+        List<PendingOrder> pendingBuys = new ArrayList<PendingOrder>();
+        List<PendingOrder> pendingSells = new ArrayList<PendingOrder>();
 
         for (int i = 0; i < bars.size(); i++) {
             BarDTO bar = bars.get(i);
@@ -133,6 +158,14 @@ public class SessionBackTestEngine {
                 continue;
             }
             LocalDate day = bar.getBarBegin().toLocalDate();
+
+            // NEXT_EFFECTIVE：先撮合到期挂单（对齐经典次日≥09:45 开盘）
+            if (nextEffective && matchingEnabled) {
+                cash = tryFillPendings(stockCode, bars, i, day, branch, cash, pos, events, trades,
+                        buyMarks, sellMarks, stats, pendingBuys, pendingSells, fillMode);
+                hold = syncHold(hold, pos);
+            }
+
             boolean newDay = currentDay == null || !currentDay.equals(day);
             if (newDay) {
                 if (currentDay != null && lastBarOfDay != null) {
@@ -141,8 +174,9 @@ public class SessionBackTestEngine {
                             lastBarIndexOfDay, hold, eqClose, cash, pos, degraded, matchingEnabled);
                     strategy.onSessionClose(closeCtx, events);
                     hold = closeCtx.getHoldState() == null ? hold : closeCtx.getHoldState();
-                    cash = fillIntents(strategy, closeCtx, bars, lastBarIndexOfDay, cash, pos, events, trades,
-                            buyMarks, sellMarks, stats, matchingEnabled, fillMode);
+                    cash = acceptIntents(strategy, closeCtx, bars, lastBarIndexOfDay, cash, pos, events, trades,
+                            buyMarks, sellMarks, stats, matchingEnabled, fillMode, nextEffective,
+                            pendingBuys, pendingSells);
                     hold = syncHold(hold, pos);
                 }
                 currentDay = day;
@@ -154,8 +188,9 @@ public class SessionBackTestEngine {
                         degraded, matchingEnabled);
                 strategy.onSessionOpen(openCtx, events);
                 hold = openCtx.getHoldState() == null ? hold : openCtx.getHoldState();
-                cash = fillIntents(strategy, openCtx, bars, i, cash, pos, events, trades,
-                        buyMarks, sellMarks, stats, matchingEnabled, fillMode);
+                cash = acceptIntents(strategy, openCtx, bars, i, cash, pos, events, trades,
+                        buyMarks, sellMarks, stats, matchingEnabled, fillMode, nextEffective,
+                        pendingBuys, pendingSells);
                 hold = syncHold(hold, pos);
             }
             lastBarOfDay = bar;
@@ -183,8 +218,9 @@ public class SessionBackTestEngine {
                 if (runBranch) {
                     strategy.onBranchBar(ctx, events);
                     hold = ctx.getHoldState() == null ? hold : ctx.getHoldState();
-                    cash = fillIntents(strategy, ctx, bars, i, cash, pos, events, trades,
-                            buyMarks, sellMarks, stats, matchingEnabled, fillMode);
+                    cash = acceptIntents(strategy, ctx, bars, i, cash, pos, events, trades,
+                            buyMarks, sellMarks, stats, matchingEnabled, fillMode, nextEffective,
+                            pendingBuys, pendingSells);
                     hold = syncHold(hold, pos);
                 }
             }
@@ -209,8 +245,9 @@ public class SessionBackTestEngine {
             SessionContext closeCtx = baseCtx(stockCode, currentDay, SessionBranch.CLOSE, lastBarOfDay,
                     lastBarIndexOfDay, hold, eqClose, cash, pos, degraded, matchingEnabled);
             strategy.onSessionClose(closeCtx, events);
-            cash = fillIntents(strategy, closeCtx, bars, lastBarIndexOfDay, cash, pos, events, trades,
-                    buyMarks, sellMarks, stats, matchingEnabled, fillMode);
+            cash = acceptIntents(strategy, closeCtx, bars, lastBarIndexOfDay, cash, pos, events, trades,
+                    buyMarks, sellMarks, stats, matchingEnabled, fillMode, nextEffective,
+                    pendingBuys, pendingSells);
             hold = syncHold(hold, pos);
         }
 
@@ -273,11 +310,29 @@ public class SessionBackTestEngine {
                 .build();
     }
 
-    private BigDecimal fillIntents(SessionStrategy strategy, SessionContext ctx, List<BarDTO> bars, int index,
-                                   BigDecimal cash, PositionState pos, List<SessionEvent> events,
-                                   List<BackTradeRecord> trades, List<BackTestResult.MarkPoint> buyMarks,
-                                   List<BackTestResult.MarkPoint> sellMarks, BranchStatsAcc stats,
-                                   boolean matchingEnabled, String fillMode) {
+    static String resolveFillMode(QuantProperties cfg, QuantProperties.Session sessCfg) {
+        String raw = sessCfg == null || sessCfg.getFillMode() == null ? "AUTO" : sessCfg.getFillMode().trim();
+        if (raw.isEmpty() || "AUTO".equalsIgnoreCase(raw)) {
+            boolean next = cfg == null || cfg.isNextBarOpenFill();
+            return next ? "NEXT_EFFECTIVE" : "BAR_CLOSE";
+        }
+        if ("NEXT_EFFECTIVE".equalsIgnoreCase(raw) || "CLASSIC".equalsIgnoreCase(raw)
+                || "NEXT_BAR".equalsIgnoreCase(raw)) {
+            return "NEXT_EFFECTIVE";
+        }
+        return "BAR_CLOSE";
+    }
+
+    static boolean isNextEffective(String fillMode) {
+        return "NEXT_EFFECTIVE".equalsIgnoreCase(fillMode);
+    }
+
+    private BigDecimal acceptIntents(SessionStrategy strategy, SessionContext ctx, List<BarDTO> bars, int index,
+                                     BigDecimal cash, PositionState pos, List<SessionEvent> events,
+                                     List<BackTradeRecord> trades, List<BackTestResult.MarkPoint> buyMarks,
+                                     List<BackTestResult.MarkPoint> sellMarks, BranchStatsAcc stats,
+                                     boolean matchingEnabled, String fillMode, boolean nextEffective,
+                                     List<PendingOrder> pendingBuys, List<PendingOrder> pendingSells) {
         if (!matchingEnabled || strategy == null || ctx == null || ctx.isBranchDegraded()) {
             return cash;
         }
@@ -290,12 +345,15 @@ public class SessionBackTestEngine {
             if (intent == null || intent.getSide() == null) {
                 continue;
             }
-            if (intent.getSide() == SessionOrderIntent.Side.BUY) {
-                cashNow = fillBuy(intent, ctx, bars, index, cashNow, pos, events, trades, buyMarks, stats, fillMode);
+            if (nextEffective) {
+                enqueueIntent(intent, ctx, cashNow, events, pendingBuys, pendingSells);
+            } else if (intent.getSide() == SessionOrderIntent.Side.BUY) {
+                cashNow = executeBuy(intent, ctx, bars, index, cashNow, pos, events, trades, buyMarks, stats,
+                        fillMode, false);
             } else {
-                cashNow = fillSell(intent, ctx, bars, index, cashNow, pos, events, trades, sellMarks, stats, fillMode);
+                cashNow = executeSell(intent, ctx, bars, index, cashNow, pos, events, trades, sellMarks, stats,
+                        fillMode, false);
             }
-            // 刷新 ctx 仓位视图供后续意图
             ctx.setCash(cashNow);
             ctx.setPositionShares(pos.getShares());
             ctx.setSellableShares(pos.sellableShares(ctx.getSessionDay()));
@@ -304,15 +362,128 @@ public class SessionBackTestEngine {
         return cashNow;
     }
 
-    private BigDecimal fillBuy(SessionOrderIntent intent, SessionContext ctx, List<BarDTO> bars, int index,
-                               BigDecimal cash, PositionState pos, List<SessionEvent> events,
-                               List<BackTradeRecord> trades, List<BackTestResult.MarkPoint> buyMarks,
-                               BranchStatsAcc stats, String fillMode) {
-        BarDTO bar = ctx.getBar();
-        if (bar == null || bar.getClose() == null || cash == null) {
+    private void enqueueIntent(SessionOrderIntent intent, SessionContext ctx, BigDecimal cash,
+                               List<SessionEvent> events, List<PendingOrder> pendingBuys,
+                               List<PendingOrder> pendingSells) {
+        if (intent.getSide() == SessionOrderIntent.Side.BUY) {
+            if (ctx.getPositionShares() > 0) {
+                return;
+            }
+            for (PendingOrder p : pendingBuys) {
+                if (p != null) {
+                    return; // 已有挂买
+                }
+            }
+            BigDecimal ref = ctx.getBar() != null && ctx.getBar().getClose() != null
+                    ? ctx.getBar().getClose() : BigDecimal.ONE;
+            int vol = intent.getVolume();
+            if (vol <= 0) {
+                vol = positionAmountUtil.calcBuyVolume(cash, ref, p().getBaseAtr());
+            }
+            vol = (vol / 100) * 100;
+            if (vol < 100) {
+                events.add(ev(ctx, "REJECT_BUY", "挂单量不足一手；" + nullToEmpty(intent.getReason())));
+                return;
+            }
+            pendingBuys.add(new PendingOrder(SessionOrderIntent.Side.BUY, vol, ctx.getSessionDay(),
+                    ctx.getBranch(), intent.getReason(), intent.isBypassParticipationCap()));
+            events.add(ev(ctx, "PEND_BUY", "vol=" + vol + " 待次日≥09:45开盘；" + nullToEmpty(intent.getReason())));
+        } else {
+            if (ctx.getPositionShares() <= 0) {
+                return;
+            }
+            if (!pendingSells.isEmpty()) {
+                return;
+            }
+            int vol = intent.getVolume();
+            pendingSells.add(new PendingOrder(SessionOrderIntent.Side.SELL, vol, ctx.getSessionDay(),
+                    ctx.getBranch(), intent.getReason(), intent.isBypassParticipationCap()));
+            events.add(ev(ctx, "PEND_SELL", "待次日≥09:45开盘；" + nullToEmpty(intent.getReason())));
+        }
+    }
+
+    private BigDecimal tryFillPendings(String stockCode, List<BarDTO> bars, int index, LocalDate tradeDay,
+                                       SessionBranch branch, BigDecimal cash, PositionState pos,
+                                       List<SessionEvent> events, List<BackTradeRecord> trades,
+                                       List<BackTestResult.MarkPoint> buyMarks,
+                                       List<BackTestResult.MarkPoint> sellMarks, BranchStatsAcc stats,
+                                       List<PendingOrder> pendingBuys, List<PendingOrder> pendingSells,
+                                       String fillMode) {
+        if (!FillTimingHelper.canFillPendingOnBar(bars, index)) {
             return cash;
         }
-        BigDecimal base = bar.getClose();
+        // 过期挂买
+        java.util.Iterator<PendingOrder> it = pendingBuys.iterator();
+        while (it.hasNext()) {
+            PendingOrder p = it.next();
+            if (p.signalDay != null && tradeDay.isAfter(p.signalDay.plusDays(PENDING_BUY_EXPIRE_DAYS))) {
+                events.add(SessionEvent.builder()
+                        .time(FMT.format(bars.get(index).getBarBegin()))
+                        .type("EXPIRE_BUY")
+                        .branch(branch == null ? null : branch.name())
+                        .detail("挂买超过 " + PENDING_BUY_EXPIRE_DAYS + " 日历日")
+                        .build());
+                it.remove();
+            }
+        }
+        SessionContext fillCtx = baseCtx(stockCode, tradeDay, branch, bars.get(index), index,
+                HoldDayState.FLAT, markEquity(cash, pos, bars.get(index)), cash, pos,
+                java.util.Collections.<SessionBranch>emptySet(), true);
+        // 先卖后买；仅成交成功才清挂单（拒单保留待下一可撮合分钟或过期）
+        if (!pendingSells.isEmpty()) {
+            PendingOrder ps = pendingSells.get(0);
+            if (ps.signalDay != null && tradeDay.isAfter(ps.signalDay)) {
+                SessionOrderIntent intent = SessionOrderIntent.builder()
+                        .side(SessionOrderIntent.Side.SELL)
+                        .volume(ps.volume)
+                        .reason(ps.reason)
+                        .bypassParticipationCap(ps.bypassCap)
+                        .build();
+                fillCtx.setBranch(ps.signalBranch != null ? ps.signalBranch : branch);
+                int before = trades.size();
+                cash = executeSell(intent, fillCtx, bars, index, cash, pos, events, trades, sellMarks, stats,
+                        fillMode, true);
+                if (trades.size() > before) {
+                    pendingSells.clear();
+                }
+            }
+        }
+        if (!pendingBuys.isEmpty() && !pos.hasPosition()) {
+            PendingOrder pb = pendingBuys.get(0);
+            if (pb.signalDay != null && tradeDay.isAfter(pb.signalDay)) {
+                SessionOrderIntent intent = SessionOrderIntent.builder()
+                        .side(SessionOrderIntent.Side.BUY)
+                        .volume(pb.volume)
+                        .reason(pb.reason)
+                        .bypassParticipationCap(pb.bypassCap)
+                        .build();
+                fillCtx.setCash(cash);
+                fillCtx.setBranch(pb.signalBranch != null ? pb.signalBranch : branch);
+                int before = trades.size();
+                cash = executeBuy(intent, fillCtx, bars, index, cash, pos, events, trades, buyMarks, stats,
+                        fillMode, true);
+                if (trades.size() > before) {
+                    pendingBuys.clear();
+                }
+            }
+        }
+        return cash;
+    }
+
+    private BigDecimal executeBuy(SessionOrderIntent intent, SessionContext ctx, List<BarDTO> bars, int index,
+                                  BigDecimal cash, PositionState pos, List<SessionEvent> events,
+                                  List<BackTradeRecord> trades, List<BackTestResult.MarkPoint> buyMarks,
+                                  BranchStatsAcc stats, String fillMode, boolean useOpen) {
+        BarDTO bar = ctx.getBar();
+        if (bar == null || cash == null) {
+            return cash;
+        }
+        BigDecimal base = useOpen
+                ? (bar.getOpen() != null ? bar.getOpen() : bar.getClose())
+                : bar.getClose();
+        if (base == null) {
+            return cash;
+        }
         int vol = intent.getVolume();
         if (vol <= 0) {
             vol = positionAmountUtil.calcBuyVolume(cash, base, p().getBaseAtr());
@@ -365,16 +536,23 @@ public class SessionBackTestEngine {
         buyMarks.add(BackTestResult.MarkPoint.builder().time(FMT.format(bar.getBarBegin())).price(deal).build());
         stats.buy(ctx.getBranch(), amount);
         events.add(ev(ctx, "FILL_BUY", "vol=" + vol + " px=" + deal + " fee=" + fee
-                + " mode=" + fillMode + " " + nullToEmpty(intent.getReason())));
+                + " mode=" + fillMode + (useOpen ? " open" : " close")
+                + " " + nullToEmpty(intent.getReason())));
         return cash;
     }
 
-    private BigDecimal fillSell(SessionOrderIntent intent, SessionContext ctx, List<BarDTO> bars, int index,
-                                BigDecimal cash, PositionState pos, List<SessionEvent> events,
-                                List<BackTradeRecord> trades, List<BackTestResult.MarkPoint> sellMarks,
-                                BranchStatsAcc stats, String fillMode) {
+    private BigDecimal executeSell(SessionOrderIntent intent, SessionContext ctx, List<BarDTO> bars, int index,
+                                   BigDecimal cash, PositionState pos, List<SessionEvent> events,
+                                   List<BackTradeRecord> trades, List<BackTestResult.MarkPoint> sellMarks,
+                                   BranchStatsAcc stats, String fillMode, boolean useOpen) {
         BarDTO bar = ctx.getBar();
-        if (bar == null || bar.getClose() == null || !pos.hasPosition()) {
+        if (bar == null || !pos.hasPosition()) {
+            return cash;
+        }
+        BigDecimal base = useOpen
+                ? (bar.getOpen() != null ? bar.getOpen() : bar.getClose())
+                : bar.getClose();
+        if (base == null) {
             return cash;
         }
         int sellable = pos.sellableShares(ctx.getSessionDay());
@@ -392,7 +570,6 @@ public class SessionBackTestEngine {
                 return cash;
             }
         }
-        BigDecimal base = bar.getClose();
         BigDecimal deal = tradeCostModel.sellPrice(base, bars, index, vol);
         BigDecimal prev = prevClose(bars, index);
         if (p().isLimitPriceProtectEnabled()) {
@@ -416,7 +593,8 @@ public class SessionBackTestEngine {
         stats.sell(ctx.getBranch(), amount, pnl);
         events.add(ev(ctx, "FILL_SELL", "vol=" + vol + " px=" + deal + " fee=" + fee
                 + " pnl=" + pnl.setScale(2, RoundingMode.HALF_UP)
-                + " mode=" + fillMode + " " + nullToEmpty(intent.getReason())));
+                + " mode=" + fillMode + (useOpen ? " open" : " close")
+                + " " + nullToEmpty(intent.getReason())));
         return cash;
     }
 

@@ -232,7 +232,7 @@
     var parts = [];
     parts.push('天数<b>' + (st.sessionDays != null ? st.sessionDays : '-') + '</b>');
     parts.push('撮合<b>' + (st.matchingEnabled === false ? '关' : '开') + '</b>');
-    parts.push('成交价<b>' + (st.fillMode || 'BAR_CLOSE') + '</b>');
+    parts.push('成交模式<b>' + (st.fillMode || 'AUTO') + '</b>');
     ['OPEN', 'MID', 'CLOSE'].forEach(function (b) {
       var m = st[b] || {};
       parts.push(b + ' tick<b>' + (m.branchTicks || 0) + '</b>'

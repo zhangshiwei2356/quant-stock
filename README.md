@@ -143,8 +143,8 @@ sequenceDiagram
 | 回测历史 | 落盘记录与分析；可跨股查看 |
 
 引擎默认 `BackTestEngine`（`engine=classic`：次日开盘撮合、止损/移动止盈、金字塔、T+1 分档、账户熔断）。  
-可选旁路 **`SessionBackTestEngine`**（`engine=session` 或策略 `branchScaffold`）：强制 **MIN_1** 三分支（OPEN/MID/CLOSE，窗口见 `quant.session.*`）+ 持仓日态事件 + **撮合子集**（`pollIntents` → 费用/T+1/涨跌停夹紧/ADV；成交价默认 `BAR_CLOSE`；脚手架默认不发意图故 0 成交）+ 分分支绩效（`sessionBranchStats`）与事件表。缺 INDEX/竞价/封单时分支 `UNAVAILABLE`（`failOnMissingDep=true` 可整单失败）。  
-纸面：`quant.session.paper-enabled=true`（默认）且激活策略实现 `SessionStrategy` 时，`scan-and-trade` 经 `SessionPaperAdaptor` 走会话钩子，意图转为挂买/挂卖后仍走原模拟账本撮合；金叉激活时行为不变。组合回测未接；隔日高开公式不实现。
+可选旁路 **`SessionBackTestEngine`**（`engine=session` 或策略 `branchScaffold`）：强制 **MIN_1** 三分支（OPEN/MID/CLOSE，窗口见 `quant.session.*`）+ 持仓日态事件 + **撮合子集**（`pollIntents` → 费用/T+1/涨跌停夹紧/ADV；`quant.session.fill-mode` 默认 **`AUTO`**：跟随 `next-bar-open-fill`→`NEXT_EFFECTIVE`（挂单，次日且分钟≥09:45 按开盘价）或 `BAR_CLOSE`（当根收盘即时）；脚手架默认不发意图故 0 成交）+ 分分支绩效（`sessionBranchStats`）与事件表。缺 INDEX/竞价/封单时分支 `UNAVAILABLE`（`failOnMissingDep=true` 可整单失败）。
+纸面：`quant.session.paper-enabled=true`（默认）且激活策略实现 `SessionStrategy` 时，`scan-and-trade` 经 `SessionPaperAdaptor` 走会话钩子，意图转为挂买/挂卖后仍走原模拟账本撮合；金叉激活时行为不变。组合 `engine=session` 为等权分账聚合（非共享池）；隔日高开公式不实现。
 
 ### 3. 组合回测
 

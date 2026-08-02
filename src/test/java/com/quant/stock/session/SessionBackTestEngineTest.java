@@ -135,12 +135,60 @@ class SessionBackTestEngineTest {
     }
 
     @Test
-    void matchingFillsBuyThenSellWithTPlus1() {
-        // 4 个交易日：D0 OPEN 买；D1 CLOSE 才能 T+1 卖
+    void matchingFillsBuyThenSellWithTPlus1_barClose() {
+        // BAR_CLOSE：当根收盘即时成交。D0 OPEN 买；D1 CLOSE T+1 卖
         List<BarDTO> bars = syntheticSessionDays("600036", 4);
-        SessionBackTestEngine engine = engineWith(bars);
+        SessionBackTestEngine engine = engineWith(bars, "BAR_CLOSE");
 
-        SessionStrategy trader = new SessionStrategy() {
+        SessionStrategy trader = matchingTrader();
+
+        BackTestResult r = engine.run("600036", null, null, new BigDecimal("100000"), trader, false);
+        assertTrue(r.getTotalTradeNum() >= 2, "应有买卖成交");
+        assertTrue(countType(r, "FILL_BUY") >= 1);
+        assertTrue(countType(r, "FILL_SELL") >= 1);
+        assertEquals(0, countType(r, "PEND_BUY"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> open = (Map<String, Object>) r.getSessionBranchStats().get("OPEN");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> close = (Map<String, Object>) r.getSessionBranchStats().get("CLOSE");
+        assertTrue(((Number) open.get("buys")).intValue() >= 1);
+        assertTrue(((Number) close.get("sells")).intValue() >= 1);
+        assertEquals("BAR_CLOSE", r.getSessionBranchStats().get("fillMode"));
+    }
+
+    @Test
+    void matchingNextEffectiveFillsNextDayOpenAfter0945() {
+        // NEXT_EFFECTIVE：D0 OPEN 挂买 → D1≥09:45 开盘成交；再挂卖 → 次日≥09:45 卖
+        List<BarDTO> bars = syntheticSessionDays("600036", 5);
+        SessionBackTestEngine engine = engineWith(bars, "NEXT_EFFECTIVE");
+
+        BackTestResult r = engine.run("600036", null, null, new BigDecimal("100000"), matchingTrader(), false);
+        assertTrue(r.getTotalTradeNum() >= 2, "应有买卖成交");
+        assertTrue(countType(r, "PEND_BUY") >= 1);
+        assertTrue(countType(r, "FILL_BUY") >= 1);
+        assertTrue(countType(r, "FILL_SELL") >= 1);
+        assertEquals("NEXT_EFFECTIVE", r.getSessionBranchStats().get("fillMode"));
+        // 成交应在 ≥09:45（合成数据里为 09:45 根）
+        assertTrue(r.getTrades().get(0).getTradeTime().toLocalTime().compareTo(LocalTime.of(9, 45)) >= 0);
+        assertTrue(r.getSessionEvents().stream().anyMatch(e ->
+                "FILL_BUY".equals(e.getType()) && e.getDetail() != null && e.getDetail().contains(" open")));
+    }
+
+    @Test
+    void resolveFillModeAutoFollowsNextBarOpenFill() {
+        QuantProperties cfg = new QuantProperties();
+        QuantProperties.Session sess = new QuantProperties.Session();
+        sess.setFillMode("AUTO");
+        cfg.setNextBarOpenFill(true);
+        assertEquals("NEXT_EFFECTIVE", SessionBackTestEngine.resolveFillMode(cfg, sess));
+        cfg.setNextBarOpenFill(false);
+        assertEquals("BAR_CLOSE", SessionBackTestEngine.resolveFillMode(cfg, sess));
+        sess.setFillMode("BAR_CLOSE");
+        assertEquals("BAR_CLOSE", SessionBackTestEngine.resolveFillMode(cfg, sess));
+    }
+
+    private static SessionStrategy matchingTrader() {
+        return new SessionStrategy() {
             private boolean bought;
 
             @Override
@@ -162,7 +210,8 @@ class SessionBackTestEngineTest {
 
             @Override
             public List<SessionOrderIntent> pollIntents(SessionContext ctx) {
-                if (ctx.getBranch() == SessionBranch.OPEN && !bought && ctx.getPositionShares() == 0) {
+                if (ctx.getBranch() == SessionBranch.OPEN && !bought
+                        && ctx.getPositionShares() == 0) {
                     bought = true;
                     return Collections.singletonList(SessionOrderIntent.buy(100, "demo-buy"));
                 }
@@ -172,26 +221,24 @@ class SessionBackTestEngineTest {
                 return Collections.emptyList();
             }
         };
-
-        BackTestResult r = engine.run("600036", null, null, new BigDecimal("100000"), trader, false);
-        assertTrue(r.getTotalTradeNum() >= 2, "应有买卖成交");
-        assertTrue(countType(r, "FILL_BUY") >= 1);
-        assertTrue(countType(r, "FILL_SELL") >= 1);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> open = (Map<String, Object>) r.getSessionBranchStats().get("OPEN");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> close = (Map<String, Object>) r.getSessionBranchStats().get("CLOSE");
-        assertTrue(((Number) open.get("buys")).intValue() >= 1);
-        assertTrue(((Number) close.get("sells")).intValue() >= 1);
     }
 
     private static SessionBackTestEngine engineWith(List<BarDTO> bars) {
+        return engineWith(bars, null);
+    }
+
+    private static SessionBackTestEngine engineWith(List<BarDTO> bars, String fillMode) {
         MarketDataService mds = mock(MarketDataService.class);
         when(mds.getKline(eq("600036"), eq(BarPeriod.MIN_1), any(), any())).thenReturn(bars);
         QuantProperties props = new QuantProperties();
         props.setLimitPriceProtectEnabled(false);
         props.setMaxParticipationAdv(BigDecimal.ZERO); // 关闭 ADV 帽便于小样本成交
         props.setMarketCapFilterEnabled(false);
+        if (fillMode != null) {
+            QuantProperties.Session sess = new QuantProperties.Session();
+            sess.setFillMode(fillMode);
+            props.setSession(sess);
+        }
         return new SessionBackTestEngine(
                 mds,
                 new SessionDepProbe(mds),

@@ -146,7 +146,8 @@ quant:
     close-start: "14:30"
     close-end: "15:00"
     matching-enabled: true
-    fill-mode: BAR_CLOSE
+    # AUTO=跟随 next-bar-open-fill；NEXT_EFFECTIVE=次日≥09:45开盘；BAR_CLOSE=当根收盘
+    fill-mode: AUTO
     # 激活策略为 SessionStrategy 时，纸面分钟扫描走会话钩子（脚手架默认不下单）
     paper-enabled: true
 

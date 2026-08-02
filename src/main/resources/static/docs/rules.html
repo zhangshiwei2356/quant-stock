@@ -161,8 +161,8 @@
   <li>历史与分析一一对应，写入 MySQL：<code>bt_backtest_record</code> / <code>bt_backtest_analysis</code></li>
   <li><b>旁路会话引擎</b>（<code>engine=session</code> 或策略 <code>branchScaffold</code>）：强制 <b>MIN_1</b>；三分支 OPEN/MID/CLOSE（窗口 <code>quant.session.*</code>）；
       策略可经 <code>pollIntents</code> 下单，撮合子集含佣金/印花税/分级滑点、T+1 可卖、涨跌停夹紧、ADV 参与率；
-      成交价默认 <code>BAR_CLOSE</code>（当根分钟收）；脚手架默认不发意图；结果含 <code>sessionBranchStats</code> / 会话事件表；
-      <strong>不</strong>跑金叉五步时序；纸面：激活策略为 <code>SessionStrategy</code> 且 <code>paper-enabled</code> 时经适配器挂单，仍走模拟账本次日/当根撮合；组合未接；隔日高开公式未实现</li>
+      成交模式 <code>quant.session.fill-mode</code> 默认 <code>AUTO</code>（跟随 <code>next-bar-open-fill</code>→<code>NEXT_EFFECTIVE</code>：挂单，次日且≥09:45 开盘；或 <code>BAR_CLOSE</code> 当根收盘即时）；脚手架默认不发意图；结果含 <code>sessionBranchStats</code> / 会话事件表；
+      <strong>不</strong>跑金叉五步时序；纸面：激活策略为 <code>SessionStrategy</code> 且 <code>paper-enabled</code> 时经适配器挂单，仍走模拟账本撮合；组合 session 为等权分账；隔日高开公式未实现</li>
 </ul>
 
 <h4>九、组合回测（多股共享资金池）</h4>

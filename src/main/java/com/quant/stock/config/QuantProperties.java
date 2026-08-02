@@ -303,9 +303,12 @@ public class QuantProperties {
          */
         private boolean matchingEnabled = true;
         /**
-         * 成交价模式：{@code BAR_CLOSE}=当前分钟收盘（会话骨架默认）。
+         * 成交模式：
+         * {@code AUTO}=跟随 {@code quant.next-bar-open-fill}（true→NEXT_EFFECTIVE，false→BAR_CLOSE）；
+         * {@code NEXT_EFFECTIVE}=挂单，次日且分钟≥09:45 按开盘价撮合（对齐经典）；
+         * {@code BAR_CLOSE}=当根分钟收盘价即时成交。
          */
-        private String fillMode = "BAR_CLOSE";
+        private String fillMode = "AUTO";
         /**
          * 纸面 {@code scan-and-trade}：激活策略实现 {@code SessionStrategy} 时是否走会话钩子。
          * 默认 true；金叉等非会话策略不受影响。
