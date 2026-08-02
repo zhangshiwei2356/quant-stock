@@ -147,6 +147,8 @@ quant:
     close-end: "15:00"
     matching-enabled: true
     fill-mode: BAR_CLOSE
+    # 激活策略为 SessionStrategy 时，纸面分钟扫描走会话钩子（脚手架默认不下单）
+    paper-enabled: true
 
   # ---- 开仓过滤 ----
   quiet-open-enabled: true

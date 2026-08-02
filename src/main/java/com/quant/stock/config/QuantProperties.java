@@ -306,6 +306,11 @@ public class QuantProperties {
          * 成交价模式：{@code BAR_CLOSE}=当前分钟收盘（会话骨架默认）。
          */
         private String fillMode = "BAR_CLOSE";
+        /**
+         * 纸面 {@code scan-and-trade}：激活策略实现 {@code SessionStrategy} 时是否走会话钩子。
+         * 默认 true；金叉等非会话策略不受影响。
+         */
+        private boolean paperEnabled = true;
     }
 
     /**

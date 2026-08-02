@@ -29,6 +29,10 @@ import com.quant.stock.risk.StressScenarioService;
 import com.quant.stock.risk.StructuralBreakMonitor;
 import com.quant.stock.risk.TurnoverGuardService;
 import com.quant.stock.risk.IcDecayMonitor;
+import com.quant.stock.session.HoldDayState;
+import com.quant.stock.session.SessionOrderIntent;
+import com.quant.stock.session.SessionPaperAdaptor;
+import com.quant.stock.session.SessionStrategy;
 import com.quant.stock.strategy.BaseStrategy;
 import com.quant.stock.strategy.IndicatorSignalUtil;
 import com.quant.stock.strategy.StrategyRegistry;
@@ -102,6 +106,7 @@ public class StrategyTask {
     private final DataReconcileGateService dataReconcileGateService;
     private final TurnoverGuardService turnoverGuardService;
     private final IcDecayMonitor icDecayMonitor;
+    private final SessionPaperAdaptor sessionPaperAdaptor;
 
     private volatile BigDecimal simCash = new BigDecimal("100000");
     /** 模拟账户初始资金（用于收益率；恢复现金不改此值） */
@@ -133,7 +138,8 @@ public class StrategyTask {
                         StructuralBreakMonitor structuralBreakMonitor,
                         DataReconcileGateService dataReconcileGateService,
                         TurnoverGuardService turnoverGuardService,
-                        IcDecayMonitor icDecayMonitor) {
+                        IcDecayMonitor icDecayMonitor,
+                        SessionPaperAdaptor sessionPaperAdaptor) {
         this.quantProperties = quantProperties;
         this.effectiveParamsService = effectiveParamsService;
         this.marketDataService = marketDataService;
@@ -148,6 +154,7 @@ public class StrategyTask {
         this.batchStockBackTestService = batchStockBackTestService;
         this.tradingCalendar = tradingCalendar;
         this.liveLedgerProvider = liveLedgerProvider;
+        this.sessionPaperAdaptor = sessionPaperAdaptor;
         this.strategyRetirementService = strategyRetirementService;
         this.riskAlertService = riskAlertService;
         this.stressScenarioService = stressScenarioService;
@@ -287,6 +294,16 @@ public class StrategyTask {
                     String pbd = b.getStr("pendingBuySignalDay", "");
                     book.pendingBuySignalDay = pbd == null || pbd.isEmpty() ? null : LocalDate.parse(pbd);
                     book.limitDownFailDays = b.getInt("limitDownFailDays", 0);
+                    String hold = b.getStr("sessionHold", "");
+                    if (hold != null && !hold.isEmpty()) {
+                        try {
+                            book.sessionState.hold = HoldDayState.valueOf(hold);
+                        } catch (Exception ignore) {
+                            book.sessionState.hold = HoldDayState.FLAT;
+                        }
+                    }
+                    String sd = b.getStr("sessionDay", "");
+                    book.sessionState.sessionDay = sd == null || sd.isEmpty() ? null : LocalDate.parse(sd);
                 }
             } catch (Exception e) {
                 log.warn("恢复挂单/金字塔元数据失败: {}", e.getMessage());
@@ -328,6 +345,9 @@ public class StrategyTask {
                 b.put("pendingBuySignalDay", book.pendingBuySignalDay == null ? ""
                         : book.pendingBuySignalDay.toString());
                 b.put("limitDownFailDays", book.limitDownFailDays);
+                b.put("sessionHold", book.sessionState.hold == null ? "FLAT" : book.sessionState.hold.name());
+                b.put("sessionDay", book.sessionState.sessionDay == null ? ""
+                        : book.sessionState.sessionDay.toString());
                 meta.put(e.getKey(), b);
             }
             ledger.saveConfig(LiveLedgerService.KEY_BOOKS_META, JSONUtil.toJsonStr(meta), "模拟挂单与金字塔元数据");
@@ -482,62 +502,69 @@ public class StrategyTask {
                     }
                 }
 
-                // Step4: 信号挂单（当前激活策略）
+                // Step4: 信号挂单（会话策略走旁路钩子；否则经典金叉/金字塔/死叉）
                 BaseStrategy strategy = strategyRegistry.active();
-                boolean buySignal = strategy.isBuySignalAt(ind, i);
-                boolean sellSignal = strategy.isSellSignalAt(ind, i);
+                boolean sessionPaper = strategy instanceof SessionStrategy
+                        && p().getSession() != null && p().getSession().isPaperEnabled();
+                if (sessionPaper) {
+                    applySessionPaperSignals(code, book, bars, i, tradeDay, close, equity, posScale,
+                            (SessionStrategy) strategy);
+                } else {
+                    boolean buySignal = strategy.isBuySignalAt(ind, i);
+                    boolean sellSignal = strategy.isSellSignalAt(ind, i);
 
-                if (!book.pos.hasPosition() && buySignal && !book.pendingSell && book.pendingBuyVol == null
-                        && strategyRetirementService.allowNewOpen()
-                        && accountRiskState.allowNewOpen(tradeDay, equity)
-                        && !dataReconcileGateService.blockNewOpen()
-                        && turnoverGuardService.allowNewOpen(tradeDay, equity)
-                        && posScale.compareTo(BigDecimal.ZERO) > 0
-                        && openFilterService.canOpen(code, bars, i)) {
-                    BigDecimal atr = atrAt(ind, i);
-                    if (atr.compareTo(p().getAtrMinThreshold()) > 0) {
-                        book.targetFullVol = positionAmountUtil.calcBuyVolume(availableCash(), close, atr, posScale);
-                        long advBuy = IndicatorSignalUtil.avgVolume(bars, i, 20);
-                        long barVol = barVolume(bars, i);
-                        book.targetFullVol = capParticipation(book.targetFullVol, advBuy, equity, barVol);
-                        int first = p().isPyramidEnabled()
-                                ? positionAmountUtil.pyramidSlice(book.targetFullVol, 0) : book.targetFullVol;
-                        first = capParticipation(first, advBuy, equity, barVol);
-                        if (first >= 100) {
-                            book.pendingBuyVol = first;
-                            book.pendingBuyPyramid = false;
+                    if (!book.pos.hasPosition() && buySignal && !book.pendingSell && book.pendingBuyVol == null
+                            && strategyRetirementService.allowNewOpen()
+                            && accountRiskState.allowNewOpen(tradeDay, equity)
+                            && !dataReconcileGateService.blockNewOpen()
+                            && turnoverGuardService.allowNewOpen(tradeDay, equity)
+                            && posScale.compareTo(BigDecimal.ZERO) > 0
+                            && openFilterService.canOpen(code, bars, i)) {
+                        BigDecimal atr = atrAt(ind, i);
+                        if (atr.compareTo(p().getAtrMinThreshold()) > 0) {
+                            book.targetFullVol = positionAmountUtil.calcBuyVolume(availableCash(), close, atr, posScale);
+                            long advBuy = IndicatorSignalUtil.avgVolume(bars, i, 20);
+                            long barVol = barVolume(bars, i);
+                            book.targetFullVol = capParticipation(book.targetFullVol, advBuy, equity, barVol);
+                            int first = p().isPyramidEnabled()
+                                    ? positionAmountUtil.pyramidSlice(book.targetFullVol, 0) : book.targetFullVol;
+                            first = capParticipation(first, advBuy, equity, barVol);
+                            if (first >= 100) {
+                                book.pendingBuyVol = first;
+                                book.pendingBuyPyramid = false;
+                                book.pendingBuySignalDay = tradeDay;
+                            }
+                        }
+                    } else if (book.pos.hasPosition() && p().isPyramidEnabled()
+                            && book.pyramidStage >= 1 && book.pyramidStage < 3
+                            && book.pendingBuyVol == null
+                            && !book.pos.isAddedToday()
+                            && close.compareTo(book.pos.getAvgCost()
+                            .multiply(BigDecimal.ONE.add(p().getPyramidAddPct()))) >= 0
+                            && ind.ma5[i] > ind.ma20[i]
+                            && strategyRetirementService.allowNewOpen()
+                            && accountRiskState.allowNewOpen(tradeDay, equity)
+                            && !dataReconcileGateService.blockNewOpen()
+                            && turnoverGuardService.allowNewOpen(tradeDay, equity)
+                            && posScale.compareTo(BigDecimal.ZERO) > 0) {
+                        int slice = positionAmountUtil.pyramidSlice(book.targetFullVol, book.pyramidStage);
+                        long advAdd = IndicatorSignalUtil.avgVolume(bars, i, 20);
+                        slice = capParticipation(slice, advAdd, equity, barVolume(bars, i));
+                        BigDecimal posMv = calcPositionMv();
+                        BigDecimal addMoney = close.multiply(BigDecimal.valueOf(Math.max(slice, 0)));
+                        if (slice >= 100 && positionAmountUtil.withinTotalPosition(equity, posMv, addMoney)) {
+                            book.pendingBuyVol = slice;
+                            book.pendingBuyPyramid = true;
                             book.pendingBuySignalDay = tradeDay;
                         }
                     }
-                } else if (book.pos.hasPosition() && p().isPyramidEnabled()
-                        && book.pyramidStage >= 1 && book.pyramidStage < 3
-                        && book.pendingBuyVol == null
-                        && !book.pos.isAddedToday()
-                        && close.compareTo(book.pos.getAvgCost()
-                        .multiply(BigDecimal.ONE.add(p().getPyramidAddPct()))) >= 0
-                        && ind.ma5[i] > ind.ma20[i]
-                        && strategyRetirementService.allowNewOpen()
-                        && accountRiskState.allowNewOpen(tradeDay, equity)
-                        && !dataReconcileGateService.blockNewOpen()
-                        && turnoverGuardService.allowNewOpen(tradeDay, equity)
-                        && posScale.compareTo(BigDecimal.ZERO) > 0) {
-                    int slice = positionAmountUtil.pyramidSlice(book.targetFullVol, book.pyramidStage);
-                    long advAdd = IndicatorSignalUtil.avgVolume(bars, i, 20);
-                    slice = capParticipation(slice, advAdd, equity, barVolume(bars, i));
-                    BigDecimal posMv = calcPositionMv();
-                    BigDecimal addMoney = close.multiply(BigDecimal.valueOf(Math.max(slice, 0)));
-                    if (slice >= 100 && positionAmountUtil.withinTotalPosition(equity, posMv, addMoney)) {
-                        book.pendingBuyVol = slice;
-                        book.pendingBuyPyramid = true;
-                        book.pendingBuySignalDay = tradeDay;
-                    }
-                }
 
-                if (book.pos.hasPosition() && sellSignal
-                        && ExitPriority.DEATH_CROSS.canRegisterPending(book.stoppedOutToday, book.pendingSell)) {
-                    book.pendingSell = true;
-                    book.pendingSellReason = ExitPriority.DEATH_CROSS.getLabel();
-                    book.pendingSellSignalDay = tradeDay;
+                    if (book.pos.hasPosition() && sellSignal
+                            && ExitPriority.DEATH_CROSS.canRegisterPending(book.stoppedOutToday, book.pendingSell)) {
+                        book.pendingSell = true;
+                        book.pendingSellReason = ExitPriority.DEATH_CROSS.getLabel();
+                        book.pendingSellSignalDay = tradeDay;
+                    }
                 }
 
                 // 非 nextBar：当根撮合（配置关闭时）
@@ -1332,8 +1359,80 @@ public class StrategyTask {
         return BigDecimal.valueOf(ind.atr14[i]);
     }
 
+    /**
+     * 纸面会话策略：钩子 → 意图 → 挂单（复用 fillPending / 风控闸）。
+     */
+    private void applySessionPaperSignals(String code, LiveBook book, List<BarDTO> bars, int i,
+                                          LocalDate tradeDay, BigDecimal close, BigDecimal equity,
+                                          BigDecimal posScale, SessionStrategy sessionStrategy) {
+        if (!book.pos.hasPosition()) {
+            book.sessionState.hold = HoldDayState.FLAT;
+        }
+        int sellable = book.pos.sellableShares(tradeDay);
+        SessionPaperAdaptor.Outcome outcome = sessionPaperAdaptor.onBar(
+                sessionStrategy, code, bars, i, book.sessionState,
+                availableCash(), book.pos.getShares(), sellable, equity);
+        book.sessionState.hold = outcome.hold == null ? book.sessionState.hold : outcome.hold;
+        if (outcome.events != null && !outcome.events.isEmpty() && log.isDebugEnabled()) {
+            log.debug("session-paper {} events={} hold={}", code, outcome.events.size(), book.sessionState.hold);
+        }
+        if (outcome.intents == null || outcome.intents.isEmpty()) {
+            return;
+        }
+        if (p().getSession() != null && !p().getSession().isMatchingEnabled()) {
+            return;
+        }
+        for (SessionOrderIntent intent : outcome.intents) {
+            if (intent == null || intent.getSide() == null) {
+                continue;
+            }
+            if (intent.getSide() == SessionOrderIntent.Side.BUY) {
+                if (book.pos.hasPosition() || book.pendingSell || book.pendingBuyVol != null) {
+                    continue;
+                }
+                if (!strategyRetirementService.allowNewOpen()
+                        || !accountRiskState.allowNewOpen(tradeDay, equity)
+                        || dataReconcileGateService.blockNewOpen()
+                        || !turnoverGuardService.allowNewOpen(tradeDay, equity)
+                        || posScale.compareTo(BigDecimal.ZERO) <= 0
+                        || !openFilterService.canOpen(code, bars, i)) {
+                    continue;
+                }
+                int vol = intent.getVolume();
+                if (vol <= 0) {
+                    vol = positionAmountUtil.calcBuyVolume(availableCash(), close, p().getBaseAtr(), posScale);
+                }
+                long advBuy = IndicatorSignalUtil.avgVolume(bars, i, 20);
+                if (!intent.isBypassParticipationCap()) {
+                    vol = capParticipation(vol, advBuy, equity, barVolume(bars, i));
+                } else {
+                    vol = (vol / 100) * 100;
+                }
+                if (vol >= 100) {
+                    book.pendingBuyVol = vol;
+                    book.pendingBuyPyramid = false;
+                    book.pendingBuySignalDay = tradeDay;
+                    book.targetFullVol = vol;
+                }
+            } else if (intent.getSide() == SessionOrderIntent.Side.SELL) {
+                if (!book.pos.hasPosition()) {
+                    continue;
+                }
+                if (!ExitPriority.DEATH_CROSS.canRegisterPending(book.stoppedOutToday, book.pendingSell)) {
+                    continue;
+                }
+                book.pendingSell = true;
+                book.pendingSellReason = "会话卖出"
+                        + (intent.getReason() == null || intent.getReason().isEmpty()
+                        ? "" : (":" + intent.getReason()));
+                book.pendingSellSignalDay = tradeDay;
+            }
+        }
+    }
+
     private static final class LiveBook {
         final PositionState pos = new PositionState();
+        final SessionPaperAdaptor.State sessionState = new SessionPaperAdaptor.State();
         LocalDate lastTradeDay;
         Integer pendingBuyVol;
         boolean pendingBuyPyramid;
