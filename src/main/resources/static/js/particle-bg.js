@@ -1,7 +1,7 @@
 /**
  * 多主题动态背景（无第三方依赖）
  * - night / matrix：夜盘深色 + 慢速代码雨
- * - day / interact：日间浅色柔光氛围（无彗星拖尾，避免游动粒子感）
+ * - day / interact：日间浅色科技氛围（柔光 + 网格/扫描/节点网，无彗星拖尾）
  * - forest / wave：背景由 starfield-bg.js（Three.js 银河）负责，界面名「银河」
  * - cosmos：粒子连线 + 流星 + 极光带，界面名「极光」
  * pointer-events:none，交互监听挂在 window，不挡点击。
@@ -18,6 +18,8 @@
   var bursts = [];
   var waves = [];
   var matrixCols = [];
+  var techNodes = [];
+  var dataBeams = [];
   var rafId = 0;
   var running = false;
   var theme = 'day';
@@ -59,50 +61,58 @@
       tailMax: 44,
       layers: true
     },
-    /* 日间 · 纸面柔光：慢漂移光斑，无拖尾/连线/准星（干净可读） */
+    /* 日间 · 浅色科技：柔光 + 网格/扫描/节点网（无彗星拖尾，保持可读） */
     day: {
-      mode: 'ambient', count: 22, speed: 0.22,
+      mode: 'ambient', count: 14, speed: 0.18,
       bg: '246, 248, 252', trail: 1,
       particle: [148, 163, 184],
-      glow: [186, 210, 235, 0.1],
+      glow: [170, 200, 235, 0.12],
       follow: 0, explode: false,
-      comet: false, soft: true, tech: false,
-      connect: 0, grid: false,
-      aurora: true, auroraSpeed: 0.00035,
+      comet: false, soft: true, tech: true,
+      connect: 150, line: '90, 140, 195', lineAlpha: 0.28,
+      grid: true, gridStep: 58,
+      gridColor: '100, 145, 195', gridAlpha: 0.055,
+      scanColor: '56, 130, 210', scanAlpha: 0.055,
+      nodeCount: 34, beamCount: 5,
+      aurora: true, auroraSpeed: 0.0004,
       auroraColors: [
-        [186, 210, 235, 0.14],
-        [214, 225, 240, 0.1],
-        [200, 218, 236, 0.08],
-        [232, 238, 246, 0.06]
+        [170, 205, 240, 0.16],
+        [200, 220, 245, 0.11],
+        [150, 185, 230, 0.09],
+        [220, 232, 246, 0.07]
       ],
       palette: [
-        [148, 163, 184],
-        [125, 155, 190],
-        [160, 175, 195],
-        [130, 160, 200]
+        [90, 145, 210],
+        [56, 160, 220],
+        [120, 155, 200],
+        [70, 130, 200]
       ]
     },
     /* 兼容旧主题 key：与 day 相同 */
     interact: {
-      mode: 'ambient', count: 22, speed: 0.22,
+      mode: 'ambient', count: 14, speed: 0.18,
       bg: '246, 248, 252', trail: 1,
       particle: [148, 163, 184],
-      glow: [186, 210, 235, 0.1],
+      glow: [170, 200, 235, 0.12],
       follow: 0, explode: false,
-      comet: false, soft: true, tech: false,
-      connect: 0, grid: false,
-      aurora: true, auroraSpeed: 0.00035,
+      comet: false, soft: true, tech: true,
+      connect: 150, line: '90, 140, 195', lineAlpha: 0.28,
+      grid: true, gridStep: 58,
+      gridColor: '100, 145, 195', gridAlpha: 0.055,
+      scanColor: '56, 130, 210', scanAlpha: 0.055,
+      nodeCount: 34, beamCount: 5,
+      aurora: true, auroraSpeed: 0.0004,
       auroraColors: [
-        [186, 210, 235, 0.14],
-        [214, 225, 240, 0.1],
-        [200, 218, 236, 0.08],
-        [232, 238, 246, 0.06]
+        [170, 205, 240, 0.16],
+        [200, 220, 245, 0.11],
+        [150, 185, 230, 0.09],
+        [220, 232, 246, 0.07]
       ],
       palette: [
-        [148, 163, 184],
-        [125, 155, 190],
-        [160, 175, 195],
-        [130, 160, 200]
+        [90, 145, 210],
+        [56, 160, 220],
+        [120, 155, 200],
+        [70, 130, 200]
       ]
     },
     /* 银河：Canvas 侧停用，由 QuantStarfieldBg 绘制（保留 key 防误调） */
@@ -695,6 +705,8 @@
     bursts.length = 0;
     waves.length = 0;
     matrixCols.length = 0;
+    techNodes.length = 0;
+    dataBeams.length = 0;
 
     if (c.mode === 'matrix') {
       var fs = c.fontSize || 15;
@@ -735,10 +747,51 @@
     for (var p = 0; p < count; p++) {
       particles.push(new Particle(c, mode));
     }
+    if (c.mode === 'ambient' && c.tech) {
+      initDayTechLayer(c);
+    }
     if (c.meteors) {
       var mc = width < 768 ? 2 : 4;
       for (var m = 0; m < mc; m++) meteors.push(new Meteor());
     }
+  }
+
+  function initDayTechLayer(c) {
+    var n = c.nodeCount || 30;
+    if (width < 768) n = Math.max(14, Math.floor(n * 0.55));
+    var pal = c.palette || [c.particle];
+    var i;
+    for (i = 0; i < n; i++) {
+      var col = pal[i % pal.length];
+      techNodes.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        vx: (Math.random() - 0.5) * 0.28,
+        vy: (Math.random() - 0.5) * 0.28,
+        phase: Math.random() * Math.PI * 2,
+        pulse: 0.6 + Math.random() * 1.4,
+        r: 1.1 + Math.random() * 1.6,
+        color: col
+      });
+    }
+    var beams = c.beamCount || 4;
+    if (width < 768) beams = Math.max(2, beams - 2);
+    for (i = 0; i < beams; i++) {
+      dataBeams.push(createDataBeam());
+    }
+  }
+
+  function createDataBeam() {
+    var horiz = Math.random() < 0.55;
+    return {
+      horiz: horiz,
+      pos: horiz ? Math.random() * height : Math.random() * width,
+      t: Math.random(),
+      speed: 0.0012 + Math.random() * 0.0022,
+      len: 0.08 + Math.random() * 0.14,
+      thick: 1 + Math.random() * 1.5,
+      wait: (Math.random() * 80) | 0
+    };
   }
 
   function connectParticles(c) {
@@ -770,8 +823,12 @@
     if (!c.tech || !c.grid) return;
     var step = c.gridStep || 56;
     var drift = (time * 0.012) % step;
+    var gCol = c.gridColor || '56, 189, 248';
+    var gA = c.gridAlpha != null ? c.gridAlpha : 0.045;
+    var sCol = c.scanColor || gCol;
+    var sA = c.scanAlpha != null ? c.scanAlpha : 0.04;
     ctx.save();
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.045)';
+    ctx.strokeStyle = 'rgba(' + gCol + ', ' + gA + ')';
     ctx.lineWidth = 1;
     var x, y;
     for (x = -step + drift; x < width + step; x += step) {
@@ -789,12 +846,170 @@
     // 扫描线
     var scanY = ((time * 0.045) % (height + 80)) - 40;
     var sg = ctx.createLinearGradient(0, scanY - 30, 0, scanY + 30);
-    sg.addColorStop(0, 'rgba(56, 189, 248, 0)');
-    sg.addColorStop(0.5, 'rgba(56, 189, 248, 0.04)');
-    sg.addColorStop(1, 'rgba(56, 189, 248, 0)');
+    sg.addColorStop(0, 'rgba(' + sCol + ', 0)');
+    sg.addColorStop(0.5, 'rgba(' + sCol + ', ' + sA + ')');
+    sg.addColorStop(1, 'rgba(' + sCol + ', 0)');
     ctx.fillStyle = sg;
     ctx.fillRect(0, scanY - 30, width, 60);
     ctx.restore();
+  }
+
+  function drawDayHudCorners(c, time) {
+    var col = c.scanColor || c.gridColor || '56, 130, 210';
+    var pulse = 0.55 + 0.45 * Math.sin(time * 0.0012);
+    var a = 0.12 + 0.08 * pulse;
+    var L = Math.min(42, Math.max(28, Math.min(width, height) * 0.045));
+    var inset = 18;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(' + col + ', ' + a + ')';
+    ctx.lineWidth = 1.2;
+    ctx.lineCap = 'square';
+    // 四角 L 形括号
+    var corners = [
+      [inset, inset, 1, 1],
+      [width - inset, inset, -1, 1],
+      [inset, height - inset, 1, -1],
+      [width - inset, height - inset, -1, -1]
+    ];
+    var ci, p, cx, cy, sx, sy;
+    for (ci = 0; ci < corners.length; ci++) {
+      p = corners[ci];
+      cx = p[0]; cy = p[1]; sx = p[2]; sy = p[3];
+      ctx.beginPath();
+      ctx.moveTo(cx, cy + sy * L);
+      ctx.lineTo(cx, cy);
+      ctx.lineTo(cx + sx * L, cy);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawDayTechNodes(c, time) {
+    if (!techNodes.length) return;
+    var maxD = c.connect || 140;
+    var line = c.line || '90, 140, 195';
+    var lineA = c.lineAlpha != null ? c.lineAlpha : 0.25;
+    var lim = 0.42;
+    var i, j, n, dx, dy, dist, alpha, flicker, s;
+
+    for (i = 0; i < techNodes.length; i++) {
+      n = techNodes[i];
+      n.vx += Math.sin(time * 0.00045 + n.phase) * 0.0015;
+      n.vy += Math.cos(time * 0.00038 + n.phase * 1.2) * 0.0015;
+      n.vx = Math.max(-lim, Math.min(lim, n.vx));
+      n.vy = Math.max(-lim, Math.min(lim, n.vy));
+      n.x += n.vx;
+      n.y += n.vy;
+      if (n.x < -8) n.x = width + 8;
+      if (n.x > width + 8) n.x = -8;
+      if (n.y < -8) n.y = height + 8;
+      if (n.y > height + 8) n.y = -8;
+    }
+
+    // 稀疏连线
+    var step = techNodes.length > 40 ? 2 : 1;
+    for (i = 0; i < techNodes.length; i += step) {
+      for (j = i + 1; j < techNodes.length; j += step) {
+        dx = techNodes[i].x - techNodes[j].x;
+        dy = techNodes[i].y - techNodes[j].y;
+        dist = dx * dx + dy * dy;
+        if (dist < maxD * maxD) {
+          dist = Math.sqrt(dist);
+          alpha = (1 - dist / maxD) * lineA;
+          ctx.beginPath();
+          ctx.moveTo(techNodes[i].x, techNodes[i].y);
+          ctx.lineTo(techNodes[j].x, techNodes[j].y);
+          ctx.strokeStyle = 'rgba(' + line + ', ' + alpha + ')';
+          ctx.lineWidth = 0.7;
+          ctx.stroke();
+        }
+      }
+    }
+
+    for (i = 0; i < techNodes.length; i++) {
+      n = techNodes[i];
+      flicker = 0.65 + 0.35 * Math.sin(time * 0.004 * n.pulse + n.phase);
+      s = n.r * (0.9 + 0.2 * flicker);
+      // 外晕
+      var gg = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, s * 5);
+      gg.addColorStop(0, rgba(n.color, 0.18 * flicker));
+      gg.addColorStop(1, rgba(n.color, 0));
+      ctx.fillStyle = gg;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, s * 5, 0, Math.PI * 2);
+      ctx.fill();
+      // 菱形节点
+      ctx.beginPath();
+      ctx.moveTo(n.x, n.y - s * 1.5);
+      ctx.lineTo(n.x + s * 1.1, n.y);
+      ctx.lineTo(n.x, n.y + s * 1.5);
+      ctx.lineTo(n.x - s * 1.1, n.y);
+      ctx.closePath();
+      ctx.fillStyle = rgba([255, 255, 255], 0.55 * flicker);
+      ctx.fill();
+      ctx.strokeStyle = rgba(n.color, 0.55 + 0.25 * flicker);
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+
+  function drawDayDataBeams(c, time) {
+    if (!dataBeams.length) return;
+    var col = c.scanColor || '56, 130, 210';
+    var i, b, head, span, x0, x1, y0, y1, g;
+    for (i = 0; i < dataBeams.length; i++) {
+      b = dataBeams[i];
+      if (b.wait > 0) {
+        b.wait--;
+        continue;
+      }
+      b.t += b.speed;
+      if (b.t > 1.2) {
+        dataBeams[i] = createDataBeam();
+        dataBeams[i].wait = 20 + ((Math.random() * 90) | 0);
+        continue;
+      }
+      head = b.t;
+      span = b.len;
+      if (b.horiz) {
+        x0 = (head - span) * width;
+        x1 = head * width;
+        y0 = b.pos;
+        g = ctx.createLinearGradient(x0, y0, x1, y0);
+        g.addColorStop(0, 'rgba(' + col + ', 0)');
+        g.addColorStop(0.55, 'rgba(' + col + ', 0.07)');
+        g.addColorStop(1, 'rgba(' + col + ', 0.22)');
+        ctx.strokeStyle = g;
+        ctx.lineWidth = b.thick;
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y0);
+        ctx.stroke();
+        // 头端亮点
+        ctx.beginPath();
+        ctx.fillStyle = 'rgba(' + col + ', 0.35)';
+        ctx.arc(x1, y0, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        y0 = (head - span) * height;
+        y1 = head * height;
+        x0 = b.pos;
+        g = ctx.createLinearGradient(x0, y0, x0, y1);
+        g.addColorStop(0, 'rgba(' + col + ', 0)');
+        g.addColorStop(0.55, 'rgba(' + col + ', 0.07)');
+        g.addColorStop(1, 'rgba(' + col + ', 0.22)');
+        ctx.strokeStyle = g;
+        ctx.lineWidth = b.thick;
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x0, y1);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.fillStyle = 'rgba(' + col + ', 0.35)';
+        ctx.arc(x0, y1, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
   }
 
   function drawAurora(c, time) {
@@ -990,10 +1205,18 @@
       ctx.fillRect(0, 0, width, height);
     }
     drawAurora(c, time);
+    if (c.tech) {
+      drawTechGrid(c, time);
+    }
     var i;
     for (i = 0; i < particles.length; i++) {
       particles[i].update(c, time);
       particles[i].draw(c, time);
+    }
+    if (c.tech) {
+      drawDayTechNodes(c, time);
+      drawDayDataBeams(c, time);
+      drawDayHudCorners(c, time);
     }
   }
 

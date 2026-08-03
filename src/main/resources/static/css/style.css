@@ -38,7 +38,7 @@ html[data-theme="night"] {
 }
 
 html[data-theme="day"] {
-  /* 日间纸面：干净浅灰底 + 克制蓝灰强调（告别电青游动粒子感） */
+  /* 日间纸面：浅灰底 + 克制蓝强调；背景为浅色科技动效（网格/节点/扫描） */
   --bg-0: #f6f8fc;
   --bg-1: #eef2f7;
   --bg-2: #e8edf4;
@@ -59,8 +59,8 @@ html[data-theme="day"] {
   --shadow: 0 6px 20px rgba(30, 45, 70, 0.06);
   --chart-bg: rgba(248, 250, 252, 0.96);
   --table-head: #eef2f7;
-  --glow-a: rgba(148, 163, 184, 0.14);
-  --glow-b: rgba(186, 210, 235, 0.1);
+  --glow-a: rgba(90, 145, 210, 0.16);
+  --glow-b: rgba(56, 160, 220, 0.12);
   --accent-soft: rgba(37, 99, 168, 0.1);
   --input-bg: #ffffff;
   --input-bg-focus: #f8fafc;
