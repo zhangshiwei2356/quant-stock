@@ -69,7 +69,7 @@
 	    	//应答消息缓存队列大小
 	    	"rspMsgQueueSize": 100,
     		//服务地址配置   *注: 1. hostNum目前不起做用; 2.addr、part要与OES的配置相对应; 3.可配多个主备地址，按实际情况进行配置;
-            // 阿里云模拟（非实盘）示例：106.15.58.119:6101；实盘请改券商地址
+            // 阿里云模拟 [oes_stk] 非实盘：ordServer=tcp://106.15.58.119:6101
             "address": [
             {"hostNum": 1, "addr": "106.15.58.119", "port": "6101"},
             {"hostNum": 2, "addr": "106.15.58.119", "port": "6101"}
@@ -88,6 +88,7 @@
 	    	"reqMsgQueueSize": 100,
 	    	//应答消息缓存队列大小
 	    	"rspMsgQueueSize": 1000,
+            // 阿里云模拟 [oes_stk]：rptServer=tcp://106.15.58.119:6301
             "address": [
             {"hostNum": 1, "addr": "106.15.58.119", "port": "6301"},
             {"hostNum": 2, "addr": "106.15.58.119", "port": "6301"}
@@ -102,6 +103,7 @@
 	    	"read_buf_size": "1M",
 	    	"min_usable_buf_size": "2K",
 	    	"write_buf_size": "512K",
+            // 阿里云模拟 [oes_stk]：qryServer=tcp://106.15.58.119:6401
             "address": [
             {"hostNum": 1, "addr": "106.15.58.119", "port": "6401"},
             {"hostNum": 2, "addr": "106.15.58.119", "port": "6401"}

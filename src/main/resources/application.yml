@@ -175,6 +175,21 @@ quant:
   schedule:
     enabled: true
 
+  # ---- 宽睿 Quant360（默认全关；真实 MDS 需 mvn -Pkuangrui 且本机 jar/账号）----
+  kuangrui:
+    enabled: false
+    config-dir: ${QUANT_KUANGRUI_CONFIG_DIR:config/kuangrui/local}
+    mds:
+      enabled: false
+      config-file: mds_api_config.json
+      subscribe-codes: ""
+      collect-pull: true
+      collect-flush: true
+    oes:
+      enabled: false
+      order-enabled: false
+      config-file: oes_api_config.json
+
   # ---- 安全与运维 ----
   api-key: ${QUANT_API_KEY:}
   rate-limit-per-minute: ${QUANT_RATE_LIMIT:30}

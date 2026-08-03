@@ -1,6 +1,8 @@
 package com.quant.stock.task;
 
 import com.quant.stock.admin.DataReconcileGateService;
+import com.quant.stock.config.QuantProperties;
+import com.quant.stock.kuangrui.MdsMinuteIngestService;
 import com.quant.stock.market.MarketDataService;
 import com.quant.stock.market.dto.BarDTO;
 import com.quant.stock.pool.TradePoolService;
@@ -42,17 +44,19 @@ public class ScheduleJobHandlers {
     private final RedisLockUtil redisLockUtil;
     private final JdbcTemplate jdbcTemplate;
     private final DataReconcileGateService dataReconcileGateService;
+    private final MdsMinuteIngestService mdsMinuteIngestService;
+    private final QuantProperties quantProperties;
 
     /**
-     * 行情采集：按股票池刷新本地 K 线缓存/落库。
-     * <p>
-     * TODO(api): 接入真实行情源（扩展 {@code KlineSdkClient}：1 分钟增量拉取、复权、停牌标记），
-     * 当前走 {@link MarketDataService#fetchAndPersistMinute}（落库 market_1min / mock/sdk 回退）。
+     * 行情采集：优先可选宽睿 MDS（开关开启且 live），否则按股票池刷新本地 K 线缓存/落库。
      */
     public void marketCollect() {
         runWithLock("job:market-collect", 55, new Runnable() {
             @Override
             public void run() {
+                if (tryMdsCollect()) {
+                    return;
+                }
                 List<String> codes = new ArrayList<String>();
                 for (Map<String, String> u : tradePoolService.listUniverse()) {
                     codes.add(u.get("code"));
@@ -61,7 +65,6 @@ public class ScheduleJobHandlers {
                     log.warn("[market-collect] 全市场为空，跳过");
                     return;
                 }
-                // TODO(api): 按交易日历/交易时段决定是否拉取；非交易时段可只补历史缺口
                 int ok = 0;
                 int fail = 0;
                 for (String code : codes) {
@@ -84,6 +87,50 @@ public class ScheduleJobHandlers {
                 log.info("[market-collect] 完成 ok={} fail={} universe={}", ok, fail, codes.size());
             }
         });
+    }
+
+    /** @return true 表示已走 MDS 路径（含失败日志），不再回退 mock 全扫 */
+    private boolean tryMdsCollect() {
+        if (!mdsMinuteIngestService.isLive()) {
+            return false;
+        }
+        QuantProperties.Kuangrui k = quantProperties.getKuangrui();
+        QuantProperties.Kuangrui.Mds mds = k == null ? null : k.getMds();
+        boolean doPull = mds == null || mds.isCollectPull();
+        boolean doFlush = mds == null || mds.isCollectFlush();
+        try {
+            Map<String, Object> st = mdsMinuteIngestService.status();
+            boolean subscribed = Boolean.TRUE.equals(st.get("subscribed"));
+            int upserted = 0;
+            if (subscribed && doFlush) {
+                upserted = mdsMinuteIngestService.flushBuckets();
+                log.info("[market-collect] MDS 订阅模式 flush upserted={}", upserted);
+                return true;
+            }
+            if (doPull) {
+                List<String> codes = new ArrayList<String>();
+                for (Map<String, String> u : tradePoolService.listUniverse()) {
+                    if (u.get("code") != null) {
+                        codes.add(u.get("code"));
+                    }
+                }
+                if (codes.isEmpty()) {
+                    codes.addAll(quantProperties.stockCodeList());
+                }
+                upserted = mdsMinuteIngestService.pullAndPersist(codes);
+                log.info("[market-collect] MDS pull codes={} upserted={}", codes.size(), upserted);
+                return true;
+            }
+            if (doFlush) {
+                upserted = mdsMinuteIngestService.flushBuckets();
+                log.info("[market-collect] MDS flush upserted={}", upserted);
+                return true;
+            }
+        } catch (Exception e) {
+            log.warn("[market-collect] MDS 路径失败，回退本地: {}", e.getMessage());
+            return false;
+        }
+        return false;
     }
 
     /**

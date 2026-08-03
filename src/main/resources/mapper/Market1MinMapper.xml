@@ -13,6 +13,8 @@
         <result column="close" property="close"/>
         <result column="volume" property="volume"/>
         <result column="amount" property="amount"/>
+        <result column="data_source" property="dataSource"/>
+        <result column="ingested_at" property="ingestedAt"/>
     </resultMap>
 
     <select id="countBySymbol" resultType="int">
@@ -20,7 +22,7 @@
     </select>
 
     <select id="selectRange" resultMap="OneMinMap">
-        SELECT id, symbol, trade_time, open, high, low, close, volume, amount
+        SELECT id, symbol, trade_time, open, high, low, close, volume, amount, data_source, ingested_at
         FROM market_1min
         WHERE symbol = #{symbol}
         <if test="start != null">AND trade_time &gt;= #{start}</if>
@@ -30,14 +32,17 @@
 
     <insert id="batchUpsert">
         INSERT INTO market_1min
-        (symbol, trade_time, open, high, low, close, volume, amount)
+        (symbol, trade_time, open, high, low, close, volume, amount, data_source, ingested_at)
         VALUES
         <foreach collection="list" item="item" separator=",">
             (#{item.symbol}, #{item.tradeTime}, #{item.open}, #{item.high}, #{item.low},
-             #{item.close}, #{item.volume}, #{item.amount})
+             #{item.close}, #{item.volume}, #{item.amount},
+             #{item.dataSource}, NOW())
         </foreach>
         ON DUPLICATE KEY UPDATE
             open = VALUES(open), high = VALUES(high), low = VALUES(low),
-            close = VALUES(close), volume = VALUES(volume), amount = VALUES(amount)
+            close = VALUES(close), volume = VALUES(volume), amount = VALUES(amount),
+            data_source = VALUES(data_source),
+            ingested_at = NOW()
     </insert>
 </mapper>

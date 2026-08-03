@@ -37,40 +37,15 @@ html[data-theme="night"] {
   --trans: 0.2s ease;
 }
 
-html[data-theme="day"] {
-  /* 数据流(day)：极浅灰底；背景为淡雅金融字符下落（淡蓝/淡绿拖尾，不抢阅读） */
-  --bg-0: #f7f9fc;
-  --bg-1: #eef2f7;
-  --bg-2: #e8edf4;
-  --panel: rgba(255, 255, 255, 0.95);
-  --panel-solid: #ffffff;
-  --header-bg: rgba(255, 255, 255, 0.94);
-  --border: #d8e0ea;
-  --border-focus: #3b82c4;
-  --text: #1a2332;
-  --muted: #64748b;
-  --accent: #2563a8;
-  --accent-deep: #1e4f86;
-  --buy: #0f766e;
-  --sell: #dc2626;
-  --warn: #c2410c;
-  --row-alt: rgba(37, 99, 168, 0.03);
-  --row-hover: rgba(37, 99, 168, 0.07);
-  --shadow: 0 6px 20px rgba(30, 45, 70, 0.06);
-  --chart-bg: rgba(248, 250, 252, 0.97);
-  --table-head: #eef2f7;
-  --glow-a: rgba(96, 148, 210, 0.1);
-  --glow-b: rgba(72, 168, 148, 0.08);
-  --accent-soft: rgba(37, 99, 168, 0.1);
-  --input-bg: #ffffff;
-  --input-bg-focus: #f8fafc;
-  --input-border-hover: #b8c5d6;
-  --focus-ring: rgba(37, 99, 168, 0.2);
-  --btn-secondary: #5b6b7c;
-  --btn-secondary-hover: #4a5868;
-  --panel-border-hover: #b8c5d6;
-  --table-border: rgba(216, 224, 234, 0.95);
-}
+/* 电路板：浅灰底板 + 青绿强调，透出 Canvas 走线 */
+
+/* 因子环：浅色底 + 淡蓝淡紫强调，透出同心粒子环 */
+
+/* 世界时钟：浅灰蓝底 + 蓝色强调，透出底部光带与城市时间 */
+
+/* 热力斑：浅色底 + 蓝青强调，透出扩散热力圆 */
+
+/* 等距K线：浅灰蓝 UI + 等距阳阴柱体漂浮背景 */
 
 /* 银河：青绿 UI + Three.js 3D 银河星空背景 */
 html[data-theme="forest"] {
@@ -108,39 +83,39 @@ html[data-theme="forest"] {
   --table-border: rgba(42, 74, 61, 0.55);
 }
 
-/* 极光：深蓝 UI + 粒子连线 / 流星 / 极光带 */
+/* 极光：浅色日间 UI + 流动极光帘背景（默认主题） */
 html[data-theme="cosmos"] {
-  --bg-0: #050810;
-  --bg-1: #0a1220;
-  --bg-2: #071018;
-  --panel: rgba(16, 24, 40, 0.82);
-  --panel-solid: #121c2e;
-  --header-bg: rgba(10, 16, 28, 0.78);
-  --border: #2a3a58;
-  --border-focus: #6eb6ff;
-  --text: #eaf0ff;
-  --muted: #9aacc8;
-  --accent: #6eb6ff;
-  --accent-deep: #4a8fd9;
-  --buy: #2dd4bf;
-  --sell: #f87171;
-  --warn: #fbbf24;
-  --row-alt: rgba(255, 255, 255, 0.03);
-  --row-hover: rgba(110, 182, 255, 0.1);
-  --shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
-  --chart-bg: rgba(6, 12, 24, 0.55);
-  --table-head: #152238;
-  --glow-a: rgba(110, 182, 255, 0.16);
-  --glow-b: rgba(99, 102, 241, 0.1);
-  --accent-soft: rgba(110, 182, 255, 0.14);
-  --input-bg: #0a1424;
-  --input-bg-focus: #101c30;
-  --input-border-hover: #3d5578;
-  --focus-ring: rgba(110, 182, 255, 0.28);
-  --btn-secondary: #2a3d5c;
-  --btn-secondary-hover: #355074;
-  --panel-border-hover: #3d5578;
-  --table-border: rgba(42, 58, 88, 0.55);
+  --bg-0: #f0f5fc;
+  --bg-1: #e8eef8;
+  --bg-2: #dde6f2;
+  --panel: rgba(255, 255, 255, 0.94);
+  --panel-solid: #ffffff;
+  --header-bg: rgba(255, 255, 255, 0.93);
+  --border: #c9d6e8;
+  --border-focus: #5a9fd4;
+  --text: #1a2432;
+  --muted: #64748b;
+  --accent: #4a8fc8;
+  --accent-deep: #3876a8;
+  --buy: #0f766e;
+  --sell: #dc2626;
+  --warn: #c2410c;
+  --row-alt: rgba(90, 159, 212, 0.04);
+  --row-hover: rgba(120, 145, 230, 0.08);
+  --shadow: 0 6px 20px rgba(40, 70, 110, 0.07);
+  --chart-bg: rgba(248, 250, 253, 0.97);
+  --table-head: #e8eef8;
+  --glow-a: rgba(90, 170, 230, 0.12);
+  --glow-b: rgba(150, 135, 220, 0.1);
+  --accent-soft: rgba(74, 143, 200, 0.12);
+  --input-bg: #ffffff;
+  --input-bg-focus: #f5f8fc;
+  --input-border-hover: #b0c0d0;
+  --focus-ring: rgba(90, 159, 212, 0.22);
+  --btn-secondary: #5b6b7c;
+  --btn-secondary-hover: #4a5868;
+  --panel-border-hover: #b0c0d0;
+  --table-border: rgba(201, 214, 232, 0.95);
 }
 
 /* 旧 interact 主题并入日间浅色 */

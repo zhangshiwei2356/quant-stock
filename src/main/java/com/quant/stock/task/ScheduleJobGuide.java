@@ -68,10 +68,10 @@ public final class ScheduleJobGuide {
         Map<String, Detail> m = new LinkedHashMap<String, Detail>();
         m.put("market-collect", new Detail(
                 "按全市场股票列表拉取/刷新本地 K 线（日线、分钟），保证后续扫描与回测有行情可用。",
-                "遍历 stock_basic / 配置 universe 中的全部标的。",
+                "遍历 stock_basic / 配置 universe 中的全部标的；若宽睿 MDS live 则走查询/订阅落库。",
                 "默认 FIXED_RATE 约 30 秒；建议仅在交易时段开启。",
-                "写入或更新 market_1min（唯一物理真相源）；更大周期查询时内存聚合。",
-                "真实行情 API 未接入时走本地 mock/已有 market_1min 回退；页面标「未实现」。"
+                "写入或更新 market_1min（唯一物理真相源）；更大周期查询时内存聚合；MDS 写入 data_source=MDS。",
+                "默认关宽睿时走本地 mock/已有 market_1min 回退；开启需 -Pkuangrui + quant.kuangrui.mds.enabled。"
         ));
         m.put("scan-and-trade", new Detail(
                 "实盘分钟级扫描：对唯一目标池标的计算信号，并按策略规则模拟下单/调仓。",

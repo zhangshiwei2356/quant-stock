@@ -8,7 +8,7 @@
 
 | 路径 | 说明 |
 |------|------|
-| `examples/` | 从官方包拷贝并脱敏的示例（地址为占位符） |
+| `examples/` | 阿里云模拟示例配置（公开非实盘地址）；对照见 `aliyun-sim.md` |
 | `local/` | 你的本地真实配置（**已 gitignore**），探针优先读这里 |
 
 ## 准备步骤
@@ -74,28 +74,40 @@ $env:QUANT_KUANGRUI_PASSWORD = "你的密码"
 mvn -Pkuangrui test "-Dtest=KuangruiLoginConnectivityTest"
 ```
 
-- 登录失败（当前常见）：测试失败，并提示日志中的 **Pre Logon 1045**  
-  （0.19.4 枚举：`OESERR_INVALID_USERNAME_OR_PASSWORD`）→ 即复现 M0 BLOCKED  
-- 可选断言「仍为 1045」：`mvn -Pkuangrui test "-Dtest=KuangruiLoginConnectivityTest#oesStillBlockedWithPreLogon1045" "-Dkuangrui.expect1045=true"`  
+- 登录成功：测试通过（当前本机已验证 M0 COMPLETE）
+- 若失败且日志含 **Pre Logon 1045**：`OESERR_INVALID_USERNAME_OR_PASSWORD` → 核对账号/加密
+- 可选历史断言「仍为 1045」：`…#oesStillBlockedWithPreLogon1045 -Dkuangrui.expect1045=true`（M0 已 COMPLETE 后通常不再需要）
 - IDEA：启用 Maven profile `kuangrui` 后，直接运行该类中的测试方法  
 
 默认 `mvn test` **不会**编译/运行该测试（无 `-Pkuangrui`）。
 
 ## 阿里云模拟环境（公开地址，非实盘）
 
-| 服务 | Host | 端口 |
-|------|------|------|
-| OES 委托 / 回报 / 查询 | `106.15.58.119` | `6101` / `6301` / `6401` |
-| MDS TCP / 查询 | `139.196.228.232` | `5103` / `5203` |
+厂商下发原文对照见 [`examples/aliyun-sim.md`](examples/aliyun-sim.md)。
+
+### OES 现货交易 `[oes_stk]`
+
+| 通道 | URL |
+|------|-----|
+| 委托 ord | `tcp://106.15.58.119:6101` |
+| 回报 rpt | `tcp://106.15.58.119:6301` |
+| 查询 qry | `tcp://106.15.58.119:6401` |
+
+### MDS 行情 `[mds_client]`
+
+| 通道 | URL |
+|------|-----|
+| 行情 TCP | `tcp://139.196.228.232:5103` |
+| 查询 qry | `tcp://139.196.228.232:5203` |
 
 账号密码由宽睿发放，写入环境变量或 `local/`（**勿入库**）。UDP 组播在公网模拟通常不可用，探针会 SKIP。
 
-### 当前实测（截至 2026-08-03 · 资料包已升 0.19.4.0）
+### 当前实测（截至 2026-08-03 · 资料包 0.19.4.0）
 
-- 上述 TCP 端口：本机可达（历史实测）
-- 登录：TCP 成功后 **Pre Logon `errorCode=1045`**（OES 与 MDS 相同）
-- **0.19.4** 中 `1045 = OESERR_INVALID_USERNAME_OR_PASSWORD`（用户名或密码非法）；另有 `1046` 密码锁定、`1047` 可选终端信息未通过校验
-- 排查优先：向宽睿确认账号开通、密码/加密与仿真柜台协议版本是否匹配新 API 包
+- 上述 TCP 端口：可达
+- 登录探针：OES 三通道 + MDS TCP/查询 **全部成功** → **`M0_STATUS=COMPLETE`**
+- 服务端 ApplVerId≈`0.19.1`，客户端 API `0.19.4.0`（协议兼容范围内）
+- 账号放 `local/credentials.ps1` 或环境变量（**勿入库**）
 
 ## 官方手册
 
@@ -109,5 +121,35 @@ mvn -Pkuangrui test "-Dtest=KuangruiLoginConnectivityTest"
 ## M0 完成标准
 
 - [x] `quant360-all-api` jar 可找到（或已 install 到本地 Maven 仓）
-- [ ] OES + MDS 仿真登录成功（当前仍常为 Pre Logon 1045）
-- [ ] `m0-env-check.ps1 -RunLoginProbe` 报告 `M0_STATUS=COMPLETE`
+- [x] OES + MDS 仿真登录成功（2026-08-03 本机探针）
+- [x] `m0-env-check.ps1 -RunLoginProbe` 报告 `M0_STATUS=COMPLETE`
+
+## M1 MDS L1 落库（可选）
+
+默认业务路径不变。启用步骤：
+
+1. `mvn install:install-file` 安装 `quant360-all-api`（同上）
+2. 准备 `local/mds_api_config.json` + 环境变量账号
+3. 以 profile 启动：
+
+```powershell
+mvn -Pkuangrui spring-boot:run
+# 或 IDEA 勾选 Maven profile kuangrui 后运行主类
+```
+
+4. 配置（勿入库密钥）：
+
+```yaml
+quant:
+  kuangrui:
+    enabled: true
+    mds:
+      enabled: true
+```
+
+5. 运维验收：
+   - `GET /api/ops/kuangrui/mds/status` → `live=true`
+   - `POST /api/ops/kuangrui/mds/pull` → `market_1min` 出现 `data_source=MDS`
+   - 或 `POST .../subscribe` 后由 `market-collect` / `flush` 落库
+
+实现位置：`src/main-kuangrui/java/.../KuangruiMdsMinuteIngestService.java`（仅 `-Pkuangrui` 编译）；主工程门面与换算在 `src/main/java/.../kuangrui/`。

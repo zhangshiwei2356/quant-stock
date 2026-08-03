@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="day">
+<html lang="zh-CN" data-theme="cosmos">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -8,21 +8,23 @@
     (function () {
       try {
         var t = localStorage.getItem('quant-theme');
-        if (t === 'interact') t = 'day';
+        if (t === 'interact' || t === 'finance' || t === 'day' || t === 'circuit' || t === 'rings' ||
+            t === 'worldclock' || t === 'heatspots' || t === 'isocandles' || t === 'orbits') t = 'cosmos';
         if (t === 'wave') t = 'forest';
-        if (t === 'matrix' || t === 'aurora' || t === 'vanta') t = 'night';
-        if (t === 'finance') t = 'day';
-        var ok = { day: 1, forest: 1, night: 1, cosmos: 1 };
-        // 无本地选择时默认「数据流」(day)
-        document.documentElement.setAttribute('data-theme', ok[t] ? t : 'day');
+        if (t === 'matrix' || t === 'vanta') t = 'night';
+        // 旧「aurora」别名并入极光日间
+        if (t === 'aurora') t = 'cosmos';
+        var ok = { cosmos: 1, forest: 1, night: 1 };
+        // 无本地选择时默认「极光」(cosmos) 日间
+        document.documentElement.setAttribute('data-theme', ok[t] ? t : 'cosmos');
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css?v=20260803-day-finrain-name"/>
+  <link rel="stylesheet" href="/css/style.css?v=20260803-no-orbits"/>
   <script src="/js/jquery.min.js"></script>
   <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/echarts.min.js"></script>
-  <script src="/js/particle-bg.js?v=20260803-day-finrain"></script>
+  <script src="/js/particle-bg.js?v=20260803-no-orbits"></script>
   <script src="/js/starfield-bg.js?v=20260718-milkyway"></script>
 </head>
 <body>
@@ -41,10 +43,9 @@
   <div class="header-actions">
     <label class="theme-field" for="themeSelect">主题
       <select id="themeSelect" aria-label="主题选择">
-        <option value="day" selected>数据流</option>
+        <option value="cosmos" selected>极光</option>
         <option value="night">夜盘</option>
         <option value="forest">银河</option>
-        <option value="cosmos">极光</option>
       </select>
     </label>
   </div>
@@ -1251,6 +1252,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260803-strategy-polish"></script>
+<script src="/js/stock-chart.js?v=20260803-data-source"></script>
 </body>
 </html>

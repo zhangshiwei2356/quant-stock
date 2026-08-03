@@ -306,16 +306,21 @@
   }
 
   var THEME_KEYS = {
-    day: 1, forest: 1, night: 1, cosmos: 1,
-    interact: 1, wave: 1, matrix: 1
+    cosmos: 1, forest: 1, night: 1,
+    wave: 1, matrix: 1
   };
 
   function applyTheme(theme) {
-    // 旧主题并入：交互粒子/金融科技→数据流(day)，波浪→银河，代码雨/极光/Vanta→夜盘
-    if (theme === 'interact' || theme === 'finance') theme = 'day';
+    // 已下线主题并入极光日间；波浪→银河；代码雨/Vanta→夜盘；旧 aurora→极光
+    if (theme === 'interact' || theme === 'finance' || theme === 'day' || theme === 'circuit' ||
+        theme === 'rings' || theme === 'worldclock' || theme === 'heatspots' || theme === 'isocandles' ||
+        theme === 'orbits') {
+      theme = 'cosmos';
+    }
     if (theme === 'wave') theme = 'forest';
-    if (theme === 'matrix' || theme === 'aurora' || theme === 'vanta') theme = 'night';
-    if (!THEME_KEYS[theme]) theme = 'day';
+    if (theme === 'matrix' || theme === 'vanta') theme = 'night';
+    if (theme === 'aurora') theme = 'cosmos';
+    if (!THEME_KEYS[theme]) theme = 'cosmos';
     document.documentElement.setAttribute('data-theme', theme);
     try { localStorage.setItem('quant-theme', theme); } catch (e) {}
     $('#themeSelect').val(theme);
@@ -338,9 +343,9 @@
   }
 
   function initTheme() {
-    var theme = 'day';
+    var theme = 'cosmos';
     try {
-      theme = localStorage.getItem('quant-theme') || document.documentElement.getAttribute('data-theme') || 'day';
+      theme = localStorage.getItem('quant-theme') || document.documentElement.getAttribute('data-theme') || 'cosmos';
     } catch (e) {}
     applyTheme(theme);
   }
@@ -1994,11 +1999,11 @@
   }
 
   var knowledgeTopics = [
-    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260803-day-finrain-name' },
+    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260803-data-source' },
     { id: 'readme', group: 'app', title: '项目 README', src: '/api/docs/readme' },
-    { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260728-macross-profiles' },
-    { id: 'memo', group: 'app', title: '能力与待办', src: '/docs/memo.html?v=20260803-kuangrui-0194' },
-    { id: 'kuangrui', group: 'app', title: '宽睿文档梳理', src: '/docs/kuangrui.html?v=20260803-kuangrui-0194' },
+    { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260803-data-source' },
+    { id: 'memo', group: 'app', title: '能力与待办', src: '/docs/memo.html?v=20260803-data-source' },
+    { id: 'kuangrui', group: 'app', title: '宽睿文档梳理', src: '/docs/kuangrui.html?v=20260804-m1' },
     { id: 'ashare', group: 'stock', title: 'A股基础', src: '/docs/ashare.html?v=20260720-nav-rename' },
     { id: 'session', group: 'stock', title: '交易时间', src: '/docs/session.html?v=20260720-nav-rename' },
     { id: 'kline', group: 'stock', title: 'K线', src: '/docs/kline.html?v=20260720-nav-rename' },

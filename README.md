@@ -209,7 +209,7 @@ sequenceDiagram
 - 进入应用先显示**初始化页**（`docs/home.html`）；侧栏一级菜单互斥展开，再点同一菜单收起并回初始化页
 - 展开一级菜单先显示介绍页（`docs/nav-*.html`），再点二级进入工作台/文档
 - 工作台顺序：**行情** → **个股回测** → **组合回测** → **目标池** → **账户** → **运维中心** → **策略管理** → **数据表** → **量化知识** → **应用说明**
-- 页头主题（`localStorage`）：数据流（默认，淡雅金融字符下落、淡蓝淡绿拖尾；内部 key 仍为 `day`）/ 夜盘 / 银河 / 极光
+- 页头主题（`localStorage`）：极光（默认日间）/ 夜盘 / 银河
 
 ---
 
@@ -218,8 +218,8 @@ sequenceDiagram
 - 种子目录：`src/main/resources/data/kline/`（仅导入用）
 - 演示股：模拟五只（空库启动灌 `market_1min`）；目标池可用 `scripts/fetch_min1_tdx.py --from-pool` 回填约 90 交易日 1 分钟
 - 区间：模拟样本约 `2025-07-17` ~ `2026-07-17`；TDX 1 分钟公开节点通常约 90 个交易日（以节点为准）
-- **物理真相源**：仅 `market_1min`；5/15/30/60/日/周/月一律内存聚合（已删除 `market_daily` / `market_minute` 与 legacy `stock_bar_*` / `bar_aggregate_meta`）
-- 1 分钟回填：`python scripts/fetch_min1_tdx.py --from-pool` 或 `--codes 600036 --sleep 0.2`
+- **物理真相源**：仅 `market_1min`（价额为**元**；`data_source`=`MOCK`/`TDX`/`MDS`；存量默认标 `TDX`）；5/15/30/60/日/周/月一律内存聚合
+- 1 分钟回填：`python scripts/fetch_min1_tdx.py --from-pool`（写入 `data_source=TDX`）；升级脚本 `scripts/sql/20260803_market_1min_data_source.sql`
 - 回测历史/分析：`bt_backtest_record` / `bt_backtest_analysis`（亦可落盘 `quant.history-dir`）；落库时写入注册策略 `strategy_id`
 - 重新生成模拟种子：`mvn -q compile exec:java -Dexec.mainClass=com.quant.stock.market.mock.MockKlineDataGenerator`
 
@@ -247,7 +247,9 @@ sequenceDiagram
 | `QUANT_RATE_LIMIT` / `quant.rate-limit-per-minute` | 回测/组合/批量每 IP 每分钟上限（默认 30，≤0 关闭） |
 | `quant.schedule.enabled` | 定时总闸（默认 true；各任务以库表为准） |
 | `quant.trade-mode` | `sim`（默认）本地模拟、即时 FILLED 并记账，不连柜台；`sdk` 先 SUBMITTED（占资/占仓），`sync-orders` 推进 FILLED 后再落账（当前为桩） |
-| `quant.market-mode` | `db`（默认）读 `market_1min`（更大周期内存聚合）；`json` 读 classpath JSON；`sdk` 走 `KlineSdkClient`（多为桩，宽睿 MDS 未接主路径） |
+| `quant.market-mode` | `db`（默认）读 `market_1min`（更大周期内存聚合）；`json` 读 classpath JSON；`sdk` 走 `KlineSdkClient`（多为桩） |
+| `quant.kuangrui.enabled` / `mds.enabled` | 宽睿旁路总闸 / MDS L1（**默认 false**）；真实客户端需 `mvn -Pkuangrui`；价÷10000 写 `market_1min(MDS)` |
+| `quant.kuangrui.config-dir` | MDS/OES JSON 目录（默认 `config/kuangrui/local`，可用 `QUANT_KUANGRUI_CONFIG_DIR`） |
 
 ---
 
@@ -279,6 +281,7 @@ sequenceDiagram
 | GET/POST `/api/ops/data-reconcile*` | `market_1min` 自洽闸（空/滞后/稀疏日/OHLC） |
 | GET/POST `/api/ops/st-pit` | ST as-of 日切；财报时钟边界说明 |
 | GET/POST `/api/ops/industry-reclass*` | 行业 reclass as-of 日志 |
+| GET/POST `/api/ops/kuangrui/mds/*` | 宽睿 MDS 状态/pull/订阅/flush/stop（默认 noop；`-Pkuangrui`+开关） |
 | GET `/api/account/turnover` | 换手门禁（日成交额/权益） |
 | GET `/api/account/ic-decay` | IC 衰减（半衰期/IR；只降仓） |
 | GET `/api/account/short-policy` | 禁空头边界（多头现货） |
@@ -308,9 +311,10 @@ sequenceDiagram
   - `data-validate`：检查 `market_1min` 覆盖与滞后（不再看日线/5 分钟旧表）
   - `sync-orders`：本地桩将 `SUBMITTED→FILLED` 并改仓；`trade-mode=sdk` 时策略在 sync 后才落现金/批次
   - `position-pnl-sync`：本地成本 + 最新价浮盈日志
-- 页面标「未实现」（缺外部 API）：`market-collect`
-- 对照：**应用说明 → 能力与待办**；宽睿对接：**应用说明 → 宽睿文档梳理**（分阶段：环境→MDS L1→OES 只读→报撤→静态/费率）
-- 宽睿 **M0**：资料包以 `OESAPI-JAVA-v0.19.4.0`（`quant360-all-api-0.19.4.0`）为准；`config/kuangrui/README.md` + `scripts/kuangrui/m0-env-check.ps1`；联通测试 `mvn -Pkuangrui test -Dtest=KuangruiLoginConnectivityTest`（对齐 Demo 登录）。阿里云 TCP 已通，预登录常见 `1045`=`OESERR_INVALID_USERNAME_OR_PASSWORD`，M0 仍 BLOCKED；主应用默认仍 `sim`+`db`
+- 页面标「未实现/缺外部默认」：`market-collect`（本地骨架；**可选**宽睿 MDS live 时 pull/flush，见下）
+- 对照：**应用说明 → 能力与待办**；宽睿对接：**应用说明 → 宽睿文档梳理**（M0✓ → M1 MDS 可选✓ → OES 只读 → 报撤 → 静态/费率）
+- 宽睿 **M0**：资料包 `OESAPI-JAVA-v0.19.4.0`；`config/kuangrui/examples/aliyun-sim.md`；探针 **OES+MDS 登录成功** → `M0_STATUS=COMPLETE`
+- 宽睿 **M1**（可选，默认关）：`mvn -Pkuangrui` + `quant.kuangrui.enabled/mds.enabled=true`；L1 订阅/查询 → 价÷10000 → `market_1min(data_source=MDS)`；运维 `GET/POST /api/ops/kuangrui/mds/{status,pull,subscribe,flush,stop}`；关开关行为与改前一致；默认仍 `sim`+`db`
 
 ---
 

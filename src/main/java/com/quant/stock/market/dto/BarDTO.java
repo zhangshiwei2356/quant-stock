@@ -36,6 +36,8 @@ public class BarDTO {
     private BigDecimal close;
     /** 成交量（股/手口径与数据源一致） */
     private BigDecimal volume;
+    /** 成交额（元）；可选，MDS 等源写入 {@code market_1min.amount} */
+    private BigDecimal amount;
 
     /** K 线周期（分钟）；null 时按 5 分钟（兼容既有 5 分钟调用方） */
     private Integer periodMinutes;

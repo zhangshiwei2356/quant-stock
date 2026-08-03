@@ -29,7 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 启动时若某演示股尚无 {@code market_1min}，则从 classpath:data/kline 导入 1 分钟种子；
+ * 启动时若某演示股尚无 {@code market_1min}，则从 classpath:data/kline 导入 1 分钟种子（data_source=MOCK）；
  * 优先 {@code MIN_1.json}，否则将 {@code MIN_5.json} 拆成 5 根同价量分摊的 1 分钟 bar。
  * 日线/更大周期由查询时聚合，不再落物理日线/5 分钟表。
  */
@@ -133,7 +133,7 @@ public class MockDataImporter {
         }
         for (int i = 0; i < dtos.size(); i += BATCH) {
             int to = Math.min(i + BATCH, dtos.size());
-            coreMarketBarService.saveMinutes1(dtos.subList(i, to));
+            coreMarketBarService.saveMinutes1(dtos.subList(i, to), MarketDataSources.MOCK);
         }
         log.info("market_1min 写入 {} bars={}", code, dtos.size());
         return dtos.size();

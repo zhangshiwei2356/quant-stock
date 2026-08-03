@@ -286,6 +286,52 @@ public class QuantProperties {
     private Session session = new Session();
 
     /**
+     * 宽睿 Quant360 对接开关（前缀 {@code quant.kuangrui}）。
+     * 默认全关；主路径仍为 {@code sim}+{@code db}。真实 MDS 实现仅 {@code -Pkuangrui} 编译进包。
+     */
+    private Kuangrui kuangrui = new Kuangrui();
+
+    /**
+     * 宽睿对接配置。
+     */
+    @Data
+    public static class Kuangrui {
+        /** 总闸；false 时不装配真实 MDS/OES 客户端 */
+        private boolean enabled = false;
+        /** 外部配置目录（含 mds/oes json；默认可指向 gitignore 的 local） */
+        private String configDir = "config/kuangrui/local";
+        private Mds mds = new Mds();
+        private Oes oes = new Oes();
+
+        @Data
+        public static class Mds {
+            /** MDS L1 摄入；需同时 {@code kuangrui.enabled=true} */
+            private boolean enabled = false;
+            /** 相对 {@link Kuangrui#configDir} 的 MDS JSON 文件名 */
+            private String configFile = "mds_api_config.json";
+            /**
+             * 订阅/拉取标的，逗号分隔；空则用目标池 universe，再空则用 {@code quant.stock-codes}。
+             */
+            private String subscribeCodes = "";
+            /** 可选登录加密类型（对齐 {@code OesLogonEncryptType#value()}）；null=跟 Demo 不显式设置 */
+            private Integer encryptType;
+            /** market-collect 在 MDS live 时是否优先 pull；默认 true */
+            private boolean collectPull = true;
+            /** market-collect 是否在订阅模式下只 flush；默认 true */
+            private boolean collectFlush = true;
+        }
+
+        @Data
+        public static class Oes {
+            /** OES 对接（M2/M3，尚未实现业务） */
+            private boolean enabled = false;
+            /** 报单总闸；默认 false */
+            private boolean orderEnabled = false;
+            private String configFile = "oes_api_config.json";
+        }
+    }
+
+    /**
      * 会话引擎配置（前缀 {@code quant.session}）。
      */
     @Data

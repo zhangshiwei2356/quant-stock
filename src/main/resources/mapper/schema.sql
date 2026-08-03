@@ -32,15 +32,24 @@ CREATE TABLE IF NOT EXISTS `market_1min` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
   `symbol` VARCHAR(10) NOT NULL COMMENT '股票代码',
   `trade_time` DATETIME NOT NULL COMMENT '1分钟K起始时间',
-  `open` DECIMAL(10,4) NOT NULL,
-  `high` DECIMAL(10,4) NOT NULL,
-  `low` DECIMAL(10,4) NOT NULL,
-  `close` DECIMAL(10,4) NOT NULL,
+  `open` DECIMAL(10,4) NOT NULL COMMENT '开盘价(元)',
+  `high` DECIMAL(10,4) NOT NULL COMMENT '最高价(元)',
+  `low` DECIMAL(10,4) NOT NULL COMMENT '最低价(元)',
+  `close` DECIMAL(10,4) NOT NULL COMMENT '收盘价(元)',
   `volume` BIGINT NOT NULL COMMENT '成交量(股)',
   `amount` DECIMAL(16,4) DEFAULT NULL COMMENT '成交额(元)',
+  `data_source` VARCHAR(16) NOT NULL DEFAULT 'TDX' COMMENT '行情来源: MOCK/TDX/MDS',
+  `ingested_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '入库时间',
   UNIQUE KEY `idx_symbol_time` (`symbol`, `trade_time`),
-  KEY `idx_time` (`trade_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='1分钟线原始行情表(唯一物理真相源)';
+  KEY `idx_time` (`trade_time`),
+  KEY `idx_data_source` (`data_source`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='1分钟线原始行情表(唯一物理真相源;价额一律为元)';
+
+-- 已有库升级（幂等）：补来源字段；存量默认 TDX（通达信/历史回填口径）
+-- ALTER TABLE `market_1min` ADD COLUMN `data_source` VARCHAR(16) NOT NULL DEFAULT 'TDX' COMMENT '行情来源: MOCK/TDX/MDS' AFTER `amount`;
+-- ALTER TABLE `market_1min` ADD COLUMN `ingested_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '入库时间' AFTER `data_source`;
+-- ALTER TABLE `market_1min` ADD KEY `idx_data_source` (`data_source`);
+-- UPDATE `market_1min` SET `data_source`='TDX' WHERE `data_source` IS NULL OR `data_source`='';
 
 -- ---------- 模块三：因子缓存 ----------
 CREATE TABLE IF NOT EXISTS `factor_daily` (

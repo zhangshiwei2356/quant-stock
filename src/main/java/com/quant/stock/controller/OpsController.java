@@ -6,6 +6,7 @@ import com.quant.stock.admin.DataReconcileGateService;
 import com.quant.stock.admin.EffectiveParamsService;
 import com.quant.stock.admin.IndustryReclassService;
 import com.quant.stock.admin.SystemParamsService;
+import com.quant.stock.kuangrui.KuangruiMdsOpsFacade;
 import com.quant.stock.risk.StPitService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
@@ -37,6 +38,7 @@ public class OpsController {
     private final ActiveStrategyService activeStrategyService;
     private final ObjectProvider<StPitService> stPitProvider;
     private final ObjectProvider<IndustryReclassService> industryReclassProvider;
+    private final ObjectProvider<KuangruiMdsOpsFacade> kuangruiMdsOpsProvider;
 
     /** 全市场数据健康抽检（覆盖率、缺口、异常项）。 */
     @GetMapping("/data-health")
@@ -201,5 +203,70 @@ public class OpsController {
             return m;
         }
         return svc.syncFromStockBasic();
+    }
+
+    /** 宽睿 MDS 状态（默认 noop；-Pkuangrui + 开关开启后为真实客户端）。 */
+    @GetMapping("/kuangrui/mds/status")
+    public Map<String, Object> kuangruiMdsStatus() {
+        KuangruiMdsOpsFacade f = kuangruiMdsOpsProvider.getIfAvailable();
+        if (f == null) {
+            Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("live", false);
+            m.put("hint", "需要 quant.db-enabled=true");
+            return m;
+        }
+        return f.status();
+    }
+
+    /** MDS 查询通道拉取快照并落库 market_1min(MDS)。 */
+    @PostMapping("/kuangrui/mds/pull")
+    public Map<String, Object> kuangruiMdsPull() {
+        KuangruiMdsOpsFacade f = kuangruiMdsOpsProvider.getIfAvailable();
+        if (f == null) {
+            Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("ok", false);
+            m.put("message", "需要 quant.db-enabled=true");
+            return m;
+        }
+        return f.pull();
+    }
+
+    /** 启动 MDS L1 TCP 订阅（目标池或配置标的）。 */
+    @PostMapping("/kuangrui/mds/subscribe")
+    public Map<String, Object> kuangruiMdsSubscribe() {
+        KuangruiMdsOpsFacade f = kuangruiMdsOpsProvider.getIfAvailable();
+        if (f == null) {
+            Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("ok", false);
+            m.put("message", "需要 quant.db-enabled=true");
+            return m;
+        }
+        return f.startSubscribe();
+    }
+
+    /** 停止 MDS 订阅并关闭连接。 */
+    @PostMapping("/kuangrui/mds/stop")
+    public Map<String, Object> kuangruiMdsStop() {
+        KuangruiMdsOpsFacade f = kuangruiMdsOpsProvider.getIfAvailable();
+        if (f == null) {
+            Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("ok", false);
+            m.put("message", "需要 quant.db-enabled=true");
+            return m;
+        }
+        return f.stopSubscribe();
+    }
+
+    /** 将 MDS 分钟桶刷入 market_1min。 */
+    @PostMapping("/kuangrui/mds/flush")
+    public Map<String, Object> kuangruiMdsFlush() {
+        KuangruiMdsOpsFacade f = kuangruiMdsOpsProvider.getIfAvailable();
+        if (f == null) {
+            Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("ok", false);
+            m.put("message", "需要 quant.db-enabled=true");
+            return m;
+        }
+        return f.flush();
     }
 }

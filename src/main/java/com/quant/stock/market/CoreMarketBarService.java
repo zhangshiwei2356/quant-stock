@@ -6,9 +6,11 @@ import com.quant.stock.market.dto.Market1MinDO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.annotation.PostConstruct;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,6 +27,62 @@ public class CoreMarketBarService {
     private static final int BATCH_SIZE = 500;
 
     private final Market1MinMapper market1MinMapper;
+    private final JdbcTemplate jdbcTemplate;
+
+    @PostConstruct
+    public void ensureDataSourceColumns() {
+        ensureColumn("data_source",
+                "ALTER TABLE `market_1min` ADD COLUMN `data_source` VARCHAR(16) NOT NULL DEFAULT 'TDX' "
+                        + "COMMENT '行情来源: MOCK/TDX/MDS' AFTER `amount`");
+        ensureColumn("ingested_at",
+                "ALTER TABLE `market_1min` ADD COLUMN `ingested_at` DATETIME DEFAULT CURRENT_TIMESTAMP "
+                        + "COMMENT '入库时间' AFTER `data_source`");
+        ensureIndex("idx_data_source",
+                "ALTER TABLE `market_1min` ADD KEY `idx_data_source` (`data_source`)");
+        // 存量空值标为通达信
+        try {
+            int n = jdbcTemplate.update(
+                    "UPDATE `market_1min` SET `data_source`='TDX' "
+                            + "WHERE `data_source` IS NULL OR TRIM(`data_source`)=''");
+            if (n > 0) {
+                log.info("market_1min 存量 data_source 标为 TDX，更新行数={}", n);
+            }
+        } catch (Exception e) {
+            log.warn("market_1min data_source 回填跳过: {}", e.getMessage());
+        }
+    }
+
+    private void ensureColumn(String column, String alterSql) {
+        try {
+            Integer cnt = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(1) FROM information_schema.COLUMNS "
+                            + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'market_1min' AND COLUMN_NAME = ?",
+                    Integer.class, column);
+            if (cnt != null && cnt > 0) {
+                return;
+            }
+            jdbcTemplate.execute(alterSql);
+            log.info("market_1min 已增加列 {}", column);
+        } catch (Exception e) {
+            log.warn("market_1min ensureColumn {} 失败: {}", column, e.getMessage());
+        }
+    }
+
+    private void ensureIndex(String indexName, String alterSql) {
+        try {
+            Integer cnt = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(1) FROM information_schema.STATISTICS "
+                            + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'market_1min' AND INDEX_NAME = ?",
+                    Integer.class, indexName);
+            if (cnt != null && cnt > 0) {
+                return;
+            }
+            jdbcTemplate.execute(alterSql);
+            log.info("market_1min 已增加索引 {}", indexName);
+        } catch (Exception e) {
+            log.warn("market_1min ensureIndex {} 失败: {}", indexName, e.getMessage());
+        }
+    }
 
     /** 是否已有 {@code market_1min} 数据。 */
     public boolean hasOneMin(String symbol) {
@@ -32,16 +90,25 @@ public class CoreMarketBarService {
     }
 
     /**
-     * 写入/更新 market_1min（物理 1 分钟 K）。
+     * 写入/更新 market_1min（默认来源 {@link MarketDataSources#TDX}）。
      */
     @Transactional(rollbackFor = Exception.class)
     public int saveMinutes1(List<BarDTO> bars) {
+        return saveMinutes1(bars, MarketDataSources.TDX);
+    }
+
+    /**
+     * 写入/更新 market_1min，并标记 {@code data_source}。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public int saveMinutes1(List<BarDTO> bars, String dataSource) {
         if (bars == null || bars.isEmpty()) {
             return 0;
         }
+        String src = MarketDataSources.normalize(dataSource);
         List<Market1MinDO> list = new ArrayList<Market1MinDO>(bars.size());
         for (BarDTO bar : bars) {
-            Market1MinDO row = Market1MinDO.fromBarDTO(bar);
+            Market1MinDO row = Market1MinDO.fromBarDTO(bar, src);
             if (row != null && row.getSymbol() != null && row.getTradeTime() != null) {
                 list.add(row);
             }

@@ -1,9 +1,8 @@
 /**
  * 多主题动态背景（无第三方依赖）
- * - night / matrix：夜盘深色 + 慢速代码雨
- * - day / interact：数据流 —— 淡雅金融字符下落（淡蓝淡绿拖尾）
+ * - cosmos：日间极光 —— 浅色天幕 + 柔和极光帘 + 淡粒子连线，界面名「极光」（默认）
  * - forest / wave：背景由 starfield-bg.js（Three.js 银河）负责，界面名「银河」
- * - cosmos：粒子连线 + 流星 + 极光带，界面名「极光」
+ * - night / matrix：夜盘深色 + 慢速代码雨
  * pointer-events:none，交互监听挂在 window，不挡点击。
  */
 (function (global) {
@@ -18,12 +17,9 @@
   var bursts = [];
   var waves = [];
   var matrixCols = [];
-  var finCols = [];
-  var techNodes = [];
-  var dataBeams = [];
   var rafId = 0;
   var running = false;
-  var theme = 'day';
+  var theme = 'cosmos';
   var t0 = 0;
   var mouse = { x: -9999, y: -9999, active: false };
   var mouseBound = false;
@@ -62,40 +58,6 @@
       tailMax: 44,
       layers: true
     },
-    /* 数据流(day) · 淡雅金融字符下落：极浅底 + 淡蓝/淡绿拖尾 */
-    day: {
-      mode: 'finrain',
-      bg: '247, 249, 252',
-      trail: 0.14,
-      fontSize: 13,
-      colGap: 1.35,
-      density: 0.62,
-      speed: 0.42,
-      tailMin: 8,
-      tailMax: 22,
-      headAlpha: 0.22,
-      tailAlpha: 0.045,
-      blue: [96, 148, 210],
-      green: [72, 168, 148],
-      glow: [186, 210, 232, 0.06]
-    },
-    /* 兼容旧主题 key：与 day 相同 */
-    interact: {
-      mode: 'finrain',
-      bg: '247, 249, 252',
-      trail: 0.14,
-      fontSize: 13,
-      colGap: 1.35,
-      density: 0.62,
-      speed: 0.42,
-      tailMin: 8,
-      tailMax: 22,
-      headAlpha: 0.22,
-      tailAlpha: 0.045,
-      blue: [96, 148, 210],
-      green: [72, 168, 148],
-      glow: [186, 210, 232, 0.06]
-    },
     /* 银河：Canvas 侧停用，由 QuantStarfieldBg 绘制（保留 key 防误调） */
     forest: {
       mode: 'off',
@@ -105,22 +67,39 @@
       mode: 'off',
       bg: '10, 20, 17'
     },
+
+    /* 极光(cosmos) · 默认日间：浅色天幕 + 流动极光帘 + 淡粒子 */
     cosmos: {
-      mode: 'net', count: 130, connect: 170, speed: 1.25,
-      bg: '5, 8, 16', trail: 0.14, particle: [210, 230, 255],
-      line: '140, 190, 255', lineAlpha: 0.75, glow: [40, 70, 160, 0.24],
-      stars: true, meteors: true, aurora: true, auroraSpeed: 0.0011,
-      auroraColors: [[80, 140, 255, 0.22], [160, 100, 255, 0.16], [40, 220, 255, 0.12]]
+      mode: 'net',
+      count: 72,
+      connect: 130,
+      speed: 0.42,
+      bg: '240, 245, 252',
+      trail: 1,
+      particle: [110, 155, 210],
+      line: '130, 170, 215',
+      lineAlpha: 0.18,
+      glow: [170, 205, 240, 0.1],
+      stars: false,
+      meteors: false,
+      aurora: true,
+      auroraDay: true,
+      auroraSpeed: 0.00038,
+      noInput: true,
+      softDots: true,
+      auroraColors: [
+        [90, 170, 230, 0.16],
+        [120, 145, 230, 0.13],
+        [70, 195, 175, 0.12],
+        [150, 135, 220, 0.1],
+        [100, 200, 210, 0.09]
+      ]
     }
   };
 
   /* 半角片假名主导，贴近电影字幕雨字形 */
   var MATRIX_CHARS = 'ﾊﾐﾋｰｳｼﾅﾓﾆｻﾜﾂｵﾘｱﾎﾃﾏｹﾒｴｶｷﾑﾕﾗｾﾈｽﾀﾇﾍｦｧｨｩｪｫｬｭｮｯｰ012345789Z:・.*=+<>¦';
   var MATRIX_CHAR_LEN = MATRIX_CHARS.length;
-
-  /* 数据流字符：数字 + 常见行情/金融符号 */
-  var FIN_CHARS = '0123456789.,%$¥€£+-↑↓▲▼·=<>|/\\KMBbp∞≈';
-  var FIN_CHAR_LEN = FIN_CHARS.length;
 
   function matrixRandChar() {
     return MATRIX_CHARS.charAt((Math.random() * MATRIX_CHAR_LEN) | 0);
@@ -154,40 +133,6 @@
     };
   }
 
-  function finRandChar() {
-    return FIN_CHARS.charAt((Math.random() * FIN_CHAR_LEN) | 0);
-  }
-
-  function createFinColumn(i, gap, fs, c) {
-    var tMin = c.tailMin || 8;
-    var tMax = c.tailMax || 22;
-    var len = tMin + ((Math.random() * (tMax - tMin + 1)) | 0);
-    var roll = Math.random();
-    var layer = roll < 0.3 ? 0 : (roll < 0.7 ? 1 : 2);
-    var glyphs = new Array(len);
-    var g;
-    for (g = 0; g < len; g++) glyphs[g] = finRandChar();
-    var tintRoll = Math.random();
-    var tint = tintRoll < 0.46 ? 'blue' : (tintRoll < 0.92 ? 'green' : 'mix');
-    var speedBase = (c.speed || 0.42) * (0.35 + Math.random() * 1.45);
-    if (layer === 0) speedBase *= 0.55;
-    else if (layer === 2) speedBase *= 1.15;
-    return {
-      x: i * gap + fs * 0.5 + (Math.random() - 0.5) * 3,
-      y: Math.random() * -height * 1.3,
-      speed: speedBase,
-      font: fs * (layer === 0 ? 0.9 : (layer === 2 ? 1.05 : 1)),
-      len: len,
-      glyphs: glyphs,
-      layer: layer,
-      tint: tint,
-      lastRow: -9999,
-      wait: (Math.random() * 140) | 0,
-      alphaMul: layer === 2 ? 1 : (layer === 1 ? 0.72 : 0.42),
-      phase: Math.random() * Math.PI * 2
-    };
-  }
-
   function prefersReducedMotion() {
     try {
       return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -196,7 +141,7 @@
     }
   }
 
-  function cfg() { return THEMES[theme] || THEMES.day; }
+  function cfg() { return THEMES[theme] || THEMES.cosmos; }
 
   function rgba(arr, a) {
     return 'rgba(' + arr[0] + ',' + arr[1] + ',' + arr[2] + ',' + (a != null ? a : arr[3]) + ')';
@@ -504,6 +449,24 @@
       return;
     }
 
+    if (c.softDots) {
+      var sdFlicker = 0.75 + 0.25 * Math.sin(time * 0.0012 * this.pulse + this.phase);
+      var sdR = this.radius * (0.7 + 0.35 * sdFlicker);
+      var sdG = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, sdR * 3.2);
+      sdG.addColorStop(0, rgba(p, 0.28 * sdFlicker));
+      sdG.addColorStop(0.4, rgba(p, 0.1 * sdFlicker));
+      sdG.addColorStop(1, rgba(p, 0));
+      ctx.beginPath();
+      ctx.fillStyle = sdG;
+      ctx.arc(this.x, this.y, sdR * 3.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.fillStyle = rgba(p, 0.35 * sdFlicker);
+      ctx.arc(this.x, this.y, sdR * 0.55, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
+
     var flicker = 0.55 + 0.45 * Math.sin(time * 0.008 * this.pulse + this.phase);
     if (c.firefly) {
       flicker = 0.25 + 0.75 * (0.5 + 0.5 * Math.sin(time * 0.012 * this.pulse + this.phase));
@@ -733,22 +696,6 @@
     bursts.length = 0;
     waves.length = 0;
     matrixCols.length = 0;
-    finCols.length = 0;
-    techNodes.length = 0;
-    dataBeams.length = 0;
-
-    if (c.mode === 'finrain') {
-      var ffs = c.fontSize || 13;
-      if (width < 768) ffs = Math.max(11, (ffs * 0.9) | 0);
-      var fgap = (c.colGap != null ? c.colGap : 1.35) * ffs;
-      var fcols = ((width / fgap) | 0) + 1;
-      var fdensity = c.density != null ? c.density : 0.62;
-      for (var fi = 0; fi < fcols; fi++) {
-        if (Math.random() > fdensity) continue;
-        finCols.push(createFinColumn(fi, fgap, ffs, c));
-      }
-      return;
-    }
 
     if (c.mode === 'matrix') {
       var fs = c.fontSize || 15;
@@ -789,87 +736,10 @@
     for (var p = 0; p < count; p++) {
       particles.push(new Particle(c, mode));
     }
-    if (c.mode === 'ambient' && c.tech) {
-      initDayTechLayer(c);
-    }
     if (c.meteors) {
       var mc = width < 768 ? 2 : 4;
       for (var m = 0; m < mc; m++) meteors.push(new Meteor());
     }
-  }
-
-  function initDayTechLayer(c) {
-    var n = c.nodeCount || 20;
-    if (width < 768) n = Math.max(10, Math.floor(n * 0.55));
-    var pal = c.palette || [c.particle];
-    var i;
-    for (i = 0; i < n; i++) {
-      var col = pal[i % pal.length];
-      // 偏置到边缘/上下带，中心工作区更干净
-      var edge = Math.random();
-      var nx, ny, zone;
-      if (edge < 0.3) {
-        nx = Math.random() * width * 0.2;
-        ny = Math.random() * height;
-        zone = 'L';
-      } else if (edge < 0.6) {
-        nx = width * (0.8 + Math.random() * 0.2);
-        ny = Math.random() * height;
-        zone = 'R';
-      } else if (edge < 0.78) {
-        nx = Math.random() * width;
-        ny = Math.random() * height * 0.18;
-        zone = 'T';
-      } else {
-        nx = Math.random() * width;
-        ny = height * (0.78 + Math.random() * 0.22);
-        zone = 'B';
-      }
-      techNodes.push({
-        x: nx,
-        y: ny,
-        homeX: nx,
-        homeY: ny,
-        zone: zone,
-        vx: (Math.random() - 0.5) * 0.16,
-        vy: (Math.random() - 0.5) * 0.16,
-        phase: Math.random() * Math.PI * 2,
-        pulse: 0.55 + Math.random() * 1.1,
-        r: 1.0 + Math.random() * 1.25,
-        color: col,
-        ring: Math.random() < 0.28 ? Math.random() : -1,
-        hex: Math.random() < 0.22
-      });
-    }
-    var beams = c.beamCount || 3;
-    if (width < 768) beams = Math.max(2, beams - 1);
-    for (i = 0; i < beams; i++) {
-      dataBeams.push(createDataBeam(c));
-    }
-  }
-
-  function createDataBeam(c) {
-    var step = (c && c.gridStep) || 72;
-    var hzRatio = (c && c.horizon != null) ? c.horizon : 0.46;
-    var horiz = Math.random() < 0.72;
-    var pos;
-    if (horiz) {
-      // 仅地板区域：贴合透视横线
-      pos = height * (hzRatio + Math.random() * (1 - hzRatio) * 0.95);
-      pos = Math.round(pos / 8) * 8;
-    } else {
-      pos = Math.random() * width;
-      pos = Math.round(pos / step) * step + (step * 0.5);
-    }
-    return {
-      horiz: horiz,
-      pos: pos,
-      t: -0.05 - Math.random() * 0.2,
-      speed: 0.00085 + Math.random() * 0.0014,
-      len: 0.1 + Math.random() * 0.15,
-      thick: 1.05 + Math.random() * 1.1,
-      wait: (Math.random() * 110) | 0
-    };
   }
 
   function connectParticles(c) {
@@ -897,387 +767,12 @@
     }
   }
 
-  function drawTechGrid(c, time) {
-    if (!c.tech || !c.grid) return;
-    if (c.perspective && c.mode === 'ambient') {
-      drawDayPerspectiveGrid(c, time);
-      return;
-    }
-    var step = c.gridStep || 56;
-    var drift = (time * 0.012) % step;
-    var gCol = c.gridColor || '56, 189, 248';
-    var gA = c.gridAlpha != null ? c.gridAlpha : 0.045;
-    var sCol = c.scanColor || gCol;
-    var sA = c.scanAlpha != null ? c.scanAlpha : 0.04;
-    ctx.save();
-    ctx.strokeStyle = 'rgba(' + gCol + ', ' + gA + ')';
-    ctx.lineWidth = 1;
-    var x, y;
-    for (x = -step + drift; x < width + step; x += step) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
-      ctx.stroke();
-    }
-    for (y = -step + drift * 0.5; y < height + step; y += step) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
-      ctx.stroke();
-    }
-    var scanY = ((time * 0.045) % (height + 80)) - 40;
-    var sg = ctx.createLinearGradient(0, scanY - 30, 0, scanY + 30);
-    sg.addColorStop(0, 'rgba(' + sCol + ', 0)');
-    sg.addColorStop(0.5, 'rgba(' + sCol + ', ' + sA + ')');
-    sg.addColorStop(1, 'rgba(' + sCol + ', 0)');
-    ctx.fillStyle = sg;
-    ctx.fillRect(0, scanY - 30, width, 60);
-    ctx.restore();
-  }
-
-  /** 日间透视地平线网格：下方科技地板 + 地平线辉光 + 中心留白 */
-  function drawDayPerspectiveGrid(c, time) {
-    var gCol = c.gridColor || '108, 148, 196';
-    var gA = c.gridAlpha != null ? c.gridAlpha : 0.038;
-    var sCol = c.scanColor || '42, 118, 208';
-    var sA = c.scanAlpha != null ? c.scanAlpha : 0.04;
-    var horizon = height * (c.horizon != null ? c.horizon : 0.46);
-    var vanishingX = width * 0.5 + Math.sin(time * 0.00015) * width * 0.028;
-    var floorH = height - horizon;
-    var i, t, y, x0, alpha, scanT, scanY, ease;
-
-    ctx.save();
-
-    // 地板底色微渐变（近处略蓝，远地平线更淡）
-    var floorG = ctx.createLinearGradient(0, horizon, 0, height);
-    floorG.addColorStop(0, 'rgba(' + sCol + ', 0)');
-    floorG.addColorStop(0.35, 'rgba(' + gCol + ', 0.02)');
-    floorG.addColorStop(1, 'rgba(' + sCol + ', 0.035)');
-    ctx.fillStyle = floorG;
-    ctx.fillRect(0, horizon, width, floorH + 2);
-
-    // 地平线辉光带
-    var hz = ctx.createLinearGradient(0, horizon - 28, 0, horizon + 18);
-    var hzPulse = 0.7 + 0.3 * Math.sin(time * 0.0008);
-    hz.addColorStop(0, 'rgba(' + sCol + ', 0)');
-    hz.addColorStop(0.55, 'rgba(' + sCol + ', ' + (0.045 * hzPulse) + ')');
-    hz.addColorStop(1, 'rgba(' + sCol + ', 0)');
-    ctx.fillStyle = hz;
-    ctx.fillRect(0, horizon - 28, width, 46);
-
-    // 地平线
-    ctx.beginPath();
-    ctx.moveTo(0, horizon);
-    ctx.lineTo(width, horizon);
-    ctx.strokeStyle = 'rgba(' + sCol + ', ' + (gA * 2.4 * hzPulse) + ')';
-    ctx.lineWidth = 1.15;
-    ctx.stroke();
-
-    // 透视纵线（地板）—— 中段更密、两侧更疏
-    ctx.beginPath();
-    for (i = -5; i <= 13; i++) {
-      t = i / 9;
-      x0 = vanishingX + (t - 0.5) * width * 1.75;
-      ctx.moveTo(vanishingX, horizon);
-      ctx.lineTo(x0, height + 24);
-    }
-    ctx.strokeStyle = 'rgba(' + gCol + ', ' + (gA * 1.25) + ')';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    // 透视横线：ease 近疏远密，近处更亮
-    var rows = width < 768 ? 9 : 11;
-    var drift = (time * 0.00007) % 1;
-    for (i = 0; i < rows; i++) {
-      t = (i + drift) / rows;
-      ease = t * t * (3 - 2 * t); // smoothstep 近处更疏
-      y = horizon + floorH * (0.08 + 0.92 * ease);
-      alpha = gA * (0.25 + 1.05 * ease);
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
-      ctx.strokeStyle = 'rgba(' + gCol + ', ' + alpha + ')';
-      ctx.lineWidth = ease > 0.75 ? 1.2 : 1;
-      ctx.stroke();
-    }
-
-    // 慢扫描带（仅地板区域）
-    scanT = (time * 0.000065) % 1;
-    scanY = horizon + (floorH + 50) * scanT - 16;
-    var sg = ctx.createLinearGradient(0, scanY - 32, 0, scanY + 32);
-    sg.addColorStop(0, 'rgba(' + sCol + ', 0)');
-    sg.addColorStop(0.5, 'rgba(' + sCol + ', ' + sA + ')');
-    sg.addColorStop(1, 'rgba(' + sCol + ', 0)');
-    ctx.fillStyle = sg;
-    ctx.fillRect(0, Math.max(horizon - 4, scanY - 32), width, 64);
-
-    // 中心柔白罩：抬升工作区可读性（略强于 v2）
-    var vg = ctx.createRadialGradient(
-      width * 0.5, height * 0.34, Math.min(width, height) * 0.1,
-      width * 0.5, height * 0.4, Math.max(width, height) * 0.58
-    );
-    vg.addColorStop(0, 'rgba(246, 248, 252, 0.34)');
-    vg.addColorStop(0.45, 'rgba(246, 248, 252, 0.12)');
-    vg.addColorStop(1, 'rgba(246, 248, 252, 0)');
-    ctx.fillStyle = vg;
-    ctx.fillRect(0, 0, width, height);
-
-    ctx.restore();
-  }
-
-  function drawDayHudCorners(c, time) {
-    var col = c.scanColor || c.gridColor || '47, 120, 210';
-    var pulse = 0.6 + 0.4 * Math.sin(time * 0.0009);
-    var a = 0.1 + 0.07 * pulse;
-    var L = Math.min(36, Math.max(22, Math.min(width, height) * 0.038));
-    var inset = 14;
-    var tick = 5;
-    ctx.save();
-    ctx.strokeStyle = 'rgba(' + col + ', ' + a + ')';
-    ctx.lineWidth = 1.1;
-    ctx.lineCap = 'square';
-    var corners = [
-      [inset, inset, 1, 1],
-      [width - inset, inset, -1, 1],
-      [inset, height - inset, 1, -1],
-      [width - inset, height - inset, -1, -1]
-    ];
-    var ci, p, cx, cy, sx, sy;
-    for (ci = 0; ci < corners.length; ci++) {
-      p = corners[ci];
-      cx = p[0]; cy = p[1]; sx = p[2]; sy = p[3];
-      ctx.beginPath();
-      ctx.moveTo(cx, cy + sy * L);
-      ctx.lineTo(cx, cy);
-      ctx.lineTo(cx + sx * L, cy);
-      ctx.stroke();
-      // 内侧小刻度
-      ctx.beginPath();
-      ctx.moveTo(cx + sx * tick, cy + sy * (L * 0.35));
-      ctx.lineTo(cx + sx * tick, cy + sy * (L * 0.35 + tick));
-      ctx.moveTo(cx + sx * (L * 0.35), cy + sy * tick);
-      ctx.lineTo(cx + sx * (L * 0.35 + tick), cy + sy * tick);
-      ctx.strokeStyle = 'rgba(' + col + ', ' + (a * 0.7) + ')';
-      ctx.stroke();
-      ctx.strokeStyle = 'rgba(' + col + ', ' + a + ')';
-    }
-    ctx.restore();
-  }
-
-  function drawDayTechNodes(c, time) {
-    if (!techNodes.length) return;
-    var maxD = c.connect || 155;
-    var maxD2 = maxD * maxD;
-    var line = c.line || '86, 136, 196';
-    var lineA = c.lineAlpha != null ? c.lineAlpha : 0.18;
-    var lim = 0.28;
-    var cx0 = width * 0.5;
-    var cy0 = height * 0.4;
-    var clearR = Math.min(width, height) * 0.22;
-    var clearR2 = clearR * clearR;
-    var i, j, n, dx, dy, dist, alpha, flicker, s, bestJ, bestD, secondJ, secondD, hx, hy;
-
-    for (i = 0; i < techNodes.length; i++) {
-      n = techNodes[i];
-      n.vx += Math.sin(time * 0.0003 + n.phase) * 0.001;
-      n.vy += Math.cos(time * 0.00026 + n.phase * 1.2) * 0.001;
-      // 回锚：贴边游荡，避免涌入中心工作区
-      hx = n.homeX != null ? n.homeX : n.x;
-      hy = n.homeY != null ? n.homeY : n.y;
-      n.vx += (hx - n.x) * 0.0009;
-      n.vy += (hy - n.y) * 0.0009;
-      dx = n.x - cx0;
-      dy = n.y - cy0;
-      dist = dx * dx + dy * dy;
-      if (dist < clearR2) {
-        dist = Math.sqrt(dist) || 1;
-        n.vx += (dx / dist) * 0.06;
-        n.vy += (dy / dist) * 0.06;
-      }
-      if (mouse.active) {
-        dx = mouse.x - n.x;
-        dy = mouse.y - n.y;
-        dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        if (dist < 200) {
-          var pull = (1 - dist / 200) * 0.028;
-          n.vx += (dx / dist) * pull;
-          n.vy += (dy / dist) * pull;
-        }
-      }
-      n.vx = Math.max(-lim, Math.min(lim, n.vx));
-      n.vy = Math.max(-lim, Math.min(lim, n.vy));
-      n.x += n.vx;
-      n.y += n.vy;
-      if (n.x < 6 || n.x > width - 6) n.vx *= -0.85;
-      if (n.y < 6 || n.y > height - 6) n.vy *= -0.85;
-      n.x = Math.max(4, Math.min(width - 4, n.x));
-      n.y = Math.max(4, Math.min(height - 4, n.y));
-      if (n.ring >= 0) {
-        n.ring += 0.0038 + 0.0012 * n.pulse;
-        if (n.ring > 1.1) n.ring = Math.random() < 0.35 ? 0 : -1;
-      } else if (Math.random() < 0.0009) {
-        n.ring = 0;
-      }
-    }
-
-    // 每节点最多连最近 2 个邻居（更干净、更快）
-    for (i = 0; i < techNodes.length; i++) {
-      bestJ = -1; bestD = maxD2;
-      secondJ = -1; secondD = maxD2;
-      for (j = 0; j < techNodes.length; j++) {
-        if (j === i) continue;
-        dx = techNodes[i].x - techNodes[j].x;
-        dy = techNodes[i].y - techNodes[j].y;
-        dist = dx * dx + dy * dy;
-        if (dist >= maxD2) continue;
-        if (dist < bestD) {
-          secondJ = bestJ; secondD = bestD;
-          bestJ = j; bestD = dist;
-        } else if (dist < secondD) {
-          secondJ = j; secondD = dist;
-        }
-      }
-      if (bestJ > i) {
-        dist = Math.sqrt(bestD);
-        alpha = (1 - dist / maxD) * lineA;
-        ctx.beginPath();
-        ctx.moveTo(techNodes[i].x, techNodes[i].y);
-        ctx.lineTo(techNodes[bestJ].x, techNodes[bestJ].y);
-        ctx.strokeStyle = 'rgba(' + line + ', ' + alpha + ')';
-        ctx.lineWidth = 0.7;
-        ctx.stroke();
-      }
-      if (secondJ > i) {
-        dist = Math.sqrt(secondD);
-        alpha = (1 - dist / maxD) * lineA * 0.7;
-        ctx.beginPath();
-        ctx.moveTo(techNodes[i].x, techNodes[i].y);
-        ctx.lineTo(techNodes[secondJ].x, techNodes[secondJ].y);
-        ctx.strokeStyle = 'rgba(' + line + ', ' + alpha + ')';
-        ctx.lineWidth = 0.6;
-        ctx.stroke();
-      }
-    }
-
-    for (i = 0; i < techNodes.length; i++) {
-      n = techNodes[i];
-      flicker = 0.72 + 0.28 * Math.sin(time * 0.003 * n.pulse + n.phase);
-      s = n.r * (0.92 + 0.14 * flicker);
-
-      if (n.ring >= 0) {
-        var rr = 5 + n.ring * 30;
-        ctx.beginPath();
-        ctx.arc(n.x, n.y, rr, 0, Math.PI * 2);
-        ctx.strokeStyle = rgba(n.color, (0.14 * (1 - n.ring)) * flicker);
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
-
-      var gg = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, s * 4);
-      gg.addColorStop(0, rgba(n.color, 0.14 * flicker));
-      gg.addColorStop(1, rgba(n.color, 0));
-      ctx.fillStyle = gg;
-      ctx.beginPath();
-      ctx.arc(n.x, n.y, s * 4, 0, Math.PI * 2);
-      ctx.fill();
-
-      if (n.hex) {
-        drawHexNode(n.x, n.y, s * 1.5, n.color, flicker);
-      } else {
-        ctx.beginPath();
-        ctx.moveTo(n.x, n.y - s * 1.4);
-        ctx.lineTo(n.x + s * 1.0, n.y);
-        ctx.lineTo(n.x, n.y + s * 1.4);
-        ctx.lineTo(n.x - s * 1.0, n.y);
-        ctx.closePath();
-        ctx.fillStyle = rgba([255, 255, 255], 0.55 * flicker);
-        ctx.fill();
-        ctx.strokeStyle = rgba(n.color, 0.48 + 0.26 * flicker);
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
-    }
-  }
-
-  function drawHexNode(x, y, r, color, flicker) {
-    var a, px, py, k;
-    ctx.beginPath();
-    for (k = 0; k < 6; k++) {
-      a = Math.PI / 6 + k * Math.PI / 3;
-      px = x + Math.cos(a) * r;
-      py = y + Math.sin(a) * r;
-      if (k === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    }
-    ctx.closePath();
-    ctx.fillStyle = rgba([255, 255, 255], 0.5 * flicker);
-    ctx.fill();
-    ctx.strokeStyle = rgba(color, 0.52 + 0.28 * flicker);
-    ctx.lineWidth = 1;
-    ctx.stroke();
-  }
-
-  function drawDayDataBeams(c, time) {
-    if (!dataBeams.length) return;
-    var col = c.scanColor || '47, 120, 210';
-    var i, b, head, span, x0, x1, y0, y1, g;
-    for (i = 0; i < dataBeams.length; i++) {
-      b = dataBeams[i];
-      if (b.wait > 0) {
-        b.wait--;
-        continue;
-      }
-      b.t += b.speed;
-      if (b.t > 1.25) {
-        dataBeams[i] = createDataBeam(c);
-        dataBeams[i].wait = 40 + ((Math.random() * 120) | 0);
-        continue;
-      }
-      if (b.t < 0) continue;
-      head = b.t;
-      span = b.len;
-      if (b.horiz) {
-        x0 = (head - span) * width;
-        x1 = head * width;
-        y0 = b.pos;
-        g = ctx.createLinearGradient(x0, y0, x1, y0);
-        g.addColorStop(0, 'rgba(' + col + ', 0)');
-        g.addColorStop(0.6, 'rgba(' + col + ', 0.06)');
-        g.addColorStop(1, 'rgba(' + col + ', 0.2)');
-        ctx.strokeStyle = g;
-        ctx.lineWidth = b.thick;
-        ctx.beginPath();
-        ctx.moveTo(x0, y0);
-        ctx.lineTo(x1, y0);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.fillStyle = 'rgba(' + col + ', 0.32)';
-        ctx.arc(x1, y0, 2.0, 0, Math.PI * 2);
-        ctx.fill();
-      } else {
-        y0 = (head - span) * height;
-        y1 = head * height;
-        x0 = b.pos;
-        g = ctx.createLinearGradient(x0, y0, x0, y1);
-        g.addColorStop(0, 'rgba(' + col + ', 0)');
-        g.addColorStop(0.6, 'rgba(' + col + ', 0.06)');
-        g.addColorStop(1, 'rgba(' + col + ', 0.2)');
-        ctx.strokeStyle = g;
-        ctx.lineWidth = b.thick;
-        ctx.beginPath();
-        ctx.moveTo(x0, y0);
-        ctx.lineTo(x0, y1);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.fillStyle = 'rgba(' + col + ', 0.32)';
-        ctx.arc(x0, y1, 2.0, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-  }
-
   function drawAurora(c, time) {
     if (!c.aurora || !c.auroraColors) return;
+    if (c.auroraDay) {
+      drawDayAuroraRibbons(c, time);
+      return;
+    }
     var sp = c.auroraSpeed || 0.001;
     for (var i = 0; i < c.auroraColors.length; i++) {
       var col = c.auroraColors[i];
@@ -1294,6 +789,111 @@
     }
   }
 
+  /** 日间极光：竖直流动光帘（多层正弦偏移 + 纵向渐隐） */
+  function drawDayAuroraRibbons(c, time) {
+    var sp = c.auroraSpeed || 0.00038;
+    var colors = c.auroraColors;
+    var i, col, baseX, amp, amp2, freq, freq2, phase, bandW, y, x, t, aTop, aMid, grad;
+    var step = height < 700 ? 5 : 4;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+
+    for (i = 0; i < colors.length; i++) {
+      col = colors[i];
+      baseX = width * (0.12 + (i / Math.max(1, colors.length - 1)) * 0.76);
+      amp = width * (0.04 + (i % 3) * 0.012);
+      amp2 = width * (0.018 + (i % 2) * 0.01);
+      freq = 0.008 + i * 0.0011;
+      freq2 = 0.015 + i * 0.0007;
+      phase = time * sp * (1.1 + i * 0.35) + i * 1.7;
+      bandW = 18 + i * 5 + Math.sin(time * sp * 2 + i) * 4;
+
+      // 主体光帘：自上而下渐隐，中段略亮
+      for (y = -20; y <= height + 20; y += step) {
+        t = y / height;
+        x = baseX
+          + Math.sin(y * freq + phase) * amp
+          + Math.sin(y * freq2 + phase * 1.35) * amp2
+          + Math.cos(time * sp * 1.2 + i + y * 0.002) * (width * 0.012);
+        aTop = col[3] * (0.35 + 0.65 * Math.sin(Math.PI * Math.min(1, Math.max(0, t * 1.15))));
+        aMid = aTop * (0.55 + 0.45 * Math.sin(time * sp * 3.2 + i + t * 4));
+        if (aMid < 0.01) continue;
+
+        grad = ctx.createLinearGradient(x - bandW, y, x + bandW, y);
+        grad.addColorStop(0, rgba(col, 0));
+        grad.addColorStop(0.35, rgba(col, aMid * 0.55));
+        grad.addColorStop(0.5, rgba(col, aMid));
+        grad.addColorStop(0.65, rgba(col, aMid * 0.55));
+        grad.addColorStop(1, rgba(col, 0));
+        ctx.fillStyle = grad;
+        ctx.fillRect(x - bandW, y, bandW * 2, step + 1);
+      }
+
+      // 顶部柔光团：增强「极光从天幕洒下」感
+      var hx = baseX + Math.sin(phase * 0.7) * width * 0.06;
+      var hy = height * (0.08 + (i % 3) * 0.05);
+      var hr = Math.max(width, height) * (0.14 + (i % 2) * 0.04);
+      var hg = ctx.createRadialGradient(hx, hy, 0, hx, hy, hr);
+      hg.addColorStop(0, rgba(col, col[3] * 0.55));
+      hg.addColorStop(0.45, rgba(col, col[3] * 0.18));
+      hg.addColorStop(1, rgba(col, 0));
+      ctx.fillStyle = hg;
+      ctx.beginPath();
+      ctx.arc(hx, hy, hr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  function drawDayAuroraScene(c, time) {
+    var bg = c.bg || '240, 245, 252';
+    ctx.fillStyle = 'rgb(' + bg + ')';
+    ctx.fillRect(0, 0, width, height);
+
+    // 天幕微渐变：上略冷蓝，下更浅
+    var sky = ctx.createLinearGradient(0, 0, 0, height);
+    sky.addColorStop(0, 'rgba(190, 215, 245, 0.35)');
+    sky.addColorStop(0.45, 'rgba(220, 232, 245, 0.12)');
+    sky.addColorStop(1, 'rgba(245, 248, 252, 0)');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, width, height);
+
+    if (c.glow) {
+      var vg = ctx.createRadialGradient(
+        width * 0.5, height * 0.2, 0,
+        width * 0.5, height * 0.35, Math.max(width, height) * 0.7
+      );
+      vg.addColorStop(0, rgba(c.glow, c.glow[3]));
+      vg.addColorStop(1, rgba(c.glow, 0));
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, width, height);
+    }
+
+    drawAurora(c, time);
+
+    var i;
+    for (i = 0; i < particles.length; i++) {
+      particles[i].update(c, time);
+    }
+    if (c.connect) connectParticles(c);
+    for (i = 0; i < particles.length; i++) {
+      particles[i].draw(c, time);
+    }
+
+    // 中心留白，保证工作台可读
+    var veil = ctx.createRadialGradient(
+      width * 0.5, height * 0.38, Math.min(width, height) * 0.1,
+      width * 0.5, height * 0.42, Math.max(width, height) * 0.58
+    );
+    veil.addColorStop(0, 'rgba(' + bg + ', 0.42)');
+    veil.addColorStop(0.45, 'rgba(' + bg + ', 0.14)');
+    veil.addColorStop(1, 'rgba(' + bg + ', 0)');
+    ctx.fillStyle = veil;
+    ctx.fillRect(0, 0, width, height);
+  }
+
   function drawTrailBase(c) {
     ctx.fillStyle = 'rgba(' + c.bg + ',' + (c.trail != null ? c.trail : 0.2) + ')';
     ctx.fillRect(0, 0, width, height);
@@ -1302,122 +902,6 @@
     g.addColorStop(0, rgba(c.glow, c.glow[3]));
     g.addColorStop(1, rgba(c.glow, 0));
     ctx.fillStyle = g;
-    ctx.fillRect(0, 0, width, height);
-  }
-
-  function drawFinRain(c) {
-    // 浅底软溶解，拖尾淡雅、不糊成一片
-    var fade = c.trail != null ? c.trail : 0.14;
-    ctx.fillStyle = 'rgba(' + (c.bg || '247, 249, 252') + ', ' + fade + ')';
-    ctx.fillRect(0, 0, width, height);
-
-    if (c.glow) {
-      var vg = ctx.createRadialGradient(
-        width * 0.5, height * 0.3, 0,
-        width * 0.5, height * 0.45, Math.max(width, height) * 0.7
-      );
-      vg.addColorStop(0, rgba(c.glow, c.glow[3]));
-      vg.addColorStop(1, rgba(c.glow, 0));
-      ctx.fillStyle = vg;
-      ctx.fillRect(0, 0, width, height);
-    }
-
-    var blue = c.blue || [96, 148, 210];
-    var green = c.green || [72, 168, 148];
-    var headA = c.headAlpha != null ? c.headAlpha : 0.22;
-    var tailA = c.tailAlpha != null ? c.tailAlpha : 0.045;
-    var fs0 = (finCols[0] && finCols[0].font) || c.fontSize || 13;
-    ctx.font = fs0 + 'px "Consolas", "Cascadia Mono", "Courier New", monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.shadowBlur = 0;
-
-    var i, col, fs, len, r, y, ch, t, aMul, headRow, gi, colRgb, a;
-
-    for (i = 0; i < finCols.length; i++) {
-      col = finCols[i];
-      if (col.wait > 0) {
-        col.wait--;
-        continue;
-      }
-
-      fs = col.font;
-      len = col.len;
-      aMul = col.alphaMul || 1;
-
-      headRow = (col.y / fs) | 0;
-      if (headRow !== col.lastRow) {
-        col.lastRow = headRow;
-        col.glyphs.unshift(finRandChar());
-        while (col.glyphs.length > len) col.glyphs.pop();
-        if (col.glyphs.length > 3 && Math.random() < 0.18) {
-          gi = 1 + ((Math.random() * (col.glyphs.length - 2)) | 0);
-          col.glyphs[gi] = finRandChar();
-        }
-      }
-
-      if (Math.abs(fs - fs0) > 0.1) {
-        ctx.font = fs + 'px "Consolas", "Cascadia Mono", "Courier New", monospace';
-        fs0 = fs;
-      }
-
-      for (r = 0; r < len; r++) {
-        y = col.y - r * fs;
-        if (y < -fs || y > height + fs) continue;
-        ch = col.glyphs[r];
-        if (!ch) continue;
-
-        if (col.tint === 'green') colRgb = green;
-        else if (col.tint === 'mix') colRgb = r % 2 === 0 ? blue : green;
-        else colRgb = blue;
-
-        t = r / Math.max(1, len - 1);
-        if (r === 0) {
-          a = headA * aMul;
-          colRgb = [
-            Math.min(255, colRgb[0] + 28),
-            Math.min(255, colRgb[1] + 22),
-            Math.min(255, colRgb[2] + 18)
-          ];
-        } else {
-          a = (headA * (1 - t * 0.85) * 0.55 + tailA * (1 - t)) * aMul;
-          a *= (0.85 + 0.15 * Math.sin(col.phase + r * 0.35));
-        }
-        if (a < 0.012) continue;
-
-        ctx.globalAlpha = a;
-        ctx.fillStyle = 'rgb(' + colRgb[0] + ',' + colRgb[1] + ',' + colRgb[2] + ')';
-        ctx.fillText(ch, col.x, y);
-      }
-
-      ctx.globalAlpha = 1;
-      col.y += col.speed * (0.9 + fs * 0.03);
-
-      if (col.y - len * fs > height + fs * 2) {
-        if (Math.random() > 0.82) {
-          var next = createFinColumn(i, fs * (c.colGap != null ? c.colGap : 1.35), (c.fontSize || 13), c);
-          next.x = col.x;
-          next.wait = 30 + ((Math.random() * 160) | 0);
-          finCols[i] = next;
-        } else {
-          col.y = -fs * (2 + Math.random() * 12);
-          col.lastRow = -9999;
-          col.speed = (c.speed || 0.42) * (0.35 + Math.random() * 1.45) * (col.layer === 0 ? 0.55 : (col.layer === 2 ? 1.15 : 1));
-          col.glyphs.unshift(finRandChar());
-          while (col.glyphs.length > len) col.glyphs.pop();
-        }
-      }
-    }
-
-    // 极淡中心柔白，保证工作区文字可读
-    var veil = ctx.createRadialGradient(
-      width * 0.5, height * 0.36, Math.min(width, height) * 0.12,
-      width * 0.5, height * 0.42, Math.max(width, height) * 0.62
-    );
-    veil.addColorStop(0, 'rgba(247, 249, 252, 0.28)');
-    veil.addColorStop(0.5, 'rgba(247, 249, 252, 0.1)');
-    veil.addColorStop(1, 'rgba(247, 249, 252, 0)');
-    ctx.fillStyle = veil;
     ctx.fillRect(0, 0, width, height);
   }
 
@@ -1585,53 +1069,10 @@
       ctx.fillRect(0, 0, width, height);
     }
     drawAurora(c, time);
-    if (c.tech) {
-      drawTechGrid(c, time);
-    }
     var i;
     for (i = 0; i < particles.length; i++) {
       particles[i].update(c, time);
       particles[i].draw(c, time);
-    }
-    if (c.tech) {
-      drawDayTechNodes(c, time);
-      drawDayDataBeams(c, time);
-      drawDayHudCorners(c, time);
-      if (mouse.active) {
-        drawDayMouseAccent(c, time);
-      }
-    }
-  }
-
-  /** 日间鼠标点缀：地板区十字准星，上半区柔光点 */
-  function drawDayMouseAccent(c, time) {
-    var sCol = c.scanColor || '42, 118, 208';
-    var horizon = height * (c.horizon != null ? c.horizon : 0.46);
-    var mp = 0.75 + 0.25 * Math.sin(time * 0.003);
-    var mc = sCol.split(',').map(function (x) { return parseInt(x, 10); });
-    var mr = mouse.y > horizon ? 90 : 70;
-    var mg = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, mr);
-    mg.addColorStop(0, rgba(mc, (mouse.y > horizon ? 0.08 : 0.05) * mp));
-    mg.addColorStop(0.5, rgba(mc, 0.02 * mp));
-    mg.addColorStop(1, rgba(mc, 0));
-    ctx.fillStyle = mg;
-    ctx.beginPath();
-    ctx.arc(mouse.x, mouse.y, mr, 0, Math.PI * 2);
-    ctx.fill();
-    if (mouse.y > horizon) {
-      var tick = 14 + 3 * mp;
-      ctx.beginPath();
-      ctx.moveTo(mouse.x - tick, mouse.y);
-      ctx.lineTo(mouse.x + tick, mouse.y);
-      ctx.moveTo(mouse.x, mouse.y - tick);
-      ctx.lineTo(mouse.x, mouse.y + tick);
-      ctx.strokeStyle = 'rgba(' + sCol + ', ' + (0.14 * mp) + ')';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(mouse.x, mouse.y, 3.2, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(' + sCol + ', ' + (0.2 * mp) + ')';
-      ctx.stroke();
     }
   }
 
@@ -1640,8 +1081,11 @@
       drawAmbient(c, time);
       return;
     }
+    if (c.auroraDay) {
+      drawDayAuroraScene(c, time);
+      return;
+    }
     drawTrailBase(c);
-    drawTechGrid(c, time);
     drawAurora(c, time);
     var i;
     for (i = 0; i < particles.length; i++) {
@@ -1724,7 +1168,6 @@
     var c = cfg();
 
     if (c.mode === 'matrix') drawMatrix(c);
-    else if (c.mode === 'finrain') drawFinRain(c);
     else if (c.mode === 'wave') drawWaves(c, time);
     else drawNetOrInteract(c, time);
 
@@ -1815,9 +1258,10 @@
       running = true;
       window.addEventListener('resize', onResize);
       document.addEventListener('visibilitychange', onVisibility);
-      bindInput();
       rafId = requestAnimationFrame(frame);
     }
+    if (c.noInput) unbindInput();
+    else bindInput();
     canvas.style.display = 'block';
   }
 
@@ -1834,7 +1278,7 @@
   }
 
   function setTheme(name) {
-    if (!name || !THEMES[name]) name = 'day';
+    if (!name || !THEMES[name]) name = 'cosmos';
     theme = name;
     if (prefersReducedMotion()) { stop(); return; }
     if (THEMES[name] && THEMES[name].mode === 'off') { stop(); return; }

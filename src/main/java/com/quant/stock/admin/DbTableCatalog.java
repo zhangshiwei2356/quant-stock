@@ -75,8 +75,8 @@ public final class DbTableCatalog {
                 "本地初始化 / Mock 导入 / 后续可对接交易所或第三方证券基础信息 API。",
                 "行情浏览全市场列表、盘后目标池扫描 universe、个股展示名称；status=0 的标的通常排除在扫描外。");
         add(m, "market_1min", "1分钟行情(唯一真相源)", "行情", "id DESC",
-                "唯一物理行情层：1 分钟 OHLCV；5/15/30/60/日/周/月均由此聚合。",
-                "TDX 回填脚本 fetch_min1_tdx.py、收盘清算/采集落库、空库 Mock 种子。",
+                "唯一物理行情层：1 分钟 OHLCV（价额为元）；data_source 区分 MOCK/TDX/MDS。",
+                "TDX 回填 fetch_min1_tdx.py（TDX）、空库 Mock 种子（MOCK）、后续宽睿 MDS（MDS）。",
                 "K 线查询、回测、scan-and-trade、因子计算（日线由 1 分钟聚合后写入 factor_daily）。");
         add(m, "factor_daily", "日频因子缓存", "因子", "id DESC",
                 "缓存日频技术指标（MA/RSI/ATR 等）；入池粗筛可读最新行（ma5>ma20 / ma60向上 / 放量）。",

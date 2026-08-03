@@ -10,7 +10,7 @@
 
 <h4>默认行情 / 交易模式</h4>
 <ul>
-  <li><b><code>quant.market-mode=db</code>（行情从哪来）</b>：K 线只读本地 MySQL <code>market_1min</code>；5/15/30/60/日/周/月一律内存聚合。空库启动自动灌演示 1 分钟种子。可选 <code>json</code>（classpath JSON，偏开发）、<code>sdk</code>（外部行情客户端，当前多为桩；宽睿 MDS 尚未接入主路径）</li>
+  <li><b><code>quant.market-mode=db</code>（行情从哪来）</b>：K 线只读本地 MySQL <code>market_1min</code>；5/15/30/60/日/周/月一律内存聚合。空库启动自动灌演示 1 分钟种子。可选 <code>json</code>（classpath JSON，偏开发）、<code>sdk</code>（外部行情客户端，当前多为桩）。宽睿 MDS L1 落库为<strong>旁路开关</strong>（默认关）：<code>quant.kuangrui.*</code>，需 <code>mvn -Pkuangrui</code> 打包</li>
   <li><b><code>quant.trade-mode=sim</code>（单怎么成交）</b>：本地模拟账本——下单即时 <code>FILLED</code> 并改现金/持仓，可持久化；<strong>不连券商柜台</strong>。可选 <code>sdk</code>：先 <code>SUBMITTED</code> 占资/占仓，由 <code>sync-orders</code> 再推进成交（当前仍为本地桩；宽睿 OES 尚未替换）</li>
   <li>二者组合含义：默认开箱即用「库内行情 + 本地模拟成交」，可回测/扫池/纸面账户，无需宽睿或券商账号</li>
 </ul>
@@ -39,9 +39,9 @@
 <h4>模拟数据与默认参数</h4>
 <ul>
   <li>演示股：模拟五只（空库灌 <code>market_1min</code>）；目标池用 <code>fetch_min1_tdx.py --from-pool</code> 回填约 90 交易日 1 分钟</li>
-  <li>物理真相源：仅 <code>market_1min</code>；更大周期内存聚合。灌数：<code>python scripts/fetch_min1_tdx.py --from-pool</code> 或 <code>--codes 600036</code></li>
+  <li>物理真相源：仅 <code>market_1min</code>（价额为元；<code>data_source</code>=MOCK/TDX/MDS，存量默认 TDX）；更大周期内存聚合。灌数：<code>python scripts/fetch_min1_tdx.py --from-pool</code> 或 <code>--codes 600036</code></li>
   <li>回测区间默认留空 = 全量 K 线；初始资金默认 <b>100000</b></li>
-  <li>页头主题默认<strong>数据流</strong>（淡雅金融字符下落，淡蓝/淡绿拖尾，不抢阅读；另可切夜盘 / 银河 / 极光并记住）</li>
+  <li>页头主题默认<strong>极光</strong>（浅色日间：流动极光帘 + 淡粒子）；另有夜盘 / 银河，可切换并记住</li>
 </ul>
 
 <h4>策略与风控摘要</h4>
@@ -60,7 +60,7 @@
   <li>限价/执行/对账/行业边界可查；组合回测对齐部成/压力降仓/成交缩量/停牌拒卖/ST as-of 强平/`atrRisk`；退役强制恢复双人复核</li>
   <li>账户「风控日报」含相关监控；委托支持撤/部成/改价；运维数据健康可跑对账闸；scan/sync/settle 锁忙手动执行 failLoud</li>
   <li>单股 / 组合 / 扫描交易对齐核心规则；实盘为<strong>本地模拟账本</strong>（含风控/挂单持久化与路径对齐）</li>
-  <li>宽睿 OES/MDS：资料包 <code>v0.19.4.0</code>；见「宽睿文档梳理」。M0 脚手架就绪，可用 <code>mvn -Pkuangrui test -Dtest=KuangruiLoginConnectivityTest</code> 复现预登录 <code>1045</code>（=用户名或密码非法；仍 BLOCKED，未进 M1）；默认仍 <code>sim</code>+<code>db</code></li>
+  <li>宽睿 OES/MDS：资料包 <code>v0.19.4.0</code>；见「宽睿文档梳理」。M0 登录探针已 COMPLETE；<b>M1 MDS L1</b> 已落地为可选旁路（默认关）：价÷10000 → <code>market_1min(data_source=MDS)</code>；运维 <code>/api/ops/kuangrui/mds/*</code>；默认仍 <code>sim</code>+<code>db</code></li>
   <li>细则：「应用说明 → 交易规则」</li>
 </ul>
 

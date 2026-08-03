@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""从通达信拉取 1 分钟 K 线，并回填 quant_stock.market_1min。
+"""从通达信拉取 1 分钟 K 线，并回填 quant_stock.market_1min（data_source=TDX）。
 
 用法：
     python scripts/fetch_min1_tdx.py --codes 600036,000001 --sleep 0.2
@@ -7,6 +7,7 @@
 
 默认从 trade_pool 读取 status=1 的标的；未找到标的时必须传 --codes。
 仅写入 market_1min（唯一物理真相源）；更大周期由应用内存聚合，不再双写 5 分钟/日线表。
+价额以「元」入库；脚本幂等补齐 data_source/ingested_at，存量空值标为 TDX。
 
 TDX 的 get_security_bars(8, ...) 通常已以“股”返回 vol。少数节点会返回“手”；
 当整个下载批次的非零成交量均为 100 的整数倍且中位数不大于 10000 时，将其识别为
@@ -44,12 +45,50 @@ BATCH_SIZE = 500
 Bar = Tuple[str, str, float, float, float, float, int, float]
 
 UPSERT_1MIN = """
-    INSERT INTO market_1min(symbol, trade_time, open, high, low, close, volume, amount)
-    VALUES(%s,%s,%s,%s,%s,%s,%s,%s)
+    INSERT INTO market_1min(symbol, trade_time, open, high, low, close, volume, amount, data_source, ingested_at)
+    VALUES(%s,%s,%s,%s,%s,%s,%s,%s,'TDX',NOW())
     ON DUPLICATE KEY UPDATE
       open=VALUES(open), high=VALUES(high), low=VALUES(low), close=VALUES(close),
-      volume=VALUES(volume), amount=VALUES(amount)
+      volume=VALUES(volume), amount=VALUES(amount),
+      data_source=VALUES(data_source), ingested_at=NOW()
 """
+
+
+def ensure_market_1min_source_columns(cur: Any) -> None:
+    """幂等补齐 data_source / ingested_at；存量空值标为 TDX。"""
+    cur.execute(
+        "SELECT COUNT(1) FROM information_schema.COLUMNS "
+        "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='market_1min' AND COLUMN_NAME='data_source'"
+    )
+    if cur.fetchone()[0] == 0:
+        cur.execute(
+            "ALTER TABLE `market_1min` ADD COLUMN `data_source` VARCHAR(16) NOT NULL DEFAULT 'TDX' "
+            "COMMENT '行情来源: MOCK/TDX/MDS' AFTER `amount`"
+        )
+        print("ALTER market_1min ADD data_source", flush=True)
+    cur.execute(
+        "SELECT COUNT(1) FROM information_schema.COLUMNS "
+        "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='market_1min' AND COLUMN_NAME='ingested_at'"
+    )
+    if cur.fetchone()[0] == 0:
+        cur.execute(
+            "ALTER TABLE `market_1min` ADD COLUMN `ingested_at` DATETIME DEFAULT CURRENT_TIMESTAMP "
+            "COMMENT '入库时间' AFTER `data_source`"
+        )
+        print("ALTER market_1min ADD ingested_at", flush=True)
+    cur.execute(
+        "SELECT COUNT(1) FROM information_schema.STATISTICS "
+        "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='market_1min' AND INDEX_NAME='idx_data_source'"
+    )
+    if cur.fetchone()[0] == 0:
+        cur.execute("ALTER TABLE `market_1min` ADD KEY `idx_data_source` (`data_source`)")
+        print("ALTER market_1min ADD idx_data_source", flush=True)
+    cur.execute(
+        "UPDATE `market_1min` SET `data_source`='TDX' "
+        "WHERE `data_source` IS NULL OR TRIM(`data_source`)=''"
+    )
+    if cur.rowcount:
+        print(f"backfill data_source=TDX rows={cur.rowcount}", flush=True)
 
 
 def tdx_market(code: str) -> int:
@@ -155,6 +194,7 @@ def upsert_symbol(code: str, bars: Sequence[Bar]) -> int:
     conn = pymysql.connect(**DB)
     try:
         with conn.cursor() as cur:
+            ensure_market_1min_source_columns(cur)
             execute_batches(cur, UPSERT_1MIN, bars)
         conn.commit()
     except Exception:
