@@ -2851,6 +2851,19 @@ tbody tr:hover { background: var(--row-hover); }
   min-width: 0;
 }
 
+.strategy-unknown-banner {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px dashed var(--border);
+  background: color-mix(in srgb, var(--warn, #c2410c) 8%, transparent);
+  color: var(--muted);
+}
+
+.strategy-unknown-banner[hidden] {
+  display: none !important;
+}
+
 .strategy-eval-cards {
   display: flex;
   flex-wrap: wrap;

@@ -58,7 +58,7 @@
     <select id="selectSummaryByStrategyId" resultMap="RecMap">
         SELECT id, record_id, kind, saved_at, stock_code, stock_codes_json, period, back_start, back_end,
                init_capital, final_asset, total_rate, max_drawdown, total_trade_num, win_rate,
-               trade_stats_json, config_fingerprint, strategy_id, created_at
+               trade_stats_json, config_fingerprint, strategy_id
         FROM bt_backtest_record
         WHERE strategy_id = #{strategyId}
         <if test="kind != null and kind != '' and kind != 'ALL'">

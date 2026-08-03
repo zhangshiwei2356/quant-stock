@@ -160,7 +160,13 @@ public class BackTestHistoryStore {
         if (backtestRecordMapper == null || !StringUtils.hasText(strategyId)) {
             return Collections.emptyList();
         }
-        String kindFilter = StringUtils.hasText(kind) ? kind.trim() : null;
+        String kindFilter = null;
+        if (StringUtils.hasText(kind)) {
+            String k = kind.trim().toUpperCase();
+            if (!"ALL".equals(k)) {
+                kindFilter = k;
+            }
+        }
         List<BtBacktestRecordDO> rows = backtestRecordMapper.selectSummaryByStrategyId(
                 strategyId.trim(), kindFilter);
         List<Object> out = new ArrayList<Object>();

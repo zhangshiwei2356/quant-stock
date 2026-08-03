@@ -1554,6 +1554,35 @@
     return $panel;
   }
 
+  /** 回测分析摘要 + 事件列表（字段经 escHtml，避免注入） */
+  function appendEscapedAnalysisBody($panel, summary, events) {
+    $panel.append($('<p/>').html('<b>摘要</b>：' + escHtml(summary || '-')));
+    events = events || [];
+    if (!events.length) {
+      $panel.append($('<p class="hint"/>').text('无事件明细'));
+      return;
+    }
+    var $ul = $('<ol/>');
+    events.forEach(function (ev) {
+      var dataStr = '';
+      if (ev.data && typeof ev.data === 'object') {
+        var parts = [];
+        Object.keys(ev.data).forEach(function (k) {
+          parts.push(escHtml(k) + '=' + escHtml(String(ev.data[k])));
+        });
+        dataStr = parts.join('；');
+      }
+      var codeTxt = ev.stockCode ? ('[' + escHtml(ev.stockCode) + '] ') : '';
+      $ul.append($('<li/>').html(
+        '<b>' + escHtml(ev.time || '') + '</b> ' + codeTxt +
+        '<code>' + escHtml(ev.type || '') + '</code> ' + escHtml(ev.title || '') +
+        '<br/>原因：' + escHtml(ev.reason || '-') +
+        (dataStr ? ('<br/><span class="hint">数据：' + dataStr + '</span>') : '')
+      ));
+    });
+    $panel.append($ul);
+  }
+
   function renderAnalysisDetail(rec, $panel, $tb) {
     var openId = $panel.attr('data-open-id');
     $panel.empty();
@@ -1575,31 +1604,7 @@
       $panel.append($('<p class="hint"/>').text('未找到与该回测记录对应的分析（旧记录可能无分析，请重新回测）。'));
       return;
     }
-    var events = rec.events || [];
-    $panel.append($('<p/>').html('<b>摘要</b>：' + (rec.summary || '-')));
-    if (!events.length) {
-      $panel.append($('<p class="hint"/>').text('无事件明细'));
-      return;
-    }
-    var $ul = $('<ol/>');
-    events.forEach(function (ev) {
-      var dataStr = '';
-      if (ev.data && typeof ev.data === 'object') {
-        var parts = [];
-        Object.keys(ev.data).forEach(function (k) {
-          parts.push(k + '=' + ev.data[k]);
-        });
-        dataStr = parts.join('；');
-      }
-      var codeTxt = ev.stockCode ? ('[' + ev.stockCode + '] ') : '';
-      $ul.append($('<li/>').html(
-        '<b>' + (ev.time || '') + '</b> ' + codeTxt +
-        '<code>' + (ev.type || '') + '</code> ' + (ev.title || '') +
-        '<br/>原因：' + (ev.reason || '-') +
-        (dataStr ? ('<br/><span class="hint">数据：' + dataStr + '</span>') : '')
-      ));
-    });
-    $panel.append($ul);
+    appendEscapedAnalysisBody($panel, rec.summary, rec.events);
   }
 
   function showHistoryAnalysis(id, apiPath, $tr, $tb, colSpan) {
@@ -2491,8 +2496,21 @@
     });
   }
 
+  function renderStrategyUnknownBanner() {
+    var $hint = $('#strategyUnknownHint');
+    if (!$hint.length) return;
+    var n = Number(strategyEvalState.unknownCount || 0);
+    if (n > 0) {
+      $hint.prop('hidden', false)
+        .text('另有 ' + n + ' 条旧回测无 strategy_id，未计入任一策略聚合（不回填）');
+    } else {
+      $hint.prop('hidden', true).text('');
+    }
+  }
+
   function renderStrategyCards(s) {
     var $cards = $('#strategyEvalCards').empty();
+    renderStrategyUnknownBanner();
     if (!s) {
       $cards.append($('<div class="hint"/>').text('请选择左侧策略'));
       return;
@@ -2511,9 +2529,6 @@
     $cards.append(card('平均回撤', pct(s.avgMaxDrawdown)));
     $cards.append(card('最近收益', pct(s.lastTotalRate),
       s.lastSavedAt ? ('最近：' + fmtDateTimeDisplay(s.lastSavedAt)) : '暂无回测'));
-    if (strategyEvalState.unknownCount > 0) {
-      $cards.append(card('未归属记录', strategyEvalState.unknownCount, '旧行无 strategy_id'));
-    }
   }
 
   function findStrategyById(id) {
@@ -2608,6 +2623,7 @@
   function loadStrategyOverview() {
     $('#strategyList').html('<div class="hint">加载策略…</div>');
     $('#strategyEvalCards').empty();
+    $('#strategyUnknownHint').prop('hidden', true).text('');
     $('#strategyHistoryBody').html(
       '<tr><td colspan="' + STRATEGY_HIST_COLSPAN + '" class="empty-state">加载中…</td></tr>'
     );
@@ -2693,31 +2709,7 @@
       $panel.append($('<p class="hint"/>').text('未找到与该回测记录对应的分析（旧记录可能无分析，请重新回测）。'));
       return;
     }
-    $panel.append($('<p/>').html('<b>摘要</b>：' + (analysis.summary || '-')));
-    var events = analysis.events || [];
-    if (!events.length) {
-      $panel.append($('<p class="hint"/>').text('无事件明细'));
-      return;
-    }
-    var $ul = $('<ol/>');
-    events.forEach(function (ev) {
-      var dataStr = '';
-      if (ev.data && typeof ev.data === 'object') {
-        var parts = [];
-        Object.keys(ev.data).forEach(function (k) {
-          parts.push(k + '=' + ev.data[k]);
-        });
-        dataStr = parts.join('；');
-      }
-      var codeTxt = ev.stockCode ? ('[' + ev.stockCode + '] ') : '';
-      $ul.append($('<li/>').html(
-        '<b>' + (ev.time || '') + '</b> ' + codeTxt +
-        '<code>' + (ev.type || '') + '</code> ' + (ev.title || '') +
-        '<br/>原因：' + (ev.reason || '-') +
-        (dataStr ? ('<br/><span class="hint">数据：' + dataStr + '</span>') : '')
-      ));
-    });
-    $panel.append($ul);
+    appendEscapedAnalysisBody($panel, analysis.summary, analysis.events);
   }
 
   function showStrategyHistoryDetail($tr) {
