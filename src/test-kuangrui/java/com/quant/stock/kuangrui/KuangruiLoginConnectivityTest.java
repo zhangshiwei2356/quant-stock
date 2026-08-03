@@ -24,15 +24,17 @@ import static org.junit.jupiter.api.Assertions.fail;
  * <b>不进 Spring 主路径</b>；仅在 Maven profile {@code kuangrui} 下编译运行。
  * 正确路径：{@code src/test-kuangrui/java/com/quant/stock/kuangrui/}（勿放在 {@code src/main/java}）。
  * <p>
- * 复现当前 BLOCKED（Pre Logon 1045）：
+ * 复现当前 BLOCKED（Pre Logon 1045，资料包以 {@code OESAPI-JAVA-v0.19.4.0} 为准）：
  * <ol>
- *   <li>安装 jar：{@code mvn install:install-file -Dfile=.../quant360-all-api-0.17.6.4.jar ...}</li>
+ *   <li>安装 jar：{@code mvn install:install-file -Dfile=.../quant360-all-api-0.19.4.0.jar
+ *       -DgroupId=com.quant360 -DartifactId=quant360-all-api -Dversion=0.19.4.0 -Dpackaging=jar}</li>
  *   <li>准备 {@code config/kuangrui/local/oes_api_config.json} 与 {@code mds_api_config.json}</li>
  *   <li>设置环境变量 {@code QUANT_KUANGRUI_USER} / {@code QUANT_KUANGRUI_PASSWORD}</li>
  *   <li>{@code mvn -Pkuangrui test -Dtest=KuangruiLoginConnectivityTest}</li>
  * </ol>
  * 期望现象（账号/协议未对齐时）：TCP 成功后日志出现
- * {@code Pre Logon faild ! ... errorCode = 1045}，本测试以失败断言复现该状态；
+ * {@code Pre Logon faild ! ... errorCode = 1045}；在 0.19.4 中该码 =
+ * {@code ErrorCode.OESERR_INVALID_USERNAME_OR_PASSWORD}。本测试以失败断言复现该状态；
  * 登录真正成功时测试通过（M0 COMPLETE）。
  */
 class KuangruiLoginConnectivityTest {
@@ -115,9 +117,11 @@ class KuangruiLoginConnectivityTest {
                 fail("期望仍为 Pre Logon 1045，但 OES 已登录成功（M0 可能已 COMPLETE），请去掉 -Dkuangrui.expect1045");
             }
             ErrorCode code = rsp == null ? null : rsp.getErrorCode();
-            // Java 枚举无 1045，API 映射为 OTHER_ERROR；以日志 Pre Logon 1045 为准
-            if (code != ErrorCode.OTHER_ERROR && code != null) {
-                fail("期望 OTHER_ERROR(对应日志 1045)，实际 errorCode=" + code);
+            // 0.19.4：1045 = OESERR_INVALID_USERNAME_OR_PASSWORD；兼容旧映射 OTHER_ERROR
+            if (code != ErrorCode.OESERR_INVALID_USERNAME_OR_PASSWORD
+                    && code != ErrorCode.OTHER_ERROR
+                    && code != null) {
+                fail("期望 OESERR_INVALID_USERNAME_OR_PASSWORD(1045) 或 OTHER_ERROR，实际 errorCode=" + code);
             }
             System.out.println("[KuangruiIT] 已复现 OES 预登录失败（日志应含 Pre Logon ... 1045），errorCode=" + code);
         } catch (Exception e) {
@@ -160,8 +164,9 @@ class KuangruiLoginConnectivityTest {
         sb.append(channel).append(" 登录未成功，可用于复现当前 M0 BLOCKED。\n");
         sb.append("detail: ").append(detail).append('\n');
         sb.append("说明: 若控制台/日志出现「Pre Logon faild ... errorCode = 1045」，\n");
-        sb.append("  表示 TCP 已通、预登录被拒（手册 V0.17.6 无 1045，Java 侧常映射 OTHER_ERROR）。\n");
-        sb.append("  预登录阶段尚未验密；换 encryptType/clEnvId 通常无效。\n");
+        sb.append("  表示 TCP 已通、预登录被拒。0.19.4 ErrorCode：1045=OESERR_INVALID_USERNAME_OR_PASSWORD\n");
+        sb.append("  （用户名或密码非法）；另有 1046 密码锁定、1047 可选终端信息未通过校验。\n");
+        sb.append("  请向宽睿确认仿真账号开通、密码/加密与 API 协议版本是否匹配。\n");
         sb.append("复现命令:\n");
         sb.append("  $env:QUANT_KUANGRUI_USER='...'; $env:QUANT_KUANGRUI_PASSWORD='...'\n");
         sb.append("  mvn -Pkuangrui test -Dtest=KuangruiLoginConnectivityTest\n");

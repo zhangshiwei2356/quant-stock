@@ -157,7 +157,7 @@
                 <dependency>
                     <groupId>com.quant360</groupId>
                     <artifactId>quant360-all-api</artifactId>
-                    <version>0.17.6.4</version>
+                    <version>0.19.4.0</version>
                     <scope>test</scope>
                 </dependency>
                 <!-- API 依赖 fastjson 1.x（与资料包 all/lib 一致；主工程用的是 fastjson2） -->

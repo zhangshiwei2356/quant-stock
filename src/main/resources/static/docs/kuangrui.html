@@ -1,33 +1,38 @@
 <!-- 片段：由 stock.html 知识面板加载 —— 宽睿文档梳理（Quant360 OES/MDS） -->
 <p>
-  本页梳理本地资料包 <code>D:\宽睿-交易系统简称OES&nbsp;&nbsp;&nbsp;行情系统简称MDS</code>
-  中的 <b>Quant360 Swordfish</b> Java API（<code>OESAPI-JAVA-v0.17.6.4-20220705</code> / 手册 V0.17.6），
+  本页以本机资料包
+  <code>D:\OESAPI-JAVA-v0.19.4.0-20260430\OESAPI-JAVA-v0.19.4.0-20260430</code>
+  为准（<b>Quant360 Swordfish</b> Java API <code>OESAPI-JAVA-v0.19.4.0-20260430</code> / 手册 <b>V0.19.4</b>），
   分开归纳<strong>文档</strong>与<strong>Demo 代码</strong>，并给出<strong>接入计划</strong>。
   厂商：上海宽睿；产品 <b>OES</b>（交易）/ <b>MDS</b>（行情）。
   <strong>业务代码尚未接入</strong>；默认仍用本地 <code>sim</code> + <code>db</code>。
 </p>
-<p class="hint" style="margin-top:0">更新：2026-07-26 · 分析+计划已落页；<b>M0 脚手架已落地</b>；阿里云模拟 TCP 已通，但预登录返回 <code>1045</code>，M0 仍为 BLOCKED。</p>
+<p class="hint" style="margin-top:0">
+  更新：2026-08-03 · 资料包已从 <code>v0.17.6.4</code> 切换为 <code>v0.19.4.0</code>；
+  手册 docx 已在资料包目录生成同名 PDF；
+  <b>M0 脚手架已落地</b>；阿里云模拟 TCP 已通，预登录仍常见 <code>1045</code>（见下），M0 仍为 BLOCKED。
+</p>
 
 <div class="memo-todo">
-  <h4 style="margin-top:0">一、资料包结构</h4>
+  <h4 style="margin-top:0">一、资料包结构（v0.19.4.0）</h4>
   <table>
     <thead><tr><th>路径/文件</th><th>说明</th></tr></thead>
     <tbody>
-      <tr><td><code>OESAPI-JAVA-v0.17.6.4-20220705/</code></td><td>解压后的 Java API 工具包（JDK ≥ 1.7）</td></tr>
-      <tr><td><code>all/</code></td><td>OES+MDS 合一：<code>quant360-all-api-0.17.6.4.jar</code>、demo、config、javadoc、tester</td></tr>
-      <tr><td><code>mds/</code></td><td>行情专用 jar + <code>MdsExample</code> / <code>MdsUdpExample</code></td></tr>
-      <tr><td><code>oes/</code></td><td>交易专用 jar + <code>OesExample</code></td></tr>
-      <tr><td><code>*API使用手册V0.17.6.docx</code></td><td>OES / MDS 官方使用手册</td></tr>
-      <tr><td>上级 <code>Quant360 …接口开发指导手册.doc</code></td><td>Quant360 总册</td></tr>
-      <tr><td><code>*_api_config.json</code></td><td>通道地址、心跳、缓冲、<code>clEnvId</code>、加密；对接时改主备地址</td></tr>
+      <tr><td><code>OESAPI-JAVA-v0.19.4.0-20260430/</code></td><td>解压后的 Java API 工具包根目录</td></tr>
+      <tr><td><code>all/</code></td><td>OES+MDS 合一：<code>quant360-all-api-0.19.4.0.jar</code>、demo、config、javadoc、tester、<code>lib/</code></td></tr>
+      <tr><td><code>mds/</code></td><td>行情专用 <code>quant360-mds-api-0.19.4.0.jar</code> + Demo</td></tr>
+      <tr><td><code>oes/</code></td><td>交易专用 <code>quant360-oes-api-0.19.4.0.jar</code> + Demo</td></tr>
+      <tr><td><code>*API使用手册V0.19.4.docx</code> / <code>.pdf</code></td><td>OES / MDS 官方使用手册（PDF 由本机 Word 自 docx 导出，与 docx 同目录）</td></tr>
+      <tr><td><code>*_api_config.json</code>（在 <code>all/config</code> 等）</td><td>通道地址、心跳、缓冲、<code>clEnvId</code>、加密；0.19.4 增补 <code>firstDecodeFailLog</code>、<code>algoStrategyId</code>、终端采集字段；MDS UDP 仅 <code>bindAddr</code>（旧组播 addr/port 废弃）。仓库示例见 <code>config/kuangrui/examples/</code></td></tr>
       <tr><td><code>bin/</code> API-Tester</td><td>接口调用与压测（需仿真/真实环境）</td></tr>
-      <tr><td><code>lib/</code></td><td>fastjson / logback / lz4 / slf4j（接入时评估 fastjson 安全债）</td></tr>
+      <tr><td><code>all/lib/</code></td><td>fastjson 1.2.83 / logback 1.2.11 / lz4-java 1.4.1 / slf4j-api 1.7.32（接入时评估 fastjson 安全债）</td></tr>
     </tbody>
   </table>
+  <p class="hint" style="margin:8px 0 0">旧包 <code>OESAPI-JAVA-v0.17.6.4-20220705</code> 仅作历史对照；脚手架、Maven profile、文档一律对齐 <b>0.19.4.0</b>。</p>
 </div>
 
 <div class="memo-todo">
-  <h4>二、文档分析（手册要点）</h4>
+  <h4>二、文档分析（手册 V0.19.4 要点）</h4>
   <h5 style="margin:8px 0 4px;">2.1 协议共性</h5>
   <ul>
     <li>TCP Socket + 二进制报文（MDS 另有 UDP 组播）</li>
@@ -56,7 +61,7 @@
     <thead><tr><th>能力</th><th>典型接口</th><th>对本应用价值</th></tr></thead>
     <tbody>
       <tr><td>下单 / 批量 / 撤单</td><td><code>sendOrdReq</code> / <code>sendBatchOrdsReq</code> / <code>sendOrdCancelReq</code></td><td>替换 <code>trade-mode=sdk</code> 桩</td></tr>
-      <tr><td>回报同步</td><td><code>sendRptSync</code>（手册有 <code>initRptSync</code> 演进）</td><td><b>登录后必做</b>；超时易断连</td></tr>
+      <tr><td>回报同步</td><td><code>sendRptSync</code>（手册/Demo 仍强调登录后同步流水）</td><td><b>登录后必做</b>；超时易断连</td></tr>
       <tr><td>查委托 / 成交</td><td><code>queryOrder</code> / <code>queryTrade</code></td><td>真柜台版 <code>sync-orders</code></td></tr>
       <tr><td>查资金 / 持仓</td><td><code>queryCashAsset</code> / <code>queryStkHolding</code></td><td>真 <code>position-pnl-sync</code></td></tr>
       <tr><td>总览 / 柜台资金</td><td><code>queryClientOverview</code> / <code>queryCounterCash</code></td><td>纸面对账</td></tr>
@@ -64,17 +69,26 @@
       <tr><td>两融 / 期权 / ETF / 银证</td><td>大量扩展接口</td><td>超出现货金叉范围，暂缓</td></tr>
     </tbody>
   </table>
-  <p class="hint" style="margin:0">文档难点在运维契约（换算、回报同步时限、环境号、加密、重连），不是缺接口名。</p>
+  <h5 style="margin:8px 0 4px;">2.4 错误码（相对 0.17.6 的重要变化）</h5>
+  <p>
+    <code>quant360-all-api-0.19.4.0</code> 中 <code>com.quant360.api.model.oes.enu.ErrorCode</code> 已显式定义：
+    <code>1045 = OESERR_INVALID_USERNAME_OR_PASSWORD</code>（用户名或密码非法）、
+    <code>1046 = OESERR_PASSWORD_LOCKED</code>、
+    <code>1047 = OESERR_ILLEGAL_OPTIONAL_INPUT_SOURCE</code>。
+    旧包/旧手册常把 <code>1045</code> 说成「表中无此码 → 映射 OTHER_ERROR」——<b>以 0.19.4 为准，该说法作废</b>。
+    阿里云模拟 Pre Logon 仍报 <code>1045</code> 时，优先核对账号是否开通、用户名密码、协议版本是否与仿真柜台匹配。
+  </p>
+  <p class="hint" style="margin:0">文档难点仍在运维契约（换算、回报同步时限、环境号、加密、重连），不是缺接口名。</p>
 </div>
 
 <div class="memo-todo">
-  <h4>三、Demo 代码分析</h4>
+  <h4>三、Demo 代码分析（v0.19.4.0）</h4>
   <ul>
-    <li><code>Main</code>：交互选 oes / MDS(TCP|UDP)；测试账号写死 <code>customer1</code>/<code>123456</code>；默认现货</li>
-    <li><code>OesExample</code> 推荐顺序：创建code>OesClientImpl</code> → <code>initCallBack</code> → <code>start(logon)</code> → 用 <code>lastInMsgSeq</code> 初始化流水 → <b><code>sendRptSync</code></b> → 再查账户/下单。样例价 <code>ordPrice=300000</code> 即 <b>30 元</b></li>
+    <li><code>all/demo/Main</code>：交互选 oes / MDS(TCP|UDP)；默认现货；测试账号勿入库</li>
+    <li><code>OesExample</code> 推荐顺序： <code>OesClientImpl</code> → <code>initCallBack</code> → <code>start(logon)</code> → 用 <code>lastInMsgSeq</code> 初始化流水 → <b><code>sendRptSync</code></b> → 再查账户/下单。样例价仍按「元后四位」理解（如 <code>300000</code> = 30 元）</li>
     <li><code>MdsExample</code>：登录 → <code>subscribeMarketData</code> → L1/L2 回调 + 静态/状态/时段查询</li>
     <li><code>MdsUdpExample</code>：组播收流；第一刀用 TCP L1，UDP/L2 后置</li>
-    <li>回调注释要求：生产用 RingBuffer + 工作线程，勿阻塞 API 线程</li>
+    <li>相对 0.17.6 Demo 体积明显增大（OES/MDS 示例均有增补）；回调注释仍要求：生产用 RingBuffer + 工作线程，勿阻塞 API 线程</li>
     <li>工程形态：本地 jar + <code>lib</code>，非 Maven 中央坐标；含 API-Tester</li>
   </ul>
 </div>
@@ -99,16 +113,16 @@
   <h4>五、接入计划（已定稿 · 业务代码未开工）</h4>
   <p class="hint" style="margin-top:0">原则：不静默改金叉；默认 <code>sim</code>+<code>db</code>；宽睿独立开关默认关；先仿真、先只读、再报单；每阶段可验收可回滚。</p>
 
-  <h5 style="margin:8px 0 4px;">M0 当前状态（2026-07-26 · 阿里云模拟）</h5>
+  <h5 style="margin:8px 0 4px;">M0 当前状态（2026-08-03 · 对齐 v0.19.4.0）</h5>
   <ul>
     <li><b>脚手架</b>：已就绪 · <code>config/kuangrui/</code>、<code>scripts/kuangrui/m0-env-check.ps1</code>、<code>M0LoginProbe</code>；本应用联通测试 <code>KuangruiLoginConnectivityTest</code>（Maven <code>-Pkuangrui</code>，对齐 Demo 登录三步）</li>
-    <li><b>资料包 / JDK</b>：官方 jar <code>0.17.6.4</code>（运行日志 ApplVerId <code>0.17.6.3</code>）；本机 Java 21 可编译运行探针</li>
-    <li><b>阿里云模拟地址（非实盘）</b>：OES <code>106.15.58.119</code> ord/rpt/qry=<code>6101/6301/6401</code>；MDS <code>139.196.228.232</code> tcp/qry=<code>5103/5203</code> — <b>TCP 全部可达</b></li>
-    <li><b>登录探针</b>：TCP 握手成功后卡在 <b>Pre Logon</b>，OES/MDS 均 <code>errorCode=1045</code>（Java 枚举无此码，映射为 <code>OTHER_ERROR</code>）。手册 V0.17.6 错误表只到 <code>1043</code>，换 <code>encryptType</code>/<code>clEnvId</code>/显式 IP·MAC 无效（预登录阶段尚未验密）</li>
-    <li><b>复现 1045</b>：配置 local + 环境变量后执行
+    <li><b>资料包 / JDK</b>：官方 jar <code>quant360-all-api-0.19.4.0.jar</code>；本机 Java 21 可编译运行探针（pom 仍声明 Java 8 源码级别）</li>
+    <li><b>阿里云模拟地址（非实盘）</b>：OES <code>106.15.58.119</code> ord/rpt/qry=<code>6101/6301/6401</code>；MDS <code>139.196.228.232</code> tcp/qry=<code>5103/5203</code> — <b>TCP 全部可达</b>（以本机实测为准）</li>
+    <li><b>登录探针</b>：TCP 握手成功后卡在 <b>Pre Logon</b>，OES/MDS 均曾报 <code>errorCode=1045</code>。在 <b>0.19.4</b> 中该码 = <code>OESERR_INVALID_USERNAME_OR_PASSWORD</code>；请向宽睿确认仿真账号是否开通、密码/加密方式是否匹配新协议</li>
+    <li><b>复现</b>：配置 local + 环境变量后执行
       <code>mvn -Pkuangrui test -Dtest=KuangruiLoginConnectivityTest</code>
-      或 <code>.\scripts\kuangrui\m0-env-check.ps1 -RunLoginProbe</code>；日志应出现 <code>Pre Logon ... 1045</code></li>
-    <li><b>M0_STATUS</b>：<code>BLOCKED</code>（网络已通，预登录被拒）。需向宽睿确认账号/API 版本。通过后同上命令应登录成功 → <code>M0_STATUS=COMPLETE</code></li>
+      或 <code>.\scripts\kuangrui\m0-env-check.ps1 -RunLoginProbe</code>（需先 <code>install-file</code> 安装 0.19.4.0 jar）</li>
+    <li><b>M0_STATUS</b>：<code>BLOCKED</code>（网络已通，预登录被拒）。通过后同上命令应登录成功 → <code>M0_STATUS=COMPLETE</code></li>
     <li>密钥只放 <code>config/kuangrui/local/</code>（已 gitignore）+ 环境变量；勿提交仓库</li>
   </ul>
 
@@ -176,7 +190,7 @@ quant.kuangrui.config-dir=…   # 外部目录，含密钥，不入库</pre>
   <h4>六、对接前置条件（非代码能补）</h4>
   <ol>
     <li>券商/宽睿侧开通 OES、MDS 账号与通道地址</li>
-    <li>将 <code>quant360-*-api-*.jar</code> 及依赖纳入工程（或私服）；评估与 Spring Boot 兼容及 fastjson</li>
+    <li>将 <code>quant360-all-api-0.19.4.0.jar</code> 及依赖纳入工程（或私服）；评估与 Spring Boot 兼容及 fastjson 1.x</li>
     <li>长连接：登录、心跳、断线重连、回报续订（参考 <code>OesExample</code> / <code>MdsExample</code>）</li>
     <li>明确仿真 vs 生产；<code>clEnvId</code>、密码加密与柜台一致</li>
   </ol>

@@ -310,7 +310,7 @@ sequenceDiagram
   - `position-pnl-sync`：本地成本 + 最新价浮盈日志
 - 页面标「未实现」（缺外部 API）：`market-collect`
 - 对照：**应用说明 → 能力与待办**；宽睿对接：**应用说明 → 宽睿文档梳理**（分阶段：环境→MDS L1→OES 只读→报撤→静态/费率）
-- 宽睿 **M0**：`config/kuangrui/README.md` + `scripts/kuangrui/m0-env-check.ps1`；本应用联通测试 `mvn -Pkuangrui test -Dtest=KuangruiLoginConnectivityTest`（对齐 Demo 登录，可复现 Pre Logon `1045`）。阿里云 TCP 已通但预登录仍 BLOCKED；主应用默认仍 `sim`+`db`
+- 宽睿 **M0**：资料包以 `OESAPI-JAVA-v0.19.4.0`（`quant360-all-api-0.19.4.0`）为准；`config/kuangrui/README.md` + `scripts/kuangrui/m0-env-check.ps1`；联通测试 `mvn -Pkuangrui test -Dtest=KuangruiLoginConnectivityTest`（对齐 Demo 登录）。阿里云 TCP 已通，预登录常见 `1045`=`OESERR_INVALID_USERNAME_OR_PASSWORD`，M0 仍 BLOCKED；主应用默认仍 `sim`+`db`
 
 ---
 

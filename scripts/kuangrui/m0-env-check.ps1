@@ -43,22 +43,42 @@ try {
 # --- Package home ---
 $kuangruiHome = $env:QUANT_KUANGRUI_HOME
 if (-not $kuangruiHome) {
-    $cand = Get-ChildItem "D:\" -Directory -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -match "OES|MDS" } |
-        Select-Object -First 1
-    if ($cand) {
-        $pkg = Get-ChildItem -LiteralPath $cand.FullName -Directory -Filter "OESAPI-JAVA-*" -ErrorAction SilentlyContinue |
-            Select-Object -First 1
-        if ($pkg) { $kuangruiHome = $pkg.FullName }
+    $preferred = "D:\OESAPI-JAVA-v0.19.4.0-20260430\OESAPI-JAVA-v0.19.4.0-20260430"
+    if (Test-Path -LiteralPath $preferred) {
+        $kuangruiHome = $preferred
+    } else {
+        $candRoots = @()
+        Get-ChildItem "D:\" -Directory -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -match "OESAPI-JAVA|OES|MDS|宽睿" } |
+            ForEach-Object { $candRoots += $_ }
+        foreach ($cand in $candRoots) {
+            if ($cand.Name -match "^OESAPI-JAVA-") {
+                $kuangruiHome = $cand.FullName
+                break
+            }
+            $pkg = Get-ChildItem -LiteralPath $cand.FullName -Directory -Filter "OESAPI-JAVA-*" -ErrorAction SilentlyContinue |
+                Sort-Object Name -Descending |
+                Select-Object -First 1
+            if ($pkg) { $kuangruiHome = $pkg.FullName; break }
+        }
     }
 }
 Log ("QUANT_KUANGRUI_HOME=" + $kuangruiHome)
 $allDir = $null
 if ($kuangruiHome) { $allDir = Join-Path $kuangruiHome "all" }
 $jar = $null
-if ($allDir) { $jar = Join-Path $allDir "quant360-all-api-0.17.6.4.jar" }
+$apiVersion = $null
+if ($allDir -and (Test-Path -LiteralPath $allDir)) {
+    $jarFile = Get-ChildItem -LiteralPath $allDir -Filter "quant360-all-api-*.jar" -File -ErrorAction SilentlyContinue |
+        Sort-Object Name -Descending |
+        Select-Object -First 1
+    if ($jarFile) {
+        $jar = $jarFile.FullName
+        if ($jarFile.Name -match "quant360-all-api-(.+)\.jar") { $apiVersion = $Matches[1] }
+    }
+}
 $pkgOk = $jar -and (Test-Path -LiteralPath $jar)
-if ($pkgOk) { Log ("OK: jar=" + $jar) } else { Log "FAIL: quant360-all-api jar not found (set QUANT_KUANGRUI_HOME)" }
+if ($pkgOk) { Log ("OK: jar=" + $jar + " version=" + $apiVersion) } else { Log "FAIL: quant360-all-api-*.jar not found (set QUANT_KUANGRUI_HOME)" }
 
 # --- Config ---
 $cfgDir = $env:QUANT_KUANGRUI_CONFIG_DIR
@@ -167,11 +187,17 @@ try {
     $m2Root = (& mvn -q help:evaluate "-Dexpression=settings.localRepository" "-DforceStdout" 2>$null)
 } catch { }
 if (-not $m2Root) { $m2Root = Join-Path $env:USERPROFILE ".m2\repository" }
-$m2Jar = Join-Path $m2Root "com\quant360\quant360-all-api\0.17.6.4\quant360-all-api-0.17.6.4.jar"
-if (Test-Path -LiteralPath $m2Jar) {
-    Log ("OK: Maven local " + $m2Jar)
+$m2ApiDir = Join-Path $m2Root "com\quant360\quant360-all-api"
+$m2Jar = $null
+if (Test-Path -LiteralPath $m2ApiDir) {
+    $m2Jar = Get-ChildItem -LiteralPath $m2ApiDir -Recurse -Filter "quant360-all-api-*.jar" -File -ErrorAction SilentlyContinue |
+        Sort-Object FullName -Descending |
+        Select-Object -First 1
+}
+if ($m2Jar -and (Test-Path -LiteralPath $m2Jar.FullName)) {
+    Log ("OK: Maven local " + $m2Jar.FullName)
 } else {
-    Log ("WARN: quant360-all-api not in Maven repo (localRepository=" + $m2Root + ")")
+    Log ("WARN: quant360-all-api not in Maven repo (localRepository=" + $m2Root + "); install 0.19.4.0 via install-file")
 }
 
 $hasCred = [bool]($env:QUANT_KUANGRUI_USER -and $env:QUANT_KUANGRUI_PASSWORD)
@@ -235,7 +261,7 @@ $m0Complete = $pkgOk -and $javaOk -and $portOkAny -and ($loginExit -eq 0)
 if ($m0Complete) {
     Log "M0_STATUS=COMPLETE"
 } elseif ($portOkAny -and $hasCred -and ($loginExit -ne 0) -and ($loginExit -ne -1)) {
-    Log "M0_STATUS=BLOCKED (TCP OK but login/pre-logon failed; check account + API protocol vs Aliyun sim; see 1045)"
+    Log "M0_STATUS=BLOCKED (TCP OK but login/pre-logon failed; 0.19.4: 1045=INVALID_USERNAME_OR_PASSWORD; check account + API version)"
 } elseif (-not $portOkAny) {
     Log "M0_STATUS=BLOCKED (sim host TCP unreachable; scaffolding ready)"
 } else {
