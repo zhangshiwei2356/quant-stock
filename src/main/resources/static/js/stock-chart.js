@@ -311,7 +311,7 @@
   };
 
   function applyTheme(theme) {
-    // 旧主题并入：交互粒子→日间，波浪→青松，代码雨/极光/Vanta→夜盘，金融科技→日间
+    // 旧主题并入：交互粒子/金融科技→数据流(day)，波浪→银河，代码雨/极光/Vanta→夜盘
     if (theme === 'interact' || theme === 'finance') theme = 'day';
     if (theme === 'wave') theme = 'forest';
     if (theme === 'matrix' || theme === 'aurora' || theme === 'vanta') theme = 'night';
@@ -1994,7 +1994,7 @@
   }
 
   var knowledgeTopics = [
-    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260803-day-tech' },
+    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260803-day-finrain-name' },
     { id: 'readme', group: 'app', title: '项目 README', src: '/api/docs/readme' },
     { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260728-macross-profiles' },
     { id: 'memo', group: 'app', title: '能力与待办', src: '/docs/memo.html?v=20260803-kuangrui-0194' },
