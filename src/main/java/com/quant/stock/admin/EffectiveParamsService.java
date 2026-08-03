@@ -9,6 +9,7 @@ import com.quant.stock.mapper.StrategyParamMapper;
 import com.quant.stock.strategy.StrategyRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -34,7 +35,7 @@ public class EffectiveParamsService {
     private final ObjectProvider<JdbcTemplate> jdbcProvider;
 
     public EffectiveParamsService(QuantProperties global,
-                                  StrategyRegistry strategyRegistry,
+                                  @Lazy StrategyRegistry strategyRegistry,
                                   ObjectProvider<StrategyParamMapper> mapperProvider,
                                   ObjectProvider<JdbcTemplate> jdbcProvider) {
         this.global = global;

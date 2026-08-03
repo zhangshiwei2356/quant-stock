@@ -6,6 +6,7 @@ import com.quant.stock.config.QuantProperties;
 import com.quant.stock.market.dto.BarDTO;
 import com.quant.stock.strategy.dto.TradeSignal;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -20,6 +21,7 @@ import java.util.Map;
 public abstract class AbstractMaCrossProfileStrategy extends BaseStrategy {
 
     @Autowired
+    @Lazy
     private EffectiveParamsService effectiveParamsService;
 
     @Autowired
