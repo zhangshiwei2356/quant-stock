@@ -63,7 +63,7 @@
   - `BacktestRecordMapper.countUnknownStrategy()` → `long`（`strategy_id IS NULL OR strategy_id = ''`）
 - Consumes: 现有 `insert` / `selectByKind`
 
-- [ ] **Step 1: schema.sql** 在 `config_fingerprint` 后增加：
+- [x] **Step 1: schema.sql** 在 `config_fingerprint` 后增加：
 
 ```sql
   `strategy_id` VARCHAR(64) DEFAULT NULL COMMENT '注册策略 id',
@@ -75,9 +75,9 @@
   KEY `idx_strategy_saved` (`strategy_id`, `saved_at`)
 ```
 
-- [ ] **Step 2: DO** 增加 `private String strategyId;`
+- [x] **Step 2: DO** 增加 `private String strategyId;`
 
-- [ ] **Step 3: Mapper 接口**
+- [x] **Step 3: Mapper 接口**
 
 ```java
 List<BtBacktestRecordDO> selectSummaryByStrategyId(@Param("strategyId") String strategyId,
@@ -88,14 +88,14 @@ BtBacktestRecordDO selectByRecordId(@Param("recordId") String recordId);
 long countUnknownStrategy();
 ```
 
-- [ ] **Step 4: XML**
+- [x] **Step 4: XML**
   - `RecMap` 增加 `strategy_id` → `strategyId`
   - `insert` 列与值增加 `strategy_id` / `#{strategyId}`
   - `selectSummaryByStrategyId`：SELECT 摘要列（含 `trade_stats_json`、`config_fingerprint`、`strategy_id`，**不含** `trades_json`、`stock_results_json`）；`WHERE strategy_id = #{strategyId}`；若 `kind` 非空且非 `ALL` 则 `AND kind = #{kind}`；`ORDER BY saved_at DESC, id DESC`
   - `selectByRecordId`：`SELECT * FROM bt_backtest_record WHERE record_id = #{recordId}`
   - `countUnknownStrategy`：`SELECT COUNT(1) FROM bt_backtest_record WHERE strategy_id IS NULL OR strategy_id = ''`
 
-- [ ] **Step 5: ensureSchema** 在 `BackTestHistoryStore.ensureSchema` 补齐列：
+- [x] **Step 5: ensureSchema** 在 `BackTestHistoryStore.ensureSchema` 补齐列：
 
 ```java
 ensureColumn(jdbc, "bt_backtest_record", "strategy_id",
@@ -105,9 +105,9 @@ ensureColumn(jdbc, "bt_backtest_record", "strategy_id",
 
 可选：若无索引则 `CREATE INDEX idx_strategy_saved ON bt_backtest_record (strategy_id, saved_at)`（失败忽略已存在）。
 
-- [ ] **Step 6: 编译** `mvn -q -DskipTests compile` Expected: SUCCESS
+- [x] **Step 6: 编译** `mvn -q -DskipTests compile` Expected: SUCCESS
 
-- [ ] **Step 7: Commit**（仅用户要求时）`feat: bt_backtest_record 增加 strategy_id`
+- [x] **Step 7: Commit**（仅用户要求时）`feat: bt_backtest_record 增加 strategy_id`
 
 ---
 
@@ -128,7 +128,7 @@ ensureColumn(jdbc, "bt_backtest_record", "strategy_id",
 - 历史 DTO 增加 `String strategyId`
 - `fromResult` / builder 带上 strategyId
 
-- [ ] **Step 1: 写失败单测**（无 DB 时测纯映射亦可）
+- [x] **Step 1: 写失败单测**（无 DB 时测纯映射亦可）
 
 ```java
 @Test
@@ -142,9 +142,9 @@ void toSingle_mapsStrategyId() {
 
 若 Store 方法为 private，改为测 `listSummaryByStrategy` 在 mapper mock 下的行为，或抽 `package` 级 mapper→DTO 转换。
 
-- [ ] **Step 2: 改 append 签名**，row builder 增加 `.strategyId(emptyToNull(strategyId))`；内存返回的 HistoryRecord 同步 set
+- [x] **Step 2: 改 append 签名**，row builder 增加 `.strategyId(emptyToNull(strategyId))`；内存返回的 HistoryRecord 同步 set
 
-- [ ] **Step 3: StockController** 在 classic/session 两路径：
+- [x] **Step 3: StockController** 在 classic/session 两路径：
 
 ```java
 String resolvedId = strategyRegistry.resolve(strategyId).name();
@@ -152,7 +152,7 @@ String resolvedId = strategyRegistry.resolve(strategyId).name();
 backTestHistoryStore.appendSingle(period, startStr, endStr, result, resolvedId);
 ```
 
-- [ ] **Step 4: PortfolioController**
+- [x] **Step 4: PortfolioController**
 
 ```java
 String resolvedId = strategyRegistry.resolve(query == null ? null : query.getStrategyId()).name();
@@ -161,11 +161,11 @@ backTestHistoryStore.appendPortfolio(query, result, resolvedId);
 
 注入 `StrategyRegistry`（若尚未注入）。
 
-- [ ] **Step 5: 跑相关测试**  
+- [x] **Step 5: 跑相关测试**  
   Run: `mvn -q -Dtest=BackTestHistoryStoreStrategyIdTest,SessionBackTestEngineTest test`  
   Expected: PASS（或仅新测 PASS，不破坏现有）
 
-- [ ] **Step 6: Commit**（用户要求时）`feat: 回测历史写入 strategy_id`
+- [x] **Step 6: Commit**（用户要求时）`feat: 回测历史写入 strategy_id`
 
 ---
 
@@ -205,7 +205,7 @@ Map<String, Object> detail(String recordId);
 - 未知 recordId → `404`
 - `db` 未启用：overview 仍列出 `strategyRegistry.ids()`，聚合数字为 0，`enabled=false`
 
-- [ ] **Step 1: 写失败单测 — 中位数与聚合**
+- [x] **Step 1: 写失败单测 — 中位数与聚合**
 
 ```java
 @Test
@@ -223,11 +223,11 @@ void overview_ignoresNullStrategyIdRows() {
 }
 ```
 
-- [ ] **Step 2: 跑测确认失败**  
+- [x] **Step 2: 跑测确认失败**  
   Run: `mvn -q -Dtest=StrategyEvalServiceTest test`  
   Expected: FAIL（类不存在）
 
-- [ ] **Step 3: 实现 StrategyEvalService**
+- [x] **Step 3: 实现 StrategyEvalService**
   - 注入：`StrategyRegistry`、`ActiveStrategyService` 或直接 `QuantProperties`+registry、`ObjectProvider<BacktestRecordMapper>` / `BackTestHistoryStore`、`BackTestAnalysisStore`
   - `median(List<BigDecimal>)`：`static`，空列表返回 null；排序后计算；除法 `RoundingMode.HALF_UP` scale 6
   - `avg`：同样 scale 6
@@ -236,7 +236,7 @@ void overview_ignoresNullStrategyIdRows() {
   - history：`contains` 校验；`kind` 规范化：`null/blank/ALL` → 不按 kind 滤；否则 `SINGLE`/`PORTFOLIO`
   - detail：`selectByRecordId`；按 `kind` 填 trades；`analysis` = kind 对应 getById（可为 null）
 
-- [ ] **Step 4: StrategyController**
+- [x] **Step 4: StrategyController**
 
 ```java
 @RestController
@@ -256,9 +256,9 @@ public class StrategyController {
 
 404：`ResponseStatusException(HttpStatus.NOT_FOUND, "未知策略: " + id)`
 
-- [ ] **Step 5: 跑测** `mvn -q -Dtest=StrategyEvalServiceTest test` Expected: PASS
+- [x] **Step 5: 跑测** `mvn -q -Dtest=StrategyEvalServiceTest test` Expected: PASS
 
-- [ ] **Step 6: Commit**（用户要求时）`feat: 策略评估 overview/history/详情 API`
+- [x] **Step 6: Commit**（用户要求时）`feat: 策略评估 overview/history/详情 API`
 
 ---
 
@@ -277,10 +277,10 @@ public class StrategyController {
   - `#strategyMenu`、`#viewStrategy`、`#strategyList`、`#strategyEvalCards`、`#strategyHistoryBody`
   - `data-strategy-panel="eval"`
 
-- [ ] **Step 1: nav-strategy.html**（对齐 nav-dbtables 结构）
+- [x] **Step 1: nav-strategy.html**（对齐 nav-dbtables 结构）
   - 说明：本页看策略回测效果；改参/激活仍在运维中心
 
-- [ ] **Step 2: stock.html 侧栏**（插在 schedule 与 dbtables 之间）
+- [x] **Step 2: stock.html 侧栏**（插在 schedule 与 dbtables 之间）
 
 ```html
 <div class="side-nav" data-nav="strategy">
@@ -324,9 +324,9 @@ public class StrategyController {
 </div>
 ```
 
-- [ ] **Step 3: CSS** `.strategy-eval-layout` 两栏（左约 200px）；卡片横排；激活角标小标签
+- [x] **Step 3: CSS** `.strategy-eval-layout` 两栏（左约 200px）；卡片横排；激活角标小标签
 
-- [ ] **Step 4: JS**
+- [x] **Step 4: JS**
   - `hideAllWorkspaceViews` 纳入 `#viewStrategy`
   - `showStrategyEval()`：开侧栏、拉 overview、渲染左列表、默认选中 active 或第一个
   - 点策略：刷卡片 + `GET /api/strategy/{id}/history`
@@ -334,14 +334,14 @@ public class StrategyController {
   - `kind` Tab 可选：全部 / 单股 / 组合（简单按钮，默认 ALL）
   - Toast 失败提示；空表 empty-state
 
-- [ ] **Step 5: 手工验收清单**
+- [x] **Step 5: 手工验收清单**
   1. 侧栏出现「策略管理」且序号正确
   2. overview 列出注册策略与激活角标
   3. 用 `maCross` 与 `branchScaffold` 各跑一次回测后，次数与收益出现在对应策略下
   4. 点行能看到详情/分析摘要
   5. 旧无 strategy_id 的记录不出现在策略列表聚合中（unknownCount 可增）
 
-- [ ] **Step 6: Commit**（用户要求时）`feat: 策略管理评估页`
+- [x] **Step 6: Commit**（用户要求时）`feat: 策略管理评估页`
 
 ---
 
@@ -353,16 +353,16 @@ public class StrategyController {
 - Modify: `src/main/resources/static/docs/memo.html`
 - Modify: 工作台顺序文案中含「策略管理」
 
-- [ ] **Step 1: README**
+- [x] **Step 1: README**
   - 工作台顺序加入策略管理
   - API：`GET /api/strategy/overview`、`/{id}/history`、`/history/{recordId}`
   - 数据表节可一句带过历史含 `strategy_id`
 
-- [ ] **Step 2: app.html** 功能列表加策略管理要点
+- [x] **Step 2: app.html** 功能列表加策略管理要点
 
-- [ ] **Step 3: memo.html** 「本地已落地」加策略管理评估项
+- [x] **Step 3: memo.html** 「本地已落地」加策略管理评估项
 
-- [ ] **Step 4: Commit**（用户要求时）`docs: 同步策略管理说明`
+- [x] **Step 4: Commit**（用户要求时）`docs: 同步策略管理说明`
 
 ---
 

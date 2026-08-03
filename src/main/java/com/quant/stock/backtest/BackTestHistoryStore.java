@@ -64,12 +64,8 @@ public class BackTestHistoryStore {
         ensureColumn(jdbc, "bt_backtest_record", "strategy_id",
                 "ALTER TABLE `bt_backtest_record` ADD COLUMN `strategy_id` VARCHAR(64) DEFAULT NULL "
                         + "COMMENT '注册策略 id' AFTER `config_fingerprint`");
-        try {
-            jdbc.execute("CREATE INDEX idx_strategy_saved ON bt_backtest_record (strategy_id, saved_at)");
-            log.info("已补齐索引 bt_backtest_record.idx_strategy_saved");
-        } catch (Exception e) {
-            log.debug("索引 idx_strategy_saved 已存在或创建跳过: {}", e.getMessage());
-        }
+        ensureIndex(jdbc, "bt_backtest_record", "idx_strategy_saved",
+                "CREATE INDEX idx_strategy_saved ON bt_backtest_record (strategy_id, saved_at)");
     }
 
     /** 持久化单股回测结果并返回历史视图 */
@@ -321,6 +317,22 @@ public class BackTestHistoryStore {
             }
         } catch (Exception e) {
             log.warn("检查/补齐列 {}.{} 失败: {}", table, column, e.getMessage());
+        }
+    }
+
+    /** 若索引不存在则创建（查 information_schema.STATISTICS，避免每次启动撞已存在错误） */
+    private void ensureIndex(JdbcTemplate jdbc, String table, String indexName, String createSql) {
+        try {
+            Integer n = jdbc.queryForObject(
+                    "SELECT COUNT(1) FROM information_schema.STATISTICS "
+                            + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?",
+                    Integer.class, table, indexName);
+            if (n == null || n == 0) {
+                jdbc.execute(createSql);
+                log.info("已补齐索引 {}.{}", table, indexName);
+            }
+        } catch (Exception e) {
+            log.warn("检查/补齐索引 {}.{} 失败: {}", table, indexName, e.getMessage());
         }
     }
 }
