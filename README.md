@@ -216,8 +216,8 @@ sequenceDiagram
 ## 模拟数据 / 行情表
 
 - 种子目录：`src/main/resources/data/kline/`（仅导入用）
-- 演示股：模拟五只（空库启动灌 `market_1min`）；目标池可用 `scripts/fetch_min1_tdx.py --from-pool` 回填约 90 交易日 1 分钟
-- 区间：模拟样本约 `2025-07-17` ~ `2026-07-17`；TDX 1 分钟公开节点通常约 90 个交易日（以节点为准）
+- 演示股：classpath 十只近一年模拟种子（空库启动灌 `market_1min`）；目标池可用 `scripts/fetch_min1_tdx.py --from-pool` 回填约 90 交易日 1 分钟
+- 区间：classpath 模拟种子为**生成时相对当日近一年**（当前包约 `2025-08-04` ~ `2026-08-04`，可用 `MockKlineDataGenerator` 重刷）；TDX 1 分钟公开节点通常约 90 个交易日（以节点为准）
 - **物理真相源**：仅 `market_1min`（价额为**元**；`data_source`=`MOCK`/`TDX`/`MDS`；存量默认标 `TDX`）；5/15/30/60/日/周/月一律内存聚合
 - 1 分钟回填：`python scripts/fetch_min1_tdx.py --from-pool`（写入 `data_source=TDX`）；升级脚本 `scripts/sql/20260803_market_1min_data_source.sql`
 - 回测历史/分析：`bt_backtest_record` / `bt_backtest_analysis`（亦可落盘 `quant.history-dir`）；落库时写入注册策略 `strategy_id`

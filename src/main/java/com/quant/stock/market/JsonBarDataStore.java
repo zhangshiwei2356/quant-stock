@@ -66,7 +66,7 @@ public class JsonBarDataStore {
                     stocks.add(m);
                 }
             }
-            log.info("JsonBarDataStore 就绪: stocks={}, range={} ~ {}",
+            log.info("JsonBarDataStore 就绪: stocks={}, classpath种子区间={} ~ {}（相对生成日近一年，非运行时滑动）",
                     stocks.size(), meta.getString("start"), meta.getString("end"));
         } catch (Exception e) {
             log.error("加载 meta.json 失败: {}", e.getMessage());

@@ -30,32 +30,44 @@ import java.util.Random;
 import java.util.Set;
 
 /**
- * 离线生成模拟股票近一年分层K线 JSON。
+ * 离线生成模拟股票「截至 end 的近一年」K 线 JSON（默认 end=今天）。
  * <pre>
  * mvn -q -DskipTests compile exec:java -Dexec.mainClass=com.quant.stock.market.mock.MockKlineDataGenerator
- * mvn -q -DskipTests compile exec:java -Dexec.mainClass=com.quant.stock.market.mock.MockKlineDataGenerator -Dexec.args="only=601318,000858"
+ * mvn -q -DskipTests compile exec:java -Dexec.mainClass=com.quant.stock.market.mock.MockKlineDataGenerator "-Dexec.args=only=601318,000858"
+ * mvn -q -DskipTests compile exec:java -Dexec.mainClass=com.quant.stock.market.mock.MockKlineDataGenerator "-Dexec.args=end=2026-08-04"
  * </pre>
+ * 只写 {@code MIN_1}/{@code MIN_5}（空库灌种优先 MIN_1，否则拆 MIN_5）；更大周期查询时内存聚合。
  */
 public class MockKlineDataGenerator {
 
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final LocalDate END = LocalDate.of(2026, 7, 17);
-    private static final LocalDate START = END.minusYears(1);
 
+    /** 与 quant.stock-codes / meta 演示十只一致 */
     private static final String[][] STOCKS = {
             {"600036", "招商银行", "35.00"},
             {"000001", "平安银行", "11.50"},
             {"300059", "东方财富", "18.80"},
             {"601318", "中国平安", "45.00"},
-            {"000858", "五粮液", "128.00"}
+            {"000858", "五粮液", "128.00"},
+            {"600519", "贵州茅台", "1680.00"},
+            {"000568", "泸州老窖", "145.00"},
+            {"002415", "海康威视", "32.00"},
+            {"600276", "恒瑞医药", "42.00"},
+            {"601166", "兴业银行", "18.50"}
     };
 
-    /** CLI 入口：生成模拟 K 线 JSON 至 resources/data/kline（支持 only=、out= 参数）。 */
+    private static LocalDate START;
+    private static LocalDate END;
+
+    /** CLI 入口：生成模拟 K 线 JSON 至 resources/data/kline（支持 only=、out=、end= 参数）。 */
     public static void main(String[] args) throws Exception {
+        END = parseEnd(args);
+        START = END.minusYears(1);
         Path outDir = resolveOutDir(args);
         Files.createDirectories(outDir);
         Set<String> only = parseOnly(args);
         System.out.println("输出目录: " + outDir.toAbsolutePath());
+        System.out.println("区间(近一年): " + START + " ~ " + END);
         if (!only.isEmpty()) {
             System.out.println("仅生成: " + only);
         }
@@ -79,27 +91,35 @@ public class MockKlineDataGenerator {
             Files.createDirectories(stockDir);
             writePeriod(stockDir, code, BarPeriod.MIN_1, min1);
 
-            for (BarPeriod period : BarPeriod.aggregatePeriods()) {
-                List<BarDTO> agg = BarAggregateUtil.aggregate(min1, period.getAggregatePeriod());
-                writePeriod(stockDir, code, period, agg);
-                System.out.println("  " + period.name() + " bars=" + agg.size());
-            }
+            List<BarDTO> min5 = BarAggregateUtil.aggregate(min1, BarAggregateUtil.Period.M5);
+            writePeriod(stockDir, code, BarPeriod.MIN_5, min5);
+            System.out.println("  MIN_5 bars=" + min5.size());
         }
 
+        // meta 保留目录内全部股票条目（含本次未重算的），但区间与描述按本次生成刷新
         Map<String, Object> meta = new LinkedHashMap<String, Object>();
-        meta.put("description", "五只股票近一年模拟K线（原始1分钟 + 预聚合多周期）");
+        meta.put("description", "演示股近一年模拟K线（生成时相对 end 回推一年；空库灌 MIN_1，否则拆 MIN_5）");
         meta.put("start", START.toString());
         meta.put("end", END.toString());
         meta.put("generatedAt", LocalDateTime.now().format(FMT));
         meta.put("stocks", stockMeta);
-        meta.put("periods", new String[]{
-                "MIN_1", "MIN_5", "MIN_15", "MIN_30", "MIN_60", "DAY", "WEEK", "MONTH"
-        });
-        meta.put("note", "字段采用紧凑数组 [t,o,h,l,c,v]；MySQL 导入用 DAY + MIN_5");
+        meta.put("periods", new String[]{"MIN_1", "MIN_5"});
+        meta.put("note", "字段采用紧凑数组 [t,o,h,l,c,v]；更大周期由应用内存聚合");
         Files.write(outDir.resolve("meta.json"),
                 JSON.toJSONBytes(meta, JSONWriter.Feature.PrettyFormat));
 
-        System.out.println("全部完成，stocks=" + stockMeta.size());
+        System.out.println("全部完成，stocks=" + stockMeta.size() + " range=" + START + " ~ " + END);
+    }
+
+    private static LocalDate parseEnd(String[] args) {
+        if (args != null) {
+            for (String a : args) {
+                if (a != null && a.startsWith("end=")) {
+                    return LocalDate.parse(a.substring(4).trim());
+                }
+            }
+        }
+        return LocalDate.now();
     }
 
     private static Set<String> parseOnly(String[] args) {
@@ -199,6 +219,10 @@ public class MockKlineDataGenerator {
      * 生成指定代码在 {@link #START}～{@link #END} 区间内的 1 分钟 K（供离线 JSON 工具使用）。
      */
     public static List<BarDTO> generateYear1Min(String code, BigDecimal basePrice) {
+        if (START == null || END == null) {
+            END = LocalDate.now();
+            START = END.minusYears(1);
+        }
         List<BarDTO> bars = new ArrayList<BarDTO>(60000);
         Random random = new Random(code.hashCode() * 31L + 20260718L);
         BigDecimal price = basePrice;
@@ -211,7 +235,6 @@ public class MockKlineDataGenerator {
                 double trend = Math.sin(dayIndex / 18.0) * 0.004
                         + Math.sin(dayIndex / 55.0) * 0.002
                         + (random.nextDouble() - 0.5) * 0.0008;
-                // 五粮液偏多头尾段，便于演示金叉推荐；平安偏震荡
                 if ("000858".equals(code)) {
                     trend += 0.0012;
                 } else if ("601318".equals(code)) {
