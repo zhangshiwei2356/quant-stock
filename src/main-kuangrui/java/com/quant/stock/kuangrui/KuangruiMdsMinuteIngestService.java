@@ -25,6 +25,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PreDestroy;
@@ -43,6 +44,7 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 @Slf4j
 @Service
+@Primary
 @ConditionalOnClass(MdsClientImpl.class)
 @ConditionalOnBean(CoreMarketBarService.class)
 @ConditionalOnProperty(name = {

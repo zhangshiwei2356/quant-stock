@@ -1,18 +1,18 @@
 package com.quant.stock.kuangrui;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.stereotype.Service;
 
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * 默认 MDS 摄入桩：恒不可用；关开关时保持主路径不变。
+ * <p>
+ * 始终注册；启用宽睿时由 {@code KuangruiMdsMinuteIngestService}（{@code @Primary}）优先注入。
+ * </p>
  */
 @Service
-@ConditionalOnMissingBean(MdsMinuteIngestService.class)
 public class NoopMdsMinuteIngestService implements MdsMinuteIngestService {
 
     @Override
