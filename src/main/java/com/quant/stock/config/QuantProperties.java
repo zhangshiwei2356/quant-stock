@@ -59,6 +59,23 @@ public class QuantProperties {
     /** 行情数据源模式：如 {@code json}、库表等 */
     private String marketMode = "json";
     /**
+     * 日线读取策略（仅 db 模式）：
+     * {@code auto}=优先 {@code market_daily}，空则 {@code market_1min} 聚日；
+     * {@code table}=仅日线表；{@code aggregate}=仅分钟聚日。
+     */
+    private String daySource = "auto";
+    /**
+     * pool-rebuild 前是否先按日线重算 {@code factor_daily}（默认 true，粗筛更准；全市场较慢时可关）。
+     */
+    private boolean poolRebuildRefreshFactors = true;
+    /**
+     * pool-rebuild 成功后是否异步调用 TDX 分钟回填脚本（需 {@link TdxScript#enabled}=true）。
+     * 默认 false，避免未装 Python/pytdx 时拖垮扫池。
+     */
+    private boolean poolRebuildBackfillMinute = false;
+    /** 通达信 Python 灌数脚本（日线/池内分钟）；默认关闭，运维显式开启。 */
+    private TdxScript tdxScript = new TdxScript();
+    /**
      * 当前激活策略 id（单活可切换），对应 {@link com.quant.stock.strategy.BaseStrategy#name()}。
      * 默认 {@code maCross}；可选已注册策略如 {@code holdNothing}。
      */
@@ -360,6 +377,25 @@ public class QuantProperties {
          * 默认 true；金叉等非会话策略不受影响。
          */
         private boolean paperEnabled = true;
+    }
+
+    /**
+     * 通达信公开节点灌数脚本配置（调用本机 Python + scripts/fetch_*_tdx.py）。
+     */
+    @Data
+    public static class TdxScript {
+        /** 总开关；false 时运维 API / 定时 / pool 后回填均拒绝执行（yml 默认 true） */
+        private boolean enabled = true;
+        /** Python 可执行文件，如 python / py / python3 */
+        private String python = "python";
+        /**
+         * 工作目录（含 scripts/ 的仓库根）。空则用 {@code user.dir}。
+         */
+        private String workingDir = "";
+        private String min1Script = "scripts/fetch_min1_tdx.py";
+        private String dailyScript = "scripts/fetch_daily_tdx.py";
+        /** 单次脚本超时秒数 */
+        private int timeoutSeconds = 3600;
     }
 
     /**

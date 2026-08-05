@@ -176,6 +176,33 @@ public class BackTestHistoryStore {
         return out;
     }
 
+    /**
+     * 按注册策略 id（含历史别名）查摘要历史。
+     */
+    public List<?> listSummaryByStrategyIds(List<String> strategyIds, String kind) {
+        if (backtestRecordMapper == null || strategyIds == null || strategyIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        String kindFilter = null;
+        if (StringUtils.hasText(kind)) {
+            String k = kind.trim().toUpperCase();
+            if (!"ALL".equals(k)) {
+                kindFilter = k;
+            }
+        }
+        List<BtBacktestRecordDO> rows = backtestRecordMapper.selectSummaryByStrategyIds(
+                strategyIds, kindFilter);
+        List<Object> out = new ArrayList<Object>();
+        for (BtBacktestRecordDO r : rows) {
+            if ("PORTFOLIO".equalsIgnoreCase(r.getKind())) {
+                out.add(toPortfolio(r));
+            } else {
+                out.add(toSingle(r));
+            }
+        }
+        return out;
+    }
+
     /** 按 recordId 取全量单股或组合历史视图；不存在返回 null。 */
     public Object getByRecordId(String recordId) {
         if (backtestRecordMapper == null || !StringUtils.hasText(recordId)) {

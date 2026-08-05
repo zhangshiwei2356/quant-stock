@@ -312,6 +312,15 @@ public class DynamicScheduleService implements ApplicationRunner {
                 case "data-validate":
                     scheduleJobHandlers.dataValidate();
                     break;
+                case "factor-daily-rebuild":
+                    scheduleJobHandlers.factorDailyRebuild();
+                    break;
+                case "pool-minute-backfill":
+                    scheduleJobHandlers.poolMinuteBackfill();
+                    break;
+                case "day-collect":
+                    scheduleJobHandlers.dayCollect();
+                    break;
                 case "pool-rebuild":
                     scheduleJobHandlers.poolRebuild();
                     break;
@@ -420,12 +429,35 @@ public class DynamicScheduleService implements ApplicationRunner {
                 "工作日 16:00 再次覆盖唯一目标池；与 pool-rebuild 启用其一即可");
         seed("data-validate", "数据校验", "CRON",
                 "0 0 17 * * MON-FRI", null, 1,
-                "本地空表/滞后检查已可用；与外部行情抽样对账待 API");
+                "分层：universe→market_daily；目标池→market_1min；外部抽样对账待 API");
+        seed("factor-daily-rebuild", "日频因子重算", "CRON",
+                "0 0 15 * * MON-FRI", null, 1,
+                "由日线重算 factor_daily；建议在 pool-rebuild 前；亦可由 pool-rebuild 内预刷新");
+        seed("day-collect", "全市场日线补齐(TDX)", "CRON",
+                "0 30 15 * * MON-FRI", null, 1,
+                "无日线补近1年，有则增量补缺口；需 quant.tdx-script.enabled=true");
+        seed("pool-minute-backfill", "目标池分钟补齐(TDX)", "CRON",
+                "0 20 15 * * MON-FRI", null, 1,
+                "池内尽量拉满节点深度(~90日)并补到最近；需 quant.tdx-script.enabled=true");
         // 纠正旧库标记（不改 enabled）
         syncJobMeta("market-collect", 0,
                 "可选宽睿 MDS（-Pkuangrui + quant.kuangrui.mds.enabled）；默认关时本地骨架/回退");
         syncJobMeta("position-pnl-sync", 1, "本地成本+市值浮盈已可用；券商持仓对账待 API");
-        syncJobMeta("data-validate", 1, "本地空表/滞后检查已可用；与外部行情抽样对账待 API");
+        syncJobMeta("data-validate", 1,
+                "分层：universe→market_daily；目标池→market_1min；外部抽样对账待 API");
+        syncJobMeta("factor-daily-rebuild", 1,
+                "由日线重算 factor_daily；建议在 pool-rebuild 前；亦可由 pool-rebuild 内预刷新");
+        syncJobMeta("day-collect", 1,
+                "无日线补近1年，有则增量补缺口；需 quant.tdx-script.enabled=true");
+        syncJobMeta("pool-minute-backfill", 1,
+                "池内尽量拉满节点深度(~90日)并补到最近；需 quant.tdx-script.enabled=true");
+        // 纠正展示名（旧库可能仍是旧名称）
+        jdbcTemplate.update(
+                "UPDATE sys_schedule_job SET job_name=? WHERE job_code=?",
+                "全市场日线补齐(TDX)", "day-collect");
+        jdbcTemplate.update(
+                "UPDATE sys_schedule_job SET job_name=? WHERE job_code=?",
+                "目标池分钟补齐(TDX)", "pool-minute-backfill");
         syncJobMeta("scan-and-trade", 1, "仅扫描唯一目标池（trade_pool status=1）");
         syncJobMeta("sync-orders", 1, "本地桩：SUBMITTED→FILLED 并改仓/回写；真券商对账待 API");
         syncJobMeta("settle-after-close", 1,

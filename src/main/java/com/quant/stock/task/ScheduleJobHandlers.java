@@ -3,7 +3,9 @@ package com.quant.stock.task;
 import com.quant.stock.admin.DataReconcileGateService;
 import com.quant.stock.config.QuantProperties;
 import com.quant.stock.kuangrui.MdsMinuteIngestService;
+import com.quant.stock.market.FactorDailyComputeService;
 import com.quant.stock.market.MarketDataService;
+import com.quant.stock.market.TdxScriptBackfillService;
 import com.quant.stock.market.dto.BarDTO;
 import com.quant.stock.pool.TradePoolService;
 import com.quant.stock.util.RedisLockUtil;
@@ -19,8 +21,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 预置定时任务业务处理器（与 {@link StrategyTask} 并列）。
@@ -46,6 +50,8 @@ public class ScheduleJobHandlers {
     private final DataReconcileGateService dataReconcileGateService;
     private final MdsMinuteIngestService mdsMinuteIngestService;
     private final QuantProperties quantProperties;
+    private final FactorDailyComputeService factorDailyComputeService;
+    private final TdxScriptBackfillService tdxScriptBackfillService;
 
     /**
      * 行情采集：优先可选宽睿 MDS（开关开启且 live），否则按股票池刷新本地 K 线缓存/落库。
@@ -196,73 +202,86 @@ public class ScheduleJobHandlers {
         runWithLock("job:pool-rebuild", 600, new Runnable() {
             @Override
             public void run() {
-                tradePoolService.rebuildFromUniverse();
+                Map<String, Object> out = tradePoolService.rebuildFromUniverse();
+                log.info("[pool-rebuild] selected={} codes={} minuteHint={}",
+                        out.get("selected"), out.get("codes"), out.get("minuteBackfillHint"));
             }
         });
     }
 
     /**
-     * 数据校验：检查股票池 1 分钟行情是否为空或明显滞后。
-     * <p>
-     * TODO(api): 与外部行情源对账（条数、OHLC 抽样、复权因子一致性）。
+     * 由日线重算 factor_daily（全市场有日线的标的）。
+     */
+    public void factorDailyRebuild() {
+        runWithLock("job:factor-daily-rebuild", 1800, new Runnable() {
+            @Override
+            public void run() {
+                Map<String, Object> out = factorDailyComputeService.rebuild(null);
+                log.info("[factor-daily-rebuild] {}", out);
+            }
+        });
+    }
+
+    /** 池内分钟 TDX 回填（同步；需 quant.tdx-script.enabled）。 */
+    public void poolMinuteBackfill() {
+        runWithLock("job:pool-minute-backfill", 3600, new Runnable() {
+            @Override
+            public void run() {
+                Map<String, Object> out = tdxScriptBackfillService.backfillPoolMinuteSync();
+                log.info("[pool-minute-backfill] {}", out);
+            }
+        });
+    }
+
+    /** 全市场日线 TDX 回填近 1 年（同步；需 quant.tdx-script.enabled）。 */
+    public void dayCollect() {
+        runWithLock("job:day-collect", 7200, new Runnable() {
+            @Override
+            public void run() {
+                Map<String, Object> out = tdxScriptBackfillService.backfillDailySync(1.0);
+                log.info("[day-collect] {}", out);
+            }
+        });
+    }
+
+    /**
+     * 数据校验分层：universe → market_daily；目标池 → market_1min。
      */
     public void dataValidate() {
         runWithLock("job:data-validate", 120, new Runnable() {
             @Override
             public void run() {
-                List<String> codes = new ArrayList<String>();
+                List<String> universe = new ArrayList<String>();
                 for (Map<String, String> u : tradePoolService.listUniverse()) {
-                    codes.add(u.get("code"));
+                    universe.add(u.get("code"));
                 }
-                if (codes.isEmpty()) {
+                if (universe.isEmpty()) {
                     log.warn("[data-validate] 全市场为空，跳过");
                     return;
                 }
-                int warn = 0;
+                Set<String> pool = new HashSet<String>(tradePoolService.listActiveCodes());
+                int dailyWarn = 0;
+                int minuteWarn = 0;
                 LocalDate today = LocalDate.now();
                 LocalDateTime now = LocalDateTime.now();
-                for (String code : codes) {
+                for (String code : universe) {
                     try {
-                        Integer oneMinCnt = jdbcTemplate.queryForObject(
-                                "SELECT COUNT(1) FROM market_1min WHERE symbol = ?", Integer.class, code);
-                        LocalDateTime maxOneMin = jdbcTemplate.query(
-                                "SELECT MAX(trade_time) FROM market_1min WHERE symbol = ?",
-                                rs -> rs.next() ? rs.getObject(1, LocalDateTime.class) : null,
-                                code);
-                        LocalDate maxDay = maxOneMin == null ? null : maxOneMin.toLocalDate();
-
-                        boolean bad = false;
-                        if (oneMinCnt == null || oneMinCnt <= 0 || maxOneMin == null) {
-                            bad = true;
-                            log.warn("[data-validate] {} 1分钟为空", code);
-                        } else {
-                            long lagDays = ChronoUnit.DAYS.between(maxDay, today);
-                            if (lagDays > DAILY_STALE_DAYS) {
-                                bad = true;
-                                log.warn("[data-validate] {} 1分钟覆盖日滞后 {} 天 (last={})",
-                                        code, lagDays, maxDay);
-                            }
-                            long lagHours = ChronoUnit.HOURS.between(maxOneMin, now);
-                            if (lagHours > MINUTE_STALE_HOURS) {
-                                bad = true;
-                                log.warn("[data-validate] {} 1分钟滞后 {} 小时 (last={})",
-                                        code, lagHours, maxOneMin);
-                            }
+                        if (!checkDailyOk(code, today)) {
+                            dailyWarn++;
                         }
-                        if (bad) {
-                            warn++;
-                        } else {
-                            log.debug("[data-validate] {} ok 1min={}@{}", code, oneMinCnt, maxOneMin);
+                        if (pool.contains(code) && !checkMinuteOk(code, today, now)) {
+                            minuteWarn++;
                         }
-                        // TODO(api): 抽样对比外部 API 最新 OHLC / 成交量
                     } catch (Exception e) {
-                        warn++;
+                        dailyWarn++;
                         log.warn("[data-validate] {} 校验异常: {}", code, e.getMessage());
                     }
                 }
-                log.info("[data-validate] 完成 universe={} warn={}", codes.size(), warn);
+                log.info("[data-validate] 完成 universe={} pool={} dailyWarn={} minuteWarn={}",
+                        universe.size(), pool.size(), dailyWarn, minuteWarn);
                 try {
-                    Map<String, Object> recon = dataReconcileGateService.reconcile(codes);
+                    List<String> reconCodes = pool.isEmpty() ? universe : new ArrayList<String>(pool);
+                    Map<String, Object> recon = dataReconcileGateService.reconcile(reconCodes);
                     log.info("[data-validate] 多源对账 diverge={} block={}",
                             recon.get("divergeCodeCount"), recon.get("blockNewOpen"));
                 } catch (Exception e) {
@@ -270,6 +289,69 @@ public class ScheduleJobHandlers {
                 }
             }
         });
+    }
+
+    private boolean checkDailyOk(String code, LocalDate today) {
+        Integer dayCnt = jdbcTemplate.queryForObject(
+                "SELECT COUNT(1) FROM market_daily WHERE symbol = ?", Integer.class, code);
+        LocalDate maxDaily = jdbcTemplate.query(
+                "SELECT MAX(trade_date) FROM market_daily WHERE symbol = ?",
+                rs -> rs.next() ? rs.getObject(1, LocalDate.class) : null,
+                code);
+        if ((dayCnt == null || dayCnt <= 0) && !hasAnyMarketDaily()) {
+            LocalDateTime maxOneMin = jdbcTemplate.query(
+                    "SELECT MAX(trade_time) FROM market_1min WHERE symbol = ?",
+                    rs -> rs.next() ? rs.getObject(1, LocalDateTime.class) : null,
+                    code);
+            maxDaily = maxOneMin == null ? null : maxOneMin.toLocalDate();
+            dayCnt = maxDaily == null ? 0 : 1;
+        }
+        if (dayCnt == null || dayCnt <= 0 || maxDaily == null) {
+            log.warn("[data-validate] {} 日线为空", code);
+            return false;
+        }
+        long lagDays = ChronoUnit.DAYS.between(maxDaily, today);
+        if (lagDays > DAILY_STALE_DAYS) {
+            log.warn("[data-validate] {} 日线滞后 {} 天 (last={})", code, lagDays, maxDaily);
+            return false;
+        }
+        return true;
+    }
+
+    private boolean checkMinuteOk(String code, LocalDate today, LocalDateTime now) {
+        Integer oneMinCnt = jdbcTemplate.queryForObject(
+                "SELECT COUNT(1) FROM market_1min WHERE symbol = ?", Integer.class, code);
+        LocalDateTime maxOneMin = jdbcTemplate.query(
+                "SELECT MAX(trade_time) FROM market_1min WHERE symbol = ?",
+                rs -> rs.next() ? rs.getObject(1, LocalDateTime.class) : null,
+                code);
+        if (oneMinCnt == null || oneMinCnt <= 0 || maxOneMin == null) {
+            log.warn("[data-validate] {} 池内1分钟为空", code);
+            return false;
+        }
+        long lagDays = ChronoUnit.DAYS.between(maxOneMin.toLocalDate(), today);
+        if (lagDays > DAILY_STALE_DAYS) {
+            log.warn("[data-validate] {} 池内1分钟覆盖日滞后 {} 天 (last={})",
+                    code, lagDays, maxOneMin.toLocalDate());
+            return false;
+        }
+        long lagHours = ChronoUnit.HOURS.between(maxOneMin, now);
+        if (lagHours > MINUTE_STALE_HOURS) {
+            log.warn("[data-validate] {} 池内1分钟滞后 {} 小时 (last={})",
+                    code, lagHours, maxOneMin);
+            return false;
+        }
+        return true;
+    }
+
+    private boolean hasAnyMarketDaily() {
+        try {
+            Integer n = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(1) FROM (SELECT 1 FROM market_daily LIMIT 1) t", Integer.class);
+            return n != null && n > 0;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /**

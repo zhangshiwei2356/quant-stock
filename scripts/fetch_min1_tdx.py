@@ -6,7 +6,10 @@
     python scripts/fetch_min1_tdx.py --from-pool
 
 默认从 trade_pool 读取 status=1 的标的；未找到标的时必须传 --codes。
-仅写入 market_1min（唯一物理真相源）；更大周期由应用内存聚合，不再双写 5 分钟/日线表。
+仅写入 market_1min（池内交易分钟真相源）；全市场日线请用 scripts/fetch_daily_tdx.py → market_daily。
+行为：尽量拉满公开节点深度（通常约 90 个交易日）并 upsert；
+  · 池内无分钟 → 相当于补满节点可给的历史；
+  · 已有分钟 → 覆盖/补齐到最近交易日（含新分钟）。
 价额以「元」入库；脚本幂等补齐 data_source/ingested_at，存量空值标为 TDX。
 
 TDX 的 get_security_bars(8, ...) 通常已以“股”返回 vol。少数节点会返回“手”；

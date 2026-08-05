@@ -22,7 +22,8 @@ import java.util.concurrent.TimeUnit;
 /**
  * 统一K线查询入口：对外按 BarPeriod 路由，屏蔽存储细节。
  * <p>
- * 查询优先级：MySQL {@code market_1min}（更大周期内存聚合）→ Redis → classpath JSON → mock/sdk
+ * 查询优先级：MySQL（DAY 优先 {@code market_daily}，分钟及回退聚日来自 {@code market_1min}）
+ * → Redis → classpath JSON → mock/sdk
  */
 @Slf4j
 @Service
@@ -64,7 +65,7 @@ public class MarketDataService {
             period = BarPeriod.MIN_1;
         }
 
-        // 0) MySQL 核心表（market_1min → 按需聚合）
+        // 0) MySQL 核心表（DAY→market_daily 优先；分钟→market_1min 聚合）
         if (coreMarketBarService != null) {
             try {
                 List<BarDTO> fromDb = coreMarketBarService.load(code, period, start, end);

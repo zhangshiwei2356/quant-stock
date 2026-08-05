@@ -27,9 +27,23 @@ public interface BacktestRecordMapper {
     List<BtBacktestRecordDO> selectSummaryByStrategyId(@Param("strategyId") String strategyId,
                                                        @Param("kind") String kind);
 
+    /** 按多个 strategy_id（规范 id + 历史别名）查询摘要。 */
+    List<BtBacktestRecordDO> selectSummaryByStrategyIds(@Param("strategyIds") List<String> strategyIds,
+                                                        @Param("kind") String kind);
+
     /** 按 record_id 查询全列。 */
     BtBacktestRecordDO selectByRecordId(@Param("recordId") String recordId);
 
     /** 统计 strategy_id 为空或空串的记录数。 */
     long countUnknownStrategy();
+
+    /** 库内出现过的 strategy_id（含 NULL 用空串不便；仅非空去重）。 */
+    List<String> selectDistinctStrategyIds();
+
+    /** 将空白 strategy_id 写为默认注册 id。 */
+    int updateBlankStrategyId(@Param("strategyId") String strategyId);
+
+    /** 将 fromIds 中的取值统一改为 toId。 */
+    int updateStrategyIdAliases(@Param("fromIds") List<String> fromIds,
+                                @Param("toId") String toId);
 }

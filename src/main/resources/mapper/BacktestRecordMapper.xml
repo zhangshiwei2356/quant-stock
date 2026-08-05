@@ -67,12 +67,49 @@
         ORDER BY saved_at DESC, id DESC
     </select>
 
+    <!-- 按注册 id + 历史别名批量匹配（解决 MaCrossStrategy 等无法关联） -->
+    <select id="selectSummaryByStrategyIds" resultMap="RecMap">
+        SELECT id, record_id, kind, saved_at, stock_code, stock_codes_json, period, back_start, back_end,
+               init_capital, final_asset, total_rate, max_drawdown, total_trade_num, win_rate,
+               trade_stats_json, config_fingerprint, strategy_id
+        FROM bt_backtest_record
+        WHERE strategy_id IN
+        <foreach collection="strategyIds" item="sid" open="(" separator="," close=")">
+            #{sid}
+        </foreach>
+        <if test="kind != null and kind != '' and kind != 'ALL'">
+            AND kind = #{kind}
+        </if>
+        ORDER BY saved_at DESC, id DESC
+    </select>
+
     <select id="selectByRecordId" resultMap="RecMap">
         SELECT * FROM bt_backtest_record WHERE record_id = #{recordId}
     </select>
 
     <select id="countUnknownStrategy" resultType="long">
         SELECT COUNT(1) FROM bt_backtest_record
-        WHERE strategy_id IS NULL OR strategy_id = ''
+        WHERE strategy_id IS NULL OR TRIM(strategy_id) = ''
     </select>
+
+    <select id="selectDistinctStrategyIds" resultType="string">
+        SELECT DISTINCT strategy_id FROM bt_backtest_record
+        WHERE strategy_id IS NOT NULL AND TRIM(strategy_id) &lt;&gt; ''
+        ORDER BY strategy_id
+    </select>
+
+    <update id="updateBlankStrategyId">
+        UPDATE bt_backtest_record
+        SET strategy_id = #{strategyId}
+        WHERE strategy_id IS NULL OR TRIM(strategy_id) = ''
+    </update>
+
+    <update id="updateStrategyIdAliases">
+        UPDATE bt_backtest_record
+        SET strategy_id = #{toId}
+        WHERE strategy_id IN
+        <foreach collection="fromIds" item="fid" open="(" separator="," close=")">
+            #{fid}
+        </foreach>
+    </update>
 </mapper>

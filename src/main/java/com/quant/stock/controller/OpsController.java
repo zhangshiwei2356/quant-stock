@@ -6,7 +6,11 @@ import com.quant.stock.admin.DataReconcileGateService;
 import com.quant.stock.admin.EffectiveParamsService;
 import com.quant.stock.admin.IndustryReclassService;
 import com.quant.stock.admin.SystemParamsService;
+import com.quant.stock.backtest.BacktestStrategyIdBackfillService;
 import com.quant.stock.kuangrui.KuangruiMdsOpsFacade;
+import com.quant.stock.market.FactorDailyComputeService;
+import com.quant.stock.market.TdxScriptBackfillService;
+import com.quant.stock.pool.TradePoolService;
 import com.quant.stock.risk.StPitService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
@@ -18,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -39,6 +44,10 @@ public class OpsController {
     private final ObjectProvider<StPitService> stPitProvider;
     private final ObjectProvider<IndustryReclassService> industryReclassProvider;
     private final ObjectProvider<KuangruiMdsOpsFacade> kuangruiMdsOpsProvider;
+    private final ObjectProvider<FactorDailyComputeService> factorDailyComputeProvider;
+    private final ObjectProvider<TradePoolService> tradePoolProvider;
+    private final ObjectProvider<TdxScriptBackfillService> tdxScriptBackfillProvider;
+    private final ObjectProvider<BacktestStrategyIdBackfillService> backtestStrategyIdBackfillProvider;
 
     /** 全市场数据健康抽检（覆盖率、缺口、异常项）。 */
     @GetMapping("/data-health")
@@ -54,6 +63,104 @@ public class OpsController {
             return m;
         }
         return svc.check();
+    }
+
+    /**
+     * 由日线重算 factor_daily。
+     * <p>
+     * query: {@code scope=universe|pool}（默认 universe）；或 {@code codes=600036,000001}。
+     */
+    @PostMapping("/factor-daily/rebuild")
+    public Map<String, Object> factorDailyRebuild(
+            @RequestParam(value = "scope", required = false) String scope,
+            @RequestParam(value = "codes", required = false) String codes) {
+        FactorDailyComputeService svc = factorDailyComputeProvider.getIfAvailable();
+        if (svc == null) {
+            Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("ok", false);
+            m.put("message", "需要 quant.db-enabled=true");
+            return m;
+        }
+        List<String> list = null;
+        if (codes != null && !codes.trim().isEmpty()) {
+            list = new ArrayList<String>();
+            for (String p : codes.split(",")) {
+                String c = p.trim();
+                if (!c.isEmpty()) {
+                    list.add(c);
+                }
+            }
+        } else if ("pool".equalsIgnoreCase(scope)) {
+            TradePoolService pool = tradePoolProvider.getIfAvailable();
+            list = pool == null ? Collections.<String>emptyList() : pool.listActiveCodes();
+        }
+        Map<String, Object> out = new LinkedHashMap<String, Object>(svc.rebuild(list));
+        out.put("ok", true);
+        out.put("scope", list == null ? "universe-with-daily" : scope == null ? "codes" : scope);
+        return out;
+    }
+
+    /** TDX 灌数脚本状态（是否开启、脚本路径、是否在跑）。 */
+    @GetMapping("/tdx-script/status")
+    public Map<String, Object> tdxScriptStatus() {
+        TdxScriptBackfillService svc = tdxScriptBackfillProvider.getIfAvailable();
+        if (svc == null) {
+            Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("enabled", false);
+            m.put("message", "需要 quant.db-enabled=true");
+            return m;
+        }
+        return svc.status();
+    }
+
+    /**
+     * 池内 1 分钟 TDX 回填。{@code async=true}（默认）后台跑；false 同步等待。
+     * 需 {@code quant.tdx-script.enabled=true}。
+     */
+    @PostMapping("/tdx-script/backfill-min1")
+    public Map<String, Object> tdxBackfillMin1(
+            @RequestParam(value = "async", required = false, defaultValue = "true") boolean async) {
+        TdxScriptBackfillService svc = tdxScriptBackfillProvider.getIfAvailable();
+        if (svc == null) {
+            Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("ok", false);
+            m.put("message", "需要 quant.db-enabled=true");
+            return m;
+        }
+        return async ? svc.backfillPoolMinuteAsync() : svc.backfillPoolMinuteSync();
+    }
+
+    /**
+     * 全市场日线 TDX 回填（同步，可能很久）。{@code years} 默认 1。
+     * 需 {@code quant.tdx-script.enabled=true}。
+     */
+    @PostMapping("/tdx-script/backfill-daily")
+    public Map<String, Object> tdxBackfillDaily(
+            @RequestParam(value = "years", required = false, defaultValue = "1") double years) {
+        TdxScriptBackfillService svc = tdxScriptBackfillProvider.getIfAvailable();
+        if (svc == null) {
+            Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("ok", false);
+            m.put("message", "需要 quant.db-enabled=true");
+            return m;
+        }
+        return svc.backfillDailySync(years);
+    }
+
+    /**
+     * 补全回测历史 strategy_id：空白→maCross；指纹旧名→注册 id。
+     * 使策略管理可关联查询旧回测。
+     */
+    @PostMapping("/backtest/backfill-strategy-id")
+    public Map<String, Object> backfillBacktestStrategyId() {
+        BacktestStrategyIdBackfillService svc = backtestStrategyIdBackfillProvider.getIfAvailable();
+        if (svc == null) {
+            Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("ok", false);
+            m.put("message", "需要 quant.db-enabled=true");
+            return m;
+        }
+        return svc.backfill();
     }
 
     /** 运行参数视图：可选 strategyId 展示该策略稀疏包与生效预览。 */

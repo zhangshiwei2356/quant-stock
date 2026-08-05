@@ -70,7 +70,7 @@ public final class ScheduleJobGuide {
                 "按全市场股票列表拉取/刷新本地 K 线（日线、分钟），保证后续扫描与回测有行情可用。",
                 "遍历 stock_basic / 配置 universe 中的全部标的；若宽睿 MDS live 则走查询/订阅落库。",
                 "默认 FIXED_RATE 约 30 秒；建议仅在交易时段开启。",
-                "写入或更新 market_1min（唯一物理真相源）；更大周期查询时内存聚合；MDS 写入 data_source=MDS。",
+                "写入或更新 market_1min（池内分钟真相源）；MDS 写入 data_source=MDS。全市场日线请用 fetch_daily_tdx→market_daily。",
                 "默认关宽睿时走本地 mock/已有 market_1min 回退；开启需 -Pkuangrui + quant.kuangrui.mds.enabled。"
         ));
         m.put("scan-and-trade", new Detail(
@@ -104,10 +104,10 @@ public final class ScheduleJobGuide {
         ));
         m.put("pool-rebuild", new Detail(
                 "全市场扫描：按策略条件筛选可入选标的，覆盖唯一目标池，并生成分析报告落库。",
-                "全市场 universe（stock_basic，粗过滤 ST）；按分数取 TopN 后整池替换。",
+                "全市场 universe（stock_basic，粗过滤 ST）；可选预刷 factor_daily；按分数取 TopN 后整池替换。",
                 "默认工作日 15:10（CRON）；亦可在「当前池 / 扫描历史」点「扫描更新」手动触发同类逻辑。",
-                "写入/覆盖 trade_pool，并写入 trade_pool_report；旧活跃行先停用再按本批入选。",
-                "已实现。扫描后覆盖唯一目标池；与 after-market-batch-scan 启用其一即可。"
+                "写入/覆盖 trade_pool，并写入 trade_pool_report；返回 minuteBackfillHint 提示池内补分钟。",
+                "已实现。默认 quant.pool-rebuild-refresh-factors=true；入池后请执行 fetch_min1_tdx.py --from-pool。"
         ));
         m.put("after-market-batch-scan", new Detail(
                 "盘后再次扫描覆盖唯一目标池：与 pool-rebuild 同类，适合收盘后统一重算一遍入选名单。",
@@ -117,11 +117,32 @@ public final class ScheduleJobGuide {
                 "已实现。扫描后覆盖唯一目标池；与 pool-rebuild 启用其一即可。"
         ));
         m.put("data-validate", new Detail(
-                "数据质量校验：检查各标的 market_1min 是否为空或明显滞后，并输出告警日志。",
-                "全市场 universe 的 market_1min。",
+                "分层校验行情：全市场查日线，目标池查分钟。",
+                "universe → market_daily；trade_pool 活跃 → market_1min（非池不因缺分钟告警）。",
                 "默认工作日 17:00（CRON）。",
-                "只读检查，默认不改业务表；问题写入日志。",
-                "未实现外部对账：当前仅本地 1 分钟滞后/空数据检查；与外部行情 OHLC 抽样对账待 API。"
+                "只读检查，默认不改业务表；问题写入日志；可触发多源对账闸。",
+                "已实现本地分层检查；与外部行情 OHLC 抽样对账待 API。"
+        ));
+        m.put("factor-daily-rebuild", new Detail(
+                "由日线重算 factor_daily，供入池粗筛（ma5>ma20 / ma60向上 / 放量）。",
+                "有日线的全市场标的；亦可 POST /api/ops/factor-daily/rebuild。",
+                "默认工作日 15:00（CRON，种子关）；建议在 pool-rebuild 前。",
+                "覆盖写入 factor_daily。",
+                "已实现。pool-rebuild 默认也会预刷新（可关 quant.pool-rebuild-refresh-factors）。"
+        ));
+        m.put("day-collect", new Detail(
+                "全市场日线补齐：无数据补近 1 年，有数据则增量补到最近交易日。",
+                "stock_basic status=1 → market_daily（TDX，adj=NONE）。",
+                "默认工作日 15:30（CRON，种子关）；运维「执行一次」可手动触发。",
+                "依赖本机 Python + pytdx/pymysql；需 quant.tdx-script.enabled=true。",
+                "已实现。推荐流水线第 1 步；亦可 POST /api/ops/tdx-script/backfill-daily。"
+        ));
+        m.put("pool-minute-backfill", new Detail(
+                "目标池分钟补齐：尽量拉满 TDX 节点深度（约 90 交易日）并 upsert 到最近。",
+                "trade_pool status=1 → market_1min。",
+                "默认工作日 15:20（CRON，种子关）；建议在 pool-rebuild 之后手动执行。",
+                "依赖本机 Python + pytdx；需 quant.tdx-script.enabled=true。",
+                "已实现。推荐流水线第 3 步；亦可 POST /api/ops/tdx-script/backfill-min1。"
         ));
         GUIDE = Collections.unmodifiableMap(m);
     }

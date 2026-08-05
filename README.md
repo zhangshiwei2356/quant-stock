@@ -189,7 +189,7 @@ sequenceDiagram
 | 策略评估 | 按注册策略聚合回测历史与整体评价（运行次数、均/中位收益与回撤）；历史表可筛全部/单股/组合，点行展开详情（内嵌 analysis） |
 
 - **职责分离**：本菜单只做效果评估；全局/按策略改参、纸面激活切换仍在 **运维中心 → 运行参数**
-- 数据：`GET /api/strategy/overview`、`GET /api/strategy/{id}/history?kind=`、`GET /api/strategy/history/{recordId}`；仅统计落库且带注册 `strategy_id` 的记录（旧空 `strategy_id` 不计入策略聚合，overview 可含 `unknownCount`）
+- 数据：`GET /api/strategy/overview`、`GET /api/strategy/{id}/history?kind=`、`GET /api/strategy/history/{recordId}`；按注册 `strategy_id` 聚合（查询含历史别名如 `MaCrossStrategy`）；启动自动补全空白→`maCross`、旧名→注册 id；运维 `POST /api/ops/backtest/backfill-strategy-id`；overview 仍可含 `unknownCount`
 
 ### 8. 数据表
 
@@ -218,7 +218,11 @@ sequenceDiagram
 - 种子目录：`src/main/resources/data/kline/`（仅导入用）
 - 演示股：classpath 十只近一年模拟种子（空库启动灌 `market_1min`）；目标池可用 `scripts/fetch_min1_tdx.py --from-pool` 回填约 90 交易日 1 分钟
 - 区间：classpath 模拟种子为**生成时相对当日近一年**（当前包约 `2025-08-04` ~ `2026-08-04`，可用 `MockKlineDataGenerator` 重刷）；TDX 1 分钟公开节点通常约 90 个交易日（以节点为准）
-- **物理真相源**：仅 `market_1min`（价额为**元**；`data_source`=`MOCK`/`TDX`/`MDS`；存量默认标 `TDX`）；5/15/30/60/日/周/月一律内存聚合
+- **行情分层**：
+  - `market_1min`：池内交易 / 分钟回测物理真相源（价额为**元**；`data_source`=`MOCK`/`TDX`/`MDS`）；5/15/30/60 由分钟内存聚合
+  - `market_daily`：全市场选股 / `pool-rebuild` 日线真相源（价额为**元**；首期 `adj_flag=NONE`）；`quant.day-source` 默认 `auto`（优先日线表，空则分钟聚日）
+- 日线回填：`python scripts/fetch_daily_tdx.py --from-basic --years 1`（或 `--codes`）；升级脚本 `scripts/sql/20260805_market_daily.sql`
+- 日频因子：`POST /api/ops/factor-daily/rebuild` 或定时任务 `factor-daily-rebuild`；`pool-rebuild` 默认会预刷新（`quant.pool-rebuild-refresh-factors`）
 - 1 分钟回填：`python scripts/fetch_min1_tdx.py --from-pool`（写入 `data_source=TDX`）；升级脚本 `scripts/sql/20260803_market_1min_data_source.sql`
 - 回测历史/分析：`bt_backtest_record` / `bt_backtest_analysis`（亦可落盘 `quant.history-dir`）；落库时写入注册策略 `strategy_id`
 - 重新生成模拟种子：`mvn -q compile exec:java -Dexec.mainClass=com.quant.stock.market.mock.MockKlineDataGenerator`
@@ -227,8 +231,9 @@ sequenceDiagram
 
 | 表 | 用途 |
 |----|------|
-| `stock_basic` | 标的档案 |
-| `market_1min` | **唯一**物理行情（1 分钟）；更大周期查询时聚合 |
+| `stock_basic` | 标的档案 / 扫池 universe |
+| `market_1min` | 池内分钟行情（交易真相源）；分钟周期聚合 |
+| `market_daily` | 全市场日线（选股真相源）；`getKline(DAY)` 默认优先 |
 | `trade_pool` / `trade_pool_report` | 唯一目标池与报告 |
 | `trade_orders` / `trade_positions` / `trade_position_lots` / `trade_cashflows` | 模拟委托、持仓、批次、日结 |
 | `risk_control_log` | 风控日志 |
@@ -247,7 +252,11 @@ sequenceDiagram
 | `QUANT_RATE_LIMIT` / `quant.rate-limit-per-minute` | 回测/组合/批量每 IP 每分钟上限（默认 30，≤0 关闭） |
 | `quant.schedule.enabled` | 定时总闸（默认 true；各任务以库表为准） |
 | `quant.trade-mode` | `sim`（默认）本地模拟、即时 FILLED 并记账，不连柜台；`sdk` 先 SUBMITTED（占资/占仓），`sync-orders` 推进 FILLED 后再落账（当前为桩） |
-| `quant.market-mode` | `db`（默认）读 `market_1min`（更大周期内存聚合）；`json` 读 classpath JSON；`sdk` 走 `KlineSdkClient`（多为桩） |
+| `quant.market-mode` | `db`（默认）读 MySQL：DAY 优先 `market_daily`，分钟读 `market_1min`；`json` 读 classpath JSON；`sdk` 走 `KlineSdkClient`（多为桩） |
+| `quant.day-source` | `auto`（默认）优先日线表，空则分钟聚日；`table` 仅日线表；`aggregate` 仅分钟聚日 |
+| `quant.pool-rebuild-refresh-factors` | `true`（默认）pool-rebuild 前重算 `factor_daily`；全市场较慢时可关 |
+| `quant.pool-rebuild-backfill-minute` | `false`（默认）扫池后异步跑 TDX 池内分钟脚本；需同时开 `tdx-script.enabled` |
+| `quant.tdx-script.*` | 通达信 Python 灌数桥接（**默认 enabled=true**）；`python` / `working-dir` / `min1-script` / `daily-script` / `timeout-seconds`；无 Python/pytdx 时可改 `false` |
 | `quant.kuangrui.enabled` / `mds.enabled` | 宽睿旁路总闸 / MDS L1（**默认 false**）；真实客户端需 `mvn -Pkuangrui`；价÷10000 写 `market_1min(MDS)` |
 | `quant.kuangrui.config-dir` | MDS/OES JSON 目录（默认 `config/kuangrui/local`，可用 `QUANT_KUANGRUI_CONFIG_DIR`） |
 
@@ -306,9 +315,14 @@ sequenceDiagram
 - 表：`sys_schedule_job`（启动自动建表+种子，**默认全关**）
 - **唯一目标池**：`pool-rebuild` / `after-market-batch-scan` 扫描后覆盖；启用其一会自动关闭另一（互斥）
 - `scan-and-trade`：只扫池内活跃标的 + 本地模拟账本
-- 已实现：`scan-and-trade` / `pool-rebuild` / `after-market-batch-scan` / `settle-after-close` / `data-validate` / `sync-orders` / `position-pnl-sync`
+- 已实现：`scan-and-trade` / `pool-rebuild` / `after-market-batch-scan` / `settle-after-close` / `data-validate` / `factor-daily-rebuild` / `day-collect` / `pool-minute-backfill` / `sync-orders` / `position-pnl-sync`
   - `settle-after-close`：权益日记最近交易日；刷新/落库 `market_1min`（更大周期查询时内存聚合）
-  - `data-validate`：检查 `market_1min` 覆盖与滞后（不再看日线/5 分钟旧表）
+  - `data-validate`：分层——universe 查 `market_daily`，目标池查 `market_1min`
+  - `factor-daily-rebuild`：日线 → `factor_daily`；`pool-rebuild` 默认同预刷新
+  - `day-collect` / `pool-minute-backfill`：TDX 脚本补齐（依赖本机 `python` + `pytdx`/`pymysql`；`quant.tdx-script.enabled` 默认 true）
+    - **推荐手动三步**：① `day-collect`（全市场日线：无→近1年，有→增量）→ ② `pool-rebuild`（入池）→ ③ `pool-minute-backfill`（池内分钟尽量拉满~90日并补到最近）
+  - `pool-rebuild`：返回 `minuteBackfillHint`；可选 `pool-rebuild-backfill-minute` 异步补分钟
+  - 运维：`GET/POST /api/ops/tdx-script/{status,backfill-min1,backfill-daily}`
   - `sync-orders`：本地桩将 `SUBMITTED→FILLED` 并改仓；`trade-mode=sdk` 时策略在 sync 后才落现金/批次
   - `position-pnl-sync`：本地成本 + 最新价浮盈日志
 - 页面标「未实现/缺外部默认」：`market-collect`（本地骨架；**可选**宽睿 MDS live 时 pull/flush，见下）

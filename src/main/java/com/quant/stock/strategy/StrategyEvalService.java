@@ -119,7 +119,8 @@ public class StrategyEvalService {
             row.put("active", activeName != null && activeName.equalsIgnoreCase(id));
 
             List<BtBacktestRecordDO> records = enabled
-                    ? nullSafe(mapper.selectSummaryByStrategyId(id, null))
+                    ? nullSafe(mapper.selectSummaryByStrategyIds(
+                    StrategyIdAliases.matchIdsForQuery(id), null))
                     : Collections.<BtBacktestRecordDO>emptyList();
 
             List<BigDecimal> rates = new ArrayList<BigDecimal>();
@@ -155,7 +156,8 @@ public class StrategyEvalService {
     public List<Map<String, Object>> history(String strategyId, String kind) {
         String canonicalId = requireKnownStrategy(strategyId);
         String kindNorm = normalizeKind(kind);
-        List<?> list = historyStore.listSummaryByStrategy(canonicalId, kindNorm);
+        List<?> list = historyStore.listSummaryByStrategyIds(
+                StrategyIdAliases.matchIdsForQuery(canonicalId), kindNorm);
         List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
         for (Object item : list) {
             out.add(toSummaryMap(item, false));

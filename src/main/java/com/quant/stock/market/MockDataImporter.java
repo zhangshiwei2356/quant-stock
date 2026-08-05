@@ -3,10 +3,8 @@ package com.quant.stock.market;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
-import com.quant.stock.mapper.FactorDailyMapper;
 import com.quant.stock.mapper.StockBasicMapper;
 import com.quant.stock.market.dto.BarDTO;
-import com.quant.stock.market.dto.FactorDailyDO;
 import com.quant.stock.market.dto.StockBasicDO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +18,6 @@ import org.springframework.stereotype.Component;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -30,8 +27,8 @@ import java.util.List;
 
 /**
  * 启动时若某演示股尚无 {@code market_1min}，则从 classpath:data/kline 导入 1 分钟种子（data_source=MOCK）；
- * 优先 {@code MIN_1.json}，否则将 {@code MIN_5.json} 拆成 5 根同价量分摊的 1 分钟 bar。
- * 日线/更大周期由查询时聚合，不再落物理日线/5 分钟表。
+ * 优先 {@code MIN_1.json}，否则将 {@code MIN_5.json} 拆成 5 根同价量分摊的 1 分钟 bar；
+ * 并重算 {@code factor_daily}（日线优先 {@code market_daily}，否则由分钟聚日）。
  */
 @Slf4j
 @Component
@@ -44,8 +41,8 @@ public class MockDataImporter {
     private static final int BATCH = 400;
 
     private final StockBasicMapper stockBasicMapper;
-    private final FactorDailyMapper factorDailyMapper;
     private final CoreMarketBarService coreMarketBarService;
+    private final FactorDailyComputeService factorDailyComputeService;
 
     /** 应用就绪后触发：空库则导入 classpath 模拟 1 分钟行情种子。 */
     @EventListener(ApplicationReadyEvent.class)
@@ -87,7 +84,7 @@ public class MockDataImporter {
                 log.warn("跳过 symbol={}：无 MIN_1.json / MIN_5.json 可导入", code);
                 continue;
             }
-            computeFactors(code);
+            factorDailyComputeService.rebuildOne(code);
             imported++;
             log.info("导入完成 symbol={} bars={}", code, n);
         }
@@ -180,50 +177,6 @@ public class MockDataImporter {
                 .build();
     }
 
-    private void computeFactors(String code) {
-        List<BarDTO> days = coreMarketBarService.load(code, BarPeriod.DAY, null, null);
-        if (days.isEmpty()) {
-            return;
-        }
-        factorDailyMapper.deleteBySymbol(code);
-        List<FactorDailyDO> factors = new ArrayList<FactorDailyDO>(days.size());
-        for (int i = 0; i < days.size(); i++) {
-            BarDTO d = days.get(i);
-            FactorDailyDO f = FactorDailyDO.builder()
-                    .symbol(code)
-                    .tradeDate(d.getBarBegin().toLocalDate())
-                    .ma5(smaClose(days, i, 5))
-                    .ma20(smaClose(days, i, 20))
-                    .ma60(smaClose(days, i, 60))
-                    .rsi14(rsi(days, i, 14))
-                    .atr14(atr(days, i, 14))
-                    .adx(null)
-                    .volumeMa20(smaVol(days, i, 20))
-                    .build();
-            if (f.getMa60() != null && i >= 60) {
-                BigDecimal prevMa60 = smaClose(days, i - 1, 60);
-                f.setMa60Up(prevMa60 != null && f.getMa60().compareTo(prevMa60) > 0 ? 1 : 0);
-            }
-            if (f.getVolumeMa20() != null && d.getVolume() != null) {
-                BigDecimal thr = f.getVolumeMa20().multiply(new BigDecimal("1.2"));
-                if (d.getVolume().compareTo(thr) >= 0) {
-                    f.setIsVolumeBreak(1);
-                } else {
-                    f.setIsVolumeBreak(0);
-                }
-            }
-            factors.add(f);
-            if (factors.size() >= BATCH) {
-                factorDailyMapper.batchUpsert(factors);
-                factors.clear();
-            }
-        }
-        if (!factors.isEmpty()) {
-            factorDailyMapper.batchUpsert(factors);
-        }
-        log.info("factor_daily 写入 {} rows={}", code, days.size());
-    }
-
     private JSONArray loadBarsArray(PathMatchingResourcePatternResolver resolver, String code, String period)
             throws Exception {
         Resource res = resolver.getResource(BASE + code + "/" + period + ".json");
@@ -232,70 +185,6 @@ public class MockDataImporter {
         }
         JSONObject obj = JSON.parseObject(readAll(res.getInputStream()));
         return obj.getJSONArray("bars");
-    }
-
-    private static BigDecimal smaClose(List<BarDTO> days, int idx, int n) {
-        if (idx + 1 < n) {
-            return null;
-        }
-        BigDecimal sum = BigDecimal.ZERO;
-        for (int j = idx - n + 1; j <= idx; j++) {
-            sum = sum.add(days.get(j).getClose());
-        }
-        return sum.divide(BigDecimal.valueOf(n), 4, RoundingMode.HALF_UP);
-    }
-
-    private static BigDecimal smaVol(List<BarDTO> days, int idx, int n) {
-        if (idx + 1 < n) {
-            return null;
-        }
-        BigDecimal sum = BigDecimal.ZERO;
-        for (int j = idx - n + 1; j <= idx; j++) {
-            BigDecimal v = days.get(j).getVolume();
-            sum = sum.add(v == null ? BigDecimal.ZERO : v);
-        }
-        return sum.divide(BigDecimal.valueOf(n), 4, RoundingMode.HALF_UP);
-    }
-
-    private static BigDecimal rsi(List<BarDTO> days, int idx, int n) {
-        if (idx < n) {
-            return null;
-        }
-        BigDecimal gain = BigDecimal.ZERO;
-        BigDecimal loss = BigDecimal.ZERO;
-        for (int j = idx - n + 1; j <= idx; j++) {
-            BigDecimal diff = days.get(j).getClose().subtract(days.get(j - 1).getClose());
-            if (diff.compareTo(BigDecimal.ZERO) >= 0) {
-                gain = gain.add(diff);
-            } else {
-                loss = loss.add(diff.abs());
-            }
-        }
-        if (loss.compareTo(BigDecimal.ZERO) == 0) {
-            return new BigDecimal("100");
-        }
-        BigDecimal avgGain = gain.divide(BigDecimal.valueOf(n), 8, RoundingMode.HALF_UP);
-        BigDecimal avgLoss = loss.divide(BigDecimal.valueOf(n), 8, RoundingMode.HALF_UP);
-        BigDecimal rs = avgGain.divide(avgLoss, 8, RoundingMode.HALF_UP);
-        return new BigDecimal("100").subtract(
-                new BigDecimal("100").divide(BigDecimal.ONE.add(rs), 4, RoundingMode.HALF_UP));
-    }
-
-    private static BigDecimal atr(List<BarDTO> days, int idx, int n) {
-        if (idx < n) {
-            return null;
-        }
-        BigDecimal sum = BigDecimal.ZERO;
-        for (int j = idx - n + 1; j <= idx; j++) {
-            BarDTO cur = days.get(j);
-            BarDTO prev = days.get(j - 1);
-            BigDecimal tr1 = cur.getHigh().subtract(cur.getLow());
-            BigDecimal tr2 = cur.getHigh().subtract(prev.getClose()).abs();
-            BigDecimal tr3 = cur.getLow().subtract(prev.getClose()).abs();
-            BigDecimal tr = tr1.max(tr2).max(tr3);
-            sum = sum.add(tr);
-        }
-        return sum.divide(BigDecimal.valueOf(n), 4, RoundingMode.HALF_UP);
     }
 
     private static BigDecimal bd(Object v) {

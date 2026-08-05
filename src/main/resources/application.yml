@@ -44,8 +44,22 @@ quant:
   pool-score-min: 45
   pool-min-list-days: 60
   pool-min-avg-amount20: 0
-  # db：读 MySQL market_1min（更大周期内存聚合）；空库启动从 classpath 灌 1 分钟种子
+  # db：读 MySQL；空库启动从 classpath 灌 1 分钟种子
   market-mode: db
+  # 日线：auto=优先 market_daily（选股），空则 market_1min 聚日；table=仅日线表；aggregate=仅分钟聚日
+  day-source: auto
+  # pool-rebuild 前是否重算 factor_daily（全市场有日线时较慢，可关）
+  pool-rebuild-refresh-factors: true
+  # pool-rebuild 后是否异步跑 TDX 池内分钟脚本（需 tdx-script.enabled=true）
+  pool-rebuild-backfill-minute: false
+  # 通达信 Python 灌数（day-collect / pool-minute-backfill；需 pip install pytdx pymysql）
+  tdx-script:
+    enabled: true
+    python: python
+    working-dir: ""
+    min1-script: scripts/fetch_min1_tdx.py
+    daily-script: scripts/fetch_daily_tdx.py
+    timeout-seconds: 3600
   # 单活策略 id（maCross=金叉默认；holdNothing=永不交易占位，用于切换验证）
   active-strategy: maCross
   mock-bar-days: 15

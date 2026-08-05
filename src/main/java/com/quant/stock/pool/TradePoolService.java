@@ -9,6 +9,8 @@ import com.quant.stock.mapper.FactorDailyMapper;
 import com.quant.stock.mapper.StockBasicMapper;
 import com.quant.stock.mapper.TradePoolMapper;
 import com.quant.stock.mapper.TradePoolReportMapper;
+import com.quant.stock.market.FactorDailyComputeService;
+import com.quant.stock.market.TdxScriptBackfillService;
 import com.quant.stock.market.dto.FactorDailyDO;
 import com.quant.stock.market.dto.StockBasicDO;
 import com.quant.stock.pool.dto.TradePoolDO;
@@ -18,7 +20,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.annotation.PostConstruct;
 import java.math.BigDecimal;
@@ -54,10 +58,13 @@ public class TradePoolService {
     private final TradePoolReportMapper reportMapper;
     private final StockBasicMapper stockBasicMapper;
     private final FactorDailyMapper factorDailyMapper;
+    private final FactorDailyComputeService factorDailyComputeService;
+    private final TdxScriptBackfillService tdxScriptBackfillService;
     private final BatchStockBackTestService batchStockBackTestService;
     private final PoolSelectScorer poolSelectScorer;
     private final QuantProperties quantProperties;
     private final JdbcTemplate jdbcTemplate;
+    private final PlatformTransactionManager transactionManager;
 
     /** 启动时确保目标池相关表结构存在并清理废弃表名 */
     @PostConstruct
@@ -472,9 +479,18 @@ public class TradePoolService {
 
     /**
      * 全市场扫描 → 粗过滤 → TopN 可入选 → 整表替换唯一目标池。
+     * 可选先重算 factor_daily（独立提交，不包进池替换事务）。
      */
-    @Transactional
     public Map<String, Object> rebuildFromUniverse() {
+        Map<String, Object> factorRefresh = null;
+        if (quantProperties.isPoolRebuildRefreshFactors()) {
+            try {
+                factorRefresh = factorDailyComputeService.rebuild(null);
+                log.info("[pool-rebuild] factor_daily 预刷新 {}", factorRefresh);
+            } catch (Exception e) {
+                log.warn("[pool-rebuild] factor_daily 预刷新失败，继续扫池: {}", e.getMessage());
+            }
+        }
         List<Map<String, String>> uni = listUniverse();
         Map<String, String> nameByCode = new HashMap<String, String>();
         for (Map<String, String> u : uni) {
@@ -507,38 +523,63 @@ public class TradePoolService {
         out.put("batchId", batchId);
         out.put("scoreMin", quantProperties.getPoolScoreMin());
         out.put("tradePoolMax", max);
+        if (factorRefresh != null) {
+            out.put("factorRefresh", factorRefresh);
+        }
+        out.put("minuteBackfillHint", "python scripts/fetch_min1_tdx.py --from-pool");
+        out.put("minuteBackfillCodes", selected);
+        if (quantProperties.isPoolRebuildBackfillMinute()) {
+            try {
+                Map<String, Object> bf = tdxScriptBackfillService.backfillPoolMinuteAsync();
+                out.put("minuteBackfill", bf);
+            } catch (Exception e) {
+                log.warn("[pool-rebuild] 池内分钟异步回填提交失败: {}", e.getMessage());
+                Map<String, Object> bf = new LinkedHashMap<String, Object>();
+                bf.put("ok", false);
+                bf.put("message", e.getMessage());
+                out.put("minuteBackfill", bf);
+            }
+        }
         return out;
     }
 
-    private List<String> replaceActivePool(List<BatchScanResultDTO> picked, Map<String, String> nameByCode,
-                                          String batchId) {
-        tradePoolMapper.deactivateAll();
-        List<String> selected = new ArrayList<String>();
-        for (BatchScanResultDTO r : picked) {
-            String code = r.getStockCode();
-            String name = nameByCode.getOrDefault(code, code);
-            Map<String, Object> analysis = buildAnalysisMap(code, name, r, true);
-            String summary = buildRecommendSummary(name, code, r, true);
-            analysis.put("summary", summary);
-            analysis.put("batchId", batchId);
-            BigDecimal poolScore = r.getPoolScore() == null ? BigDecimal.ZERO : r.getPoolScore();
-            TradePoolReportDO report = TradePoolReportDO.builder()
-                    .symbol(code).name(name)
-                    .score(poolScore)
-                    .reason(trimReason(poolReason(r) + " | " + r.getSignalDesc()))
-                    .summary(summary.length() > 1000 ? summary.substring(0, 1000) : summary)
-                    .analysisJson(JSON.toJSONString(analysis))
-                    .batchId(batchId)
-                    .build();
-            reportMapper.insert(report);
-            tradePoolMapper.upsert(TradePoolDO.builder()
-                    .symbol(code).name(name).status(1)
-                    .score(report.getScore()).reason(report.getReason())
-                    .source("BATCH_SCAN").reportId(report.getId())
-                    .build());
-            selected.add(code);
-        }
-        return selected;
+    private List<String> replaceActivePool(final List<BatchScanResultDTO> picked,
+                                          final Map<String, String> nameByCode,
+                                          final String batchId) {
+        return new TransactionTemplate(transactionManager).execute(
+                new org.springframework.transaction.support.TransactionCallback<List<String>>() {
+                    @Override
+                    public List<String> doInTransaction(
+                            org.springframework.transaction.TransactionStatus status) {
+                        tradePoolMapper.deactivateAll();
+                        List<String> selected = new ArrayList<String>();
+                        for (BatchScanResultDTO r : picked) {
+                            String code = r.getStockCode();
+                            String name = nameByCode.getOrDefault(code, code);
+                            Map<String, Object> analysis = buildAnalysisMap(code, name, r, true);
+                            String summary = buildRecommendSummary(name, code, r, true);
+                            analysis.put("summary", summary);
+                            analysis.put("batchId", batchId);
+                            BigDecimal poolScore = r.getPoolScore() == null ? BigDecimal.ZERO : r.getPoolScore();
+                            TradePoolReportDO report = TradePoolReportDO.builder()
+                                    .symbol(code).name(name)
+                                    .score(poolScore)
+                                    .reason(trimReason(poolReason(r) + " | " + r.getSignalDesc()))
+                                    .summary(summary.length() > 1000 ? summary.substring(0, 1000) : summary)
+                                    .analysisJson(JSON.toJSONString(analysis))
+                                    .batchId(batchId)
+                                    .build();
+                            reportMapper.insert(report);
+                            tradePoolMapper.upsert(TradePoolDO.builder()
+                                    .symbol(code).name(name).status(1)
+                                    .score(report.getScore()).reason(report.getReason())
+                                    .source("BATCH_SCAN").reportId(report.getId())
+                                    .build());
+                            selected.add(code);
+                        }
+                        return selected;
+                    }
+                });
     }
 
     /**

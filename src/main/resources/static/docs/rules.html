@@ -64,7 +64,7 @@
       <code>GET /api/account/alerts</code>；硬拦截仍由仓位与熔断逻辑执行</li>
   <li><b>信号漂移（P0-90）</b>：滚动胜率（闭环回合）+ MA5/MA20 价差 vs 次日收益<strong>代理</strong> IC（真因子 IC 不可用）；低于阈连续确认后 CRITICAL；
       <code>auto-retire-on-signal-drift</code> 默认 false；<code>GET /api/account/signal-drift</code>；不改金叉、不报复满仓</li>
-  <li><b>行情自洽闸（P0-107）</b>：检查 <code>market_1min</code> 空/滞后/稀疏日/OHLC；超阈告警；
+  <li><b>行情自洽闸（P0-107）</b>：分层检查——universe 看 <code>market_daily</code>，目标池看 <code>market_1min</code>；超阈告警；
       <code>data-reconcile-block-on-diverge</code> 默认 false；开启后阻断新开；<code>GET/POST /api/ops/data-reconcile*</code>；外部双源仍待 API</li>
   <li><b>结构突变（P0-120）</b>：双窗收益均值差/波动；超阈确认后仓位×0.5 并挂漂移；<code>GET /api/account/structural-break</code>；不改金叉</li>
   <li><b>ST as-of（P0-101）</b>：优先 <code>st_status_hist</code> 日切；无行回退 <code>stock_basic.is_st</code>（有前视风险）；
@@ -150,7 +150,7 @@
 <h4>八、单只回测（页面「个股回测」）</h4>
 <ul>
   <li>工作台选股<strong>仅来自目标池</strong>（<code>trade_pool</code>）；池空需先「扫描更新」。行情浏览仍为全市场</li>
-  <li>默认周期 <b>DAY</b>；起止时间留空 = 该股全量可用 K 线（由 <code>market_1min</code> 聚合）；非 DAY 周期同样由 1 分钟聚合；页面默认工作台仍为 DAY</li>
+  <li>默认周期 <b>DAY</b>；起止时间留空 = 该股全量可用 K 线（优先 <code>market_daily</code>，空则 <code>market_1min</code> 聚日）；分钟周期仍由 1 分钟聚合；页面默认工作台仍为 DAY</li>
   <li>初始资金默认 <b>100000</b>（可改）</li>
   <li><b>本次临时参数</b>：请求 <code>paramOverrides</code>（白名单同运维可写键）叠在 yml→全局→策略包之上，仅本轮生效、不落库；写入 <code>configFingerprint</code></li>
   <li>K 线 &lt; 65 根 → 返回空结果</li>
@@ -225,7 +225,7 @@
 
 <h4>十二、行情与页面产品规则</h4>
 <ul>
-  <li>行情真相源：仅 <code>market_1min</code>（价额为元；<code>data_source</code> 区分 MOCK/TDX/MDS）；5/15/30/60/日/周/月一律内存聚合</li>
+  <li>行情真相源分层：<code>market_daily</code>（选股日线，首期不复权）+ <code>market_1min</code>（池内分钟，价额为元；MOCK/TDX/MDS）；分钟周期由 1 分钟聚合；日线默认不依赖全市场分钟</li>
   <li>聚合交易分钟：约 09:30–11:29、13:00–14:59；周线键为周一所在周</li>
   <li>空库启动时从 <code>classpath:data/kline</code> 导入 1 分钟种子（优先 <code>MIN_1.json</code>，否则拆 <code>MIN_5.json</code>），运行时不再读 JSON 做展示</li>
   <li>行情页展示 / K 线图表：走统一 <code>MarketDataService#getKline</code></li>

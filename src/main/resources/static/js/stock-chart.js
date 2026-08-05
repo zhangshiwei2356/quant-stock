@@ -2507,7 +2507,7 @@
     var n = Number(strategyEvalState.unknownCount || 0);
     if (n > 0) {
       $hint.prop('hidden', false)
-        .text('另有 ' + n + ' 条旧回测无 strategy_id，未计入任一策略聚合（不回填）');
+        .text('另有 ' + n + ' 条回测 strategy_id 仍为空；启动会自动补全，亦可 POST /api/ops/backtest/backfill-strategy-id');
     } else {
       $hint.prop('hidden', true).text('');
     }
@@ -4732,10 +4732,17 @@
       if (opts.showFunnel !== false) {
         renderTpFunnel(res);
       }
-      toast('目标池已更新：' + (res.selected != null ? res.selected : 0)
+      var msg = '目标池已更新：' + (res.selected != null ? res.selected : 0)
         + ' 只 · 全市场 ' + (res.universe || 0)
         + ' → 入选 ' + (res.selected || 0)
-        + (res.batchId ? (' · 批次 ' + res.batchId) : ''), 'ok');
+        + (res.batchId ? (' · 批次 ' + res.batchId) : '');
+      toast(msg, 'ok');
+      if (res.minuteBackfill && res.minuteBackfill.async) {
+        toast('已提交池内分钟异步回填（TDX 脚本）', 'info');
+      } else if (res.minuteBackfillHint && (res.selected || 0) > 0) {
+        toast('请补池内分钟：' + res.minuteBackfillHint
+          + '（或运维开启 tdx-script 后 POST /api/ops/tdx-script/backfill-min1）', 'info');
+      }
       loadTradePoolManage();
       if (opts.refreshHistory) {
         loadTpScanHistory();

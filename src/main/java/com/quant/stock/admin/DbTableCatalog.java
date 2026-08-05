@@ -74,13 +74,17 @@ public final class DbTableCatalog {
                 "维护可交易/可浏览标的的基础档案（代码、简称、市场、行业、上市状态等）。",
                 "本地初始化 / Mock 导入 / 后续可对接交易所或第三方证券基础信息 API。",
                 "行情浏览全市场列表、盘后目标池扫描 universe、个股展示名称；status=0 的标的通常排除在扫描外。");
-        add(m, "market_1min", "1分钟行情(唯一真相源)", "行情", "id DESC",
-                "唯一物理行情层：1 分钟 OHLCV（价额为元）；data_source 区分 MOCK/TDX/MDS。",
-                "TDX 回填 fetch_min1_tdx.py（TDX）、空库 Mock 种子（MOCK）、后续宽睿 MDS（MDS）。",
-                "K 线查询、回测、scan-and-trade、因子计算（日线由 1 分钟聚合后写入 factor_daily）。");
+        add(m, "market_1min", "1分钟行情(交易真相源)", "行情", "id DESC",
+                "池内交易/分钟回测物理层：1 分钟 OHLCV（价额为元）；data_source 区分 MOCK/TDX/MDS。",
+                "TDX 回填 fetch_min1_tdx.py（TDX）、空库 Mock 种子（MOCK）、宽睿 MDS（MDS）。",
+                "分钟 K 线、scan-and-trade、分钟回测；DAY 在无 market_daily 时可由 1 分钟聚合回退。");
+        add(m, "market_daily", "日线行情(选股真相源)", "行情", "id DESC",
+                "全市场日线 OHLCV（价额为元）；adj_flag 首期统一 NONE；供选股/pool-rebuild 扫池。",
+                "TDX 回填 scripts/fetch_daily_tdx.py；升级脚本 scripts/sql/20260805_market_daily.sql。",
+                "getKline(DAY) 默认优先本表；周/月可由日线再聚合；与分钟层分工，勿灌全市场分钟。");
         add(m, "factor_daily", "日频因子缓存", "因子", "id DESC",
                 "缓存日频技术指标（MA/RSI/ATR 等）；入池粗筛可读最新行（ma5>ma20 / ma60向上 / 放量）。",
-                "MockDataImporter 导入或后续因子任务写入。",
+                "FactorDailyComputeService / factor-daily-rebuild / Mock 导入；由日线重算。",
                 "pool-rebuild 粗过滤加速；无行则放行该标的。");
         add(m, "factor_minute", "分钟因子缓存", "因子", "id DESC",
                 "缓存分钟频技术因子（如 MA5/MA20/ATR），供分钟级策略使用。",

@@ -23,10 +23,10 @@ CREATE TABLE IF NOT EXISTS `stock_basic` (
   KEY `idx_market` (`market`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='股票基本信息表';
 
--- ---------- 模块二：行情（仅 market_1min；已废弃 market_daily / market_minute） ----------
--- 升级已有库时可执行（幂等）：
+-- ---------- 模块二：行情（分钟交易真相源 + 日线选股真相源） ----------
+-- 历史：曾废弃 market_daily / market_minute；2026-08 起重建 market_daily 专供全市场选股/扫池。
+-- 升级已有库：勿再 DROP market_daily；见 scripts/sql/20260805_market_daily.sql
 DROP TABLE IF EXISTS `market_minute`;
-DROP TABLE IF EXISTS `market_daily`;
 
 CREATE TABLE IF NOT EXISTS `market_1min` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -43,13 +43,32 @@ CREATE TABLE IF NOT EXISTS `market_1min` (
   UNIQUE KEY `idx_symbol_time` (`symbol`, `trade_time`),
   KEY `idx_time` (`trade_time`),
   KEY `idx_data_source` (`data_source`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='1分钟线原始行情表(唯一物理真相源;价额一律为元)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='1分钟线(池内交易/分钟回测物理真相源;价额一律为元)';
 
 -- 已有库升级（幂等）：补来源字段；存量默认 TDX（通达信/历史回填口径）
 -- ALTER TABLE `market_1min` ADD COLUMN `data_source` VARCHAR(16) NOT NULL DEFAULT 'TDX' COMMENT '行情来源: MOCK/TDX/MDS' AFTER `amount`;
 -- ALTER TABLE `market_1min` ADD COLUMN `ingested_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '入库时间' AFTER `data_source`;
 -- ALTER TABLE `market_1min` ADD KEY `idx_data_source` (`data_source`);
 -- UPDATE `market_1min` SET `data_source`='TDX' WHERE `data_source` IS NULL OR `data_source`='';
+
+-- 日线：全市场选股/pool-rebuild 扫池用；非分钟替代品。首期复权口径统一 NONE（与 TDX 裸价一致）
+CREATE TABLE IF NOT EXISTS `market_daily` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `symbol` VARCHAR(10) NOT NULL COMMENT '股票代码(6位)',
+  `trade_date` DATE NOT NULL COMMENT '交易日',
+  `open` DECIMAL(10,4) NOT NULL COMMENT '开盘价(元)',
+  `high` DECIMAL(10,4) NOT NULL COMMENT '最高价(元)',
+  `low` DECIMAL(10,4) NOT NULL COMMENT '最低价(元)',
+  `close` DECIMAL(10,4) NOT NULL COMMENT '收盘价(元)',
+  `volume` BIGINT NOT NULL COMMENT '成交量(股)',
+  `amount` DECIMAL(16,4) DEFAULT NULL COMMENT '成交额(元)',
+  `adj_flag` VARCHAR(8) NOT NULL DEFAULT 'NONE' COMMENT 'NONE=不复权 / QFQ=前复权(库内勿混用)',
+  `data_source` VARCHAR(16) NOT NULL DEFAULT 'TDX' COMMENT 'TDX/EM/BAO/MOCK/…',
+  `ingested_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '入库时间',
+  UNIQUE KEY `idx_symbol_date` (`symbol`, `trade_date`),
+  KEY `idx_date` (`trade_date`),
+  KEY `idx_data_source` (`data_source`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='日线行情(全市场选股真相源;价额一律为元)';
 
 -- ---------- 模块三：因子缓存 ----------
 CREATE TABLE IF NOT EXISTS `factor_daily` (
@@ -286,7 +305,10 @@ INSERT IGNORE INTO `sys_schedule_job`
 ('settle-after-close', '收盘清算与K线聚合', 'CRON', '0 30 15 * * MON-FRI', NULL, 0, 1, '本地权益日结 + K 线聚合；真实行情增量仍依赖 market-collect/外部 API'),
 ('pool-rebuild', '全市场入池扫描', 'CRON', '0 10 15 * * MON-FRI', NULL, 0, 1, '全市场扫描覆盖唯一目标池；与 after-market-batch-scan 启用其一即可'),
 ('after-market-batch-scan', '盘后入池扫描', 'CRON', '0 0 16 * * MON-FRI', NULL, 0, 1, '工作日 16:00 覆盖唯一目标池；与 pool-rebuild 启用其一即可'),
-('data-validate', '数据校验', 'CRON', '0 0 17 * * MON-FRI', NULL, 0, 1, '本地空表/滞后检查已可用；与外部行情抽样对账待 API');
+('data-validate', '数据校验', 'CRON', '0 0 17 * * MON-FRI', NULL, 0, 1, '分层：universe→market_daily；目标池→market_1min'),
+('factor-daily-rebuild', '日频因子重算', 'CRON', '0 0 15 * * MON-FRI', NULL, 0, 1, '由日线重算 factor_daily；建议在 pool-rebuild 前'),
+('day-collect', '全市场日线补齐(TDX)', 'CRON', '0 30 15 * * MON-FRI', NULL, 0, 1, '无日线补近1年，有则增量补缺口；需 quant.tdx-script.enabled'),
+('pool-minute-backfill', '目标池分钟补齐(TDX)', 'CRON', '0 20 15 * * MON-FRI', NULL, 0, 1, '池内尽量拉满(~90日)并补到最近；需 quant.tdx-script.enabled');
 
 -- ---------- ST 日切 / 行业 reclass（P0-101 / P0-121；启动亦可 ensure） ----------
 CREATE TABLE IF NOT EXISTS `st_status_hist` (
