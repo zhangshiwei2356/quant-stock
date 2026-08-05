@@ -41,6 +41,21 @@ public abstract class BaseStrategy {
     }
 
     /**
+     * 策略管理页「详细介绍」正文（可多句）；默认拼接 {@link #uiLabel()} 与 {@link #profileSummary()}。
+     */
+    public String detailIntro() {
+        String label = uiLabel();
+        String summary = profileSummary();
+        if (summary == null || summary.trim().isEmpty()) {
+            return label != null ? label : name();
+        }
+        if (label == null || label.trim().isEmpty()) {
+            return summary.trim();
+        }
+        return label.trim() + "。" + summary.trim();
+    }
+
+    /**
      * 基于已闭合 K 线计算当前信号。
      *
      * @param stockCode  标的

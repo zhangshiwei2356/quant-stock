@@ -1,6 +1,7 @@
 package com.quant.stock.controller;
 
 import com.quant.stock.strategy.StrategyEvalService;
+import com.quant.stock.strategy.StrategyPoolSeedService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -19,17 +20,19 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * 策略评估 Controller：未知策略 / 未知记录映射为 404。
+ * 策略总览 Controller：未知策略 / 未知记录映射为 404。
  */
 class StrategyControllerTest {
 
     private StrategyEvalService evalService;
+    private StrategyPoolSeedService seedService;
     private StrategyController controller;
 
     @BeforeEach
     void setUp() {
         evalService = mock(StrategyEvalService.class);
-        controller = new StrategyController(evalService);
+        seedService = mock(StrategyPoolSeedService.class);
+        controller = new StrategyController(evalService, seedService);
     }
 
     @Test
@@ -64,5 +67,14 @@ class StrategyControllerTest {
         detail.put("id", "abc");
         when(evalService.detail("abc")).thenReturn(detail);
         assertEquals("abc", controller.detail("abc").get("id"));
+    }
+
+    @Test
+    void seed_conflict_returns409() {
+        when(seedService.start("maCross", false))
+                .thenThrow(new IllegalStateException("已有回测"));
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> controller.seedPoolBacktest("maCross", false));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
     }
 }

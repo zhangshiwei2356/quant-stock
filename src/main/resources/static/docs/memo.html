@@ -65,8 +65,8 @@
     <li><b>交易日历（静态）</b> — 已落地 · 周末 + 内置法定节假日（含 2026 中秋 9/25–27、国庆 10/1–7；10/8 开市）；风控拒非交易日</li>
     <li><b>账户概览</b> — 已落地 · 资金权益 / 当前持仓（批次 T+1）/ 委托记录 / 权益日结 / 风控事件 / 风控日报</li>
     <li><b>唯一目标池</b> — 已落地 · 「当前池」手动「扫描更新」或定时 <code>pool-rebuild</code> / <code>after-market-batch-scan</code>；「扫描历史」可查看批次，亦可手动扫描；移出≠卖出；漏斗 + Markdown 报告</li>
-    <li><b>运维中心</b> — 已落地 · 任务管理（库表动态调度）/ 数据健康（本地空与滞后）/ 运行参数（白名单可写 + 中文说明对照配置键；改参/纸面激活在此，与策略评估页职责分离）</li>
-    <li><b>策略管理</b> — 已落地 · 一级菜单（运维与数据表之间）；二级「策略评估」：注册策略列表 + 聚合卡片 + 历史表点行详情；按 <code>strategy_id</code> 关联；启动自动补全空白/指纹旧名（如 MaCrossStrategy→maCross）；运维 <code>POST /api/ops/backtest/backfill-strategy-id</code></li>
+    <li><b>运维中心</b> — 已落地 · 任务管理（库表动态调度）/ 数据健康（本地空与滞后）/ 运行参数（白名单可写 + 中文说明对照配置键；改参/纸面激活在此，与策略总览页职责分离）</li>
+    <li><b>策略管理</b> — 已落地 · 一级菜单（运维与数据表之间）；二级「策略总览」：介绍（默认收起）+ 满分 100 评分 + 历史表；无回测自动/手动目标池补种（单股×池 + 组合×1，进度条）；按 <code>strategy_id</code> 关联；运维 <code>POST /api/ops/backtest/backfill-strategy-id</code></li>
     <li><b>数据表</b> — 已落地 · MySQL 白名单分页只读浏览；列表/详情展示 information_schema 磁盘占用（数据/索引）</li>
     <li><b>回测工作台</b> — 已落地 · 行情全市场选股；个股/组合回测<strong>仅从目标池</strong>选股；个股二级：回测工作台 / 批量扫描（yml 列表）/ 回测历史；组合二级：回测工作台 / 回测历史；结果含 <code>configFingerprint</code> / <code>atrRisk</code>；历史落库带注册策略 <code>strategy_id</code></li>
     <li><b>ADV 参与率硬顶</b> — 已落地 · <code>quant.max-participation-adv</code> 默认 0.10；买入/死叉卖受限，止损与熔断卖不受限</li>

@@ -49,6 +49,15 @@ public abstract class AbstractMaCrossProfileStrategy extends BaseStrategy {
     }
 
     @Override
+    public String detailIntro() {
+        MaCrossFilterProfile p = profile();
+        return p.getLabel() + "。买卖公式与主路径金叉相同（MA5/MA20），过滤包固定为画像参数，"
+                + "不读全局 quant 过滤开关，便于回测下拉对照。"
+                + "画像摘要：" + p.getSummary()
+                + "。若存在 strategy_param 稀疏包，过滤改读生效快照（全局⊕稀疏）。";
+    }
+
+    @Override
     public TradeSignal calcSignal(String stockCode, List<BarDTO> closedBars) {
         if (closedBars == null || closedBars.size() < 65) {
             return TradeSignal.none(stockCode);

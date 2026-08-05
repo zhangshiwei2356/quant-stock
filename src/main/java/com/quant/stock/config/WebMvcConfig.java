@@ -42,7 +42,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .addPathPatterns(
                         "/api/backtest/run",
                         "/api/portfolio/run",
-                        "/api/batch/scanAllStock"
+                        "/api/batch/scanAllStock",
+                        "/api/strategy/*/seed-pool-backtest"
                 );
     }
 }

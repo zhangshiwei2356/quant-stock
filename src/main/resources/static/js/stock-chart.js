@@ -2458,7 +2458,10 @@
     selectedId: '',
     kind: 'ALL',
     enabled: true,
-    unknownCount: 0
+    unknownCount: 0,
+    seedPollTimer: null,
+    seedHintShown: {},
+    autoSeedStarted: {}
   };
   var STRATEGY_HIST_COLSPAN = 10;
 
@@ -2479,6 +2482,7 @@
     setStrategyMenuActive('eval');
     $('#viewStrategy').prop('hidden', false);
     loadStrategyOverview();
+    pollStrategySeedStatus(false);
     resizeCharts();
   }
 
@@ -2489,17 +2493,56 @@
       return;
     }
     strategies.forEach(function (s) {
-      var id = s.strategyId || s.displayName || '';
+      var id = s.strategyId || '';
+      var label = s.displayName || id || '—';
       var $item = $('<div class="strategy-list-item" role="button" tabindex="0"/>')
-        .attr('data-strategy-id', id);
+        .attr('data-strategy-id', id)
+        .attr('title', id || '');
       if (id && id === selectedId) $item.addClass('active');
-      var $name = $('<span class="strategy-list-name"/>').text(s.displayName || id || '—');
-      $item.append($name);
+      var $top = $('<div class="strategy-list-top"/>');
+      $top.append($('<span class="strategy-list-name"/>').text(label));
+      var $badges = $('<span class="strategy-list-badges"/>');
       if (s.active) {
-        $item.append($('<span class="strategy-active-badge"/>').text('激活'));
+        $badges.append($('<span class="strategy-active-badge"/>').text('激活'));
       }
+      if (s.score != null && s.score !== '') {
+        $badges.append($('<span class="strategy-score-badge"/>')
+          .text(String(s.score) + (s.grade ? ('·' + s.grade) : '')));
+      } else {
+        $badges.append($('<span class="strategy-score-badge muted"/>').text('未评'));
+      }
+      $top.append($badges);
+      $item.append($top);
+      $item.append($('<div class="strategy-list-id"/>').text(id || '—'));
       $list.append($item);
     });
+  }
+
+  function setStrategyIntroCollapsed(collapsed) {
+    var $wrap = $('#strategyIntro');
+    var $btn = $('#btnStrategyIntroToggle');
+    var $body = $('#strategyIntroBody');
+    if (!$wrap.length) return;
+    $btn.attr('aria-expanded', collapsed ? 'false' : 'true');
+    $btn.find('.strategy-intro-chevron').text(collapsed ? '▸' : '▾');
+    $body.prop('hidden', !!collapsed);
+  }
+
+  function renderStrategyIntro(s) {
+    var $wrap = $('#strategyIntro');
+    if (!$wrap.length) return;
+    if (!s) {
+      $wrap.prop('hidden', true);
+      $('#strategyIntroBody').empty();
+      setStrategyIntroCollapsed(true);
+      return;
+    }
+    $wrap.prop('hidden', false);
+    var title = (s.displayName || s.strategyId || '策略') + ' · 详细介绍';
+    $('#strategyIntroTitle').text(title);
+    var text = s.detailIntro || s.summary || '暂无详细介绍';
+    $('#strategyIntroBody').empty().append($('<p class="strategy-intro-text"/>').text(text));
+    setStrategyIntroCollapsed(true);
   }
 
   function renderStrategyUnknownBanner() {
@@ -2517,24 +2560,202 @@
   function renderStrategyCards(s) {
     var $cards = $('#strategyEvalCards').empty();
     renderStrategyUnknownBanner();
+    renderStrategySeedBar(s);
     if (!s) {
       $cards.append($('<div class="hint"/>').text('请选择左侧策略'));
       return;
     }
-    function card(label, value, sub) {
+    function card(label, value, sub, extraClass) {
       var $c = $('<div class="strategy-eval-card"/>');
+      if (extraClass) $c.addClass(extraClass);
       $c.append($('<div class="label"/>').text(label));
       $c.append($('<div class="value"/>').text(value == null || value === '' ? '—' : String(value)));
       if (sub) $c.append($('<div class="sub"/>').text(sub));
       return $c;
     }
+    var scoreText = s.score != null && s.score !== ''
+      ? (String(s.score) + ' / ' + (s.scoreMax != null ? s.scoreMax : 100))
+      : '—';
+    var gradeSub = s.grade ? ('等级 ' + s.grade) : null;
+    if (s.score == null) gradeSub = '暂无回测，无法评分';
+    $cards.append(card('综合评分', scoreText, gradeSub, 'strategy-eval-card--score'));
+
+    var comps = s.scoreComponents || [];
+    if (comps.length) {
+      var lines = comps.map(function (c) {
+        return (c.label || c.key) + ' ' + (c.points != null ? c.points : '—')
+          + '/' + (c.max != null ? c.max : '—')
+          + (c.detail ? ('（' + c.detail + '）') : '');
+      });
+      $cards.append(card('评分分项', lines.length + ' 项', lines.join('； '), 'strategy-eval-card--wide'));
+    }
+
     $cards.append(card('运行次数', s.runCount != null ? s.runCount : 0,
       strategyEvalState.enabled === false ? '数据库未启用，聚合为 0' : null));
     $cards.append(card('平均收益率', pct(s.avgTotalRate)));
     $cards.append(card('中位收益率', pct(s.medianTotalRate)));
     $cards.append(card('平均回撤', pct(s.avgMaxDrawdown)));
+    $cards.append(card('平均胜率', pct(s.avgWinRate)));
+    $cards.append(card('盈利占比', pct(s.positiveRatio)));
     $cards.append(card('最近收益', pct(s.lastTotalRate),
       s.lastSavedAt ? ('最近：' + fmtDateTimeDisplay(s.lastSavedAt)) : '暂无回测'));
+  }
+
+  function renderStrategySeedBar(s) {
+    var $bar = $('#strategySeedBar');
+    if (!$bar.length) return;
+    if (!s) {
+      $bar.prop('hidden', true);
+      return;
+    }
+    var runCount = Number(s.runCount || 0);
+    $bar.prop('hidden', false);
+    var $btn = $('#btnStrategySeed');
+    var $hint = $('#strategySeedHint');
+    if (runCount <= 0) {
+      $btn.text('用目标池补回测').prop('disabled', false);
+      $hint.text('无回测时会自动用目标池补种（逐只单股 + 全池组合）；也可手动再点');
+    } else {
+      $btn.text('强制再补目标池回测').prop('disabled', false);
+      $hint.text('已有 ' + runCount + ' 条回测；强制将再追加目标池单股+组合');
+    }
+  }
+
+  function applyStrategySeedStatus(st) {
+    st = st || {};
+    var $prog = $('#strategySeedProgress');
+    if (!$prog.length) return;
+    var running = !!st.running;
+    var hasResult = st.ok === true || st.ok === false;
+    if (!running && !hasResult && st.idle) {
+      $prog.prop('hidden', true);
+      return;
+    }
+    if (!running && !hasResult) {
+      return;
+    }
+    $prog.prop('hidden', false);
+    var phase = st.phaseLabel || st.phase || '—';
+    if (st.currentCode) phase += ' · ' + st.currentCode;
+    $('#strategySeedPhase').text(phase);
+    var pctVal = st.progressPercent != null ? Number(st.progressPercent) : 0;
+    if (isNaN(pctVal)) pctVal = 0;
+    $('#strategySeedPct').text(pctVal.toFixed(1) + '%');
+    $('#strategySeedBarFill').css('width', Math.max(0, Math.min(100, pctVal)) + '%');
+    $('#strategySeedSummary').text(st.summary || st.message || '');
+    $('#btnStrategySeed').prop('disabled', running);
+  }
+
+  function stopStrategySeedPoll() {
+    if (strategyEvalState.seedPollTimer) {
+      clearInterval(strategyEvalState.seedPollTimer);
+      strategyEvalState.seedPollTimer = null;
+    }
+  }
+
+  function pollStrategySeedStatus(refreshOverviewOnDone) {
+    $.getJSON('/api/strategy/seed-status')
+      .done(function (st) {
+        applyStrategySeedStatus(st);
+        if (st && st.running) {
+          if (!strategyEvalState.seedPollTimer) {
+            strategyEvalState.seedPollTimer = setInterval(function () {
+              pollStrategySeedStatus(true);
+            }, 1500);
+          }
+          return;
+        }
+        stopStrategySeedPoll();
+        if (refreshOverviewOnDone && st && (st.ok === true || st.ok === false)) {
+          if (st.ok) {
+            toast(st.summary || '目标池补回测完成', 'ok');
+            loadStrategyOverview();
+          } else {
+            toast(st.message || st.summary || '目标池补回测失败', 'err');
+            renderStrategySeedBar(findStrategyById(strategyEvalState.selectedId));
+          }
+        }
+      })
+      .fail(function () {
+        /* 忽略瞬时失败，继续轮询 */
+      });
+  }
+
+  function extractAjaxError(xhr, fallback) {
+    var msg = fallback || '请求失败';
+    if (!xhr) return msg;
+    if (xhr.responseJSON) {
+      return xhr.responseJSON.message || xhr.responseJSON.error || xhr.responseJSON.reason || msg;
+    }
+    if (xhr.responseText) {
+      try {
+        var j = JSON.parse(xhr.responseText);
+        return j.message || j.error || j.reason || msg;
+      } catch (e) {
+        return String(xhr.responseText).slice(0, 200) || msg;
+      }
+    }
+    return msg;
+  }
+
+  /**
+   * @param force 是否强制（已有回测时）
+   * @param opts.auto 自动触发：无确认框；仅 runCount==0
+   */
+  function startStrategyPoolSeed(force, opts) {
+    opts = opts || {};
+    var id = String(strategyEvalState.selectedId || '').trim();
+    if (!id) {
+      toast('请先选择策略', 'err');
+      return;
+    }
+    var s = findStrategyById(id);
+    var runCount = s ? Number(s.runCount || 0) : 0;
+    var useForce = !!force || runCount > 0;
+    if (opts.auto && runCount > 0) {
+      return;
+    }
+    if (!opts.auto) {
+      if (useForce && runCount > 0) {
+        if (!window.confirm('策略已有 ' + runCount + ' 条回测，确认再追加目标池单股+组合回测？')) {
+          return;
+        }
+      } else if (runCount <= 0) {
+        if (!window.confirm('将对目标池全部股票各跑一次单股回测，再跑一次全池组合回测。可能较久，确认开始？')) {
+          return;
+        }
+      }
+    }
+    var $btn = $('#btnStrategySeed');
+    withLoading($btn, $.ajax({
+      url: '/api/strategy/' + encodeURIComponent(id) + '/seed-pool-backtest',
+      method: 'POST',
+      data: { force: useForce }
+    }).done(function (data) {
+      data = data || {};
+      toast(data.message || (opts.auto ? '无回测，已自动开始目标池补种' : '已开始补回测'), 'ok');
+      applyStrategySeedStatus(data.status || { running: true, phaseLabel: '已受理', progressPercent: 0 });
+      stopStrategySeedPoll();
+      strategyEvalState.seedPollTimer = setInterval(function () {
+        pollStrategySeedStatus(true);
+      }, 1500);
+      pollStrategySeedStatus(true);
+    }).fail(function (xhr) {
+      toast(extractAjaxError(xhr, '启动补回测失败'), 'err');
+      if (opts.auto) {
+        /* 允许用户手动再点 */
+        delete strategyEvalState.autoSeedStarted[id];
+      }
+    }));
+  }
+
+  function maybeAutoSeedStrategy(s) {
+    if (!s || strategyEvalState.enabled === false) return;
+    var id = String(s.strategyId || '');
+    if (!id || Number(s.runCount || 0) > 0) return;
+    if (strategyEvalState.autoSeedStarted[id]) return;
+    strategyEvalState.autoSeedStarted[id] = true;
+    startStrategyPoolSeed(false, { auto: true });
   }
 
   function findStrategyById(id) {
@@ -2622,8 +2843,11 @@
     if (!id) return;
     strategyEvalState.selectedId = id;
     renderStrategyList(strategyEvalState.strategies, id);
-    renderStrategyCards(findStrategyById(id));
+    var s = findStrategyById(id);
+    renderStrategyIntro(s);
+    renderStrategyCards(s);
     loadStrategyHistory(id);
+    maybeAutoSeedStrategy(s);
   }
 
   function loadStrategyOverview() {
@@ -2657,6 +2881,7 @@
         } else {
           strategyEvalState.selectedId = '';
           renderStrategyCards(null);
+          renderStrategyIntro(null);
           $('#strategyHistoryBody').html(
             '<tr><td colspan="' + STRATEGY_HIST_COLSPAN + '" class="empty-state">暂无注册策略</td></tr>'
           );
@@ -4296,6 +4521,15 @@
       e.preventDefault();
       $(this).trigger('click');
     }
+  });
+
+  $('#btnStrategyIntroToggle').on('click', function () {
+    var expanded = $(this).attr('aria-expanded') === 'true';
+    setStrategyIntroCollapsed(expanded);
+  });
+
+  $('#btnStrategySeed').on('click', function () {
+    startStrategyPoolSeed(false);
   });
 
   $('#viewStrategy').on('click', '.strategy-kind-btn', function () {

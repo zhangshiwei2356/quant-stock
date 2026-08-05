@@ -28,6 +28,12 @@ public class HoldNothingStrategy extends BaseStrategy {
     }
 
     @Override
+    public String detailIntro() {
+        return "永不交易占位策略（holdNothing）。不产生任何买卖信号，用于验证策略注册表切换、"
+                + "配置指纹与扫池空跑；不参与真实交易逻辑。回测结果通常接近空仓持币。";
+    }
+
+    @Override
     public TradeSignal calcSignal(String stockCode, List<BarDTO> closedBars) {
         return TradeSignal.none(stockCode);
     }

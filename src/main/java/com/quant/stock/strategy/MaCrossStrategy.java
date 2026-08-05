@@ -42,6 +42,13 @@ public class MaCrossStrategy extends BaseStrategy {
         return "买卖=MA5/MA20；过滤开关读 application.yml";
     }
 
+    @Override
+    public String detailIntro() {
+        return "默认主路径金叉策略（maCross）。买卖信号为 MA5/MA20 金叉买入、死叉卖出；"
+                + "趋势(MA60)、放量、ADX/RSI 等过滤开关与阈值读取全局 quant 配置（application.yml / 运维改参）。"
+                + "纸面扫池与默认回测均以此为激活策略；对照画像（Trend/Volume/Balanced/Strict）为固定过滤副本，不改本类行为。";
+    }
+
     /**
      * 在已收盘 K 线上计算金叉/死叉及可选过滤后的买卖信号。
      *

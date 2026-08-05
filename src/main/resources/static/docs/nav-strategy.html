@@ -1,24 +1,25 @@
 <!-- 一级菜单介绍：策略管理 -->
-<p class="nav-intro-lead">按<strong>注册策略</strong>查看回测历史与整体评价。本页只做效果评估；改参 / 激活仍在「运维中心 → 运行参数」。</p>
+<p class="nav-intro-lead">按<strong>注册策略</strong>查看详细介绍、综合评分与回测历史。本页只做效果总览；改参 / 激活仍在「运维中心 → 运行参数」。</p>
 <div class="nav-intro-grid">
   <section class="nav-intro-card">
     <h4><span class="nav-intro-card-tag">能力</span>能做什么</h4>
     <ul class="nav-intro-list">
-      <li>左侧列出已注册策略；当前激活策略带角标</li>
-      <li>卡片展示运行次数、平均/中位收益率、平均回撤、最近一次结果</li>
-      <li>下方历史表可按全部 / 单股 / 组合筛选；点行展开成交统计与分析摘要</li>
+      <li>左侧列出已注册策略（含综合评分徽章）；当前激活策略带角标</li>
+      <li>策略介绍默认收起，可展开查看买卖逻辑与用途说明</li>
+      <li>无回测时自动用目标池补种（逐只单股 + 全池组合），并显示进度</li>
+      <li>卡片展示满分 100 的加权评分与聚合指标；历史表点行可看详情</li>
     </ul>
   </section>
   <section class="nav-intro-card nav-intro-card--steps">
     <h4><span class="nav-intro-card-tag">步骤</span>怎么开始</h4>
     <ol class="nav-intro-steps">
-      <li>点「策略评估」进入工作台</li>
-      <li>左侧选策略，看聚合指标与回测列表</li>
+      <li>点「策略总览」进入工作台</li>
+      <li>左侧选策略，展开介绍，看评分分项与回测列表</li>
       <li>需要改参或切换激活策略 → 运维中心</li>
     </ol>
   </section>
 </div>
 <div class="nav-intro-cta">
-  <button type="button" class="nav-intro-btn" data-enter-mode="strategy" data-strategy-panel="eval">进入策略评估</button>
+  <button type="button" class="nav-intro-btn" data-enter-mode="strategy" data-strategy-panel="eval">进入策略总览</button>
 </div>
-<p class="nav-intro-hint">旧回测若无 <code>strategy_id</code> 不会计入任一策略聚合。再点一次「策略管理」可收起并回初始化页。</p>
+<p class="nav-intro-hint">评分来自历史回测加权（收益/回撤/胜率/盈利占比/样本），样本少时仅供对照。旧回测若无 <code>strategy_id</code> 不会计入。再点一次「策略管理」可收起并回初始化页。</p>

@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 
 /**
- * 策略评估：按注册策略聚合回测历史 overview / 摘要列表 / 详情（内嵌 analysis）。
+ * 策略总览：按注册策略聚合回测历史 overview（含综合评分）/ 摘要列表 / 详情（内嵌 analysis）。
  */
 @Service
 public class StrategyEvalService {
@@ -113,31 +113,61 @@ public class StrategyEvalService {
         String activeName = strategyRegistry.active().name();
         List<Map<String, Object>> strategies = new ArrayList<Map<String, Object>>();
         for (String id : strategyRegistry.ids()) {
+            BaseStrategy strategy = strategyRegistry.resolve(id);
             Map<String, Object> row = new LinkedHashMap<String, Object>();
-            row.put("strategyId", id);
-            row.put("displayName", id);
-            row.put("active", activeName != null && activeName.equalsIgnoreCase(id));
+            row.put("strategyId", strategy.name());
+            row.put("displayName", strategy.uiLabel());
+            row.put("summary", strategy.profileSummary());
+            row.put("detailIntro", strategy.detailIntro());
+            row.put("active", activeName != null && activeName.equalsIgnoreCase(strategy.name()));
 
             List<BtBacktestRecordDO> records = enabled
                     ? nullSafe(mapper.selectSummaryByStrategyIds(
-                    StrategyIdAliases.matchIdsForQuery(id), null))
+                    StrategyIdAliases.matchIdsForQuery(strategy.name()), null))
                     : Collections.<BtBacktestRecordDO>emptyList();
 
             List<BigDecimal> rates = new ArrayList<BigDecimal>();
             List<BigDecimal> drawdowns = new ArrayList<BigDecimal>();
+            List<BigDecimal> winRates = new ArrayList<BigDecimal>();
+            int positiveCount = 0;
+            int rateCount = 0;
             for (BtBacktestRecordDO r : records) {
                 if (r.getTotalRate() != null) {
                     rates.add(r.getTotalRate());
+                    rateCount++;
+                    if (r.getTotalRate().compareTo(BigDecimal.ZERO) > 0) {
+                        positiveCount++;
+                    }
                 }
                 if (r.getMaxDrawdown() != null) {
                     drawdowns.add(r.getMaxDrawdown());
                 }
+                if (r.getWinRate() != null) {
+                    winRates.add(r.getWinRate());
+                }
             }
 
+            BigDecimal avgRate = avg(rates);
+            BigDecimal avgDd = avg(drawdowns);
+            BigDecimal avgWin = avg(winRates);
+            BigDecimal positiveRatio = rateCount == 0 ? null
+                    : BigDecimal.valueOf(positiveCount)
+                    .divide(BigDecimal.valueOf(rateCount), SCALE, RoundingMode.HALF_UP);
+
             row.put("runCount", records.size());
-            row.put("avgTotalRate", avg(rates));
+            row.put("avgTotalRate", avgRate);
             row.put("medianTotalRate", median(rates));
-            row.put("avgMaxDrawdown", avg(drawdowns));
+            row.put("avgMaxDrawdown", avgDd);
+            row.put("avgWinRate", avgWin);
+            row.put("positiveRatio", positiveRatio);
+
+            Map<String, Object> scoreMap = StrategyScoreCalculator.score(
+                    avgRate, avgDd, avgWin, positiveRatio, records.size());
+            row.put("score", scoreMap.get("score"));
+            row.put("scoreMax", scoreMap.get("scoreMax"));
+            row.put("grade", scoreMap.get("grade"));
+            row.put("scoreNote", scoreMap.get("note"));
+            row.put("scoreComponents", scoreMap.get("components"));
 
             BtBacktestRecordDO last = records.isEmpty() ? null : records.get(0);
             row.put("lastSavedAt", last == null || last.getSavedAt() == null
@@ -146,6 +176,7 @@ public class StrategyEvalService {
             strategies.add(row);
         }
         out.put("strategies", strategies);
+        out.put("strategyCount", strategies.size());
         return out;
     }
 

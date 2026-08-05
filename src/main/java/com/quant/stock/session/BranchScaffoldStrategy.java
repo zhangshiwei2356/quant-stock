@@ -38,6 +38,13 @@ public class BranchScaffoldStrategy extends BaseStrategy implements SessionStrat
     }
 
     @Override
+    public String detailIntro() {
+        return "会话三分支脚手架（branchScaffold）。在 1 分钟 K 上旁路记录分支事件，不发真实买卖单；"
+                + "经典引擎买卖信号恒为 false。用于验收 session 分支与 fill-mode，缺 INDEX/竞价/封单时标记 UNAVAILABLE。"
+                + "评分仅反映旁路回测摘要，不代表可交易策略绩效。";
+    }
+
+    @Override
     public String sessionId() {
         return ID;
     }

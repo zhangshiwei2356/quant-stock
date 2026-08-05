@@ -183,9 +183,9 @@
             <span class="chevron">▸</span>
           </button>
           <div id="strategyBody" class="side-nav-body">
-            <p class="hint">二级：策略评估（回测历史与整体评价）</p>
+            <p class="hint">二级：策略总览（介绍、评分与回测历史）</p>
             <ul id="strategyMenu" class="side-nav-menu">
-              <li data-strategy-panel="eval" role="button" tabindex="0">策略评估</li>
+              <li data-strategy-panel="eval" role="button" tabindex="0">策略总览</li>
             </ul>
           </div>
         </div>
@@ -686,15 +686,38 @@
       </section>
     </div>
 
-    <!-- 策略管理 · 策略评估 -->
+    <!-- 策略管理 · 策略总览 -->
     <div id="viewStrategy" class="workspace-view" hidden>
       <section class="panel">
-        <h3>策略评估</h3>
-        <p class="hint">按策略查看回测历史与整体评价；改参/激活请到运维中心</p>
+        <h3>策略总览</h3>
+        <p class="hint">按注册策略查看介绍、综合评分（满分 100）与回测历史；改参/激活请到运维中心</p>
         <div class="strategy-eval-layout">
           <aside id="strategyList" class="strategy-list" aria-label="策略列表"></aside>
           <div class="strategy-eval-main">
             <p class="hint strategy-unknown-banner" id="strategyUnknownHint" hidden></p>
+            <div id="strategyIntro" class="strategy-intro" hidden>
+              <button type="button" id="btnStrategyIntroToggle" class="strategy-intro-toggle" aria-expanded="false">
+                <span class="strategy-intro-chevron" aria-hidden="true">▸</span>
+                <span id="strategyIntroTitle">策略介绍</span>
+              </button>
+              <div id="strategyIntroBody" class="strategy-intro-body" hidden></div>
+            </div>
+            <div id="strategySeedBar" class="strategy-seed-bar" hidden>
+              <div class="strategy-seed-actions">
+                <button type="button" id="btnStrategySeed" class="secondary">用目标池补回测</button>
+                <span class="field-hint" id="strategySeedHint">无回测时：对目标池逐只单股 + 全池组合各跑一次</span>
+              </div>
+              <div id="strategySeedProgress" class="strategy-seed-progress" hidden>
+                <div class="strategy-seed-progress-meta">
+                  <span id="strategySeedPhase">—</span>
+                  <span id="strategySeedPct" class="mono">0%</span>
+                </div>
+                <div class="strategy-seed-progress-track" aria-hidden="true">
+                  <div id="strategySeedBarFill" class="strategy-seed-progress-fill" style="width:0%"></div>
+                </div>
+                <p class="hint" id="strategySeedSummary"></p>
+              </div>
+            </div>
             <div id="strategyEvalCards" class="strategy-eval-cards"></div>
             <div class="toolbar strategy-kind-toolbar" style="margin-top:10px;">
               <span class="field-hint">类型</span>

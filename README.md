@@ -186,10 +186,12 @@ sequenceDiagram
 
 | 二级 | 功能 |
 |------|------|
-| 策略评估 | 按注册策略聚合回测历史与整体评价（运行次数、均/中位收益与回撤）；历史表可筛全部/单股/组合，点行展开详情（内嵌 analysis） |
+| 策略总览 | 注册策略列表（含介绍、满分 100 综合评分）+ 聚合指标与回测历史；历史表可筛全部/单股/组合，点行展开详情 |
 
-- **职责分离**：本菜单只做效果评估；全局/按策略改参、纸面激活切换仍在 **运维中心 → 运行参数**
-- 数据：`GET /api/strategy/overview`、`GET /api/strategy/{id}/history?kind=`、`GET /api/strategy/history/{recordId}`；按注册 `strategy_id` 聚合（查询含历史别名如 `MaCrossStrategy`）；启动自动补全空白→`maCross`、旧名→注册 id；运维 `POST /api/ops/backtest/backfill-strategy-id`；overview 仍可含 `unknownCount`
+- **职责分离**：本菜单只做效果总览与评分；全局/按策略改参、纸面激活切换仍在 **运维中心 → 运行参数**
+- 数据：`GET /api/strategy/overview`（含 `detailIntro`、加权 `score`/`scoreComponents`）、`GET /api/strategy/{id}/history?kind=`、`GET /api/strategy/history/{recordId}`；按注册 `strategy_id` 聚合（查询含历史别名如 `MaCrossStrategy`）；启动自动补全空白→`maCross`、旧名→注册 id；运维 `POST /api/ops/backtest/backfill-strategy-id`；overview 仍可含 `unknownCount`
+- **评分（满分 100）**：收益 30 + 回撤 25 + 胜率 20 + 盈利占比 15 + 样本 10；无回测则不评分；样本少时仅供对照
+- **无回测补种**：选中 `runCount=0` 的策略时自动（亦可手动）`POST /api/strategy/{id}/seed-pool-backtest`：对目标池活跃股逐只单股回测 + 全池组合回测一次（初始资金默认 10 万；经典策略用日线，`branchScaffold` 走 session）；进度 `GET /api/strategy/seed-status`；已有记录需 `force=true`
 
 ### 8. 数据表
 
@@ -275,7 +277,9 @@ sequenceDiagram
 | GET `/api/backtest/history` · `/analysis` | 个股历史与分析 |
 | GET `/api/batch/scanAllStock` | 批量扫描 |
 | GET `/api/portfolio/history` · `/analysis` | 组合历史与分析 |
-| GET `/api/strategy/overview` | 策略评估总览（注册表 + 按 `strategy_id` 聚合；db 关则 `enabled=false`） |
+| GET `/api/strategy/overview` | 策略总览（注册表 + 介绍 + 按 `strategy_id` 聚合与满分 100 评分；db 关则 `enabled=false`） |
+| POST `/api/strategy/{id}/seed-pool-backtest` | 目标池补回测（异步：单股×池 + 组合×1；默认仅无记录时可跑，`force=true` 可强制） |
+| GET `/api/strategy/seed-status` | 补回测进度 |
 | GET `/api/strategy/{id}/history?kind=` | 某策略回测摘要（`ALL\|SINGLE\|PORTFOLIO`；未知 id → 404） |
 | GET `/api/strategy/history/{recordId}` | 单条详情（trades + 内嵌 analysis；未知 → 404） |
 | GET `/api/stock/universe` | 全市场 |
@@ -363,7 +367,7 @@ sequenceDiagram
 - 限价保护边界：`GET /api/account/order-protect`（五档/L2=`UNAVAILABLE`）
 - 执行降频边界：组合回测已对齐 AUM+POV；`GET /api/account/execution-cap`（TWAP=`UNAVAILABLE`）
 - 行情自洽闸：检查 `market_1min` 空/滞后/稀疏日/OHLC；`data-reconcile-block-on-diverge` 默认 **false**；`GET/POST /api/ops/data-reconcile*`；外部双源仍 `UNAVAILABLE`
-- 运维可查看已注册策略并热切换纸面激活：`GET /api/ops/strategies`、`POST /api/ops/active-strategy`（改参/激活在运维；策略效果评估在 **策略管理 → 策略评估**）
+- 运维可查看已注册策略并热切换纸面激活：`GET /api/ops/strategies`、`POST /api/ops/active-strategy`（改参/激活在运维；策略效果总览在 **策略管理 → 策略总览**）
 - 扩容降频：权益超 `capacity-aum-base`（默认 10万）时收紧 ADV 参与率；`pov-max-bar-volume-pct` 默认 0.10（当根量 POV 切片）
 - 结构突变：双窗收益均值差；确认后降仓×0.5 并挂漂移；`GET /api/account/structural-break`（不改金叉）
 - ST as-of：`st_status_hist` 日切优先；`st-open-filter-enabled` 默认 true 禁开 ST；财报公告时钟本地无数据（边界已声明）

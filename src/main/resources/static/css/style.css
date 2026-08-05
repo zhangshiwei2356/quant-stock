@@ -2888,10 +2888,10 @@ tbody tr:hover { background: var(--row-hover); }
   color: var(--danger, #e85d5d);
 }
 
-/* 策略管理 · 策略评估 */
+/* 策略管理 · 策略总览 */
 .strategy-eval-layout {
   display: grid;
-  grid-template-columns: 200px minmax(0, 1fr);
+  grid-template-columns: 240px minmax(0, 1fr);
   gap: 14px;
   margin-top: 10px;
   align-items: start;
@@ -2911,9 +2911,8 @@ tbody tr:hover { background: var(--row-hover); }
 
 .strategy-list-item {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid transparent;
@@ -2931,11 +2930,36 @@ tbody tr:hover { background: var(--row-hover); }
   background: rgba(61, 153, 153, 0.14);
 }
 
+.strategy-list-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .strategy-list-item .strategy-list-name {
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+  line-height: 1.25;
+}
+
+.strategy-list-id {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.strategy-list-badges {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: flex-end;
 }
 
 .strategy-active-badge {
@@ -2947,6 +2971,128 @@ tbody tr:hover { background: var(--row-hover); }
   border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--border));
   color: var(--accent);
   background: rgba(61, 153, 153, 0.12);
+}
+
+.strategy-score-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+
+.strategy-score-badge.muted {
+  color: var(--muted);
+  background: transparent;
+}
+
+.strategy-intro {
+  margin: 0 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--chart-bg);
+  overflow: hidden;
+}
+
+.strategy-intro[hidden] {
+  display: none !important;
+}
+
+.strategy-intro-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.strategy-intro-toggle:hover {
+  background: rgba(127, 127, 127, 0.08);
+}
+
+.strategy-intro-chevron {
+  color: var(--muted);
+  font-size: 12px;
+  width: 1em;
+}
+
+.strategy-intro-body {
+  padding: 0 12px 12px 32px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.strategy-intro-body[hidden] {
+  display: none !important;
+}
+
+.strategy-intro-text {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+  white-space: pre-wrap;
+}
+
+.strategy-seed-bar {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-solid);
+}
+
+.strategy-seed-bar[hidden] {
+  display: none !important;
+}
+
+.strategy-seed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.strategy-seed-progress {
+  margin-top: 10px;
+}
+
+.strategy-seed-progress[hidden] {
+  display: none !important;
+}
+
+.strategy-seed-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.strategy-seed-progress-track {
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--border) 70%, transparent);
+  overflow: hidden;
+}
+
+.strategy-seed-progress-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.3s ease;
 }
 
 .strategy-eval-main {
@@ -2979,6 +3125,24 @@ tbody tr:hover { background: var(--row-hover); }
   border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--chart-bg);
+}
+
+.strategy-eval-card--score {
+  flex: 1 1 160px;
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
+.strategy-eval-card--score .value {
+  color: var(--accent);
+}
+
+.strategy-eval-card--wide {
+  flex: 2 1 280px;
+}
+
+.strategy-eval-card--wide .sub {
+  white-space: normal;
+  line-height: 1.45;
 }
 
 .strategy-eval-card .label {
@@ -3014,6 +3178,9 @@ tbody tr:hover { background: var(--row-hover); }
     flex-direction: row;
     flex-wrap: wrap;
     max-height: none;
+  }
+  .strategy-list-item {
+    flex: 1 1 160px;
   }
 }
 

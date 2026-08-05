@@ -29,7 +29,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 策略评估：中位数与 overview 聚合（Task 3）。
+ * 策略总览：中位数与 overview 聚合（含评分）。
  */
 class StrategyEvalServiceTest {
 
@@ -79,43 +79,59 @@ class StrategyEvalServiceTest {
     }
 
     @Test
-    void overview_ignoresNullStrategyIdRows() {
-        // maCross 仅有一条 10% 收益；另有未知 strategy_id 行（mapper 不会按策略查出）
-        when(mapper.selectSummaryByStrategyId(eq("maCross"), any()))
-                .thenReturn(Collections.singletonList(
-                        BtBacktestRecordDO.builder()
-                                .recordId("s1")
-                                .kind("SINGLE")
-                                .strategyId("maCross")
-                                .totalRate(new BigDecimal("0.10"))
-                                .maxDrawdown(new BigDecimal("0.05"))
-                                .savedAt(LocalDateTime.of(2026, 8, 1, 10, 0))
-                                .build()));
-        when(mapper.selectSummaryByStrategyId(eq("holdNothing"), any()))
-                .thenReturn(Collections.<BtBacktestRecordDO>emptyList());
+    void overview_aggregatesAndScores() {
+        when(mapper.selectSummaryByStrategyIds(any(), any()))
+                .thenAnswer(inv -> {
+                    @SuppressWarnings("unchecked")
+                    List<String> ids = (List<String>) inv.getArgument(0);
+                    if (ids != null && ids.stream().anyMatch(s ->
+                            s != null && s.equalsIgnoreCase("maCross"))) {
+                        return Collections.singletonList(
+                                BtBacktestRecordDO.builder()
+                                        .recordId("s1")
+                                        .kind("SINGLE")
+                                        .strategyId("maCross")
+                                        .totalRate(new BigDecimal("0.10"))
+                                        .maxDrawdown(new BigDecimal("0.05"))
+                                        .winRate(new BigDecimal("0.60"))
+                                        .savedAt(LocalDateTime.of(2026, 8, 1, 10, 0))
+                                        .build());
+                    }
+                    return Collections.<BtBacktestRecordDO>emptyList();
+                });
         when(mapper.countUnknownStrategy()).thenReturn(1L);
 
         Map<String, Object> overview = service.overview();
         assertEquals(true, overview.get("enabled"));
         assertEquals(1L, overview.get("unknownCount"));
+        assertEquals(2, overview.get("strategyCount"));
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> strategies = (List<Map<String, Object>>) overview.get("strategies");
         assertNotNull(strategies);
         Map<String, Object> ma = null;
+        Map<String, Object> hold = null;
         for (Map<String, Object> row : strategies) {
             if ("maCross".equals(row.get("strategyId"))) {
                 ma = row;
-                break;
+            }
+            if ("holdNothing".equals(row.get("strategyId"))) {
+                hold = row;
             }
         }
         assertNotNull(ma);
         assertEquals(1, ma.get("runCount"));
         assertEquals(0, ((BigDecimal) ma.get("avgTotalRate")).compareTo(bd("0.100000")));
         assertEquals(0, ((BigDecimal) ma.get("medianTotalRate")).compareTo(bd("0.100000")));
-        // 未知行的 100% 不得混入 maCross
+        assertNotNull(ma.get("score"));
+        assertNotNull(ma.get("detailIntro"));
+        assertFalse(String.valueOf(ma.get("displayName")).equals("maCross"));
         assertFalse(((BigDecimal) ma.get("avgTotalRate")).compareTo(bd("1")) == 0
                 || ((BigDecimal) ma.get("avgTotalRate")).compareTo(bd("0.55")) == 0);
+
+        assertNotNull(hold);
+        assertEquals(0, hold.get("runCount"));
+        assertNull(hold.get("score"));
     }
 
     @Test
@@ -124,11 +140,11 @@ class StrategyEvalServiceTest {
         rec.setId("s1");
         rec.setStrategyId("maCross");
         doReturn(Collections.singletonList(rec))
-                .when(historyStore).listSummaryByStrategy(eq("maCross"), eq(null));
+                .when(historyStore).listSummaryByStrategyIds(any(), eq(null));
 
         List<Map<String, Object>> rows = service.history("MaCross", "ALL");
 
-        verify(historyStore).listSummaryByStrategy(eq("maCross"), eq(null));
+        verify(historyStore).listSummaryByStrategyIds(any(), eq(null));
         assertEquals(1, rows.size());
         assertEquals("maCross", rows.get(0).get("strategyId"));
     }
