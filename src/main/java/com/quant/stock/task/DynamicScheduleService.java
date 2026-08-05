@@ -260,6 +260,7 @@ public class DynamicScheduleService implements ApplicationRunner {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.put("manualRun", snapshotManualRun());
         m.put("tdxScript", tdxScriptBackfillService.status());
+        m.put("serverTimeMs", System.currentTimeMillis());
         return m;
     }
 

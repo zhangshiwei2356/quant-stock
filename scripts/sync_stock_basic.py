@@ -164,7 +164,7 @@ def fetch_eastmoney(page_size: int = 100) -> List[Row]:
         if payload is None:
             raise RuntimeError(f"东方财富第 {pn} 页失败: {err}")
         ingest((payload.get("data") or {}).get("diff") or [])
-        if pn % 10 == 0 or pn == pages:
+        if (pn % 5 == 0 or pn == pages:
             print(f"  eastmoney page {pn}/{pages} unique={len(rows)}", flush=True)
         time.sleep(0.08)
     if len(rows) < 3000:
@@ -225,7 +225,7 @@ def fetch_tdx() -> List[Row]:
                     )
                 got = len(chunk)
                 start += got if got > 0 else 1000
-                if start % 5000 < 1000:
+                if start % 2000 < 1000:
                     print(f"  tdx market={market} start={start} unique={len(rows)}", flush=True)
                 if got < 1000 and empty_streak == 0 and start > 1000:
                     # 正常末页

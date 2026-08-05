@@ -97,7 +97,9 @@ public class ScheduleController {
 
     /** 手动「执行一次」进度（含 TDX 脚本行进度），供页面轮询。 */
     @GetMapping("/run-status")
-    public Map<String, Object> runStatus() {
+    public Map<String, Object> runStatus(javax.servlet.http.HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+        response.setHeader("Pragma", "no-cache");
         return requireService().runStatus();
     }
 
