@@ -59,19 +59,33 @@ public class FactorDailyComputeService {
                 "SELECT DISTINCT symbol FROM market_1min ORDER BY symbol", String.class);
     }
 
+    @FunctionalInterface
+    public interface ProgressCallback {
+        void onProgress(int done, int total, String symbol);
+    }
+
     /**
      * 批量重算；{@code codes} 为空则取有日线的全市场。
      *
      * @return 统计：input / ok / skip / fail
      */
     public Map<String, Object> rebuild(List<String> codes) {
+        return rebuild(codes, null);
+    }
+
+    /**
+     * 批量重算；可选进度回调（完成一只报一次，便于运维进度条）。
+     */
+    public Map<String, Object> rebuild(List<String> codes, ProgressCallback progress) {
         List<String> targets = codes;
         if (targets == null || targets.isEmpty()) {
             targets = listSymbolsWithDailyBars();
         }
+        final int total = targets.size();
         final AtomicInteger ok = new AtomicInteger();
         final AtomicInteger skip = new AtomicInteger();
         final AtomicInteger fail = new AtomicInteger();
+        final AtomicInteger done = new AtomicInteger();
         List<CompletableFuture<Void>> futures = new ArrayList<CompletableFuture<Void>>(targets.size());
         for (final String code : targets) {
             futures.add(CompletableFuture.runAsync(new Runnable() {
@@ -87,6 +101,15 @@ public class FactorDailyComputeService {
                     } catch (Exception e) {
                         fail.incrementAndGet();
                         log.warn("factor_daily 重算失败 {}: {}", code, e.getMessage());
+                    } finally {
+                        int d = done.incrementAndGet();
+                        if (progress != null) {
+                            try {
+                                progress.onProgress(d, total, code);
+                            } catch (Exception ignored) {
+                                // 进度不影响主流程
+                            }
+                        }
                     }
                 }
             }, batchScanExecutor));

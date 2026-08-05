@@ -176,7 +176,7 @@ sequenceDiagram
 
 | 二级 | 功能 |
 |------|------|
-| 任务管理 | `sys_schedule_job` 启停 / cron / 立即执行（种子默认全关；执行一次弹进度框+页内横幅，可「收起到页内」） |
+| 任务管理 | `sys_schedule_job` 启停 / cron / 立即执行（种子默认全关；执行一次弹进度框+页内横幅，可「收起到页内」；长任务 `i/n`） |
 | 数据健康 | 覆盖检查（异步进度弹框：加载标的→逐只日线/分钟）+ 分钟自洽检查（默认不阻断开仓） |
 | 运行参数 | 全局白名单可写（`quant.prop.*`）+ **按策略稀疏参数包**（表 `strategy_param`）；回测还可带 **本次临时改参**（`paramOverrides`，不落库） |
 
@@ -318,7 +318,7 @@ sequenceDiagram
 ## 运维中心 · 定时任务
 
 - 表：`sys_schedule_job`（启动自动建表+种子，**默认全关**）
-- 运维「执行一次」：全部任务后台执行；弹框与任务管理页顶部横幅同步展示阶段/摘要/进度条；执行中可「收起到页内」；TDX 日线/分钟任务额外解析脚本 `[i/n]` 与预计剩余（`GET /api/schedule/run-status`）
+- 运维「执行一次」：全部任务后台执行；弹框与任务管理页顶部横幅同步展示阶段/摘要/进度条；执行中可「收起到页内」；长任务（日线/分钟 TDX、因子重算、入池、数据校验、行情采集）上报 `i/n` 百分比；其余短任务为不确定进度 + 已用时（`GET /api/schedule/run-status`）
 - **唯一目标池**：`pool-rebuild` / `after-market-batch-scan` 扫描后覆盖；启用其一会自动关闭另一（互斥）
 - `scan-and-trade`：只扫池内活跃标的 + 本地模拟账本
 - 已实现：`scan-and-trade` / `pool-rebuild` / `after-market-batch-scan` / `settle-after-close` / `data-validate` / `factor-daily-rebuild` / `day-collect` / `pool-minute-backfill` / `sync-orders` / `position-pnl-sync`

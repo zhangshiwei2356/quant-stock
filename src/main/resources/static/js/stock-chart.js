@@ -4096,6 +4096,14 @@
     var tagLabel = tdx.tagLabel || (tdx.lastFinished && tdx.lastFinished.tagLabel) || '';
     var titleName = jobName || tagLabel || jobCode;
     var stillRunning = !!mr.running || !!tdx.running || !!opts.forceRunning;
+    // 统一进度：TDX 脚本 或 manualRun 上报的 i/n
+    var mrHasPct = !tdxJob && mr.progressTotal != null && Number(mr.progressTotal) > 0
+      && mr.progressPct != null;
+    var unifiedPct = tdxJob && tdx.progressPct != null
+      ? Number(tdx.progressPct)
+      : (mrHasPct ? Number(mr.progressPct) : null);
+    var unifiedIndex = tdxJob ? tdx.progressIndex : mr.progressIndex;
+    var unifiedTotal = tdxJob ? tdx.progressTotal : mr.progressTotal;
 
     if (stillRunning || (polling && !mr.finishedAt && mr.ok == null)) {
       $banner.removeClass('is-done-ok is-done-err').addClass('is-live');
@@ -4103,8 +4111,8 @@
       $('#scheduleRunTitle').text(liveTitle);
       var meta = [];
       meta.push('已用时 ' + formatElapsedSec(clientElapsedSec(mr, tdx)));
-      if (tdxJob && tdx.progressIndex != null && tdx.progressTotal != null) {
-        meta.push('进度 ' + tdx.progressIndex + ' / ' + tdx.progressTotal + ' 只');
+      if (unifiedIndex != null && unifiedTotal != null) {
+        meta.push('进度 ' + unifiedIndex + ' / ' + unifiedTotal + ' 只');
       }
       if (tdxJob && tdx.etaSec != null && tdx.etaSec > 0) {
         meta.push('预计剩余 ' + formatElapsedSec(tdx.etaSec));
@@ -4127,12 +4135,14 @@
         summary = stillRunning
           ? (isTdxProgressJob(jobCode)
             ? '正在同步列表 / 拉取行情，进度会持续更新…'
-            : '任务执行中，进度将持续更新…')
+            : (mrHasPct
+              ? '长任务执行中，进度会持续更新…'
+              : '任务执行中，进度将持续更新…'))
           : '正在连接任务状态…';
       }
       $('#scheduleRunSummary').text(summary);
-      var indeterminate = !(tdxJob && tdx.progressPct != null);
-      var pctVal = tdxJob && tdx.progressPct != null ? Math.max(2, Number(tdx.progressPct)) : 0;
+      var indeterminate = unifiedPct == null;
+      var pctVal = unifiedPct != null ? Math.max(2, Number(unifiedPct)) : 0;
       var pctText = indeterminate
         ? (phase === 'sync' || phase === 'starting' ? '启动中' : '进行中')
         : (pctVal + '%');
@@ -4145,11 +4155,11 @@
       var rawLine = '';
       if (tdxJob && tdx.summary) rawLine = tdx.summary;
       else if (tdxJob && tdx.lastLine) rawLine = tdx.lastLine;
-      else rawLine = mr.summary || mr.message || '';
+      else rawLine = mr.detail || mr.summary || mr.message || '';
       // 摘要里已含代码时不再拼「当前 xxx」，避免重复与乱码叠字
-      if (tdxJob && tdx.currentSymbol
-          && rawLine.indexOf(String(tdx.currentSymbol)) < 0) {
-        rawLine = (rawLine ? rawLine + ' · ' : '') + '当前 ' + tdx.currentSymbol;
+      var curSym = tdxJob ? tdx.currentSymbol : mr.currentSymbol;
+      if (curSym && rawLine.indexOf(String(curSym)) < 0) {
+        rawLine = (rawLine ? rawLine + ' · ' : '') + '当前 ' + curSym;
       }
       $('#scheduleRunDetail').text(rawLine || '等待任务输出…');
       try { $('#scheduleRunLogWrap').prop('open', true); } catch (eOpen) {}
@@ -4183,6 +4193,8 @@
     doneMeta.push('总耗时 ' + formatElapsedSec(clientElapsedSec(mr, tdx) || mr.elapsedSec || 0));
     if (tdx.lastFinished && tdx.lastFinished.progressTotal != null && isTdxProgressJob(jobCode)) {
       doneMeta.push('标的 ' + (tdx.lastFinished.progressTotal) + ' 只');
+    } else if (mr.progressTotal != null) {
+      doneMeta.push('标的 ' + mr.progressTotal + ' 只');
     }
     if (mr.finishedAt) doneMeta.push(String(mr.finishedAt).replace('T', ' ').slice(0, 19));
     var doneMetaText = doneMeta.join(' · ');
@@ -4197,7 +4209,8 @@
     $('#scheduleRunSummary').text(doneSummary);
     $fill.removeClass('is-indeterminate').css('width', '100%');
     $('#scheduleRunPct').text(ok === false ? '失败' : '100%');
-    var rawDone = (tdx.lastFinished && tdx.lastFinished.lastLine) || tdx.lastLine || mr.summary || mr.message || '';
+    var rawDone = (tdx.lastFinished && tdx.lastFinished.lastLine) || tdx.lastLine
+      || mr.detail || mr.summary || mr.message || '';
     $('#scheduleRunDetail').text(rawDone || '—');
     if (ok === false) {
       try { $('#scheduleRunLogWrap').prop('open', true); } catch (e) {}

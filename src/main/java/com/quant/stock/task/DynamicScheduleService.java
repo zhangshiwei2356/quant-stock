@@ -60,6 +60,7 @@ public class DynamicScheduleService implements ApplicationRunner {
     private final QuantProperties quantProperties;
     private final JdbcTemplate jdbcTemplate;
     private final TdxScriptBackfillService tdxScriptBackfillService;
+    private final JobProgressHub jobProgressHub;
 
     private final ThreadPoolTaskScheduler taskScheduler = createScheduler();
     private final Map<String, ScheduledFuture<?>> futures = new ConcurrentHashMap<String, ScheduledFuture<?>>();
@@ -272,7 +273,58 @@ public class DynamicScheduleService implements ApplicationRunner {
             state.message = longJobStartMessage(jobCode);
             state.startedAt = LocalDateTime.now();
             state.finishedAt = null;
+            state.progressIndex = null;
+            state.progressTotal = null;
+            state.progressPct = null;
+            state.currentSymbol = null;
+            state.detail = state.summary;
             manualRunRef.set(state);
+            jobProgressHub.attach(new JobProgressHub.Listener() {
+                @Override
+                public void onPhase(String phase, String phaseLabel, String summary) {
+                    if (phase != null) {
+                        state.phase = phase;
+                    }
+                    if (phaseLabel != null) {
+                        state.phaseLabel = phaseLabel;
+                    }
+                    if (summary != null) {
+                        state.summary = summary;
+                        state.message = summary;
+                        state.detail = summary;
+                    }
+                }
+
+                @Override
+                public void onTick(int index, int total, String current, String detail) {
+                    if (total > 0) {
+                        int idx = Math.max(0, index);
+                        int tot = total;
+                        if (idx > tot) {
+                            idx = tot;
+                        }
+                        state.progressIndex = idx;
+                        state.progressTotal = tot;
+                        state.progressPct = (int) Math.min(100L, Math.round(100.0 * idx / tot));
+                        state.phase = "running";
+                        state.phaseLabel = "执行中";
+                    }
+                    if (current != null && !current.isEmpty()) {
+                        state.currentSymbol = current;
+                    }
+                    if (detail != null && !detail.isEmpty()) {
+                        state.detail = detail;
+                        state.summary = detail;
+                        state.message = detail;
+                    } else if (total > 0) {
+                        String line = "进度 " + state.progressIndex + " / " + state.progressTotal
+                                + (state.currentSymbol != null ? (" · 当前 " + state.currentSymbol) : "");
+                        state.detail = line;
+                        state.summary = line;
+                        state.message = line;
+                    }
+                }
+            });
             manualRunExecutor.submit(new Runnable() {
                 @Override
                 public void run() {
@@ -281,20 +333,28 @@ public class DynamicScheduleService implements ApplicationRunner {
                         state.phaseLabel = "执行中";
                         state.summary = "正在执行「" + state.jobName + "」…";
                         state.message = state.summary;
+                        state.detail = state.summary;
                         invoke(jobCode, true);
                         state.ok = true;
                         state.phase = "done";
                         state.phaseLabel = "已完成";
+                        if (state.progressTotal != null && state.progressTotal > 0) {
+                            state.progressIndex = state.progressTotal;
+                            state.progressPct = 100;
+                        }
                         state.summary = "「" + state.jobName + "」已完成";
                         state.message = "执行完成";
+                        state.detail = state.summary;
                     } catch (Exception e) {
                         state.ok = false;
                         state.phase = "error";
                         state.phaseLabel = "失败";
                         state.message = e.getMessage() == null ? "执行失败" : e.getMessage();
                         state.summary = "「" + state.jobName + "」失败：" + state.message;
+                        state.detail = state.summary;
                         log.warn("手动任务后台失败 {}: {}", jobCode, state.message);
                     } finally {
+                        jobProgressHub.detach();
                         state.running = false;
                         state.finishedAt = LocalDateTime.now();
                     }
@@ -382,6 +442,11 @@ public class DynamicScheduleService implements ApplicationRunner {
         m.put("phase", state.phase);
         m.put("phaseLabel", state.phaseLabel);
         m.put("summary", state.summary);
+        m.put("detail", state.detail);
+        m.put("progressIndex", state.progressIndex);
+        m.put("progressTotal", state.progressTotal);
+        m.put("progressPct", state.progressPct);
+        m.put("currentSymbol", state.currentSymbol);
         m.put("startedAt", state.startedAt == null ? null : state.startedAt.toString());
         m.put("finishedAt", state.finishedAt == null ? null : state.finishedAt.toString());
         if (state.startedAt != null) {
@@ -401,6 +466,11 @@ public class DynamicScheduleService implements ApplicationRunner {
         private volatile String phase;
         private volatile String phaseLabel;
         private volatile String summary;
+        private volatile String detail;
+        private volatile Integer progressIndex;
+        private volatile Integer progressTotal;
+        private volatile Integer progressPct;
+        private volatile String currentSymbol;
         private LocalDateTime startedAt;
         private volatile LocalDateTime finishedAt;
     }

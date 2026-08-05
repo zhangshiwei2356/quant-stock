@@ -15,6 +15,7 @@ import com.quant.stock.market.dto.FactorDailyDO;
 import com.quant.stock.market.dto.StockBasicDO;
 import com.quant.stock.pool.dto.TradePoolDO;
 import com.quant.stock.pool.dto.TradePoolReportDO;
+import com.quant.stock.task.JobProgressHub;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -65,6 +66,7 @@ public class TradePoolService {
     private final QuantProperties quantProperties;
     private final JdbcTemplate jdbcTemplate;
     private final PlatformTransactionManager transactionManager;
+    private final JobProgressHub jobProgressHub;
 
     /** 启动时确保目标池相关表结构存在并清理废弃表名 */
     @PostConstruct
@@ -485,12 +487,22 @@ public class TradePoolService {
         Map<String, Object> factorRefresh = null;
         if (quantProperties.isPoolRebuildRefreshFactors()) {
             try {
-                factorRefresh = factorDailyComputeService.rebuild(null);
+                jobProgressHub.phase("running", "执行中", "入池前：重算日频因子…");
+                factorRefresh = factorDailyComputeService.rebuild(null,
+                        new FactorDailyComputeService.ProgressCallback() {
+                            @Override
+                            public void onProgress(int done, int total, String symbol) {
+                                jobProgressHub.tick(done, total, symbol,
+                                        "因子预刷新 " + done + "/" + total
+                                                + (symbol != null ? (" · " + symbol) : ""));
+                            }
+                        });
                 log.info("[pool-rebuild] factor_daily 预刷新 {}", factorRefresh);
             } catch (Exception e) {
                 log.warn("[pool-rebuild] factor_daily 预刷新失败，继续扫池: {}", e.getMessage());
             }
         }
+        jobProgressHub.phase("running", "执行中", "入池：粗筛与扫描…");
         List<Map<String, String>> uni = listUniverse();
         Map<String, String> nameByCode = new HashMap<String, String>();
         for (Map<String, String> u : uni) {
@@ -498,6 +510,7 @@ public class TradePoolService {
         }
         List<String> codes = coarseFilter(uni);
         int afterCoarse = codes.size();
+        jobProgressHub.note("粗筛后 " + afterCoarse + " 只，开始扫描…");
         List<BatchScanResultDTO> scanned = codes.isEmpty()
                 ? new ArrayList<BatchScanResultDTO>()
                 : new ArrayList<BatchScanResultDTO>(batchStockBackTestService.scan(codes));
@@ -505,6 +518,7 @@ public class TradePoolService {
         filterByAvgAmount(scanned);
         int afterLiquidity = scanned.size();
         int max = Math.max(1, quantProperties.getTradePoolMax());
+        jobProgressHub.note("扫描完成 " + afterLiquidity + " 只，选取 Top" + max + "…");
         List<BatchScanResultDTO> picked = poolSelectScorer.pickTop(scanned, max);
         String batchId = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
                 + "-" + UUID.randomUUID().toString().substring(0, 8);
@@ -530,6 +544,7 @@ public class TradePoolService {
         out.put("minuteBackfillCodes", selected);
         if (quantProperties.isPoolRebuildBackfillMinute()) {
             try {
+                jobProgressHub.note("提交池内分钟异步回填…");
                 Map<String, Object> bf = tdxScriptBackfillService.backfillPoolMinuteAsync();
                 out.put("minuteBackfill", bf);
             } catch (Exception e) {
@@ -540,6 +555,7 @@ public class TradePoolService {
                 out.put("minuteBackfill", bf);
             }
         }
+        jobProgressHub.note("入池完成 selected=" + selected.size() + " batchId=" + batchId);
         return out;
     }
 

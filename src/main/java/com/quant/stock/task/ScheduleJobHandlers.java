@@ -52,6 +52,7 @@ public class ScheduleJobHandlers {
     private final QuantProperties quantProperties;
     private final FactorDailyComputeService factorDailyComputeService;
     private final TdxScriptBackfillService tdxScriptBackfillService;
+    private final JobProgressHub jobProgressHub;
 
     /**
      * 行情采集：优先可选宽睿 MDS（开关开启且 live），否则按股票池刷新本地 K 线缓存/落库。
@@ -73,7 +74,11 @@ public class ScheduleJobHandlers {
                 }
                 int ok = 0;
                 int fail = 0;
+                int total = codes.size();
+                jobProgressHub.phase("running", "执行中", "行情采集：共 " + total + " 只");
+                int i = 0;
                 for (String code : codes) {
+                    i++;
                     try {
                         List<BarDTO> bars = marketDataService.fetchAndPersistMinute(code);
                         if (bars == null || bars.isEmpty()) {
@@ -89,8 +94,12 @@ public class ScheduleJobHandlers {
                         fail++;
                         log.warn("[market-collect] 失败 code={}: {}", code, e.getMessage());
                     }
+                    jobProgressHub.tick(i, total, code,
+                            "行情采集 " + i + "/" + total + " · ok=" + ok + " fail=" + fail);
                 }
                 log.info("[market-collect] 完成 ok={} fail={} universe={}", ok, fail, codes.size());
+                jobProgressHub.tick(total, total, null,
+                        "行情采集完成 ok=" + ok + " fail=" + fail);
             }
         });
     }
@@ -202,9 +211,11 @@ public class ScheduleJobHandlers {
         runWithLock("job:pool-rebuild", 600, new Runnable() {
             @Override
             public void run() {
+                jobProgressHub.phase("running", "执行中", "全市场入池扫描进行中…");
                 Map<String, Object> out = tradePoolService.rebuildFromUniverse();
                 log.info("[pool-rebuild] selected={} codes={} minuteHint={}",
                         out.get("selected"), out.get("codes"), out.get("minuteBackfillHint"));
+                jobProgressHub.note("入池完成 selected=" + out.get("selected"));
             }
         });
     }
@@ -216,8 +227,23 @@ public class ScheduleJobHandlers {
         runWithLock("job:factor-daily-rebuild", 1800, new Runnable() {
             @Override
             public void run() {
-                Map<String, Object> out = factorDailyComputeService.rebuild(null);
+                jobProgressHub.phase("running", "执行中", "日频因子重算开始…");
+                Map<String, Object> out = factorDailyComputeService.rebuild(null,
+                        new FactorDailyComputeService.ProgressCallback() {
+                            @Override
+                            public void onProgress(int done, int total, String symbol) {
+                                jobProgressHub.tick(done, total, symbol,
+                                        "因子重算 " + done + "/" + total
+                                                + (symbol != null ? (" · " + symbol) : ""));
+                            }
+                        });
                 log.info("[factor-daily-rebuild] {}", out);
+                jobProgressHub.tick(
+                        out.get("input") instanceof Number ? ((Number) out.get("input")).intValue() : 0,
+                        out.get("input") instanceof Number ? ((Number) out.get("input")).intValue() : 0,
+                        null,
+                        "因子重算完成 ok=" + out.get("ok") + " skip=" + out.get("skip")
+                                + " fail=" + out.get("fail"));
             }
         });
     }
@@ -270,7 +296,11 @@ public class ScheduleJobHandlers {
                 int minuteWarn = 0;
                 LocalDate today = LocalDate.now();
                 LocalDateTime now = LocalDateTime.now();
+                int total = universe.size();
+                jobProgressHub.phase("running", "执行中", "数据校验：共 " + total + " 只");
+                int i = 0;
                 for (String code : universe) {
+                    i++;
                     try {
                         if (!checkDailyOk(code, today)) {
                             dailyWarn++;
@@ -282,16 +312,28 @@ public class ScheduleJobHandlers {
                         dailyWarn++;
                         log.warn("[data-validate] {} 校验异常: {}", code, e.getMessage());
                     }
+                    if (i == total || i % 50 == 0) {
+                        jobProgressHub.tick(i, total, code,
+                                "数据校验 " + i + "/" + total
+                                        + " · dailyWarn=" + dailyWarn + " minuteWarn=" + minuteWarn);
+                    }
                 }
                 log.info("[data-validate] 完成 universe={} pool={} dailyWarn={} minuteWarn={}",
                         universe.size(), pool.size(), dailyWarn, minuteWarn);
+                jobProgressHub.phase("running", "执行中", "分钟自洽检查…");
                 try {
                     List<String> reconCodes = pool.isEmpty() ? universe : new ArrayList<String>(pool);
                     Map<String, Object> recon = dataReconcileGateService.reconcile(reconCodes);
                     log.info("[data-validate] 分钟自洽 diverge={} block={}",
                             recon.get("divergeCodeCount"), recon.get("blockNewOpen"));
+                    jobProgressHub.tick(total, total, null,
+                            "校验完成 dailyWarn=" + dailyWarn + " minuteWarn=" + minuteWarn
+                                    + " · diverge=" + recon.get("divergeCodeCount"));
                 } catch (Exception e) {
                     log.warn("[data-validate] 分钟自洽失败: {}", e.getMessage());
+                    jobProgressHub.tick(total, total, null,
+                            "校验完成 dailyWarn=" + dailyWarn + " minuteWarn=" + minuteWarn
+                                    + "（自洽失败：" + e.getMessage() + "）");
                 }
             }
         });
