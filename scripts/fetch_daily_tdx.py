@@ -6,6 +6,9 @@
     python scripts/fetch_daily_tdx.py --from-basic --incremental
     python scripts/fetch_daily_tdx.py --from-basic --years 1 --no-incremental
 
+默认 --from-basic 时会先同步 stock_basic 全市场列表（约 5000+，见 sync_stock_basic.py），
+否则只会处理库内已有 status=1 的标的（可能只有演示/抽样几十上百只）。
+
 默认 --incremental：
   · 该股无日线 → 补最近 --years 年（默认 1）
   · 已有日线 → 自 MAX(trade_date) 前几天起重拉并 upsert（补缺口到最近交易日）
@@ -21,10 +24,17 @@ import statistics
 import sys
 import time
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from typing import Any, Iterable, List, Optional, Sequence, Tuple
 
 import pymysql
 from pytdx.hq import TdxHq_API
+
+# 允许直接 import 同目录 sync_stock_basic
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+import sync_stock_basic  # noqa: E402
 
 DB = dict(
     host="127.0.0.1",
@@ -260,11 +270,32 @@ def main() -> int:
         action="store_false",
         help="强制全量按 --years 窗口重拉",
     )
+    parser.add_argument(
+        "--sync-universe",
+        dest="sync_universe",
+        action="store_true",
+        default=True,
+        help="--from-basic 时先同步 stock_basic 全市场列表（默认开）",
+    )
+    parser.add_argument(
+        "--no-sync-universe",
+        dest="sync_universe",
+        action="store_false",
+        help="不刷新 stock_basic，仅用库内现有 status=1",
+    )
     parser.add_argument("--sleep", type=float, default=0.05, help="每标的间隔秒（默认 0.05）")
     args = parser.parse_args()
 
     try:
         if args.from_basic:
+            if args.sync_universe:
+                print("sync stock_basic universe…", flush=True)
+                sync_result = sync_stock_basic.sync_universe(deactivate_missing=False, source="auto")
+                print(
+                    f"universe source={sync_result.get('source')} "
+                    f"active={sync_result.get('active')} upserted={sync_result.get('upserted')}",
+                    flush=True,
+                )
             codes = basic_codes()
         else:
             codes = normalize_codes(args.codes)

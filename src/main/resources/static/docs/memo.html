@@ -58,7 +58,7 @@
     <li><b>单活策略可切换</b> — 已落地 · <code>StrategyRegistry</code> + <code>quant.active-strategy</code>（默认 <code>maCross</code>）；对照画像 <code>maCrossTrend/Volume/Balanced/Strict</code>（固定过滤，不改原版类）；回测下拉对比；扫池/纸面仍用配置激活；占位 <code>holdNothing</code>；多策略并行分账本仍不做</li>
     <li><b>行情分层（日线选股 + 分钟交易）</b> — 已落地 · <code>market_daily</code> 供全市场扫池；<code>market_1min</code> 供池内分钟交易；<code>quant.day-source=auto</code> 日线优先，空则分钟聚日</li>
     <li><b>TDX 日线回填</b> — 已落地 · <code>scripts/fetch_daily_tdx.py</code>（<code>--from-basic --years 1</code> / <code>--codes</code>）写 <code>market_daily</code>（adj=NONE）；升级 <code>scripts/sql/20260805_market_daily.sql</code></li>
-    <li><b>TDX 脚本桥接</b> — 已落地 · 默认开 · <code>quant.tdx-script.enabled</code>；任务 <code>day-collect</code>（全市场日线：无→1年/有→增量）、<code>pool-minute-backfill</code>（池内分钟尽量~90日）；运维 <code>/api/ops/tdx-script/*</code>；推荐手动三步：日线→扫池→池内分钟；无本机 Python/pytdx 时可关</li>
+    <li><b>TDX 脚本桥接</b> — 已落地 · 默认开 · <code>quant.tdx-script.enabled</code>；任务 <code>day-collect</code>（先同步 <code>stock_basic</code> 全市场约5000+，再补日线：无→1年/有→增量）、<code>pool-minute-backfill</code>（池内分钟尽量~90日）；运维 <code>/api/ops/tdx-script/*</code>；亦可单独跑 <code>scripts/sync_stock_basic.py</code>；推荐手动三步：日线→扫池→池内分钟；无本机 Python/pytdx 时可关</li>
     <li><b>日频因子批算</b> — 已落地 · <code>FactorDailyComputeService</code>；运维 <code>POST /api/ops/factor-daily/rebuild</code>；定时 <code>factor-daily-rebuild</code>；<code>pool-rebuild</code> 默认预刷（<code>quant.pool-rebuild-refresh-factors</code>）</li>
     <li><b>1 分钟交易真相源</b> — 已落地 · 读写 <code>market_1min</code>（价额为元）；<code>data_source</code> 区分 MOCK/TDX/MDS；分钟周期内存聚合；灌数 <code>scripts/fetch_min1_tdx.py</code></li>
     <li><b>TDX 1 分钟历史回填</b> — 已落地 · <code>scripts/fetch_min1_tdx.py</code>（含 <code>--from-pool</code>）只写 <code>market_1min</code>；公开节点通常约 90 个交易日，非全市场多年历史源</li>
@@ -104,7 +104,7 @@
     <li><b>组合回测冒烟单测</b> — 已落地 · 合成双标的；断言指纹与 <code>atrRisk</code></li>
     <li><b>文档 PDF</b> — 已落地 · 量化知识 / 应用说明介绍页一键导出（服务端 iText，<code>GET /api/docs/pdf/{stock|app}</code>）</li>
     <li><b>项目 README 在线查看</b> — 已落地 · 应用说明 →「项目 README」；<code>GET /api/docs/readme</code> 实时渲染仓库根目录 Markdown（含 Mermaid 架构图）</li>
-    <li><b>本地可调度任务</b> — 已落地 · <code>scan-and-trade</code>、<code>pool-rebuild</code>、<code>after-market-batch-scan</code>、<code>settle-after-close</code>、<code>data-validate</code>、<code>factor-daily-rebuild</code>、<code>day-collect</code>、<code>pool-minute-backfill</code>、<code>sync-orders</code>、<code>position-pnl-sync</code>；入池粗筛可读 <code>factor_daily</code>；运维「执行一次」可手动触发；scan/sync/settle 锁忙与业务失败均返回错误而非假成功</li>
+    <li><b>本地可调度任务</b> — 已落地 · <code>scan-and-trade</code>、<code>pool-rebuild</code>、<code>after-market-batch-scan</code>、<code>settle-after-close</code>、<code>data-validate</code>、<code>factor-daily-rebuild</code>、<code>day-collect</code>、<code>pool-minute-backfill</code>、<code>sync-orders</code>、<code>position-pnl-sync</code>；入池粗筛可读 <code>factor_daily</code>；运维「执行一次」可手动触发；日线/分钟/扫池等长任务后台跑并轮询进度；scan/sync/settle 锁忙与业务失败均返回错误而非假成功</li>
     <li><b>宽睿资料梳理</b> — 已落地（文档）· 以 <code>OESAPI-JAVA-v0.19.4.0</code> 为准；「应用说明 → 宽睿文档梳理」仅展示当前手册要点与 M0/M1 接入记录</li>
     <li><b>宽睿 M0 环境脚手架</b> — 已完成 · jar <code>0.19.4.0</code>；阿里云模拟地址见 <code>aliyun-sim.md</code>；本机探针 OES+MDS 登录成功，<code>M0_STATUS=COMPLETE</code>；主应用仍默认 sim/db</li>
     <li><b>宽睿 M1 MDS L1 落库</b> — 可选已落地 · 开关默认关；<code>src/main-kuangrui</code> + <code>-Pkuangrui</code>；分钟桶聚合写 <code>market_1min(MDS)</code>；下一步 M2 OES 只读</li>

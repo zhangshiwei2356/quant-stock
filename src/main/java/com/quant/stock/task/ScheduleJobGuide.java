@@ -132,7 +132,7 @@ public final class ScheduleJobGuide {
         ));
         m.put("day-collect", new Detail(
                 "全市场日线补齐：无数据补近 1 年，有数据则增量补到最近交易日。",
-                "stock_basic status=1 → market_daily（TDX，adj=NONE）。",
+                "stock_basic status=1 → market_daily（TDX，adj=NONE）；--from-basic 默认先同步全市场列表约5000+。",
                 "默认工作日 15:30（CRON，种子关）；运维「执行一次」可手动触发。",
                 "依赖本机 Python + pytdx/pymysql；需 quant.tdx-script.enabled=true。",
                 "已实现。推荐流水线第 1 步；亦可 POST /api/ops/tdx-script/backfill-daily。"

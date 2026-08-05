@@ -20,6 +20,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 调用本机 Python 通达信灌数脚本（日线 / 池内分钟）。
@@ -31,6 +33,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @ConditionalOnProperty(name = "quant.db-enabled", havingValue = "true")
 public class TdxScriptBackfillService {
 
+    /** 脚本进度行形如 {@code [12/5000] 600036: daily=120 ...} */
+    private static final Pattern PROGRESS_LINE = Pattern.compile("\\[(\\d+)/(\\d+)]");
+
     private final QuantProperties quantProperties;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final ExecutorService asyncPool = Executors.newSingleThreadExecutor(r -> {
@@ -38,6 +43,14 @@ public class TdxScriptBackfillService {
         t.setDaemon(true);
         return t;
     });
+
+    private volatile String currentTag = "";
+    private volatile long startedAtMs;
+    private volatile String lastLine = "";
+    private volatile int lineCount;
+    private volatile Integer progressIndex;
+    private volatile Integer progressTotal;
+    private volatile Map<String, Object> lastFinished;
 
     public boolean isEnabled() {
         QuantProperties.TdxScript cfg = quantProperties.getTdxScript();
@@ -94,7 +107,21 @@ public class TdxScriptBackfillService {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         QuantProperties.TdxScript cfg = quantProperties.getTdxScript();
         m.put("enabled", isEnabled());
-        m.put("running", running.get());
+        boolean run = running.get();
+        m.put("running", run);
+        m.put("tag", currentTag == null ? "" : currentTag);
+        m.put("startedAtMs", startedAtMs > 0 ? startedAtMs : null);
+        m.put("elapsedMs", run && startedAtMs > 0 ? System.currentTimeMillis() - startedAtMs : null);
+        m.put("lastLine", lastLine == null ? "" : lastLine);
+        m.put("lineCount", lineCount);
+        m.put("progressIndex", progressIndex);
+        m.put("progressTotal", progressTotal);
+        if (progressIndex != null && progressTotal != null && progressTotal > 0) {
+            m.put("progressPct", Math.min(100, (int) Math.round(100.0 * progressIndex / progressTotal)));
+        } else {
+            m.put("progressPct", null);
+        }
+        m.put("lastFinished", lastFinished);
         m.put("python", cfg == null ? "python" : cfg.getPython());
         m.put("workingDir", resolveWorkDir().toString());
         m.put("min1Script", resolveMin1Script().toString());
@@ -125,6 +152,12 @@ public class TdxScriptBackfillService {
             out.put("message", "已有 TDX 脚本在执行");
             return out;
         }
+        currentTag = tag == null ? "" : tag;
+        startedAtMs = System.currentTimeMillis();
+        lastLine = "启动中…";
+        lineCount = 0;
+        progressIndex = null;
+        progressTotal = null;
         QuantProperties.TdxScript cfg = quantProperties.getTdxScript();
         List<String> cmd = new ArrayList<String>();
         cmd.add(cfg.getPython() == null || cfg.getPython().trim().isEmpty() ? "python" : cfg.getPython().trim());
@@ -156,6 +189,7 @@ public class TdxScriptBackfillService {
                         String line;
                         while ((line = br.readLine()) != null) {
                             log.info("[tdx-script:{}] {}", tag, line);
+                            noteProgressLine(line);
                             synchronized (logBuf) {
                                 if (logBuf.length() < 8000) {
                                     logBuf.append(line).append('\n');
@@ -175,6 +209,7 @@ public class TdxScriptBackfillService {
                 out.put("ok", false);
                 out.put("message", "超时 " + timeout + "s，已强制结束");
                 out.put("tail", tailOf(logBuf));
+                rememberFinished(out);
                 return out;
             }
             reader.join(30_000L);
@@ -184,15 +219,50 @@ public class TdxScriptBackfillService {
             out.put("ok", code == 0);
             out.put("message", code == 0 ? "完成" : "脚本退出码 " + code);
             out.put("tail", trimTail(tailOf(logBuf), 2000));
+            rememberFinished(out);
             return out;
         } catch (Exception e) {
             out.put("ok", false);
             out.put("message", e.getMessage());
             log.warn("[tdx-script] 执行失败 tag={}: {}", tag, e.getMessage());
+            rememberFinished(out);
             return out;
         } finally {
             running.set(false);
         }
+    }
+
+    private void noteProgressLine(String line) {
+        if (line == null) {
+            return;
+        }
+        String trimmed = line.trim();
+        if (trimmed.isEmpty()) {
+            return;
+        }
+        lastLine = trimmed.length() > 240 ? trimmed.substring(0, 240) + "…" : trimmed;
+        lineCount++;
+        Matcher matcher = PROGRESS_LINE.matcher(trimmed);
+        if (matcher.find()) {
+            try {
+                progressIndex = Integer.parseInt(matcher.group(1));
+                progressTotal = Integer.parseInt(matcher.group(2));
+            } catch (NumberFormatException ignored) {
+                // keep previous
+            }
+        }
+    }
+
+    private void rememberFinished(Map<String, Object> out) {
+        Map<String, Object> snap = new LinkedHashMap<String, Object>();
+        snap.put("tag", currentTag);
+        snap.put("ok", out.get("ok"));
+        snap.put("message", out.get("message"));
+        snap.put("exitCode", out.get("exitCode"));
+        snap.put("elapsedMs", out.get("elapsedMs"));
+        snap.put("finishedAtMs", System.currentTimeMillis());
+        snap.put("lastLine", lastLine);
+        lastFinished = snap;
     }
 
     private Path resolveWorkDir() {

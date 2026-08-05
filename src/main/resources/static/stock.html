@@ -809,6 +809,16 @@
           <button type="button" id="btnScheduleReload" class="secondary">重载调度</button>
           <span class="field-hint" id="scheduleMasterHint"></span>
         </div>
+        <div id="scheduleRunBanner" class="schedule-run-banner" hidden>
+          <div class="schedule-run-head">
+            <span id="scheduleRunTitle" class="schedule-run-title">任务执行中</span>
+            <span id="scheduleRunMeta" class="schedule-run-meta mono"></span>
+          </div>
+          <div class="schedule-run-bar" aria-hidden="true">
+            <div id="scheduleRunBarFill" class="schedule-run-bar-fill"></div>
+          </div>
+          <div id="scheduleRunDetail" class="schedule-run-detail mono"></div>
+        </div>
         <div class="table-wrap" style="margin-top:12px;max-height:none;">
           <table class="schedule-table">
             <thead>

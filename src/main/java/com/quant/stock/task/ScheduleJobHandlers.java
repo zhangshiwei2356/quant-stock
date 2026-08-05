@@ -229,6 +229,9 @@ public class ScheduleJobHandlers {
             public void run() {
                 Map<String, Object> out = tdxScriptBackfillService.backfillPoolMinuteSync();
                 log.info("[pool-minute-backfill] {}", out);
+                if (!Boolean.TRUE.equals(out.get("ok"))) {
+                    throw new IllegalStateException(String.valueOf(out.get("message")));
+                }
             }
         });
     }
@@ -240,6 +243,9 @@ public class ScheduleJobHandlers {
             public void run() {
                 Map<String, Object> out = tdxScriptBackfillService.backfillDailySync(1.0);
                 log.info("[day-collect] {}", out);
+                if (!Boolean.TRUE.equals(out.get("ok"))) {
+                    throw new IllegalStateException(String.valueOf(out.get("message")));
+                }
             }
         });
     }

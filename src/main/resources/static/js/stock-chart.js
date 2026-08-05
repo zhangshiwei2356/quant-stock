@@ -145,7 +145,7 @@
   /**
    * @param {string} msg
    * @param {string} [type] ok|err|info
-   * @param {{ place?: 'theme'|'default' }} [opts]
+   * @param {{ place?: 'theme'|'default', duration?: number }} [opts]
    */
   function toast(msg, type, opts) {
     opts = opts || {};
@@ -157,6 +157,7 @@
     }
     var $t = $('<div class="toast"/>').addClass(type || 'info').text(msg);
     $host.append($t);
+    var holdMs = opts.duration != null ? opts.duration : (opts.place === 'theme' ? 2200 : 2800);
     setTimeout(function () {
       $t.addClass('out');
       setTimeout(function () {
@@ -165,7 +166,7 @@
           $host.removeClass('toast-host--theme').css({ top: '', right: '', left: '', bottom: '', transform: '' });
         }
       }, 250);
-    }, opts.place === 'theme' ? 2200 : 2800);
+    }, holdMs);
   }
 
   function cssVar(name, fallback) {
@@ -3628,6 +3629,123 @@
 
   var scheduleJobsByCode = {};
   var SCHEDULE_COLSPAN = 8;
+  var scheduleRunPollTimer = null;
+  var scheduleRunPollCode = '';
+  var scheduleRunSeenFinishedKey = '';
+
+  function formatElapsedSec(sec) {
+    sec = Number(sec) || 0;
+    if (sec < 60) return sec + 's';
+    var m = Math.floor(sec / 60);
+    var s = sec % 60;
+    if (m < 60) return m + '分' + s + '秒';
+    var h = Math.floor(m / 60);
+    return h + '时' + (m % 60) + '分';
+  }
+
+  function stopScheduleRunPoll() {
+    if (scheduleRunPollTimer) {
+      clearInterval(scheduleRunPollTimer);
+      scheduleRunPollTimer = null;
+    }
+  }
+
+  function applyScheduleRunButtons(runningCode) {
+    $('#scheduleJobBody .sch-run').each(function () {
+      var code = $(this).closest('tr').attr('data-code');
+      var busy = !!(runningCode && code === runningCode);
+      $(this).prop('disabled', busy).text(busy ? '执行中…' : '执行一次');
+    });
+  }
+
+  function renderScheduleRunBanner(payload) {
+    var $banner = $('#scheduleRunBanner');
+    if (!$banner.length) return;
+    var mr = (payload && payload.manualRun) || {};
+    var tdx = (payload && payload.tdxScript) || {};
+    var running = !!mr.running || !!tdx.running;
+    var jobCode = mr.jobCode || scheduleRunPollCode || '';
+    var jobName = mr.jobName || jobCode || '任务';
+    var $fill = $('#scheduleRunBarFill');
+
+    if (!running && !mr.finishedAt && !tdx.lastFinished) {
+      $banner.attr('hidden', true).removeClass('is-done-ok is-done-err');
+      applyScheduleRunButtons('');
+      return;
+    }
+
+    $banner.removeAttr('hidden');
+    if (running) {
+      $banner.removeClass('is-done-ok is-done-err');
+      $('#scheduleRunTitle').text('执行中 · ' + (jobName || jobCode));
+      var meta = [];
+      if (mr.elapsedSec != null) meta.push('已用 ' + formatElapsedSec(mr.elapsedSec));
+      else if (tdx.elapsedMs != null) meta.push('已用 ' + formatElapsedSec(Math.floor(tdx.elapsedMs / 1000)));
+      if (tdx.progressIndex != null && tdx.progressTotal != null) {
+        meta.push(tdx.progressIndex + ' / ' + tdx.progressTotal);
+      }
+      $('#scheduleRunMeta').text(meta.join(' · '));
+      if (tdx.progressPct != null) {
+        $fill.removeClass('is-indeterminate').css('width', Math.max(2, tdx.progressPct) + '%');
+      } else {
+        $fill.addClass('is-indeterminate').css('width', '36%');
+      }
+      var detail = tdx.lastLine || mr.message || '后台执行中，请稍候…';
+      if (tdx.tag) detail = '[' + tdx.tag + '] ' + detail;
+      $('#scheduleRunDetail').text(detail);
+      applyScheduleRunButtons(jobCode || scheduleRunPollCode);
+      return;
+    }
+
+    // finished
+    var ok = mr.ok;
+    if (ok == null && tdx.lastFinished) ok = !!tdx.lastFinished.ok;
+    $banner.toggleClass('is-done-ok', ok === true).toggleClass('is-done-err', ok === false);
+    $('#scheduleRunTitle').text((ok === false ? '执行失败' : '执行完成') + ' · ' + (jobName || jobCode));
+    var doneMeta = [];
+    if (mr.elapsedSec != null) doneMeta.push('耗时 ' + formatElapsedSec(mr.elapsedSec));
+    else if (tdx.lastFinished && tdx.lastFinished.elapsedMs != null) {
+      doneMeta.push('耗时 ' + formatElapsedSec(Math.floor(tdx.lastFinished.elapsedMs / 1000)));
+    }
+    if (mr.finishedAt) doneMeta.push(String(mr.finishedAt).replace('T', ' ').slice(0, 19));
+    $('#scheduleRunMeta').text(doneMeta.join(' · '));
+    $fill.removeClass('is-indeterminate').css('width', ok === false ? '100%' : '100%');
+    var doneDetail = mr.message || (tdx.lastFinished && tdx.lastFinished.message) || '';
+    if (tdx.lastFinished && tdx.lastFinished.lastLine) {
+      doneDetail = (doneDetail ? doneDetail + ' · ' : '') + tdx.lastFinished.lastLine;
+    }
+    $('#scheduleRunDetail').text(doneDetail || '—');
+    applyScheduleRunButtons('');
+  }
+
+  function startScheduleRunPoll(jobCode) {
+    scheduleRunPollCode = jobCode || scheduleRunPollCode || '';
+    stopScheduleRunPoll();
+    var tick = function () {
+      $.getJSON('/api/schedule/run-status').done(function (data) {
+        renderScheduleRunBanner(data);
+        var mr = (data && data.manualRun) || {};
+        var tdx = (data && data.tdxScript) || {};
+        var running = !!mr.running || !!tdx.running;
+        if (running) return;
+        stopScheduleRunPoll();
+        var finishKey = (mr.jobCode || '') + '|' + (mr.finishedAt || '') + '|' + String(mr.ok);
+        if (mr.finishedAt && finishKey !== scheduleRunSeenFinishedKey) {
+          scheduleRunSeenFinishedKey = finishKey;
+          if (mr.ok === false) {
+            toast((mr.jobName || mr.jobCode || '任务') + '失败：' + (mr.message || ''), 'err', { duration: 6000 });
+          } else if (mr.ok === true) {
+            toast((mr.jobName || mr.jobCode || '任务') + '已完成', 'ok', { duration: 4500 });
+          }
+          loadScheduleJobs();
+        }
+      }).fail(function () {
+        // keep polling; transient errors ignored
+      });
+    };
+    tick();
+    scheduleRunPollTimer = setInterval(tick, 2000);
+  }
 
   function loadScheduleJobs() {
     var $body = $('#scheduleJobBody');
@@ -3638,7 +3756,8 @@
         ? '总闸已开 · 已注册 ' + (data.registeredCount || 0) + ' 个触发器'
         : '总闸 quant.schedule.enabled=false（改 yml 后需重启）');
       var baseHint = data.hint || '';
-      $('#scheduleHint').text(baseHint + (baseHint ? ' · ' : '') + '点击行空白处展开任务详细介绍');
+      $('#scheduleHint').text(baseHint + (baseHint ? ' · ' : '')
+        + '点击行空白处展开任务详细介绍；长任务「执行一次」后台跑并显示进度');
       var jobs = data.jobs || [];
       scheduleJobsByCode = {};
       if (!jobs.length) {
@@ -3674,6 +3793,17 @@
           + '</td></tr>';
       });
       $body.html(rows.join(''));
+      var mr = data.manualRun || {};
+      var tdx = data.tdxScript || {};
+      if (mr.running || tdx.running) {
+        renderScheduleRunBanner({ manualRun: mr, tdxScript: tdx });
+        startScheduleRunPoll(mr.jobCode || '');
+      } else if (mr.finishedAt) {
+        renderScheduleRunBanner({ manualRun: mr, tdxScript: tdx });
+        applyScheduleRunButtons('');
+      } else {
+        applyScheduleRunButtons('');
+      }
     }).fail(function (xhr) {
       var msg = (xhr.responseJSON && xhr.responseJSON.message) || xhr.statusText || '加载失败';
       $body.html('<tr><td colspan="8" class="empty-state">' + escHtml(msg) + '</td></tr>');
@@ -4861,18 +4991,29 @@
 
   $('#scheduleJobBody').on('click', '.sch-run', function () {
     var code = $(this).closest('tr').attr('data-code');
+    var job = scheduleJobsByCode[code] || {};
     var $btn = $(this);
-    $btn.prop('disabled', true);
+    var asyncStarted = false;
+    $btn.prop('disabled', true).text('提交中…');
+    toast('正在提交「' + (job.jobName || code) + '」…', 'info');
     $.post('/api/schedule/jobs/' + encodeURIComponent(code) + '/run').done(function (res) {
+      if (res && res.async) {
+        asyncStarted = true;
+        toast((res.message) || ('已后台启动 ' + code), 'info', { duration: 5500 });
+        startScheduleRunPoll(code);
+        return;
+      }
       toast((res && res.message) ? res.message : ('已执行 ' + code), 'ok');
       loadScheduleJobs();
     }).fail(function (xhr) {
       var msg = (xhr.responseJSON && (xhr.responseJSON.message || xhr.responseJSON.error))
         || '执行失败';
-      toast(msg, 'err');
+      toast(msg, 'err', { duration: 5000 });
       loadScheduleJobs();
     }).always(function () {
-      $btn.prop('disabled', false);
+      if (!asyncStarted) {
+        $btn.prop('disabled', false).text('执行一次');
+      }
     });
   });
 

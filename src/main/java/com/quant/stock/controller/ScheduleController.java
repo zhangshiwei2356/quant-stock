@@ -80,7 +80,7 @@ public class ScheduleController {
         }
     }
 
-    /** 立即手动触发一次指定任务（与 cron 无关）。 */
+    /** 立即手动触发一次指定任务（与 cron 无关）。长任务后台执行并返回 async。 */
     @PostMapping("/jobs/{jobCode}/run")
     public Map<String, Object> runOnce(@PathVariable String jobCode) {
         try {
@@ -93,6 +93,12 @@ public class ScheduleController {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "执行失败: " + e.getMessage());
         }
+    }
+
+    /** 手动「执行一次」进度（含 TDX 脚本行进度），供页面轮询。 */
+    @GetMapping("/run-status")
+    public Map<String, Object> runStatus() {
+        return requireService().runStatus();
     }
 
     /** 从数据库重新加载全部任务并刷新 Spring 调度注册。 */

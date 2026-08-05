@@ -2,6 +2,7 @@ package com.quant.stock.task;
 
 import com.quant.stock.config.QuantProperties;
 import com.quant.stock.mapper.ScheduleJobMapper;
+import com.quant.stock.market.TdxScriptBackfillService;
 import com.quant.stock.task.dto.ScheduleJobDO;
 import com.quant.stock.task.dto.ScheduleJobUpdateRequest;
 import lombok.RequiredArgsConstructor;
@@ -20,12 +21,19 @@ import javax.annotation.PreDestroy;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 基于 MySQL {@code sys_schedule_job} 的动态调度：启停与 cron 热更新，无需改 yml 重启。
@@ -40,14 +48,32 @@ public class DynamicScheduleService implements ApplicationRunner {
 
     private static final ZoneId ZONE = ZoneId.of("Asia/Shanghai");
 
+    /** 手动「执行一次」改后台跑，避免 HTTP 长时间无响应、页面无进度 */
+    private static final Set<String> ASYNC_MANUAL_JOBS = Collections.unmodifiableSet(new HashSet<String>(Arrays.asList(
+            "day-collect",
+            "pool-minute-backfill",
+            "pool-rebuild",
+            "factor-daily-rebuild",
+            "after-market-batch-scan",
+            "data-validate",
+            "market-collect"
+    )));
+
     private final ScheduleJobMapper scheduleJobMapper;
     private final StrategyTask strategyTask;
     private final ScheduleJobHandlers scheduleJobHandlers;
     private final QuantProperties quantProperties;
     private final JdbcTemplate jdbcTemplate;
+    private final TdxScriptBackfillService tdxScriptBackfillService;
 
     private final ThreadPoolTaskScheduler taskScheduler = createScheduler();
     private final Map<String, ScheduledFuture<?>> futures = new ConcurrentHashMap<String, ScheduledFuture<?>>();
+    private final AtomicReference<ManualRunState> manualRunRef = new AtomicReference<ManualRunState>();
+    private final ExecutorService manualRunExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "schedule-manual-run");
+        t.setDaemon(true);
+        return t;
+    });
 
     private static ThreadPoolTaskScheduler createScheduler() {
         ThreadPoolTaskScheduler s = new ThreadPoolTaskScheduler();
@@ -70,6 +96,7 @@ public class DynamicScheduleService implements ApplicationRunner {
     public void destroy() {
         cancelAll();
         taskScheduler.shutdown();
+        manualRunExecutor.shutdownNow();
     }
 
     /** 取消并重新从库表加载全部启用任务的触发器。 */
@@ -115,6 +142,8 @@ public class DynamicScheduleService implements ApplicationRunner {
                 ? "动态调度已开启；各任务以库表 enabled 为准，改后立即生效"
                 : "总闸 quant.schedule.enabled=false；库表可编辑，开启总闸并重启后才会真正调度");
         m.put("jobs", listJobs());
+        m.put("manualRun", snapshotManualRun());
+        m.put("tdxScript", tdxScriptBackfillService.status());
         return m;
     }
 
@@ -209,17 +238,135 @@ public class DynamicScheduleService implements ApplicationRunner {
     }
 
     /**
-     * 运维「执行一次」：同步调用 handler，失败向上抛。
+     * 运维「执行一次」：短任务同步；长任务（日线/分钟补齐、扫池等）后台执行并返回 async。
      */
     public Map<String, Object> runOnce(String jobCode) {
         requireJob(jobCode);
+        if (ASYNC_MANUAL_JOBS.contains(jobCode)) {
+            return startAsyncManual(jobCode);
+        }
         invoke(jobCode, true);
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.put("ok", true);
+        m.put("async", false);
         m.put("jobCode", jobCode);
         m.put("message", "执行完成");
         m.put("lastRunAt", LocalDateTime.now().toString());
         return m;
+    }
+
+    /** 手动执行进度（含 TDX 脚本行进度），供页面轮询。 */
+    public Map<String, Object> runStatus() {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        m.put("manualRun", snapshotManualRun());
+        m.put("tdxScript", tdxScriptBackfillService.status());
+        return m;
+    }
+
+    private Map<String, Object> startAsyncManual(String jobCode) {
+        synchronized (manualRunRef) {
+            ManualRunState cur = manualRunRef.get();
+            if (cur != null && cur.running) {
+                throw new IllegalStateException("已有手动任务在执行: " + cur.jobCode
+                        + "（请等待完成后再点）");
+            }
+            Map<String, Object> tdxSt = tdxScriptBackfillService.status();
+            if (Boolean.TRUE.equals(tdxSt.get("running"))
+                    && ("day-collect".equals(jobCode) || "pool-minute-backfill".equals(jobCode))) {
+                throw new IllegalStateException("TDX 脚本正在执行，请稍后再试");
+            }
+            final ManualRunState state = new ManualRunState();
+            state.jobCode = jobCode;
+            state.jobName = resolveJobName(jobCode);
+            state.running = true;
+            state.ok = null;
+            state.message = "后台执行中…";
+            state.startedAt = LocalDateTime.now();
+            state.finishedAt = null;
+            manualRunRef.set(state);
+            manualRunExecutor.submit(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        invoke(jobCode, true);
+                        state.ok = true;
+                        state.message = "执行完成";
+                    } catch (Exception e) {
+                        state.ok = false;
+                        state.message = e.getMessage() == null ? "执行失败" : e.getMessage();
+                        log.warn("手动任务后台失败 {}: {}", jobCode, state.message);
+                    } finally {
+                        state.running = false;
+                        state.finishedAt = LocalDateTime.now();
+                    }
+                }
+            });
+        }
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        m.put("ok", true);
+        m.put("async", true);
+        m.put("jobCode", jobCode);
+        m.put("jobName", resolveJobName(jobCode));
+        m.put("message", longJobStartMessage(jobCode));
+        m.put("poll", "/api/schedule/run-status");
+        m.put("manualRun", snapshotManualRun());
+        return m;
+    }
+
+    private String longJobStartMessage(String jobCode) {
+        if ("day-collect".equals(jobCode)) {
+            return "已后台启动全市场日线补齐(TDX)；进度见下方条，可能需数十分钟";
+        }
+        if ("pool-minute-backfill".equals(jobCode)) {
+            return "已后台启动目标池分钟补齐(TDX)；进度见下方条";
+        }
+        if ("pool-rebuild".equals(jobCode)) {
+            return "已后台启动目标池重建；完成后请看最近执行时间";
+        }
+        return "已后台启动「" + resolveJobName(jobCode) + "」，请在进度区查看";
+    }
+
+    private String resolveJobName(String jobCode) {
+        try {
+            ScheduleJobDO job = scheduleJobMapper.selectByCode(jobCode);
+            if (job != null && StringUtils.hasText(job.getJobName())) {
+                return job.getJobName();
+            }
+        } catch (Exception ignored) {
+            // fall through
+        }
+        return jobCode;
+    }
+
+    private Map<String, Object> snapshotManualRun() {
+        ManualRunState state = manualRunRef.get();
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        if (state == null) {
+            m.put("running", false);
+            return m;
+        }
+        m.put("jobCode", state.jobCode);
+        m.put("jobName", state.jobName);
+        m.put("running", state.running);
+        m.put("ok", state.ok);
+        m.put("message", state.message);
+        m.put("startedAt", state.startedAt == null ? null : state.startedAt.toString());
+        m.put("finishedAt", state.finishedAt == null ? null : state.finishedAt.toString());
+        if (state.startedAt != null) {
+            LocalDateTime end = state.finishedAt != null ? state.finishedAt : LocalDateTime.now();
+            m.put("elapsedSec", java.time.Duration.between(state.startedAt, end).getSeconds());
+        }
+        return m;
+    }
+
+    private static final class ManualRunState {
+        private String jobCode;
+        private String jobName;
+        private volatile boolean running;
+        private volatile Boolean ok;
+        private volatile String message;
+        private LocalDateTime startedAt;
+        private volatile LocalDateTime finishedAt;
     }
 
     private void validateTrigger(ScheduleJobDO job) {
@@ -435,7 +582,7 @@ public class DynamicScheduleService implements ApplicationRunner {
                 "由日线重算 factor_daily；建议在 pool-rebuild 前；亦可由 pool-rebuild 内预刷新");
         seed("day-collect", "全市场日线补齐(TDX)", "CRON",
                 "0 30 15 * * MON-FRI", null, 1,
-                "无日线补近1年，有则增量补缺口；需 quant.tdx-script.enabled=true");
+                "执行前默认同步 stock_basic 全市场(~5000+)；无日线补近1年，有则增量；需 tdx-script.enabled");
         seed("pool-minute-backfill", "目标池分钟补齐(TDX)", "CRON",
                 "0 20 15 * * MON-FRI", null, 1,
                 "池内尽量拉满节点深度(~90日)并补到最近；需 quant.tdx-script.enabled=true");
@@ -448,7 +595,7 @@ public class DynamicScheduleService implements ApplicationRunner {
         syncJobMeta("factor-daily-rebuild", 1,
                 "由日线重算 factor_daily；建议在 pool-rebuild 前；亦可由 pool-rebuild 内预刷新");
         syncJobMeta("day-collect", 1,
-                "无日线补近1年，有则增量补缺口；需 quant.tdx-script.enabled=true");
+                "执行前默认同步 stock_basic 全市场(~5000+)；无日线补近1年，有则增量；需 tdx-script.enabled");
         syncJobMeta("pool-minute-backfill", 1,
                 "池内尽量拉满节点深度(~90日)并补到最近；需 quant.tdx-script.enabled=true");
         // 纠正展示名（旧库可能仍是旧名称）

@@ -41,7 +41,7 @@
   <li>演示股：classpath 十只近一年模拟种子（空库灌 <code>market_1min</code>，区间随 <code>MockKlineDataGenerator</code> 重刷）；目标池可用 <code>fetch_min1_tdx.py --from-pool</code> 回填约 90 交易日 1 分钟</li>
   <li>行情分层：<code>market_1min</code>=池内交易分钟真相源；<code>market_daily</code>=全市场选股日线真相源（首期不复权 NONE）。日线灌数：<code>python scripts/fetch_daily_tdx.py --from-basic --years 1</code>；分钟灌数：<code>python scripts/fetch_min1_tdx.py --from-pool</code></li>
   <li>入池流水线：日线入库 → <code>factor-daily-rebuild</code>（或 pool-rebuild 预刷）→ <code>pool-rebuild</code> → 池内补分钟。数据健康分层：全市场看日线、池内看分钟</li>
-  <li>推荐手动三步（定时任务默认关，运维「执行一次」）：① <code>day-collect</code> 全市场日线（无→近1年，有→增量）→ ② <code>pool-rebuild</code> 入池 → ③ <code>pool-minute-backfill</code> 池内分钟（尽量~90日并补到最近）。依赖本机 Python + pytdx/pymysql（<code>quant.tdx-script.enabled</code> 默认 true）</li>
+  <li>推荐手动三步（定时任务默认关，运维「执行一次」）：① <code>day-collect</code> 全市场日线（先同步 <code>stock_basic</code> 约 5000+，无日线→近1年，有→增量）→ ② <code>pool-rebuild</code> 入池 → ③ <code>pool-minute-backfill</code> 池内分钟（尽量~90日并补到最近）。依赖本机 Python + pytdx/pymysql（<code>quant.tdx-script.enabled</code> 默认 true）。长任务后台执行，任务管理页显示进度条与脚本最新行</li>
   <li>回测区间默认留空 = 全量 K 线；初始资金默认 <b>100000</b></li>
   <li>页头主题默认<strong>极光</strong>（浅色日间：流动极光帘 + 淡粒子）；另有夜盘 / 银河，可切换并记住</li>
 </ul>

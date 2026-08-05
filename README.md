@@ -176,7 +176,7 @@ sequenceDiagram
 
 | 二级 | 功能 |
 |------|------|
-| 任务管理 | `sys_schedule_job` 启停 / cron / 立即执行（种子默认全关） |
+| 任务管理 | `sys_schedule_job` 启停 / cron / 立即执行（种子默认全关；长任务后台跑并显示进度） |
 | 数据健康 | 本地空数据与滞后检查 |
 | 运行参数 | 全局白名单可写（`quant.prop.*`）+ **按策略稀疏参数包**（表 `strategy_param`）；回测还可带 **本次临时改参**（`paramOverrides`，不落库） |
 
@@ -299,7 +299,7 @@ sequenceDiagram
 | POST `/api/account/orders/{id}/cancel` | 撤销 SUBMITTED/PARTIAL |
 | POST `/api/account/orders/{id}/partial-fill?qty=` | 本地部成桩 |
 | POST `/api/account/orders/{id}/replace?price=&volume=` | 改价=撤补（新单队尾） |
-| GET/PUT/POST `/api/schedule/**` | 定时任务 |
+| GET/PUT/POST `/api/schedule/**` | 定时任务（长任务「执行一次」后台跑；`GET /api/schedule/run-status` 轮询进度） |
 | GET `/api/ops/data-health` · `/params` · `/strategies` | 数据健康 / 运行参数（`?strategyId=` 含稀疏/生效预览） / 已注册策略 |
 | POST `/api/ops/params` | 全局白名单热写（`quant.prop.*`，`confirm:true`） |
 | POST `/api/ops/strategy-params` | 策略稀疏包热写（`strategyId` + `updates`/`clearKeys` + `confirm:true`） |
@@ -313,6 +313,7 @@ sequenceDiagram
 ## 运维中心 · 定时任务
 
 - 表：`sys_schedule_job`（启动自动建表+种子，**默认全关**）
+- 运维「执行一次」：短任务同步；日线/分钟/扫池等长任务**后台执行**，页面进度条 + `GET /api/schedule/run-status` 轮询（TDX 解析脚本 `[i/n]` 行）
 - **唯一目标池**：`pool-rebuild` / `after-market-batch-scan` 扫描后覆盖；启用其一会自动关闭另一（互斥）
 - `scan-and-trade`：只扫池内活跃标的 + 本地模拟账本
 - 已实现：`scan-and-trade` / `pool-rebuild` / `after-market-batch-scan` / `settle-after-close` / `data-validate` / `factor-daily-rebuild` / `day-collect` / `pool-minute-backfill` / `sync-orders` / `position-pnl-sync`
@@ -320,7 +321,8 @@ sequenceDiagram
   - `data-validate`：分层——universe 查 `market_daily`，目标池查 `market_1min`
   - `factor-daily-rebuild`：日线 → `factor_daily`；`pool-rebuild` 默认同预刷新
   - `day-collect` / `pool-minute-backfill`：TDX 脚本补齐（依赖本机 `python` + `pytdx`/`pymysql`；`quant.tdx-script.enabled` 默认 true）
-    - **推荐手动三步**：① `day-collect`（全市场日线：无→近1年，有→增量）→ ② `pool-rebuild`（入池）→ ③ `pool-minute-backfill`（池内分钟尽量拉满~90日并补到最近）
+    - **推荐手动三步**：① `day-collect`（先同步 `stock_basic` 全市场约 5000+，再补日线：无→近1年，有→增量）→ ② `pool-rebuild`（入池）→ ③ `pool-minute-backfill`（池内分钟尽量拉满~90日并补到最近）
+    - 仅刷新列表：`python scripts/sync_stock_basic.py`（东方财富优先，失败回退 TDX）
   - `pool-rebuild`：返回 `minuteBackfillHint`；可选 `pool-rebuild-backfill-minute` 异步补分钟
   - 运维：`GET/POST /api/ops/tdx-script/{status,backfill-min1,backfill-daily}`
   - `sync-orders`：本地桩将 `SUBMITTED→FILLED` 并改仓；`trade-mode=sdk` 时策略在 sync 后才落现金/批次
