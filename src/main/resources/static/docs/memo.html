@@ -104,7 +104,7 @@
     <li><b>组合回测冒烟单测</b> — 已落地 · 合成双标的；断言指纹与 <code>atrRisk</code></li>
     <li><b>文档 PDF</b> — 已落地 · 量化知识 / 应用说明介绍页一键导出（服务端 iText，<code>GET /api/docs/pdf/{stock|app}</code>）</li>
     <li><b>项目 README 在线查看</b> — 已落地 · 应用说明 →「项目 README」；<code>GET /api/docs/readme</code> 实时渲染仓库根目录 Markdown（含 Mermaid 架构图）</li>
-    <li><b>本地可调度任务</b> — 已落地 · <code>scan-and-trade</code>、<code>pool-rebuild</code>、<code>after-market-batch-scan</code>、<code>settle-after-close</code>、<code>data-validate</code>、<code>factor-daily-rebuild</code>、<code>day-collect</code>、<code>pool-minute-backfill</code>、<code>sync-orders</code>、<code>position-pnl-sync</code>；入池粗筛可读 <code>factor_daily</code>；运维「执行一次」可手动触发；日线/分钟/扫池等长任务后台跑并轮询进度；scan/sync/settle 锁忙与业务失败均返回错误而非假成功</li>
+    <li><b>本地可调度任务</b> — 已落地 · <code>scan-and-trade</code>、<code>pool-rebuild</code>、<code>after-market-batch-scan</code>、<code>settle-after-close</code>、<code>data-validate</code>、<code>factor-daily-rebuild</code>、<code>day-collect</code>、<code>pool-minute-backfill</code>、<code>sync-orders</code>、<code>position-pnl-sync</code>；入池粗筛可读 <code>factor_daily</code>；运维「执行一次」可手动触发；日线/分钟/扫池等长任务后台跑，进度区展示阶段/摘要/百分比；scan/sync/settle 锁忙与业务失败均返回错误而非假成功</li>
     <li><b>宽睿资料梳理</b> — 已落地（文档）· 以 <code>OESAPI-JAVA-v0.19.4.0</code> 为准；「应用说明 → 宽睿文档梳理」仅展示当前手册要点与 M0/M1 接入记录</li>
     <li><b>宽睿 M0 环境脚手架</b> — 已完成 · jar <code>0.19.4.0</code>；阿里云模拟地址见 <code>aliyun-sim.md</code>；本机探针 OES+MDS 登录成功，<code>M0_STATUS=COMPLETE</code>；主应用仍默认 sim/db</li>
     <li><b>宽睿 M1 MDS L1 落库</b> — 可选已落地 · 开关默认关；<code>src/main-kuangrui</code> + <code>-Pkuangrui</code>；分钟桶聚合写 <code>market_1min(MDS)</code>；下一步 M2 OES 只读</li>

@@ -289,11 +289,14 @@ def main() -> int:
     try:
         if args.from_basic:
             if args.sync_universe:
-                print("sync stock_basic universe…", flush=True)
+                print("【阶段】同步全市场股票列表…", flush=True)
                 sync_result = sync_stock_basic.sync_universe(deactivate_missing=False, source="auto")
                 print(
-                    f"universe source={sync_result.get('source')} "
-                    f"active={sync_result.get('active')} upserted={sync_result.get('upserted')}",
+                    "【阶段】列表已就绪 · 来源={source} · 在市={active} 只 · 写入/更新={upserted}".format(
+                        source=sync_result.get("source"),
+                        active=sync_result.get("active"),
+                        upserted=sync_result.get("upserted"),
+                    ),
                     flush=True,
                 )
             codes = basic_codes()
@@ -304,9 +307,9 @@ def main() -> int:
     except Exception as exc:
         parser.error(str(exc))
 
+    incr_cn = "增量补缺口" if args.incremental else "按年窗口全量"
     print(
-        f"target={len(codes)} incremental={args.incremental} years={args.years} "
-        f"adj=NONE source=TDX",
+        f"【阶段】开始拉取日线 · 共 {len(codes)} 只 · {incr_cn} · 回溯年={args.years} · 复权=NONE · 来源=TDX",
         flush=True,
     )
     api = connect_tdx()
@@ -316,28 +319,33 @@ def main() -> int:
         for index, code in enumerate(codes, 1):
             try:
                 since, mode = resolve_since(code, args.years, args.incremental)
+                mode_cn = "增量" if mode == "incr" else "全量"
                 bars = fetch_tdx_day_bars(api, code, since)
                 n = upsert_symbol(code, bars)
                 if n == 0:
                     skipped += 1
                     print(
-                        f"[{index}/{len(codes)}] {code}: skip empty mode={mode} since={since}",
+                        f"[{index}/{len(codes)}] {code} · 无新数据 · {mode_cn} · 自 {since}",
                         flush=True,
                     )
                 else:
                     print(
-                        f"[{index}/{len(codes)}] {code}: daily={n} mode={mode} since={since}",
+                        f"[{index}/{len(codes)}] {code} · 写入 {n} 根日线 · {mode_cn} · 自 {since}",
                         flush=True,
                     )
             except Exception as exc:
                 failures.append(code)
-                print(f"[{index}/{len(codes)}] {code}: FAIL {exc}", file=sys.stderr, flush=True)
+                print(
+                    f"[{index}/{len(codes)}] {code} · 失败 {exc}",
+                    file=sys.stderr,
+                    flush=True,
+                )
             if index < len(codes) and args.sleep > 0:
                 time.sleep(args.sleep)
     finally:
         api.disconnect()
     print(
-        f"done ok={len(codes) - len(failures)} fail={len(failures)} empty={skipped}",
+        f"【完成】成功 {len(codes) - len(failures)} 只 · 失败 {len(failures)} 只 · 空数据 {skipped} 只",
         flush=True,
     )
     return 1 if failures else 0

@@ -814,10 +814,24 @@
             <span id="scheduleRunTitle" class="schedule-run-title">任务执行中</span>
             <span id="scheduleRunMeta" class="schedule-run-meta mono"></span>
           </div>
-          <div class="schedule-run-bar" aria-hidden="true">
-            <div id="scheduleRunBarFill" class="schedule-run-bar-fill"></div>
+          <div id="scheduleRunPhases" class="schedule-run-phases" aria-hidden="true">
+            <span class="schedule-run-phase" data-phase="sync">① 同步列表</span>
+            <span class="schedule-run-phase-sep">→</span>
+            <span class="schedule-run-phase" data-phase="fetch">② 拉取行情</span>
+            <span class="schedule-run-phase-sep">→</span>
+            <span class="schedule-run-phase" data-phase="done">③ 完成</span>
           </div>
-          <div id="scheduleRunDetail" class="schedule-run-detail mono"></div>
+          <div id="scheduleRunSummary" class="schedule-run-summary"></div>
+          <div class="schedule-run-bar-row">
+            <div class="schedule-run-bar" aria-hidden="true">
+              <div id="scheduleRunBarFill" class="schedule-run-bar-fill"></div>
+            </div>
+            <span id="scheduleRunPct" class="schedule-run-pct mono"></span>
+          </div>
+          <details id="scheduleRunLogWrap" class="schedule-run-log">
+            <summary>原始日志（最新一行）</summary>
+            <div id="scheduleRunDetail" class="schedule-run-detail mono"></div>
+          </details>
         </div>
         <div class="table-wrap" style="margin-top:12px;max-height:none;">
           <table class="schedule-table">

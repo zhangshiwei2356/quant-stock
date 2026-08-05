@@ -315,15 +315,15 @@ public class DynamicScheduleService implements ApplicationRunner {
 
     private String longJobStartMessage(String jobCode) {
         if ("day-collect".equals(jobCode)) {
-            return "已后台启动全市场日线补齐(TDX)；进度见下方条，可能需数十分钟";
+            return "已开始全市场日线补齐：先同步股票列表，再逐只拉取日线（约五千只，可能需数十分钟）。请看下方进度";
         }
         if ("pool-minute-backfill".equals(jobCode)) {
-            return "已后台启动目标池分钟补齐(TDX)；进度见下方条";
+            return "已开始目标池分钟补齐，请看下方进度";
         }
         if ("pool-rebuild".equals(jobCode)) {
-            return "已后台启动目标池重建；完成后请看最近执行时间";
+            return "已开始目标池重建（全市场扫描），请看下方进度；完成后刷新最近执行时间";
         }
-        return "已后台启动「" + resolveJobName(jobCode) + "」，请在进度区查看";
+        return "已开始「" + resolveJobName(jobCode) + "」，请看下方进度";
     }
 
     private String resolveJobName(String jobCode) {
