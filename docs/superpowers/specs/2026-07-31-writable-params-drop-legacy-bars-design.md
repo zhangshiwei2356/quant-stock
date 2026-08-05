@@ -2,7 +2,7 @@
 
 **日期：** 2026-07-31  
 **状态：** 已实现  
-**范围：** 过滤/仓位/止损类参数热写；删除 `stock_bar_*` / `BarStorageService` / `bar_aggregate_meta` 主路径依赖
+**范围：** 过滤/仓位/止损类参数热写；删除 `stock_bar_*` / `BarStorageService` 主路径依赖
 
 ## 参数可写
 
@@ -17,7 +17,6 @@
 
 - 删除：`BarStorageService`、`StockBarMapper(+xml)`、`StockBarDO`、`BarAggregateMetaMapper(+xml)`
 - `MarketDataService` 去掉分表分支
-- `schema.sql`：`DROP TABLE IF EXISTS bar_aggregate_meta`；目录去掉该表
 - `BarPeriod.tableName` 保留字段但标注废弃（避免大范围改枚举）
 
 ## 非目标

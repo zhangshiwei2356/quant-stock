@@ -48,15 +48,10 @@ public class DynamicScheduleService implements ApplicationRunner {
 
     private static final ZoneId ZONE = ZoneId.of("Asia/Shanghai");
 
-    /** 手动「执行一次」改后台跑，避免 HTTP 长时间无响应、页面无进度 */
-    private static final Set<String> ASYNC_MANUAL_JOBS = Collections.unmodifiableSet(new HashSet<String>(Arrays.asList(
+    /** 手动「执行一次」一律后台跑，页面统一进度条/提示语 */
+    private static final Set<String> TDX_PROGRESS_JOBS = Collections.unmodifiableSet(new HashSet<String>(Arrays.asList(
             "day-collect",
-            "pool-minute-backfill",
-            "pool-rebuild",
-            "factor-daily-rebuild",
-            "after-market-batch-scan",
-            "data-validate",
-            "market-collect"
+            "pool-minute-backfill"
     )));
 
     private final ScheduleJobMapper scheduleJobMapper;
@@ -238,21 +233,11 @@ public class DynamicScheduleService implements ApplicationRunner {
     }
 
     /**
-     * 运维「执行一次」：短任务同步；长任务（日线/分钟补齐、扫池等）后台执行并返回 async。
+     * 运维「执行一次」：一律后台执行并返回 async，页面轮询进度（与长任务交互一致）。
      */
     public Map<String, Object> runOnce(String jobCode) {
         requireJob(jobCode);
-        if (ASYNC_MANUAL_JOBS.contains(jobCode)) {
-            return startAsyncManual(jobCode);
-        }
-        invoke(jobCode, true);
-        Map<String, Object> m = new LinkedHashMap<String, Object>();
-        m.put("ok", true);
-        m.put("async", false);
-        m.put("jobCode", jobCode);
-        m.put("message", "执行完成");
-        m.put("lastRunAt", LocalDateTime.now().toString());
-        return m;
+        return startAsyncManual(jobCode);
     }
 
     /** 手动执行进度（含 TDX 脚本行进度），供页面轮询。 */
@@ -272,8 +257,7 @@ public class DynamicScheduleService implements ApplicationRunner {
                         + "（请等待完成后再点）");
             }
             Map<String, Object> tdxSt = tdxScriptBackfillService.status();
-            if (Boolean.TRUE.equals(tdxSt.get("running"))
-                    && ("day-collect".equals(jobCode) || "pool-minute-backfill".equals(jobCode))) {
+            if (Boolean.TRUE.equals(tdxSt.get("running")) && TDX_PROGRESS_JOBS.contains(jobCode)) {
                 throw new IllegalStateException("TDX 脚本正在执行，请稍后再试");
             }
             final ManualRunState state = new ManualRunState();
@@ -281,7 +265,11 @@ public class DynamicScheduleService implements ApplicationRunner {
             state.jobName = resolveJobName(jobCode);
             state.running = true;
             state.ok = null;
-            state.message = "后台执行中…";
+            state.progressKind = TDX_PROGRESS_JOBS.contains(jobCode) ? "tdx" : "generic";
+            state.phase = "starting";
+            state.phaseLabel = "已受理";
+            state.summary = manualStartSummary(jobCode);
+            state.message = longJobStartMessage(jobCode);
             state.startedAt = LocalDateTime.now();
             state.finishedAt = null;
             manualRunRef.set(state);
@@ -289,12 +277,22 @@ public class DynamicScheduleService implements ApplicationRunner {
                 @Override
                 public void run() {
                     try {
+                        state.phase = "running";
+                        state.phaseLabel = "执行中";
+                        state.summary = "正在执行「" + state.jobName + "」…";
+                        state.message = state.summary;
                         invoke(jobCode, true);
                         state.ok = true;
+                        state.phase = "done";
+                        state.phaseLabel = "已完成";
+                        state.summary = "「" + state.jobName + "」已完成";
                         state.message = "执行完成";
                     } catch (Exception e) {
                         state.ok = false;
+                        state.phase = "error";
+                        state.phaseLabel = "失败";
                         state.message = e.getMessage() == null ? "执行失败" : e.getMessage();
+                        state.summary = "「" + state.jobName + "」失败：" + state.message;
                         log.warn("手动任务后台失败 {}: {}", jobCode, state.message);
                     } finally {
                         state.running = false;
@@ -308,6 +306,7 @@ public class DynamicScheduleService implements ApplicationRunner {
         m.put("async", true);
         m.put("jobCode", jobCode);
         m.put("jobName", resolveJobName(jobCode));
+        m.put("progressKind", TDX_PROGRESS_JOBS.contains(jobCode) ? "tdx" : "generic");
         m.put("message", longJobStartMessage(jobCode));
         m.put("poll", "/api/schedule/run-status");
         m.put("manualRun", snapshotManualRun());
@@ -315,16 +314,44 @@ public class DynamicScheduleService implements ApplicationRunner {
     }
 
     private String longJobStartMessage(String jobCode) {
+        return manualStartSummary(jobCode) + " 请看下方进度。";
+    }
+
+    private String manualStartSummary(String jobCode) {
         if ("day-collect".equals(jobCode)) {
-            return "已开始全市场日线补齐：先同步股票列表，再逐只拉取日线（约五千只，可能需数十分钟）。请看下方进度";
+            return "已开始全市场日线补齐：先同步股票列表，再逐只拉取日线（约五千只，可能需数十分钟）。";
         }
         if ("pool-minute-backfill".equals(jobCode)) {
-            return "已开始目标池分钟补齐，请看下方进度";
+            return "已开始目标池分钟补齐（TDX），可能需较长时间。";
         }
         if ("pool-rebuild".equals(jobCode)) {
-            return "已开始目标池重建（全市场扫描），请看下方进度；完成后刷新最近执行时间";
+            return "已开始全市场入池扫描（可含因子预刷新），完成后覆盖目标池。";
         }
-        return "已开始「" + resolveJobName(jobCode) + "」，请看下方进度";
+        if ("after-market-batch-scan".equals(jobCode)) {
+            return "已开始盘后入池扫描，完成后覆盖目标池。";
+        }
+        if ("factor-daily-rebuild".equals(jobCode)) {
+            return "已开始日频因子重算（由日线写入 factor_daily）。";
+        }
+        if ("data-validate".equals(jobCode)) {
+            return "已开始数据校验（日线/分钟分层检查）。";
+        }
+        if ("market-collect".equals(jobCode)) {
+            return "已开始行情采集（本地骨架或宽睿 MDS，视配置而定）。";
+        }
+        if ("scan-and-trade".equals(jobCode)) {
+            return "已开始实盘分钟扫描交易（仅目标池）。";
+        }
+        if ("sync-orders".equals(jobCode)) {
+            return "已开始订单状态同步。";
+        }
+        if ("settle-after-close".equals(jobCode)) {
+            return "已开始收盘清算与权益日结。";
+        }
+        if ("position-pnl-sync".equals(jobCode)) {
+            return "已开始持仓盈亏同步。";
+        }
+        return "已开始「" + resolveJobName(jobCode) + "」。";
     }
 
     private String resolveJobName(String jobCode) {
@@ -351,6 +378,10 @@ public class DynamicScheduleService implements ApplicationRunner {
         m.put("running", state.running);
         m.put("ok", state.ok);
         m.put("message", state.message);
+        m.put("progressKind", state.progressKind == null ? "generic" : state.progressKind);
+        m.put("phase", state.phase);
+        m.put("phaseLabel", state.phaseLabel);
+        m.put("summary", state.summary);
         m.put("startedAt", state.startedAt == null ? null : state.startedAt.toString());
         m.put("finishedAt", state.finishedAt == null ? null : state.finishedAt.toString());
         if (state.startedAt != null) {
@@ -366,6 +397,10 @@ public class DynamicScheduleService implements ApplicationRunner {
         private volatile boolean running;
         private volatile Boolean ok;
         private volatile String message;
+        private volatile String progressKind;
+        private volatile String phase;
+        private volatile String phaseLabel;
+        private volatile String summary;
         private LocalDateTime startedAt;
         private volatile LocalDateTime finishedAt;
     }

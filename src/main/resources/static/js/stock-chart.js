@@ -3674,9 +3674,27 @@
     });
   }
 
-  function setScheduleRunPhases(phase, running, failed) {
+  function isTdxProgressJob(jobCode) {
+    return jobCode === 'day-collect' || jobCode === 'pool-minute-backfill';
+  }
+
+  function applyPhaseLabels(jobCode) {
     var $phases = $('#scheduleRunPhases');
     if (!$phases.length) return;
+    if (isTdxProgressJob(jobCode)) {
+      $phases.find('[data-phase="sync"]').text('① 同步列表');
+      $phases.find('[data-phase="fetch"]').text(jobCode === 'day-collect' ? '② 拉取日线' : '② 拉取分钟');
+    } else {
+      $phases.find('[data-phase="sync"]').text('① 已受理');
+      $phases.find('[data-phase="fetch"]').text('② 执行中');
+    }
+    $phases.find('[data-phase="done"]').text('③ 完成');
+  }
+
+  function setScheduleRunPhases(phase, running, failed, jobCode) {
+    var $phases = $('#scheduleRunPhases');
+    if (!$phases.length) return;
+    applyPhaseLabels(jobCode || scheduleRunPollCode);
     var show = running || phase === 'sync' || phase === 'fetch' || phase === 'done' || phase === 'error'
       || phase === 'starting' || phase === 'running';
     if (show) $phases.show(); else $phases.hide();
@@ -3710,11 +3728,14 @@
   }
 
   function friendlyScheduleSummary(mr, tdx, running) {
+    var tdxLive = tdx && (tdx.running || (running && tdx.summary && isTdxProgressJob(mr && mr.jobCode)));
+    if (tdxLive && tdx.summary) return tdx.summary;
+    if (mr && mr.summary) return mr.summary;
     if (tdx && tdx.summary) return tdx.summary;
     if (mr && mr.message && mr.message !== '后台执行中…' && mr.message !== '执行完成') {
       return mr.message;
     }
-    if (running) return '任务后台执行中，请稍候…';
+    if (running) return '任务执行中，请稍候…';
     if (tdx && tdx.lastFinished && tdx.lastFinished.summaryFriendly) {
       return tdx.lastFinished.summaryFriendly;
     }
@@ -3743,7 +3764,11 @@
     var jobCode = mr.jobCode || scheduleRunPollCode || '';
     var jobName = mr.jobName || jobCode || '任务';
     var $fill = $('#scheduleRunBarFill');
-    var phase = tdx.phase || (running ? 'running' : (mr.ok === false ? 'error' : 'done'));
+    var tdxJob = isTdxProgressJob(jobCode) && (tdx.running || !!tdx.phase);
+    var phase = (tdxJob && tdx.phase)
+      || mr.phase
+      || (running ? 'running' : (mr.ok === false ? 'error' : 'done'));
+    var phaseLabel = (tdxJob && tdx.phaseLabel) || mr.phaseLabel || '';
 
     // 轮询进行中即使短暂拿不到 running，也不要把横幅藏掉
     if (!running && !polling && !mr.finishedAt && !tdx.lastFinished) {
@@ -3759,16 +3784,15 @@
 
     if (stillRunning || (polling && !mr.finishedAt && mr.ok == null)) {
       $banner.removeClass('is-done-ok is-done-err').addClass('is-live');
-      var phaseLabel = tdx.phaseLabel ? (' · ' + tdx.phaseLabel) : '';
-      $('#scheduleRunTitle').text('执行中 · ' + titleName + phaseLabel);
+      $('#scheduleRunTitle').text('执行中 · ' + titleName + (phaseLabel ? (' · ' + phaseLabel) : ''));
       var meta = [];
       meta.push('已用时 ' + formatElapsedSec(clientElapsedSec(mr, tdx)));
-      if (tdx.progressIndex != null && tdx.progressTotal != null) {
+      if (tdxJob && tdx.progressIndex != null && tdx.progressTotal != null) {
         meta.push('进度 ' + tdx.progressIndex + ' / ' + tdx.progressTotal + ' 只');
       }
-      if (tdx.etaSec != null && tdx.etaSec > 0) {
+      if (tdxJob && tdx.etaSec != null && tdx.etaSec > 0) {
         meta.push('预计剩余 ' + formatElapsedSec(tdx.etaSec));
-      } else if (tdx.etaSec === 0 && tdx.progressPct != null && tdx.progressPct >= 99) {
+      } else if (tdxJob && tdx.etaSec === 0 && tdx.progressPct != null && tdx.progressPct >= 99) {
         meta.push('即将完成');
       }
       if (scheduleRunPollOkAt) {
@@ -3780,40 +3804,41 @@
         meta.push('刷新失败 ' + scheduleRunPollFail + ' 次');
       }
       $('#scheduleRunMeta').text(meta.join(' · '));
-      setScheduleRunPhases(phase, true, false);
+      setScheduleRunPhases(phase, true, false, jobCode);
       var summary = friendlyScheduleSummary(mr, tdx, true);
       if (!summary || summary === '后台执行中…') {
         summary = stillRunning
-          ? '任务执行中，进度将随脚本输出持续更新…'
+          ? '任务执行中，进度将持续更新…'
           : '正在连接任务状态…';
       }
       $('#scheduleRunSummary').text(summary);
-      if (tdx.progressPct != null) {
+      if (tdxJob && tdx.progressPct != null) {
         $fill.removeClass('is-indeterminate').css('width', Math.max(2, tdx.progressPct) + '%');
         $('#scheduleRunPct').text(tdx.progressPct + '%');
       } else {
         $fill.addClass('is-indeterminate').css('width', '36%');
-        $('#scheduleRunPct').text(phase === 'sync' ? '同步中' : '进行中');
+        $('#scheduleRunPct').text(phase === 'sync' || phase === 'starting' ? '启动中' : '进行中');
       }
-      $('#scheduleRunDetail').text(tdx.lastLine || '等待脚本输出…');
+      var rawLine = (tdxJob && tdx.lastLine) ? tdx.lastLine : (mr.summary || mr.message || '');
+      $('#scheduleRunDetail').text(rawLine || '等待任务输出…');
       applyScheduleRunButtons(jobCode || scheduleRunPollCode);
       return;
     }
 
     var ok = mr.ok;
-    if (ok == null && tdx.lastFinished) ok = !!tdx.lastFinished.ok;
+    if (ok == null && tdx.lastFinished && isTdxProgressJob(jobCode)) ok = !!tdx.lastFinished.ok;
     $banner.removeClass('is-live')
       .toggleClass('is-done-ok', ok === true)
       .toggleClass('is-done-err', ok === false);
     $('#scheduleRunTitle').text((ok === false ? '执行失败' : '执行完成') + ' · ' + titleName);
     var doneMeta = [];
     doneMeta.push('总耗时 ' + formatElapsedSec(clientElapsedSec(mr, tdx) || mr.elapsedSec || 0));
-    if (tdx.lastFinished && tdx.lastFinished.progressTotal != null) {
+    if (tdx.lastFinished && tdx.lastFinished.progressTotal != null && isTdxProgressJob(jobCode)) {
       doneMeta.push('标的 ' + (tdx.lastFinished.progressTotal) + ' 只');
     }
     if (mr.finishedAt) doneMeta.push(String(mr.finishedAt).replace('T', ' ').slice(0, 19));
     $('#scheduleRunMeta').text(doneMeta.join(' · '));
-    setScheduleRunPhases(ok === false ? 'error' : 'done', false, ok === false);
+    setScheduleRunPhases(ok === false ? 'error' : 'done', false, ok === false, jobCode);
     var doneSummary = friendlyScheduleSummary(mr, tdx, false);
     if (!doneSummary) {
       doneSummary = ok === false
@@ -3823,7 +3848,7 @@
     $('#scheduleRunSummary').text(doneSummary);
     $fill.removeClass('is-indeterminate').css('width', '100%');
     $('#scheduleRunPct').text(ok === false ? '失败' : '100%');
-    var rawDone = (tdx.lastFinished && tdx.lastFinished.lastLine) || tdx.lastLine || '';
+    var rawDone = (tdx.lastFinished && tdx.lastFinished.lastLine) || tdx.lastLine || mr.summary || '';
     $('#scheduleRunDetail').text(rawDone || '—');
     if (ok === false) {
       try { $('#scheduleRunLogWrap').prop('open', true); } catch (e) {}
@@ -5166,28 +5191,34 @@
         scheduleRunStartedAtMs = Date.now();
         scheduleRunSeenFinishedKey = '';
         toast((res.message) || ('已开始「' + (job.jobName || code) + '」，请看下方进度'), 'info', { duration: 6500 });
-        // 立即展示占位横幅，避免轮询首包前空白
+        var startSummary = (res.manualRun && res.manualRun.summary)
+          || (isTdxProgressJob(code)
+            ? '即将同步列表并拉取行情…'
+            : ('已受理「' + (job.jobName || code) + '」，正在启动…'));
         renderScheduleRunBanner({
           manualRun: {
             jobCode: code,
             jobName: job.jobName || code,
             running: true,
-            message: '已受理，正在启动…',
+            progressKind: isTdxProgressJob(code) ? 'tdx' : 'generic',
+            phase: 'starting',
+            phaseLabel: '已受理',
+            summary: startSummary,
+            message: res.message || startSummary,
             elapsedSec: 0
           },
-          tdxScript: {
+          tdxScript: isTdxProgressJob(code) ? {
             running: true,
             phase: 'starting',
             phaseLabel: '启动中',
-            summary: code === 'day-collect'
-              ? '即将同步全市场列表，然后逐只拉取日线…'
-              : '任务已受理，正在启动…',
+            summary: startSummary,
             lastLine: ''
-          }
+          } : { running: false }
         }, { forceRunning: true });
         startScheduleRunPoll(code);
         return;
       }
+      // 兜底：若后端仍返回同步完成
       toast((res && res.message) ? res.message : ('已执行 ' + code), 'ok');
       loadScheduleJobs();
     }).fail(function (xhr) {

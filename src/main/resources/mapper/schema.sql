@@ -24,9 +24,10 @@ CREATE TABLE IF NOT EXISTS `stock_basic` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='股票基本信息表';
 
 -- ---------- 模块二：行情（分钟交易真相源 + 日线选股真相源） ----------
--- 历史：曾废弃 market_daily / market_minute；2026-08 起重建 market_daily 专供全市场选股/扫池。
--- 升级已有库：勿再 DROP market_daily；见 scripts/sql/20260805_market_daily.sql
+-- 升级已有库：market_daily 见 scripts/sql/20260805_market_daily.sql
+DROP TABLE IF EXISTS `factor_minute`;
 DROP TABLE IF EXISTS `market_minute`;
+DROP TABLE IF EXISTS `bar_aggregate_meta`;
 
 CREATE TABLE IF NOT EXISTS `market_1min` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -87,16 +88,6 @@ CREATE TABLE IF NOT EXISTS `factor_daily` (
   UNIQUE KEY `idx_symbol_date` (`symbol`, `trade_date`),
   KEY `idx_date` (`trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='日频技术因子缓存表';
-
-CREATE TABLE IF NOT EXISTS `factor_minute` (
-  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
-  `symbol` VARCHAR(10) NOT NULL,
-  `trade_time` DATETIME NOT NULL,
-  `ma5` DECIMAL(10,4) DEFAULT NULL,
-  `ma20` DECIMAL(10,4) DEFAULT NULL,
-  `atr14` DECIMAL(10,4) DEFAULT NULL,
-  UNIQUE KEY `idx_symbol_time` (`symbol`, `trade_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='分钟频因子(可选)';
 
 -- ---------- 模块四：交易执行 ----------
 CREATE TABLE IF NOT EXISTS `trade_orders` (
@@ -244,9 +235,6 @@ CREATE TABLE IF NOT EXISTS `bt_backtest_analysis` (
   UNIQUE KEY `uk_record_id` (`record_id`),
   KEY `idx_kind_code` (`kind`, `stock_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='回测分析数据表';
-
--- 已删除 legacy 分表聚合元数据（主路径仅 market_1min 内存聚合）
-DROP TABLE IF EXISTS `bar_aggregate_meta`;
 
 -- ---------- 模块：交易目标池（盘后扫描自动覆盖） ----------
 CREATE TABLE IF NOT EXISTS `trade_pool_report` (

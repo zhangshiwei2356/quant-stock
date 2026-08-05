@@ -86,10 +86,6 @@ public final class DbTableCatalog {
                 "缓存日频技术指标（MA/RSI/ATR 等）；入池粗筛可读最新行（ma5>ma20 / ma60向上 / 放量）。",
                 "FactorDailyComputeService / factor-daily-rebuild / Mock 导入；由日线重算。",
                 "pool-rebuild 粗过滤加速；无行则放行该标的。");
-        add(m, "factor_minute", "分钟因子缓存", "因子", "id DESC",
-                "缓存分钟频技术因子（如 MA5/MA20/ATR），供分钟级策略使用。",
-                "由分钟行情计算后写入。",
-                "分钟扫描与分钟回测中的指标复用。");
         add(m, "trade_orders", "交易委托", "交易执行", "id DESC",
                 "记录买卖委托及成交状态（含回测/实盘账户隔离）。",
                 "回测引擎成交落库、或实盘下单/同步订单任务写入。",

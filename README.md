@@ -313,7 +313,7 @@ sequenceDiagram
 ## 运维中心 · 定时任务
 
 - 表：`sys_schedule_job`（启动自动建表+种子，**默认全关**）
-- 运维「执行一次」：短任务同步；日线/分钟/扫池等长任务**后台执行**，页面进度区展示阶段步骤、中文摘要、百分比/预计剩余，并轮询 `GET /api/schedule/run-status`（解析脚本阶段行与 `[i/n]`）
+- 运维「执行一次」：全部任务后台执行；进度区统一展示阶段/摘要/已用时心跳；TDX 日线/分钟任务额外解析脚本 `[i/n]` 与预计剩余（`GET /api/schedule/run-status`）
 - **唯一目标池**：`pool-rebuild` / `after-market-batch-scan` 扫描后覆盖；启用其一会自动关闭另一（互斥）
 - `scan-and-trade`：只扫池内活跃标的 + 本地模拟账本
 - 已实现：`scan-and-trade` / `pool-rebuild` / `after-market-batch-scan` / `settle-after-close` / `data-validate` / `factor-daily-rebuild` / `day-collect` / `pool-minute-backfill` / `sync-orders` / `position-pnl-sync`

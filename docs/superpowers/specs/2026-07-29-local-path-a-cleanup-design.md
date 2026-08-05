@@ -24,7 +24,6 @@
 
 - 删除未再灌库的周期文件：`DAY/WEEK/MONTH/MIN_15/MIN_30/MIN_60.json`。
 - 保留：`MIN_1.json`；无 `MIN_1` 时保留 `MIN_5.json`；`meta.json` 更新描述。
-- `bar_aggregate_meta`：本轮不 DROP，目录/文档标兼容。
 
 ## A3 · 运维策略发现与切换
 
@@ -35,7 +34,7 @@
 
 ## 非目标
 
-- MDS/OES、新策略实现、静默改 `MaCrossStrategy`、删除 `bar_aggregate_meta` 表。
+- MDS/OES、新策略实现、静默改 `MaCrossStrategy`。
 
 ## 文档同步
 
