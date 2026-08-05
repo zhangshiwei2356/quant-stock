@@ -176,8 +176,8 @@ sequenceDiagram
 
 | 二级 | 功能 |
 |------|------|
-| 任务管理 | `sys_schedule_job` 启停 / cron / 立即执行（种子默认全关；长任务后台跑并显示进度） |
-| 数据健康 | 本地空数据与滞后检查 |
+| 任务管理 | `sys_schedule_job` 启停 / cron / 立即执行（种子默认全关；执行一次弹进度框+页内横幅，可「收起到页内」） |
+| 数据健康 | 覆盖检查（异步进度弹框：加载标的→逐只日线/分钟）+ 分钟自洽检查（默认不阻断开仓） |
 | 运行参数 | 全局白名单可写（`quant.prop.*`）+ **按策略稀疏参数包**（表 `strategy_param`）；回测还可带 **本次临时改参**（`paramOverrides`，不落库） |
 
 总闸：`quant.schedule.enabled`（默认 true）。
@@ -223,7 +223,7 @@ sequenceDiagram
 - **行情分层**：
   - `market_1min`：池内交易 / 分钟回测物理真相源（价额为**元**；`data_source`=`MOCK`/`TDX`/`MDS`）；5/15/30/60 由分钟内存聚合
   - `market_daily`：全市场选股 / `pool-rebuild` 日线真相源（价额为**元**；首期 `adj_flag=NONE`）；`quant.day-source` 默认 `auto`（优先日线表，空则分钟聚日）
-- 日线回填：`python scripts/fetch_daily_tdx.py --from-basic --years 1`（或 `--codes`）；升级脚本 `scripts/sql/20260805_market_daily.sql`
+- 日线回填：`python scripts/fetch_daily_tdx.py --from-basic --years 1`（默认增量、已齐跳过、`--workers 4`；升级脚本 `scripts/sql/20260805_market_daily.sql`）
 - 日频因子：`POST /api/ops/factor-daily/rebuild` 或定时任务 `factor-daily-rebuild`；`pool-rebuild` 默认会预刷新（`quant.pool-rebuild-refresh-factors`）
 - 1 分钟回填：`python scripts/fetch_min1_tdx.py --from-pool`（写入 `data_source=TDX`）；升级脚本 `scripts/sql/20260803_market_1min_data_source.sql`
 - 回测历史/分析：`bt_backtest_record` / `bt_backtest_analysis`（亦可落盘 `quant.history-dir`）；落库时写入注册策略 `strategy_id`
@@ -291,7 +291,7 @@ sequenceDiagram
 | GET `/api/account/stress` | 预注册压力情景状态 |
 | GET `/api/account/signal-drift` | 信号漂移（滚动胜率/IC） |
 | GET `/api/account/structural-break` | 结构突变监控 |
-| GET/POST `/api/ops/data-reconcile*` | `market_1min` 自洽闸（空/滞后/稀疏日/OHLC） |
+| GET/POST `/api/ops/data-reconcile*` | 分钟行情自洽检查（空/滞后/稀疏日/OHLC；UI 文案「检查分钟自洽」） |
 | GET/POST `/api/ops/st-pit` | ST as-of 日切；财报时钟边界说明 |
 | GET/POST `/api/ops/industry-reclass*` | 行业 reclass as-of 日志 |
 | GET/POST `/api/ops/kuangrui/mds/*` | 宽睿 MDS 状态/pull/订阅/flush/stop（默认 noop；`-Pkuangrui`+开关） |
@@ -304,7 +304,8 @@ sequenceDiagram
 | POST `/api/account/orders/{id}/partial-fill?qty=` | 本地部成桩 |
 | POST `/api/account/orders/{id}/replace?price=&volume=` | 改价=撤补（新单队尾） |
 | GET/PUT/POST `/api/schedule/**` | 定时任务（长任务「执行一次」后台跑；`GET /api/schedule/run-status` 轮询进度） |
-| GET `/api/ops/data-health` · `/params` · `/strategies` | 数据健康 / 运行参数（`?strategyId=` 含稀疏/生效预览） / 已注册策略 |
+| GET `/api/ops/data-health` · `/params` · `/strategies` | 最近覆盖检查结果 / 运行参数（`?strategyId=` 含稀疏/生效预览） / 已注册策略 |
+| POST `/api/ops/data-health/run` · GET `/status` | 异步覆盖检查 + 进度（弹框：加载标的→逐只日线/分钟） |
 | POST `/api/ops/params` | 全局白名单热写（`quant.prop.*`，`confirm:true`） |
 | POST `/api/ops/strategy-params` | 策略稀疏包热写（`strategyId` + `updates`/`clearKeys` + `confirm:true`） |
 | POST `/api/ops/active-strategy` | 纸面激活策略热切换（须 `confirm:true`） |
@@ -317,7 +318,7 @@ sequenceDiagram
 ## 运维中心 · 定时任务
 
 - 表：`sys_schedule_job`（启动自动建表+种子，**默认全关**）
-- 运维「执行一次」：全部任务后台执行；进度区统一展示阶段/摘要/已用时心跳；TDX 日线/分钟任务额外解析脚本 `[i/n]` 与预计剩余（`GET /api/schedule/run-status`）
+- 运维「执行一次」：全部任务后台执行；弹框与任务管理页顶部横幅同步展示阶段/摘要/进度条；执行中可「收起到页内」；TDX 日线/分钟任务额外解析脚本 `[i/n]` 与预计剩余（`GET /api/schedule/run-status`）
 - **唯一目标池**：`pool-rebuild` / `after-market-batch-scan` 扫描后覆盖；启用其一会自动关闭另一（互斥）
 - `scan-and-trade`：只扫池内活跃标的 + 本地模拟账本
 - 已实现：`scan-and-trade` / `pool-rebuild` / `after-market-batch-scan` / `settle-after-close` / `data-validate` / `factor-daily-rebuild` / `day-collect` / `pool-minute-backfill` / `sync-orders` / `position-pnl-sync`
@@ -325,7 +326,7 @@ sequenceDiagram
   - `data-validate`：分层——universe 查 `market_daily`，目标池查 `market_1min`
   - `factor-daily-rebuild`：日线 → `factor_daily`；`pool-rebuild` 默认同预刷新
   - `day-collect` / `pool-minute-backfill`：TDX 脚本补齐（依赖本机 `python` + `pytdx`/`pymysql`；`quant.tdx-script.enabled` 默认 true）
-    - **推荐手动三步**：① `day-collect`（先同步 `stock_basic` 全市场约 5000+，再补日线：无→近1年，有→增量）→ ② `pool-rebuild`（入池）→ ③ `pool-minute-backfill`（池内分钟尽量拉满~90日并补到最近）
+    - **推荐手动三步**：① `day-collect`（同步列表；已齐日线跳过，否则增量；默认 4 线程）→ ② `pool-rebuild`（入池）→ ③ `pool-minute-backfill`（池内分钟尽量拉满~90日并补到最近）
     - 仅刷新列表：`python scripts/sync_stock_basic.py`（东方财富优先，失败回退 TDX）
   - `pool-rebuild`：返回 `minuteBackfillHint`；可选 `pool-rebuild-backfill-minute` 异步补分钟
   - 运维：`GET/POST /api/ops/tdx-script/{status,backfill-min1,backfill-daily}`
@@ -366,7 +367,7 @@ sequenceDiagram
 - 禁空头：`ShortSellPolicy.allowShort=false`（无配置开关）；卖出≤持仓；`GET /api/account/short-policy`
 - 限价保护边界：`GET /api/account/order-protect`（五档/L2=`UNAVAILABLE`）
 - 执行降频边界：组合回测已对齐 AUM+POV；`GET /api/account/execution-cap`（TWAP=`UNAVAILABLE`）
-- 行情自洽闸：检查 `market_1min` 空/滞后/稀疏日/OHLC；`data-reconcile-block-on-diverge` 默认 **false**；`GET/POST /api/ops/data-reconcile*`；外部双源仍 `UNAVAILABLE`
+- 分钟行情自洽：检查 `market_1min` 空/滞后/稀疏日/OHLC；运维页按钮「检查分钟自洽」；`data-reconcile-block-on-diverge` 默认 **false**；`GET/POST /api/ops/data-reconcile*`；外部多源仍 `UNAVAILABLE`
 - 运维可查看已注册策略并热切换纸面激活：`GET /api/ops/strategies`、`POST /api/ops/active-strategy`（改参/激活在运维；策略效果总览在 **策略管理 → 策略总览**）
 - 扩容降频：权益超 `capacity-aum-base`（默认 10万）时收紧 ADV 参与率；`pov-max-bar-volume-pct` 默认 0.10（当根量 POV 切片）
 - 结构突变：双窗收益均值差；确认后降仓×0.5 并挂漂移；`GET /api/account/structural-break`（不改金叉）

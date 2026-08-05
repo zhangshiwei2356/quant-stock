@@ -27,6 +27,12 @@ import time
 from datetime import datetime
 from typing import Any, Iterable, List, Sequence, Tuple
 
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 import pymysql
 from pytdx.hq import TdxHq_API
 

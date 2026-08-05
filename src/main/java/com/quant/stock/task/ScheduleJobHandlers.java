@@ -288,10 +288,10 @@ public class ScheduleJobHandlers {
                 try {
                     List<String> reconCodes = pool.isEmpty() ? universe : new ArrayList<String>(pool);
                     Map<String, Object> recon = dataReconcileGateService.reconcile(reconCodes);
-                    log.info("[data-validate] 多源对账 diverge={} block={}",
+                    log.info("[data-validate] 分钟自洽 diverge={} block={}",
                             recon.get("divergeCodeCount"), recon.get("blockNewOpen"));
                 } catch (Exception e) {
-                    log.warn("[data-validate] 多源对账失败: {}", e.getMessage());
+                    log.warn("[data-validate] 分钟自洽失败: {}", e.getMessage());
                 }
             }
         });

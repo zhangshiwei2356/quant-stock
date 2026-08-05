@@ -607,28 +607,57 @@
     <div id="viewDataHealth" class="workspace-view" hidden>
       <section class="panel">
         <h3>数据健康 <span id="healthBadge" class="trade-pool-count">0</span></h3>
-        <p class="hint" id="healthHint">检查全市场日线/分钟覆盖与滞后（与 data-validate 同口径）。</p>
-        <div class="toolbar" style="margin-top:8px;">
-          <button type="button" id="btnHealthRefresh" class="secondary">刷新检查</button>
-          <button type="button" id="btnReconcileRun" class="secondary">跑对账闸</button>
-          <span class="field-hint" id="healthMeta"></span>
+        <p class="hint" id="healthHint">本地行情体检：先做覆盖检查，再按需做分钟自洽。默认只告警，不禁止开仓。</p>
+        <div class="ops-action-cards" style="margin-top:10px;">
+          <div class="ops-action-card">
+            <div class="ops-action-card-head">
+              <button type="button" id="btnHealthRefresh" class="secondary">刷新覆盖检查</button>
+              <span class="ops-action-tag">推荐先做</span>
+            </div>
+            <p class="ops-action-desc">
+              扫描<strong>全市场</strong>日线与<strong>目标池</strong>分钟：是否<strong>为空</strong>、是否<strong>过旧</strong>。
+              结果写入下方「覆盖汇总」与明细表；全市场较多时会弹出进度框。
+            </p>
+            <ul class="ops-action-points">
+              <li>全市场 → 查日线表 <code>market_daily</code></li>
+              <li>目标池 → 额外查分钟表 <code>market_1min</code></li>
+              <li>不改库，只读检查</li>
+            </ul>
+          </div>
+          <div class="ops-action-card">
+            <div class="ops-action-card-head">
+              <button type="button" id="btnReconcileRun" class="secondary">检查分钟自洽</button>
+              <span class="ops-action-tag muted">深度检查</span>
+            </div>
+            <p class="ops-action-desc">
+              对目标池分钟 K 做质量深挖：空数据、滞后、当日根数过少、OHLC 不合法。
+              结果写入「分钟自洽结果」；默认<strong>只告警</strong>，不禁止新开仓。
+            </p>
+            <ul class="ops-action-points">
+              <li>聚焦分钟 K 质量，不是覆盖扫表</li>
+              <li>异常数 →「异常标的」</li>
+              <li>外部多源对账尚未接入</li>
+            </ul>
+          </div>
         </div>
+        <p class="field-hint" id="healthMeta" style="margin-top:8px;"></p>
         <div class="result-board" id="healthBoard" style="margin-top:12px;">
           <div class="result-groups">
             <div class="result-group">
-              <div class="result-group-title">汇总</div>
-              <div class="result-kv"><span class="label">Universe</span><span class="value" id="healthUniverse">—</span></div>
+              <div class="result-group-title">覆盖汇总</div>
+              <div class="result-kv"><span class="label" title="stock_basic 全市场标的数，覆盖检查扫这些股票的日线">全市场</span><span class="value" id="healthUniverse">—</span></div>
+              <div class="result-kv"><span class="label" title="目标池活跃标的数；这些股票额外检查分钟线">目标池</span><span class="value" id="healthPool">—</span></div>
               <div class="result-kv"><span class="label">正常</span><span class="value" id="healthOk">—</span></div>
               <div class="result-kv"><span class="label">告警</span><span class="value" id="healthWarn">—</span></div>
             </div>
             <div class="result-group">
-              <div class="result-group-title">多源对账闸</div>
-              <div class="result-kv"><span class="label">阻断新开</span><span class="value" id="reconcileBlock">—</span></div>
-              <div class="result-kv"><span class="label">分歧标的</span><span class="value" id="reconcileDiverge">—</span></div>
-              <div class="result-kv"><span class="label">上次运行</span><span class="value mono" id="reconcileAt">—</span></div>
+              <div class="result-group-title">分钟自洽结果</div>
+              <div class="result-kv"><span class="label">禁止新开仓</span><span class="value" id="reconcileBlock">—</span></div>
+              <div class="result-kv"><span class="label">异常标的</span><span class="value" id="reconcileDiverge">—</span></div>
+              <div class="result-kv"><span class="label">上次检查</span><span class="value mono" id="reconcileAt">—</span></div>
             </div>
           </div>
-          <p class="hint" id="reconcileHint" style="margin-top:8px;">日线 vs 分钟聚合对账；外部 vendor 仍不可用。</p>
+          <p class="hint" id="reconcileHint" style="margin-top:8px;">检查分钟K是否为空、过旧、当日根数过少或 OHLC 不合法；外部多源对账仍未接入。默认只告警，不禁止开仓。</p>
         </div>
         <div class="table-wrap" style="margin-top:12px;max-height:none;">
           <table class="tp-table">
@@ -638,11 +667,36 @@
             </tr>
             </thead>
             <tbody id="healthBody">
-            <tr><td colspan="7" class="empty-state">点击刷新检查</td></tr>
+            <tr><td colspan="7" class="empty-state">点击「刷新覆盖检查」</td></tr>
             </tbody>
           </table>
         </div>
       </section>
+    </div>
+
+    <div id="healthProgressModal" class="ops-progress-modal" hidden>
+      <div class="ops-progress-dialog" role="dialog" aria-modal="true" aria-labelledby="healthProgressTitle">
+        <h4 id="healthProgressTitle">覆盖检查进行中</h4>
+        <div id="healthProgressPhases" class="ops-progress-phases" aria-hidden="true">
+          <span class="ops-progress-phase" data-phase="loading">① 加载标的</span>
+          <span class="ops-progress-phase-sep">→</span>
+          <span class="ops-progress-phase" data-phase="checking">② 逐只检查</span>
+          <span class="ops-progress-phase-sep">→</span>
+          <span class="ops-progress-phase" data-phase="done">③ 完成</span>
+        </div>
+        <div class="ops-progress-meta">
+          <span id="healthProgressPhase">—</span>
+          <span id="healthProgressPct" class="mono">0%</span>
+        </div>
+        <div class="ops-progress-track" aria-hidden="true">
+          <div id="healthProgressFill" class="ops-progress-fill" style="width:0%"></div>
+        </div>
+        <p class="ops-progress-detail" id="healthProgressDetail">准备中…</p>
+        <p class="hint" id="healthProgressSummary"></p>
+        <div class="ops-progress-actions">
+          <button type="button" id="btnHealthProgressClose" class="secondary" hidden>关闭</button>
+        </div>
+      </div>
     </div>
 
     <!-- 运维 · 运行参数 -->
@@ -837,6 +891,7 @@
             <span id="scheduleRunTitle" class="schedule-run-title">任务执行中</span>
             <span id="scheduleRunMeta" class="schedule-run-meta mono"></span>
           </div>
+          <p class="hint schedule-run-inline-hint" id="scheduleRunInlineHint">页内进度（与弹框同步；可点弹框「收起到页内」后继续在此查看）</p>
           <div id="scheduleRunPhases" class="schedule-run-phases" aria-hidden="true">
             <span class="schedule-run-phase" data-phase="sync">① 已受理</span>
             <span class="schedule-run-phase-sep">→</span>
@@ -851,8 +906,8 @@
             </div>
             <span id="scheduleRunPct" class="schedule-run-pct mono"></span>
           </div>
-          <details id="scheduleRunLogWrap" class="schedule-run-log">
-            <summary>原始日志（最新一行）</summary>
+          <details id="scheduleRunLogWrap" class="schedule-run-log" open>
+            <summary>当前进度详情</summary>
             <div id="scheduleRunDetail" class="schedule-run-detail mono"></div>
           </details>
         </div>
@@ -876,6 +931,33 @@
           </table>
         </div>
       </section>
+    </div>
+
+    <div id="scheduleProgressModal" class="ops-progress-modal" hidden>
+      <div class="ops-progress-dialog ops-progress-dialog--wide" role="dialog" aria-modal="true" aria-labelledby="scheduleProgressTitle">
+        <h4 id="scheduleProgressTitle">任务执行中</h4>
+        <div id="scheduleProgressPhases" class="ops-progress-phases" aria-hidden="true">
+          <span class="ops-progress-phase" data-phase="sync">① 已受理</span>
+          <span class="ops-progress-phase-sep">→</span>
+          <span class="ops-progress-phase" data-phase="fetch">② 执行中</span>
+          <span class="ops-progress-phase-sep">→</span>
+          <span class="ops-progress-phase" data-phase="done">③ 完成</span>
+        </div>
+        <div class="ops-progress-meta">
+          <span id="scheduleProgressPhase">—</span>
+          <span id="scheduleProgressPct" class="mono">0%</span>
+        </div>
+        <div class="ops-progress-track" aria-hidden="true">
+          <div id="scheduleProgressFill" class="ops-progress-fill" style="width:0%"></div>
+        </div>
+        <p class="ops-progress-detail" id="scheduleProgressDetail">准备中…</p>
+        <p class="hint" id="scheduleProgressSummary"></p>
+        <p class="ops-progress-meta mono" id="scheduleProgressMeta"></p>
+        <div class="ops-progress-actions">
+          <button type="button" id="btnScheduleProgressMinimize" class="secondary" hidden>收起到页内</button>
+          <button type="button" id="btnScheduleProgressClose" class="secondary" hidden>关闭</button>
+        </div>
+      </div>
     </div>
 
     <!-- 账户概览 · 资金权益 -->

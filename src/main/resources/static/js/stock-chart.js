@@ -3855,6 +3855,7 @@
   var scheduleJobsByCode = {};
   var SCHEDULE_COLSPAN = 8;
   var scheduleRunPollTimer = null;
+  var scheduleProgressModalMinimized = false;
   var scheduleRunTickTimer = null;
   var scheduleRunPollCode = '';
   var scheduleRunSeenFinishedKey = '';
@@ -3976,6 +3977,87 @@
     return 0;
   }
 
+  function showScheduleProgressModal(visible) {
+    var $m = $('#scheduleProgressModal');
+    if (!$m.length) return;
+    if (visible && scheduleProgressModalMinimized) {
+      $m.prop('hidden', true);
+      return;
+    }
+    $m.prop('hidden', !visible);
+  }
+
+  function setScheduleProgressModalPhases(phase, running, failed, jobCode) {
+    var $phases = $('#scheduleProgressPhases');
+    if (!$phases.length) return;
+    applyPhaseLabels(jobCode || scheduleRunPollCode);
+    // 同步弹框阶段文案
+    if (isTdxProgressJob(jobCode || scheduleRunPollCode)) {
+      $phases.find('[data-phase="sync"]').text('① 同步列表');
+      $phases.find('[data-phase="fetch"]').text(
+        (jobCode || scheduleRunPollCode) === 'day-collect' ? '② 拉取日线' : '② 拉取分钟');
+    } else {
+      $phases.find('[data-phase="sync"]').text('① 已受理');
+      $phases.find('[data-phase="fetch"]').text('② 执行中');
+    }
+    var map = {
+      starting: 'sync',
+      idle: 'sync',
+      running: 'fetch',
+      sync: 'sync',
+      fetch: 'fetch',
+      summarizing: 'fetch',
+      done: 'done',
+      error: 'done'
+    };
+    var active = map[phase] || (running ? 'fetch' : 'done');
+    var order = ['sync', 'fetch', 'done'];
+    var activeIdx = order.indexOf(active);
+    $phases.find('.ops-progress-phase').each(function () {
+      var p = $(this).attr('data-phase');
+      var idx = order.indexOf(p);
+      $(this).removeClass('is-active is-done is-error');
+      if (p === 'done') $(this).text(failed ? '③ 失败' : '③ 完成');
+      if (failed && p === 'done') {
+        $(this).addClass('is-error');
+      } else if (idx < activeIdx || (!running && phase === 'done' && idx <= activeIdx)) {
+        $(this).addClass('is-done');
+      } else if (idx === activeIdx) {
+        $(this).addClass('is-active');
+      }
+    });
+  }
+
+  function syncScheduleProgressModal(view) {
+    view = view || {};
+    var $m = $('#scheduleProgressModal');
+    if (!$m.length) return;
+    showScheduleProgressModal(true);
+    setScheduleProgressModalPhases(view.phase, view.running, view.failed, view.jobCode);
+    $('#scheduleProgressTitle').text(view.title || '任务执行中');
+    $('#scheduleProgressPhase').text(view.phaseLabel || view.phase || '—');
+    $('#scheduleProgressDetail').text(view.detail || '准备中…');
+    $('#scheduleProgressSummary').text(view.summary || '');
+    $('#scheduleProgressMeta').text(view.meta || '');
+    var $fill = $('#scheduleProgressFill');
+    if (view.indeterminate) {
+      $fill.addClass('is-indeterminate').css('width', '36%');
+      $('#scheduleProgressPct').text(view.pctText || '进行中');
+    } else {
+      $fill.removeClass('is-indeterminate').css('width', (view.pct != null ? view.pct : 0) + '%');
+      $('#scheduleProgressPct').text(view.pctText || ((view.pct != null ? view.pct : 0) + '%'));
+    }
+    // 执行中可收起到页内；结束后显示关闭
+    $('#btnScheduleProgressMinimize').prop('hidden', !view.running);
+    $('#btnScheduleProgressClose').prop('hidden', !!view.running);
+    var $hint = $('#scheduleRunInlineHint');
+    if ($hint.length) {
+      $hint.text(view.running
+        ? '页内进度（与弹框同步；可点弹框「收起到页内」后继续在此查看）'
+        : '页内进度（任务已结束，可关闭弹框后仍保留在此）');
+    }
+  }
+
   function renderScheduleRunBanner(payload, opts) {
     opts = opts || {};
     var $banner = $('#scheduleRunBanner');
@@ -3985,11 +4067,13 @@
     var mr = (payload && payload.manualRun) || {};
     var tdx = (payload && payload.tdxScript) || {};
     var polling = !!scheduleRunPollTimer || !!opts.forceRunning;
-    var running = !!mr.running || !!tdx.running || !!opts.forceRunning || polling && !!opts.keepAlive;
+    var running = !!mr.running || !!tdx.running || !!opts.forceRunning || (!!polling && !!opts.keepAlive);
     var jobCode = mr.jobCode || scheduleRunPollCode || '';
     var jobName = mr.jobName || jobCode || '任务';
     var $fill = $('#scheduleRunBarFill');
-    var tdxJob = isTdxProgressJob(jobCode) && (tdx.running || !!tdx.phase);
+    // 仅当 TDX 脚本真正在跑或已进入有效阶段时，才用脚本进度（避免 idle 盖住任务态）
+    var tdxActive = !!tdx.running || (tdx.phase && tdx.phase !== 'idle');
+    var tdxJob = isTdxProgressJob(jobCode) && tdxActive;
     var phase = (tdxJob && tdx.phase)
       || mr.phase
       || (running ? 'running' : (mr.ok === false ? 'error' : 'done'));
@@ -3997,19 +4081,26 @@
 
     // 轮询进行中即使短暂拿不到 running，也不要把横幅藏掉
     if (!running && !polling && !mr.finishedAt && !tdx.lastFinished) {
-      $banner.attr('hidden', true).removeClass('is-done-ok is-done-err is-live');
+      $banner.prop('hidden', true).removeClass('is-done-ok is-done-err is-live');
       applyScheduleRunButtons('');
       return;
     }
 
-    $banner.removeAttr('hidden');
+    $banner.prop('hidden', false);
+    try {
+      if ($banner[0] && $banner[0].scrollIntoView) {
+        $banner[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    } catch (eScroll) {}
+
     var tagLabel = tdx.tagLabel || (tdx.lastFinished && tdx.lastFinished.tagLabel) || '';
     var titleName = jobName || tagLabel || jobCode;
     var stillRunning = !!mr.running || !!tdx.running || !!opts.forceRunning;
 
     if (stillRunning || (polling && !mr.finishedAt && mr.ok == null)) {
       $banner.removeClass('is-done-ok is-done-err').addClass('is-live');
-      $('#scheduleRunTitle').text('执行中 · ' + titleName + (phaseLabel ? (' · ' + phaseLabel) : ''));
+      var liveTitle = '执行中 · ' + titleName + (phaseLabel ? (' · ' + phaseLabel) : '');
+      $('#scheduleRunTitle').text(liveTitle);
       var meta = [];
       meta.push('已用时 ' + formatElapsedSec(clientElapsedSec(mr, tdx)));
       if (tdxJob && tdx.progressIndex != null && tdx.progressTotal != null) {
@@ -4028,25 +4119,56 @@
       if (scheduleRunPollFail > 0) {
         meta.push('刷新失败 ' + scheduleRunPollFail + ' 次');
       }
-      $('#scheduleRunMeta').text(meta.join(' · '));
+      var metaText = meta.join(' · ');
+      $('#scheduleRunMeta').text(metaText);
       setScheduleRunPhases(phase, true, false, jobCode);
       var summary = friendlyScheduleSummary(mr, tdx, true);
       if (!summary || summary === '后台执行中…') {
         summary = stillRunning
-          ? '任务执行中，进度将持续更新…'
+          ? (isTdxProgressJob(jobCode)
+            ? '正在同步列表 / 拉取行情，进度会持续更新…'
+            : '任务执行中，进度将持续更新…')
           : '正在连接任务状态…';
       }
       $('#scheduleRunSummary').text(summary);
-      if (tdxJob && tdx.progressPct != null) {
-        $fill.removeClass('is-indeterminate').css('width', Math.max(2, tdx.progressPct) + '%');
-        $('#scheduleRunPct').text(tdx.progressPct + '%');
+      var indeterminate = !(tdxJob && tdx.progressPct != null);
+      var pctVal = tdxJob && tdx.progressPct != null ? Math.max(2, Number(tdx.progressPct)) : 0;
+      var pctText = indeterminate
+        ? (phase === 'sync' || phase === 'starting' ? '启动中' : '进行中')
+        : (pctVal + '%');
+      if (!indeterminate) {
+        $fill.removeClass('is-indeterminate').css('width', pctVal + '%');
       } else {
         $fill.addClass('is-indeterminate').css('width', '36%');
-        $('#scheduleRunPct').text(phase === 'sync' || phase === 'starting' ? '启动中' : '进行中');
       }
-      var rawLine = (tdxJob && tdx.lastLine) ? tdx.lastLine : (mr.summary || mr.message || '');
+      $('#scheduleRunPct').text(pctText);
+      var rawLine = '';
+      if (tdxJob && tdx.summary) rawLine = tdx.summary;
+      else if (tdxJob && tdx.lastLine) rawLine = tdx.lastLine;
+      else rawLine = mr.summary || mr.message || '';
+      // 摘要里已含代码时不再拼「当前 xxx」，避免重复与乱码叠字
+      if (tdxJob && tdx.currentSymbol
+          && rawLine.indexOf(String(tdx.currentSymbol)) < 0) {
+        rawLine = (rawLine ? rawLine + ' · ' : '') + '当前 ' + tdx.currentSymbol;
+      }
       $('#scheduleRunDetail').text(rawLine || '等待任务输出…');
+      try { $('#scheduleRunLogWrap').prop('open', true); } catch (eOpen) {}
       applyScheduleRunButtons(jobCode || scheduleRunPollCode);
+      syncScheduleProgressModal({
+        visible: true,
+        running: true,
+        failed: false,
+        jobCode: jobCode,
+        title: liveTitle,
+        phase: phase,
+        phaseLabel: phaseLabel || '执行中',
+        detail: rawLine || summary,
+        summary: summary,
+        meta: metaText,
+        indeterminate: indeterminate,
+        pct: pctVal,
+        pctText: pctText
+      });
       return;
     }
 
@@ -4055,30 +4177,47 @@
     $banner.removeClass('is-live')
       .toggleClass('is-done-ok', ok === true)
       .toggleClass('is-done-err', ok === false);
-    $('#scheduleRunTitle').text((ok === false ? '执行失败' : '执行完成') + ' · ' + titleName);
+    var doneTitle = (ok === false ? '执行失败' : '执行完成') + ' · ' + titleName;
+    $('#scheduleRunTitle').text(doneTitle);
     var doneMeta = [];
     doneMeta.push('总耗时 ' + formatElapsedSec(clientElapsedSec(mr, tdx) || mr.elapsedSec || 0));
     if (tdx.lastFinished && tdx.lastFinished.progressTotal != null && isTdxProgressJob(jobCode)) {
       doneMeta.push('标的 ' + (tdx.lastFinished.progressTotal) + ' 只');
     }
     if (mr.finishedAt) doneMeta.push(String(mr.finishedAt).replace('T', ' ').slice(0, 19));
-    $('#scheduleRunMeta').text(doneMeta.join(' · '));
+    var doneMetaText = doneMeta.join(' · ');
+    $('#scheduleRunMeta').text(doneMetaText);
     setScheduleRunPhases(ok === false ? 'error' : 'done', false, ok === false, jobCode);
     var doneSummary = friendlyScheduleSummary(mr, tdx, false);
     if (!doneSummary) {
       doneSummary = ok === false
-        ? ((mr.message) || '任务失败，请查看原始日志或服务端日志')
+        ? ((mr.message) || '任务失败，请查看进度详情或服务端日志')
         : '任务已完成';
     }
     $('#scheduleRunSummary').text(doneSummary);
     $fill.removeClass('is-indeterminate').css('width', '100%');
     $('#scheduleRunPct').text(ok === false ? '失败' : '100%');
-    var rawDone = (tdx.lastFinished && tdx.lastFinished.lastLine) || tdx.lastLine || mr.summary || '';
+    var rawDone = (tdx.lastFinished && tdx.lastFinished.lastLine) || tdx.lastLine || mr.summary || mr.message || '';
     $('#scheduleRunDetail').text(rawDone || '—');
     if (ok === false) {
       try { $('#scheduleRunLogWrap').prop('open', true); } catch (e) {}
     }
     applyScheduleRunButtons('');
+    syncScheduleProgressModal({
+      visible: true,
+      running: false,
+      failed: ok === false,
+      jobCode: jobCode,
+      title: doneTitle,
+      phase: ok === false ? 'error' : 'done',
+      phaseLabel: ok === false ? '失败' : '已完成',
+      detail: rawDone || doneSummary,
+      summary: doneSummary,
+      meta: doneMetaText,
+      indeterminate: false,
+      pct: 100,
+      pctText: ok === false ? '失败' : '100%'
+    });
   }
 
   function startScheduleRunPoll(jobCode) {
@@ -4649,50 +4788,245 @@
     $.getJSON('/api/ops/data-reconcile')
       .done(renderReconcile)
       .fail(function () {
-        $('#reconcileHint').text('对账闸加载失败');
+        $('#reconcileHint').text('分钟自洽结果加载失败');
       });
   }
 
-  function loadDataHealth() {
-    $('#healthBody').html('<tr><td colspan="7" class="empty-state">检查中…</td></tr>');
-    loadDataReconcile();
-    $.getJSON('/api/ops/data-health')
-      .done(function (data) {
-        if (data.hint) $('#healthHint').text(data.hint);
-        $('#healthUniverse').text(String(data.universeSize == null ? '—' : data.universeSize));
-        $('#healthOk').text(String(data.okCount == null ? '—' : data.okCount));
-        $('#healthWarn').attr('class', 'value ' + (data.warnCount > 0 ? 'pnl-neg' : ''))
-          .text(String(data.warnCount == null ? '—' : data.warnCount));
-        $('#healthBadge').text(String(data.warnCount == null ? 0 : data.warnCount));
-        $('#healthMeta').text(data.asOf ? ('检查时间：' + fmtDateTimeDisplay(data.asOf)) : '');
-        var items = data.items || [];
-        var $tb = $('#healthBody').empty();
-        if (!items.length) {
-          $tb.html('<tr><td colspan="7" class="empty-state">无标的或未启用数据库</td></tr>');
+  var healthCheckPollTimer = null;
+
+  function stopHealthCheckPoll() {
+    if (healthCheckPollTimer) {
+      clearInterval(healthCheckPollTimer);
+      healthCheckPollTimer = null;
+    }
+  }
+
+  function setHealthProgressPhases(phase, running, failed) {
+    var $phases = $('#healthProgressPhases');
+    if (!$phases.length) return;
+    var map = {
+      starting: 'loading',
+      loading: 'loading',
+      checking: 'checking',
+      summarizing: 'checking',
+      done: 'done',
+      error: 'done'
+    };
+    var active = map[phase] || (running ? 'checking' : 'done');
+    var order = ['loading', 'checking', 'done'];
+    var activeIdx = order.indexOf(active);
+    $phases.find('.ops-progress-phase').each(function () {
+      var p = $(this).attr('data-phase');
+      var idx = order.indexOf(p);
+      $(this).removeClass('is-active is-done is-error');
+      if (p === 'done') {
+        $(this).text(failed ? '③ 失败' : '③ 完成');
+      } else if (p === 'loading') {
+        $(this).text('① 加载标的');
+      } else if (p === 'checking') {
+        $(this).text('② 逐只检查');
+      }
+      if (failed && p === 'done') {
+        $(this).addClass('is-error');
+      } else if (idx < activeIdx || (!running && phase === 'done' && idx <= activeIdx)) {
+        $(this).addClass('is-done');
+      } else if (idx === activeIdx) {
+        $(this).addClass('is-active');
+      }
+    });
+  }
+
+  function showHealthProgressModal(visible) {
+    var $m = $('#healthProgressModal');
+    if (!$m.length) return;
+    $m.prop('hidden', !visible);
+  }
+
+  function applyHealthProgressStatus(st) {
+    st = st || {};
+    var running = !!st.running;
+    var failed = st.ok === false || st.phase === 'error';
+    var done = !running && (st.ok === true || st.ok === false || st.phase === 'done' || st.phase === 'error');
+    setHealthProgressPhases(st.phase || (running ? 'checking' : 'done'), running, failed);
+    $('#healthProgressTitle').text(running ? '覆盖检查进行中' : (failed ? '覆盖检查失败' : '覆盖检查完成'));
+    $('#healthProgressPhase').text(st.phaseLabel || st.phase || '—');
+    var pctVal = st.progressPercent != null ? Number(st.progressPercent) : 0;
+    if (isNaN(pctVal)) pctVal = 0;
+    if (st.phase === 'loading' || st.phase === 'starting') {
+      $('#healthProgressFill').addClass('is-indeterminate').css('width', '36%');
+      $('#healthProgressPct').text('…');
+    } else {
+      $('#healthProgressFill').removeClass('is-indeterminate')
+        .css('width', Math.max(0, Math.min(100, pctVal)) + '%');
+      $('#healthProgressPct').text(pctVal.toFixed(1) + '%');
+    }
+    var detail = st.detail || st.summary || st.message || '';
+    if (st.currentCode && running && detail.indexOf(st.currentCode) < 0) {
+      detail = (detail ? detail + ' · ' : '') + st.currentCode;
+    }
+    $('#healthProgressDetail').text(detail || '准备中…');
+    var counts = '';
+    if (st.total != null && st.total > 0) {
+      counts = '进度 ' + (st.currentIndex != null ? st.currentIndex : 0) + '/' + st.total;
+      if (st.okSoFar != null || st.warnSoFar != null) {
+        counts += ' · 正常 ' + (st.okSoFar || 0) + ' / 告警 ' + (st.warnSoFar || 0);
+      }
+      if (st.poolSize != null) counts += ' · 目标池 ' + st.poolSize;
+    }
+    $('#healthProgressSummary').text(counts || (st.summary || ''));
+    $('#btnHealthProgressClose').prop('hidden', !done);
+    $('#btnHealthRefresh').prop('disabled', running);
+  }
+
+  function renderHealthResult(data) {
+    data = data || {};
+    if (data.hint) $('#healthHint').text(data.hint);
+    $('#healthUniverse').text(String(data.universeSize == null ? '—' : data.universeSize));
+    $('#healthPool').text(String(data.poolSize == null ? '—' : data.poolSize));
+    $('#healthOk').text(String(data.okCount == null ? '—' : data.okCount));
+    $('#healthWarn').attr('class', 'value ' + (data.warnCount > 0 ? 'pnl-neg' : ''))
+      .text(String(data.warnCount == null ? '—' : data.warnCount));
+    $('#healthBadge').text(String(data.warnCount == null ? 0 : data.warnCount));
+    $('#healthMeta').text(data.asOf ? ('检查时间：' + fmtDateTimeDisplay(data.asOf)) : '');
+    var items = data.items || [];
+    var $tb = $('#healthBody').empty();
+    if (!items.length) {
+      $tb.html('<tr><td colspan="7" class="empty-state">无标的或尚未执行覆盖检查</td></tr>');
+      return;
+    }
+    items.sort(function (a, b) {
+      return (a.ok === b.ok) ? 0 : (a.ok ? 1 : -1);
+    });
+    items.forEach(function (it) {
+      $tb.append(
+        '<tr>'
+        + '<td><b>' + escHtml(it.code) + '</b></td>'
+        + '<td>' + (it.ok ? '<span class="tag-buy">正常</span>' : '<span class="tag-wait">告警</span>') + '</td>'
+        + '<td class="mono">' + escHtml(String(it.dailyCount == null ? '—' : it.dailyCount)) + '</td>'
+        + '<td class="mono">' + escHtml(it.maxDaily || '—') + '</td>'
+        + '<td class="mono">' + escHtml(String(it.minuteCount == null ? '—' : it.minuteCount)) + '</td>'
+        + '<td class="mono">' + escHtml(it.maxMinute ? fmtDateTimeDisplay(it.maxMinute) : '—') + '</td>'
+        + '<td>' + escHtml(it.issueText || '—') + '</td>'
+        + '</tr>'
+      );
+    });
+  }
+
+  function pollHealthCheckStatus(opts) {
+    opts = opts || {};
+    $.getJSON('/api/ops/data-health/status')
+      .done(function (st) {
+        st = st || {};
+        if (st.running) {
+          showHealthProgressModal(true);
+          applyHealthProgressStatus(st);
+          if (!healthCheckPollTimer) {
+            healthCheckPollTimer = setInterval(function () {
+              pollHealthCheckStatus({ fromPoll: true });
+            }, 800);
+          }
           return;
         }
-        // 告警优先
-        items.sort(function (a, b) {
-          return (a.ok === b.ok) ? 0 : (a.ok ? 1 : -1);
-        });
-        items.forEach(function (it) {
-          $tb.append(
-            '<tr>'
-            + '<td><b>' + escHtml(it.code) + '</b></td>'
-            + '<td>' + (it.ok ? '<span class="tag-buy">正常</span>' : '<span class="tag-wait">告警</span>') + '</td>'
-            + '<td class="mono">' + escHtml(String(it.dailyCount == null ? '—' : it.dailyCount)) + '</td>'
-            + '<td class="mono">' + escHtml(it.maxDaily || '—') + '</td>'
-            + '<td class="mono">' + escHtml(String(it.minuteCount == null ? '—' : it.minuteCount)) + '</td>'
-            + '<td class="mono">' + escHtml(it.maxMinute ? fmtDateTimeDisplay(it.maxMinute) : '—') + '</td>'
-            + '<td>' + escHtml(it.issueText || '—') + '</td>'
-            + '</tr>'
-          );
-        });
+        stopHealthCheckPoll();
+        if (opts.fromPoll || opts.forceModal) {
+          applyHealthProgressStatus(st);
+          showHealthProgressModal(true);
+          if (st.result) {
+            renderHealthResult(st.result);
+          }
+          if (st.ok === true) {
+            toast(st.summary || '覆盖检查完成', 'ok');
+          } else if (st.ok === false) {
+            toast(st.message || st.summary || '覆盖检查失败', 'err');
+          }
+        } else if (st.hasLastResult && st.result) {
+          renderHealthResult(st.result);
+        }
       })
-      .fail(function (xhr) {
-        var msg = (xhr.responseJSON && xhr.responseJSON.message) || '数据健康检查失败';
-        $('#healthHint').text(msg);
-        toast(msg, 'err');
+      .fail(function () {
+        /* 瞬时失败忽略 */
+      });
+  }
+
+  function startHealthCoverageCheck() {
+    var $btn = $('#btnHealthRefresh');
+    if ($btn.prop('disabled')) return;
+    $('#healthBody').html('<tr><td colspan="7" class="empty-state">覆盖检查进行中…</td></tr>');
+    loadDataReconcile();
+    showHealthProgressModal(true);
+    applyHealthProgressStatus({
+      running: true,
+      phase: 'starting',
+      phaseLabel: '已受理',
+      detail: '正在启动覆盖检查：先加载股票列表，再逐只核对日线/分钟…',
+      progressPercent: 0
+    });
+    $('#btnHealthProgressClose').prop('hidden', true);
+    withLoading($btn, $.ajax({
+      url: '/api/ops/data-health/run',
+      method: 'POST'
+    }).done(function (data) {
+      data = data || {};
+      applyHealthProgressStatus(data.status || {
+        running: true,
+        phase: 'loading',
+        phaseLabel: '加载标的',
+        detail: data.message || '已开始'
+      });
+      stopHealthCheckPoll();
+      healthCheckPollTimer = setInterval(function () {
+        pollHealthCheckStatus({ fromPoll: true });
+      }, 800);
+      pollHealthCheckStatus({ fromPoll: true });
+    }).fail(function (xhr) {
+      showHealthProgressModal(true);
+      applyHealthProgressStatus({
+        running: false,
+        ok: false,
+        phase: 'error',
+        phaseLabel: '失败',
+        detail: extractAjaxError(xhr, '启动覆盖检查失败'),
+        progressPercent: 0
+      });
+      toast(extractAjaxError(xhr, '启动覆盖检查失败'), 'err');
+    }));
+  }
+
+  /** 进入数据健康页：展示上次结果；若任务仍在跑则打开进度框。 */
+  function loadDataHealth() {
+    loadDataReconcile();
+    $.getJSON('/api/ops/data-health/status')
+      .done(function (st) {
+        st = st || {};
+        if (st.running) {
+          showHealthProgressModal(true);
+          applyHealthProgressStatus(st);
+          stopHealthCheckPoll();
+          healthCheckPollTimer = setInterval(function () {
+            pollHealthCheckStatus({ fromPoll: true });
+          }, 800);
+          return;
+        }
+        if (st.hasLastResult && st.result) {
+          renderHealthResult(st.result);
+        } else {
+          $.getJSON('/api/ops/data-health')
+            .done(function (data) {
+              if (data && (data.items || []).length) {
+                renderHealthResult(data);
+              } else {
+                $('#healthBody').html(
+                  '<tr><td colspan="7" class="empty-state">点击「刷新覆盖检查」开始（全市场日线 + 目标池分钟）</td></tr>'
+                );
+                if (data && data.hint) $('#healthHint').text(data.hint);
+              }
+            });
+        }
+      })
+      .fail(function () {
+        $('#healthBody').html(
+          '<tr><td colspan="7" class="empty-state">点击「刷新覆盖检查」</td></tr>'
+        );
       });
   }
 
@@ -4993,7 +5327,10 @@
     loadTpScanHistory();
     toast('已刷新扫描历史列表（未扫描）', 'info');
   });
-  $('#btnHealthRefresh').on('click', loadDataHealth);
+  $('#btnHealthRefresh').on('click', startHealthCoverageCheck);
+  $('#btnHealthProgressClose').on('click', function () {
+    showHealthProgressModal(false);
+  });
   $('#btnReconcileRun').on('click', function () {
     var $btn = $(this);
     if ($btn.prop('disabled')) return;
@@ -5004,7 +5341,7 @@
         toast('行情自洽检查已执行', 'ok');
       })
       .fail(function (xhr) {
-        var msg = (xhr.responseJSON && xhr.responseJSON.message) || '对账执行失败';
+        var msg = (xhr.responseJSON && xhr.responseJSON.message) || '分钟自洽检查失败';
         toast(msg, 'err');
       })
       .always(function () {
@@ -5418,46 +5755,85 @@
     var $btn = $(this);
     var asyncStarted = false;
     $btn.prop('disabled', true).text('提交中…');
+    var startSummary = isTdxProgressJob(code)
+      ? '即将同步全市场股票列表，再逐只拉取日线/分钟…'
+      : ('已受理「' + (job.jobName || code) + '」，正在启动…');
+    // 先弹进度框，避免只看到 toast、看不到进度
+    scheduleProgressModalMinimized = false;
+    renderScheduleRunBanner({
+      manualRun: {
+        jobCode: code,
+        jobName: job.jobName || code,
+        running: true,
+        progressKind: isTdxProgressJob(code) ? 'tdx' : 'generic',
+        phase: 'starting',
+        phaseLabel: '已受理',
+        summary: startSummary,
+        message: startSummary,
+        elapsedSec: 0
+      },
+      tdxScript: isTdxProgressJob(code) ? {
+        running: false,
+        phase: 'starting',
+        phaseLabel: '启动中',
+        summary: startSummary,
+        lastLine: '正在提交任务…'
+      } : { running: false }
+    }, { forceRunning: true });
     toast('正在提交「' + (job.jobName || code) + '」…', 'info');
     $.post('/api/schedule/jobs/' + encodeURIComponent(code) + '/run').done(function (res) {
       if (res && res.async) {
         asyncStarted = true;
         scheduleRunStartedAtMs = Date.now();
         scheduleRunSeenFinishedKey = '';
-        toast((res.message) || ('已开始「' + (job.jobName || code) + '」，请看下方进度'), 'info', { duration: 6500 });
-        var startSummary = (res.manualRun && res.manualRun.summary)
-          || (isTdxProgressJob(code)
-            ? '即将同步列表并拉取行情…'
-            : ('已受理「' + (job.jobName || code) + '」，正在启动…'));
+        toast((res.message) || ('已开始「' + (job.jobName || code) + '」，请看进度弹框'), 'info', { duration: 6500 });
+        var summary2 = (res.manualRun && res.manualRun.summary) || startSummary;
         renderScheduleRunBanner({
-          manualRun: {
+          manualRun: Object.assign({
             jobCode: code,
             jobName: job.jobName || code,
             running: true,
             progressKind: isTdxProgressJob(code) ? 'tdx' : 'generic',
             phase: 'starting',
             phaseLabel: '已受理',
-            summary: startSummary,
-            message: res.message || startSummary,
             elapsedSec: 0
-          },
-          tdxScript: isTdxProgressJob(code) ? {
-            running: true,
+          }, res.manualRun || {}, {
+            summary: summary2,
+            message: res.message || summary2,
+            running: true
+          }),
+          tdxScript: isTdxProgressJob(code) ? Object.assign({
             phase: 'starting',
             phaseLabel: '启动中',
-            summary: startSummary,
             lastLine: ''
-          } : { running: false }
+          }, (res.tdxScript || {}), {
+            summary: summary2
+          }) : { running: false }
         }, { forceRunning: true });
         startScheduleRunPoll(code);
         return;
       }
       // 兜底：若后端仍返回同步完成
+      showScheduleProgressModal(false);
       toast((res && res.message) ? res.message : ('已执行 ' + code), 'ok');
       loadScheduleJobs();
     }).fail(function (xhr) {
       var msg = (xhr.responseJSON && (xhr.responseJSON.message || xhr.responseJSON.error))
         || '执行失败';
+      renderScheduleRunBanner({
+        manualRun: {
+          jobCode: code,
+          jobName: job.jobName || code,
+          running: false,
+          ok: false,
+          phase: 'error',
+          phaseLabel: '失败',
+          finishedAt: new Date().toISOString().slice(0, 19).replace('T', ' '),
+          summary: msg,
+          message: msg
+        },
+        tdxScript: { running: false }
+      });
       toast(msg, 'err', { duration: 5000 });
       loadScheduleJobs();
     }).always(function () {
@@ -5465,6 +5841,26 @@
         $btn.prop('disabled', false).text('执行一次');
       }
     });
+  });
+
+  $('#btnScheduleProgressMinimize').on('click', function () {
+    scheduleProgressModalMinimized = true;
+    showScheduleProgressModal(false);
+    var $banner = $('#scheduleRunBanner');
+    if ($banner.length) {
+      $banner.prop('hidden', false);
+      try {
+        if ($banner[0].scrollIntoView) {
+          $banner[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      } catch (e) {}
+    }
+    toast('已收起到任务管理页内进度条，任务仍在后台继续', 'info', { duration: 4000 });
+  });
+
+  $('#btnScheduleProgressClose').on('click', function () {
+    scheduleProgressModalMinimized = false;
+    showScheduleProgressModal(false);
   });
 
   $('#viewNavIntro').on('click', '[data-download-docs], [data-docs-pdf]', function () {

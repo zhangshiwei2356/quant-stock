@@ -20,6 +20,12 @@ import urllib.request
 from datetime import date
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 import pymysql
 
 DB = dict(
@@ -164,7 +170,7 @@ def fetch_eastmoney(page_size: int = 100) -> List[Row]:
         if payload is None:
             raise RuntimeError(f"东方财富第 {pn} 页失败: {err}")
         ingest((payload.get("data") or {}).get("diff") or [])
-        if (pn % 5 == 0 or pn == pages:
+        if pn % 5 == 0 or pn == pages:
             print(f"  eastmoney page {pn}/{pages} unique={len(rows)}", flush=True)
         time.sleep(0.08)
     if len(rows) < 3000:

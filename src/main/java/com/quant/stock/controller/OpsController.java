@@ -14,12 +14,14 @@ import com.quant.stock.pool.TradePoolService;
 import com.quant.stock.risk.StPitService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -29,7 +31,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 运维：数据健康、运行参数、对账闸、激活策略切换。
+ * 运维：数据健康、运行参数、分钟行情自洽、激活策略切换。
  */
 @RestController
 @RequestMapping("/api/ops")
@@ -49,7 +51,7 @@ public class OpsController {
     private final ObjectProvider<TdxScriptBackfillService> tdxScriptBackfillProvider;
     private final ObjectProvider<BacktestStrategyIdBackfillService> backtestStrategyIdBackfillProvider;
 
-    /** 全市场数据健康抽检（覆盖率、缺口、异常项）。 */
+    /** 最近一次覆盖检查结果（未跑过则提示刷新）；若正在跑则 running=true。 */
     @GetMapping("/data-health")
     public Map<String, Object> dataHealth() {
         DataHealthService svc = dataHealthProvider.getIfAvailable();
@@ -62,7 +64,38 @@ public class OpsController {
             m.put("hint", "需要 quant.db-enabled=true");
             return m;
         }
-        return svc.check();
+        return svc.lastResult();
+    }
+
+    /** 异步启动覆盖检查（全市场日线 + 目标池分钟）；进度见 /data-health/status。 */
+    @PostMapping("/data-health/run")
+    public Map<String, Object> dataHealthRun() {
+        DataHealthService svc = dataHealthProvider.getIfAvailable();
+        if (svc == null) {
+            Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("ok", false);
+            m.put("message", "需要 quant.db-enabled=true");
+            return m;
+        }
+        try {
+            return svc.startAsync();
+        } catch (IllegalStateException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
+        }
+    }
+
+    /** 覆盖检查进度（完成后含 result）。 */
+    @GetMapping("/data-health/status")
+    public Map<String, Object> dataHealthStatus() {
+        DataHealthService svc = dataHealthProvider.getIfAvailable();
+        if (svc == null) {
+            Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("idle", true);
+            m.put("running", false);
+            m.put("message", "需要 quant.db-enabled=true");
+            return m;
+        }
+        return svc.status();
     }
 
     /**
@@ -244,13 +277,13 @@ public class OpsController {
         return activeStrategyService.switchActive(id, confirm);
     }
 
-    /** 行情自洽闸最近结果（原 P0-107；现检查 market_1min） */
+    /** 分钟行情自洽最近结果（原 P0-107；现检查 market_1min） */
     @GetMapping("/data-reconcile")
     public Map<String, Object> dataReconcile() {
         return dataReconcileGateService.lastReport();
     }
 
-    /** 立即跑一轮 market_1min 自洽检查 */
+    /** 立即跑一轮分钟行情自洽检查（空/滞后/稀疏/OHLC） */
     @PostMapping("/data-reconcile/run")
     public Map<String, Object> dataReconcileRun() {
         return dataReconcileGateService.reconcile(null);

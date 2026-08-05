@@ -120,7 +120,7 @@ public final class ScheduleJobGuide {
                 "分层校验行情：全市场查日线，目标池查分钟。",
                 "universe → market_daily；trade_pool 活跃 → market_1min（非池不因缺分钟告警）。",
                 "默认工作日 17:00（CRON）。",
-                "只读检查，默认不改业务表；问题写入日志；可触发多源对账闸。",
+                "只读检查，默认不改业务表；问题写入日志；可顺带触发分钟行情自洽检查。",
                 "已实现本地分层检查；与外部行情 OHLC 抽样对账待 API。"
         ));
         m.put("factor-daily-rebuild", new Detail(
@@ -131,7 +131,7 @@ public final class ScheduleJobGuide {
                 "已实现。pool-rebuild 默认也会预刷新（可关 quant.pool-rebuild-refresh-factors）。"
         ));
         m.put("day-collect", new Detail(
-                "全市场日线补齐：无数据补近 1 年，有数据则增量补到最近交易日。",
+                "全市场日线补齐：无数据补近1年；已齐（最新日线≤3日历日）直接跳过；否则增量补缺口。默认 4 线程并行拉 TDX。",
                 "stock_basic status=1 → market_daily（TDX，adj=NONE）；--from-basic 默认先同步全市场列表约5000+。",
                 "默认工作日 15:30（CRON，种子关）；运维「执行一次」可手动触发。",
                 "依赖本机 Python + pytdx/pymysql；需 quant.tdx-script.enabled=true。",

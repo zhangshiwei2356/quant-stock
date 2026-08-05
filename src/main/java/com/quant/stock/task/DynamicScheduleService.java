@@ -618,7 +618,7 @@ public class DynamicScheduleService implements ApplicationRunner {
                 "由日线重算 factor_daily；建议在 pool-rebuild 前；亦可由 pool-rebuild 内预刷新");
         seed("day-collect", "全市场日线补齐(TDX)", "CRON",
                 "0 30 15 * * MON-FRI", null, 1,
-                "执行前默认同步 stock_basic 全市场(~5000+)；无日线补近1年，有则增量；需 tdx-script.enabled");
+                "同步全市场列表；已齐日线跳过、否则增量；默认4线程；需 tdx-script.enabled");
         seed("pool-minute-backfill", "目标池分钟补齐(TDX)", "CRON",
                 "0 20 15 * * MON-FRI", null, 1,
                 "池内尽量拉满节点深度(~90日)并补到最近；需 quant.tdx-script.enabled=true");
@@ -631,7 +631,7 @@ public class DynamicScheduleService implements ApplicationRunner {
         syncJobMeta("factor-daily-rebuild", 1,
                 "由日线重算 factor_daily；建议在 pool-rebuild 前；亦可由 pool-rebuild 内预刷新");
         syncJobMeta("day-collect", 1,
-                "执行前默认同步 stock_basic 全市场(~5000+)；无日线补近1年，有则增量；需 tdx-script.enabled");
+                "同步全市场列表；已齐日线跳过、否则增量；默认4线程；需 tdx-script.enabled");
         syncJobMeta("pool-minute-backfill", 1,
                 "池内尽量拉满节点深度(~90日)并补到最近；需 quant.tdx-script.enabled=true");
         // 纠正展示名（旧库可能仍是旧名称）

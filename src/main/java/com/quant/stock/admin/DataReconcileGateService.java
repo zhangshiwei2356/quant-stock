@@ -68,7 +68,7 @@ public class DataReconcileGateService {
         m.put("secondarySource", lastReport.getOrDefault("secondarySource", "SELF_CONSISTENCY"));
         m.put("externalVendorSource", "UNAVAILABLE");
         m.put("hint", lastReport.getOrDefault("hint",
-                "自洽检查 market_1min（空/滞后/稀疏日/OHLC）；外部双源仍待 API"));
+                "检查分钟K是否为空、过旧、稀疏或 OHLC 不合法；默认只告警不禁止开仓；外部多源对账仍未接入"));
         return m;
     }
 
@@ -126,8 +126,8 @@ public class DataReconcileGateService {
         m.put("divergences", divergences);
         m.put("primarySource", "MARKET_1MIN");
         m.put("secondarySource", "SELF_CONSISTENCY");
-        m.put("hint", "自洽检查 market_1min（空/滞后/稀疏日/OHLC）；"
-                + "data-reconcile-max-close-diff-pct 保留兼容但未用于价差；外部双源 UNAVAILABLE");
+        m.put("hint", "检查分钟K（market_1min）是否为空、过旧、当日根数过少或 OHLC 不合法；"
+                + "默认只告警不禁止开仓（data-reconcile-block-on-diverge=false）；外部多源对账仍未接入");
         lastReport = m;
         return lastReport();
     }

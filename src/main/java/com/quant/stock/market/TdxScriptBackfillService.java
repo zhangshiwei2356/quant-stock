@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -104,7 +104,8 @@ public class TdxScriptBackfillService {
     public Map<String, Object> backfillDailySync(double years) {
         double y = years <= 0 ? 1.0 : years;
         return runScript("daily-basic", resolveDailyScript(),
-                "--from-basic", "--years", String.valueOf(y), "--incremental");
+                "--from-basic", "--years", String.valueOf(y), "--incremental",
+                "--workers", "4", "--skip-fresh-days", "3");
     }
 
     public Map<String, Object> status() {
@@ -191,17 +192,19 @@ public class TdxScriptBackfillService {
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.directory(work.toFile());
         pb.redirectErrorStream(true);
+        // 统一 UTF-8，避免 Windows 默认 GBK 与 Python 输出不一致导致进度中文乱码
+        pb.environment().put("PYTHONIOENCODING", "utf-8");
+        pb.environment().put("PYTHONUTF8", "1");
         long start = System.currentTimeMillis();
         final StringBuilder logBuf = new StringBuilder();
         try {
             log.info("[tdx-script] 启动 tag={} cmd={} cwd={}", tag, cmd, work);
             final Process p = pb.start();
-            final Charset cs = Charset.defaultCharset();
             Thread reader = new Thread(new Runnable() {
                 @Override
                 public void run() {
                     try (BufferedReader br = new BufferedReader(
-                            new InputStreamReader(p.getInputStream(), cs))) {
+                            new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
                         String line;
                         while ((line = br.readLine()) != null) {
                             log.info("[tdx-script:{}] {}", tag, line);
@@ -316,6 +319,21 @@ public class TdxScriptBackfillService {
                     : ("脚本收尾：" + line);
             if (progressTotal != null) {
                 progressIndex = progressTotal;
+            }
+            return;
+        }
+        if (line.contains("已齐跳过")) {
+            phase = "fetch";
+            phaseLabel = "拉取日线";
+            summary = line;
+            Matcher sm = Pattern.compile("^\\[(\\d+)/(\\d+)]").matcher(line);
+            if (sm.find()) {
+                try {
+                    progressIndex = Integer.parseInt(sm.group(1));
+                    progressTotal = Integer.parseInt(sm.group(2));
+                } catch (NumberFormatException ignored) {
+                    // ignore
+                }
             }
             return;
         }
