@@ -64,7 +64,7 @@
     <li><b>TDX 1 分钟历史回填</b> — 已落地 · <code>scripts/fetch_min1_tdx.py</code>（含 <code>--from-pool</code>）只写 <code>market_1min</code>；公开节点通常约 90 个交易日，非全市场多年历史源</li>
     <li><b>交易日历（静态）</b> — 已落地 · 周末 + 内置法定节假日（含 2026 中秋 9/25–27、国庆 10/1–7；10/8 开市）；风控拒非交易日</li>
     <li><b>账户概览</b> — 已落地 · 资金权益 / 当前持仓（批次 T+1）/ 委托记录 / 权益日结 / 风控事件 / 风控日报</li>
-    <li><b>唯一目标池</b> — 已落地 · 「当前池 / 扫描历史」的「扫描更新」提交 <code>pool-rebuild</code>（与运维「执行一次」同一异步进度弹框）；亦可定时 <code>pool-rebuild</code> / <code>after-market-batch-scan</code>；移出≠卖出；漏斗 + Markdown 报告</li>
+    <li><b>唯一目标池</b> — 已落地 · 「当前池 / 扫描历史」的「扫描更新」提交 <code>pool-rebuild</code>（与运维「执行一次」同一异步进度弹框）；亦可定时 <code>pool-rebuild</code> / <code>after-market-batch-scan</code>；移出≠卖出；漏斗 + PDF 报告（<code>GET /api/stock/trade-pool/reports/{pool-*.pdf}</code>）</li>
     <li><b>运维中心</b> — 已落地 · 任务管理（执行一次弹进度框+页内横幅，可收起到页内）/ 数据健康（覆盖检查异步进度；明细仅告警并区分北交所/疑似退市空日线；分钟自洽）/ 运行参数（白名单可写 + 中文说明对照配置键；改参/纸面激活在此，与策略总览页职责分离）</li>
     <li><b>策略管理</b> — 已落地 · 一级菜单（运维与数据表之间）；二级「策略总览」：介绍（默认收起）+ 满分 100 评分 + 历史表；无回测自动/手动目标池补种（单股×池 + 组合×1，进度条）；按 <code>strategy_id</code> 关联；运维 <code>POST /api/ops/backtest/backfill-strategy-id</code></li>
     <li><b>数据表</b> — 已落地 · MySQL 白名单分页只读浏览；列表/详情展示 information_schema 磁盘占用（数据/索引）</li>

@@ -94,19 +94,23 @@ public class TradePoolController {
         return require().rebuildFromUniverse();
     }
 
-    /** 全市场分析打分 + 覆盖目标池 + 落盘 Markdown 报告 */
+    /** 全市场分析打分 + 覆盖目标池 + 落盘 PDF 报告 */
     @PostMapping("/trade-pool/analyze")
     public Map<String, Object> analyze() {
         return require().analyzeAndRecommend();
     }
 
-    /** 下载扫描 Markdown 报告（仅允许 pool-yyyyMMdd-HHmmss.md） */
+    /** 下载扫描 PDF 报告（允许 pool-yyyyMMdd-HHmmss.pdf；兼容历史 .md） */
     @GetMapping("/trade-pool/reports/{fileName}")
     public ResponseEntity<byte[]> downloadReport(@PathVariable("fileName") String fileName) {
         try {
             byte[] body = require().readReportFile(fileName);
             HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(new MediaType("text", "markdown", StandardCharsets.UTF_8));
+            if (fileName != null && fileName.endsWith(".pdf")) {
+                headers.setContentType(MediaType.APPLICATION_PDF);
+            } else {
+                headers.setContentType(new MediaType("text", "markdown", StandardCharsets.UTF_8));
+            }
             headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"");
             return new ResponseEntity<byte[]>(body, headers, HttpStatus.OK);
         } catch (IllegalArgumentException e) {

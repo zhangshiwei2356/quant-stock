@@ -527,11 +527,11 @@
         <p class="hint">当前生效的可买名单（盘后扫描自动覆盖）。实盘分钟扫描只盯本列表；「移出」仅退出池，不停仓、不卖出。点击一行展开分析。「扫描更新」走运维任务 <code>pool-rebuild</code>（异步进度弹框）。</p>
         <div class="toolbar" style="margin-top:8px;">
           <button type="button" id="btnTpRebuild"
-                  title="提交 pool-rebuild：全市场扫描并覆盖当前目标池（异步进度弹框；写入新批次与 Markdown 报告）">扫描更新</button>
+                  title="提交 pool-rebuild：全市场扫描并覆盖当前目标池（异步进度弹框；写入新批次与 PDF 报告）">扫描更新</button>
           <button type="button" id="btnTpRefresh" class="secondary"
                   title="仅重新加载当前池名单，不发起扫描">刷新列表</button>
           <a id="tpReportLink" class="secondary" href="#" hidden
-             title="下载最近一次扫描更新生成的 Markdown 报告"
+             title="下载最近一次扫描更新生成的 PDF 报告"
              style="display:inline-block;padding:6px 12px;text-decoration:none;">下载报告</a>
           <span class="field-hint" id="tpPoolHint"></span>
         </div>

@@ -13,6 +13,7 @@ import com.quant.stock.market.FactorDailyComputeService;
 import com.quant.stock.market.TdxScriptBackfillService;
 import com.quant.stock.market.dto.FactorDailyDO;
 import com.quant.stock.market.dto.StockBasicDO;
+import com.quant.stock.pdf.HtmlPdfExporter;
 import com.quant.stock.pool.dto.TradePoolDO;
 import com.quant.stock.pool.dto.TradePoolReportDO;
 import com.quant.stock.task.JobProgressHub;
@@ -28,7 +29,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import javax.annotation.PostConstruct;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -436,7 +436,7 @@ public class TradePoolService {
     }
 
     /**
-     * 全市场扫描分析报告：打分、覆盖唯一目标池，并落盘 Markdown。
+     * 全市场扫描分析报告：打分、覆盖唯一目标池，并落盘 PDF。
      * <p>
      * 注意：扫描本身可能数十分钟，不可包在长事务里；池替换由 {@link #replaceActivePool} 自管短事务。
      */
@@ -454,7 +454,7 @@ public class TradePoolService {
             item.put("scorePct", row.getScore() == null ? "—" : (row.getScore().toPlainString() + "分"));
             rows.add(item);
         }
-        String reportPath = writeMarkdownReport(rows, selectedCodes, rebuild);
+        String reportPath = writePdfReport(rows, selectedCodes, rebuild);
         Map<String, Object> out = new LinkedHashMap<String, Object>();
         out.putAll(rebuild);
         out.put("analysis", rows);
@@ -498,10 +498,10 @@ public class TradePoolService {
     }
 
     /**
-     * 安全读取 historyDir/reports 下 pool-*.md 报告内容（供下载）。
+     * 安全读取 historyDir/reports 下 pool-*.pdf（及历史 .md）报告内容（供下载）。
      */
     public byte[] readReportFile(String fileName) {
-        if (fileName == null || !fileName.matches("pool-\\d{8}-\\d{6}\\.md")) {
+        if (fileName == null || !fileName.matches("pool-\\d{8}-\\d{6}\\.(pdf|md)")) {
             throw new IllegalArgumentException("非法报告文件名");
         }
         Path file = Paths.get(quantProperties.getHistoryDir(), "reports", fileName).normalize();
@@ -750,49 +750,93 @@ public class TradePoolService {
         return v.multiply(new BigDecimal("100")).setScale(2, RoundingMode.HALF_UP).toPlainString() + "%";
     }
 
-    private String writeMarkdownReport(List<Map<String, Object>> rows, List<String> eligible,
-                                       Map<String, Object> rebuild) {
+    /**
+     * 将扫描结果落盘为 PDF（historyDir/reports/pool-yyyyMMdd-HHmmss.pdf）。
+     */
+    private String writePdfReport(List<Map<String, Object>> rows, List<String> eligible,
+                                  Map<String, Object> rebuild) {
         try {
             Path dir = Paths.get(quantProperties.getHistoryDir(), "reports");
             Files.createDirectories(dir);
             String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
-            Path file = dir.resolve("pool-" + ts + ".md");
-            StringBuilder sb = new StringBuilder();
-            sb.append("# 量化目标池扫描分析报告\n\n");
-            sb.append("- 生成时间：").append(LocalDateTime.now()).append('\n');
-            sb.append("- 全市场：").append(rebuild.get("universe")).append(" 只\n");
-            sb.append("- 粗筛后：").append(rebuild.get("afterCoarse")).append(" 只\n");
-            sb.append("- 扫描返回：").append(rebuild.get("afterScan")).append(" 只\n");
-            sb.append("- 流动性后：").append(rebuild.get("afterLiquidity")).append(" 只\n");
-            sb.append("- 写入目标池：").append(rebuild.get("selected")).append(" 只\n");
-            sb.append("- 分数下限：").append(rebuild.get("scoreMin")).append('\n');
-            sb.append("- 批次：").append(rebuild.get("batchId")).append('\n');
-            sb.append("- 入选代码：").append(eligible.isEmpty() ? "（无）" : String.join(", ", eligible)).append("\n\n");
-            sb.append("| 代码 | 名称 | 分数 | 原因 | 来源 | 报告ID |\n");
-            sb.append("|---|---|---|---|---|---|\n");
-            for (Map<String, Object> r : rows) {
-                sb.append("| ").append(r.get("code"))
-                        .append(" | ").append(r.get("name"))
-                        .append(" | ").append(r.get("scorePct") != null ? r.get("scorePct") : r.get("score"))
-                        .append(" | ").append(r.get("reason"))
-                        .append(" | ").append(r.get("source"))
-                        .append(" | ").append(r.get("reportId"))
-                        .append(" |\n");
-            }
-            sb.append("\n## 说明\n\n");
-            sb.append("- **分数**为多因子综合分（0~100）：趋势均线/MA60斜率/ADX + 动量排名 + 波动 + 流动性。\n");
-            sb.append("- **可入目标池**：综合分≥配置下限，且金叉可买或 MA5>MA20（RSI 未过热）。\n");
-            sb.append("- 回测收益率仅作参考，不再作为主排序。\n");
-            sb.append("- 盘后扫描会 `deactivateAll` 后按 TopN 覆盖唯一目标池（`source=BATCH_SCAN`）。\n");
-            sb.append("- 手动移出目标池仅停用池记录，不卖出持仓。\n");
-            sb.append("- 入选时写入表 `trade_pool_report`，由 `trade_pool.report_id` 关联。\n");
-            Files.write(file, sb.toString().getBytes(StandardCharsets.UTF_8));
+            Path file = dir.resolve("pool-" + ts + ".pdf");
+            byte[] pdf = HtmlPdfExporter.toPdfBytes(buildPoolReportXhtml(rows, eligible, rebuild));
+            Files.write(file, pdf);
             log.info("目标池分析报告已写入 {}", file.toAbsolutePath());
             return file.toAbsolutePath().toString();
         } catch (Exception e) {
             log.warn("写目标池报告失败: {}", e.getMessage());
             return null;
         }
+    }
+
+    /** 构建目标池扫描报告 XHTML（供 iText XMLWorker 转 PDF）。 */
+    static String buildPoolReportXhtml(List<Map<String, Object>> rows, List<String> eligible,
+                                       Map<String, Object> rebuild) {
+        StringBuilder body = new StringBuilder();
+        body.append("<h1>量化目标池扫描分析报告</h1>");
+        body.append("<ul>");
+        body.append("<li>生成时间：").append(esc(String.valueOf(LocalDateTime.now()))).append("</li>");
+        body.append("<li>全市场：").append(esc(String.valueOf(rebuild.get("universe")))).append(" 只</li>");
+        body.append("<li>粗筛后：").append(esc(String.valueOf(rebuild.get("afterCoarse")))).append(" 只</li>");
+        body.append("<li>扫描返回：").append(esc(String.valueOf(rebuild.get("afterScan")))).append(" 只</li>");
+        body.append("<li>流动性后：").append(esc(String.valueOf(rebuild.get("afterLiquidity")))).append(" 只</li>");
+        body.append("<li>写入目标池：").append(esc(String.valueOf(rebuild.get("selected")))).append(" 只</li>");
+        body.append("<li>分数下限：").append(esc(String.valueOf(rebuild.get("scoreMin")))).append("</li>");
+        body.append("<li>批次：").append(esc(String.valueOf(rebuild.get("batchId")))).append("</li>");
+        body.append("<li>入选代码：")
+                .append(esc(eligible == null || eligible.isEmpty() ? "（无）" : String.join(", ", eligible)))
+                .append("</li>");
+        body.append("</ul>");
+        body.append("<table><thead><tr>")
+                .append("<th>代码</th><th>名称</th><th>分数</th><th>原因</th><th>来源</th><th>报告ID</th>")
+                .append("</tr></thead><tbody>");
+        if (rows != null) {
+            for (Map<String, Object> r : rows) {
+                Object score = r.get("scorePct") != null ? r.get("scorePct") : r.get("score");
+                body.append("<tr>")
+                        .append("<td>").append(esc(String.valueOf(r.get("code")))).append("</td>")
+                        .append("<td>").append(esc(String.valueOf(r.get("name")))).append("</td>")
+                        .append("<td>").append(esc(String.valueOf(score))).append("</td>")
+                        .append("<td>").append(esc(String.valueOf(r.get("reason")))).append("</td>")
+                        .append("<td>").append(esc(String.valueOf(r.get("source")))).append("</td>")
+                        .append("<td>").append(esc(String.valueOf(r.get("reportId")))).append("</td>")
+                        .append("</tr>");
+            }
+        }
+        body.append("</tbody></table>");
+        body.append("<h2>说明</h2><ul>");
+        body.append("<li><b>分数</b>为多因子综合分（0~100）：趋势均线/MA60斜率/ADX + 动量排名 + 波动 + 流动性。</li>");
+        body.append("<li><b>可入目标池</b>：综合分≥配置下限，且金叉可买或 MA5&gt;MA20（RSI 未过热）。</li>");
+        body.append("<li>回测收益率仅作参考，不再作为主排序。</li>");
+        body.append("<li>盘后扫描会 deactivateAll 后按 TopN 覆盖唯一目标池（source=BATCH_SCAN）。</li>");
+        body.append("<li>手动移出目标池仅停用池记录，不卖出持仓。</li>");
+        body.append("<li>入选时写入表 trade_pool_report，由 trade_pool.report_id 关联。</li>");
+        body.append("</ul>");
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+                + "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" "
+                + "\"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\">"
+                + "<html xmlns=\"http://www.w3.org/1999/xhtml\">"
+                + "<head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\"/>"
+                + "<title>目标池扫描报告</title>"
+                + "<style type=\"text/css\">"
+                + "body{font-size:11pt;line-height:1.55;color:#222;}"
+                + "h1{font-size:18pt;margin:0 0 10px 0;}"
+                + "h2{font-size:14pt;margin:18px 0 8px 0;}"
+                + "ul{margin:6px 0 6px 22px;}"
+                + "li{font-size:11pt;}"
+                + "table{border-collapse:collapse;width:100%;margin:8px 0;}"
+                + "th,td{border:1px solid #aaa;padding:4px 6px;font-size:10pt;}"
+                + "</style></head><body>"
+                + body
+                + "</body></html>";
+    }
+
+    private static String esc(String s) {
+        if (s == null || "null".equals(s)) {
+            return "";
+        }
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
     }
 
     private static Map<String, Object> toPoolView(TradePoolDO row) {
