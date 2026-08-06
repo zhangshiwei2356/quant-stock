@@ -18,7 +18,6 @@ import com.quant.stock.session.SessionOrderIntent;
 import com.quant.stock.session.SessionPortfolioBackTestEngine;
 import com.quant.stock.session.SessionStrategy;
 import com.quant.stock.session.SessionBranch;
-import com.quant.stock.strategy.HoldNothingStrategy;
 import com.quant.stock.strategy.MaCrossStrategy;
 import com.quant.stock.strategy.StrategyRegistry;
 import com.quant.stock.trade.TradeCostModel;
@@ -279,7 +278,6 @@ class PortfolioBackTestEngineSmokeTest {
                 new OpenFilterService(props),
                 new StrategyRegistry(Arrays.asList(
                         new MaCrossStrategy(props),
-                        new HoldNothingStrategy(),
                         new BranchScaffoldStrategy()), props),
                 new TradingCalendar(),
                 sessionPortfolio);

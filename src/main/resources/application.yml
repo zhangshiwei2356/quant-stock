@@ -62,7 +62,7 @@ quant:
     min1-script: scripts/fetch_min1_tdx.py
     daily-script: scripts/fetch_daily_tdx.py
     timeout-seconds: 3600
-  # 单活策略 id（maCross=金叉默认；holdNothing=永不交易占位，用于切换验证）
+  # 单活策略 id（maCross=金叉默认；可切换对照画像或 branchScaffold）
   active-strategy: maCross
   mock-bar-days: 15
   db-enabled: true

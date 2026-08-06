@@ -4,8 +4,8 @@ import com.quant.stock.admin.dto.StrategyParamDO;
 import com.quant.stock.config.QuantProperties;
 import com.quant.stock.mapper.StrategyParamMapper;
 import com.quant.stock.strategy.BaseStrategy;
-import com.quant.stock.strategy.HoldNothingStrategy;
 import com.quant.stock.strategy.MaCrossStrategy;
+import com.quant.stock.strategy.MaCrossBalancedStrategy;
 import com.quant.stock.strategy.StrategyRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,7 +44,7 @@ class EffectiveParamsServiceTest {
         ObjectProvider<org.springframework.jdbc.core.JdbcTemplate> jdbc = mock(ObjectProvider.class);
         when(jdbc.getIfAvailable()).thenReturn(null);
         List<BaseStrategy> strategies = java.util.Arrays.asList(
-                new MaCrossStrategy(global), new HoldNothingStrategy());
+                new MaCrossStrategy(global), new MaCrossBalancedStrategy());
         StrategyRegistry registry = new StrategyRegistry(strategies, global);
         service = new EffectiveParamsService(global, registry, provider, jdbc);
     }

@@ -58,7 +58,7 @@ class RunParamOverridesTest {
                 new com.quant.stock.strategy.StrategyRegistry(
                         java.util.Arrays.asList(
                                 new com.quant.stock.strategy.MaCrossStrategy(global),
-                                new com.quant.stock.strategy.HoldNothingStrategy()),
+                                new com.quant.stock.strategy.MaCrossBalancedStrategy()),
                         global),
                 mp, jdbc);
         Map<String, String> run = new HashMap<String, String>();
