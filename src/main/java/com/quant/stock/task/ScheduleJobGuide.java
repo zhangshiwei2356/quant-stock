@@ -84,15 +84,15 @@ public final class ScheduleJobGuide {
                 "同步委托/成交状态：将本地已报订单推进为成交，并落本地仓位与现金。",
                 "针对本地内存中 SUBMITTED 未完结订单（trade-mode=sdk）。",
                 "默认 FIXED_RATE 约 10 秒；亦可运维「执行一次」。",
-                "推进 SUBMITTED→FILLED，改网关持仓，回写 trade_orders，并由策略补入现金/批次。",
-                "已实现（本地桩）。真券商委托查询/成交回报仍待 API。"
+                "默认本地桩 SUBMITTED→FILLED；若宽睿 OES order-enabled live，则按柜台回报/查询推进 FILLED（不假推进）。",
+                "本地桩 + M2 对账日志 + M3 可选真实报撤回报（默认关）。"
         ));
         m.put("position-pnl-sync", new Detail(
                 "持仓盈亏同步：用本地成本与最新价估算市值与浮动盈亏，便于监控。",
-                "策略账本持仓（成本/数量）+ 最新价。",
+                "策略账本持仓（成本/数量）+ 最新价；可选 OES 资金/持仓。",
                 "默认交易时段每分钟一次（CRON）。",
-                "日志输出市值、浮盈及合计；不写库。",
-                "已实现（本地）。真实柜台成本/可用数量对账仍待 API。"
+                "日志输出市值、浮盈及合计；不写库。OES live 时附加柜台对账日志。",
+                "本地已实现；OES 只读对账为可选旁路（M2，默认关）。"
         ));
         m.put("settle-after-close", new Detail(
                 "收盘后清算：账户日结、权益落库，并做 K 线聚合等收盘批处理。",

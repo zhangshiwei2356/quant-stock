@@ -3,6 +3,7 @@ package com.quant.stock.task;
 import com.quant.stock.admin.DataReconcileGateService;
 import com.quant.stock.config.QuantProperties;
 import com.quant.stock.kuangrui.MdsMinuteIngestService;
+import com.quant.stock.kuangrui.KuangruiOesOpsFacade;
 import com.quant.stock.market.FactorDailyComputeService;
 import com.quant.stock.market.MarketDataService;
 import com.quant.stock.market.TdxScriptBackfillService;
@@ -11,6 +12,7 @@ import com.quant.stock.pool.TradePoolService;
 import com.quant.stock.util.RedisLockUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -53,6 +55,7 @@ public class ScheduleJobHandlers {
     private final FactorDailyComputeService factorDailyComputeService;
     private final TdxScriptBackfillService tdxScriptBackfillService;
     private final JobProgressHub jobProgressHub;
+    private final ObjectProvider<KuangruiOesOpsFacade> kuangruiOesOpsProvider;
 
     /**
      * 行情采集：优先可选宽睿 MDS（开关开启且 live），否则按股票池刷新本地 K 线缓存/落库。
@@ -149,9 +152,8 @@ public class ScheduleJobHandlers {
     }
 
     /**
-     * 持仓盈亏同步：本地成本 + 最新价估算市值/浮动盈亏并打日志。
-     * <p>
-     * TODO(api): 对接券商持仓/成本对账；当前以策略账本成本为准。
+     * 持仓盈亏同步：本地成本 + 最新价估算市值/浮动盈亏并打日志；
+     * 若宽睿 OES 只读 live，额外拉柜台资金/持仓做纸面对账日志（不改本地账本）。
      */
     public void positionPnlSync() {
         runWithLock("job:position-pnl-sync", 50, new Runnable() {
@@ -160,34 +162,38 @@ public class ScheduleJobHandlers {
                 List<Map<String, Object>> views = strategyTask.listLivePositionViews();
                 if (views == null || views.isEmpty()) {
                     log.info("[position-pnl-sync] 当前无持仓");
-                    return;
+                } else {
+                    BigDecimal totalMv = BigDecimal.ZERO;
+                    BigDecimal totalPnl = BigDecimal.ZERO;
+                    for (Map<String, Object> row : views) {
+                        String code = String.valueOf(row.get("code"));
+                        Object volObj = row.get("volume");
+                        int shares = volObj instanceof Number ? ((Number) volObj).intValue() : 0;
+                        BigDecimal avg = toBd(row.get("avgCost"));
+                        BigDecimal px = toBd(row.get("lastPrice"));
+                        BigDecimal mv = toBd(row.get("marketValue"));
+                        BigDecimal pnl = toBd(row.get("unrealizedPnl"));
+                        BigDecimal pnlPct = toBd(row.get("unrealizedPnlPct"));
+                        totalMv = totalMv.add(mv);
+                        totalPnl = totalPnl.add(pnl);
+                        log.info("[position-pnl-sync] {} x{} cost={} mark={} mv={} pnl={} ({})",
+                                code, shares,
+                                avg.setScale(4, RoundingMode.HALF_UP).toPlainString(),
+                                px.setScale(4, RoundingMode.HALF_UP).toPlainString(),
+                                mv.setScale(2, RoundingMode.HALF_UP).toPlainString(),
+                                pnl.setScale(2, RoundingMode.HALF_UP).toPlainString(),
+                                pnlPct.multiply(new BigDecimal("100")).setScale(2, RoundingMode.HALF_UP)
+                                        .toPlainString() + "%");
+                    }
+                    log.info("[position-pnl-sync] 持仓只数={} 市值合计≈{} 浮盈合计≈{}",
+                            views.size(),
+                            totalMv.setScale(2, RoundingMode.HALF_UP).toPlainString(),
+                            totalPnl.setScale(2, RoundingMode.HALF_UP).toPlainString());
                 }
-                BigDecimal totalMv = BigDecimal.ZERO;
-                BigDecimal totalPnl = BigDecimal.ZERO;
-                for (Map<String, Object> row : views) {
-                    String code = String.valueOf(row.get("code"));
-                    Object volObj = row.get("volume");
-                    int shares = volObj instanceof Number ? ((Number) volObj).intValue() : 0;
-                    BigDecimal avg = toBd(row.get("avgCost"));
-                    BigDecimal px = toBd(row.get("lastPrice"));
-                    BigDecimal mv = toBd(row.get("marketValue"));
-                    BigDecimal pnl = toBd(row.get("unrealizedPnl"));
-                    BigDecimal pnlPct = toBd(row.get("unrealizedPnlPct"));
-                    totalMv = totalMv.add(mv);
-                    totalPnl = totalPnl.add(pnl);
-                    log.info("[position-pnl-sync] {} x{} cost={} mark={} mv={} pnl={} ({})",
-                            code, shares,
-                            avg.setScale(4, RoundingMode.HALF_UP).toPlainString(),
-                            px.setScale(4, RoundingMode.HALF_UP).toPlainString(),
-                            mv.setScale(2, RoundingMode.HALF_UP).toPlainString(),
-                            pnl.setScale(2, RoundingMode.HALF_UP).toPlainString(),
-                            pnlPct.multiply(new BigDecimal("100")).setScale(2, RoundingMode.HALF_UP)
-                                    .toPlainString() + "%");
+                KuangruiOesOpsFacade oes = kuangruiOesOpsProvider.getIfAvailable();
+                if (oes != null) {
+                    oes.logReconcileIfLive("position-pnl-sync");
                 }
-                log.info("[position-pnl-sync] 持仓只数={} 市值合计≈{} 浮盈合计≈{}",
-                        views.size(),
-                        totalMv.setScale(2, RoundingMode.HALF_UP).toPlainString(),
-                        totalPnl.setScale(2, RoundingMode.HALF_UP).toPlainString());
             }
         });
     }

@@ -9,6 +9,7 @@ import com.quant.stock.admin.MarketSourceSampleReconcileService;
 import com.quant.stock.admin.SystemParamsService;
 import com.quant.stock.backtest.BacktestStrategyIdBackfillService;
 import com.quant.stock.kuangrui.KuangruiMdsOpsFacade;
+import com.quant.stock.kuangrui.KuangruiOesOpsFacade;
 import com.quant.stock.market.FactorDailyComputeService;
 import com.quant.stock.market.TdxScriptBackfillService;
 import com.quant.stock.pool.TradePoolService;
@@ -48,6 +49,7 @@ public class OpsController {
     private final ObjectProvider<StPitService> stPitProvider;
     private final ObjectProvider<IndustryReclassService> industryReclassProvider;
     private final ObjectProvider<KuangruiMdsOpsFacade> kuangruiMdsOpsProvider;
+    private final ObjectProvider<KuangruiOesOpsFacade> kuangruiOesOpsProvider;
     private final ObjectProvider<FactorDailyComputeService> factorDailyComputeProvider;
     private final ObjectProvider<TradePoolService> tradePoolProvider;
     private final ObjectProvider<TdxScriptBackfillService> tdxScriptBackfillProvider;
@@ -429,5 +431,122 @@ public class OpsController {
             return m;
         }
         return f.flush();
+    }
+
+    /** 宽睿 OES 只读状态（默认 noop；-Pkuangrui + 开关开启后为真实客户端）。 */
+    @GetMapping("/kuangrui/oes/status")
+    public Map<String, Object> kuangruiOesStatus() {
+        KuangruiOesOpsFacade f = kuangruiOesOpsProvider.getIfAvailable();
+        if (f == null) {
+            Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("live", false);
+            m.put("hint", "需要 quant.db-enabled=true");
+            return m;
+        }
+        return f.status();
+    }
+
+    /** OES 查资金（价÷10000 为元）。 */
+    @GetMapping("/kuangrui/oes/cash")
+    public Map<String, Object> kuangruiOesCash() {
+        return oesOrDbOff(new OesCall() {
+            @Override
+            public Map<String, Object> call(KuangruiOesOpsFacade f) {
+                return f.cash();
+            }
+        });
+    }
+
+    /** OES 查持仓。 */
+    @GetMapping("/kuangrui/oes/holdings")
+    public Map<String, Object> kuangruiOesHoldings() {
+        return oesOrDbOff(new OesCall() {
+            @Override
+            public Map<String, Object> call(KuangruiOesOpsFacade f) {
+                return f.holdings();
+            }
+        });
+    }
+
+    /** OES 查委托。 */
+    @GetMapping("/kuangrui/oes/orders")
+    public Map<String, Object> kuangruiOesOrders() {
+        return oesOrDbOff(new OesCall() {
+            @Override
+            public Map<String, Object> call(KuangruiOesOpsFacade f) {
+                return f.orders();
+            }
+        });
+    }
+
+    /** OES 查成交。 */
+    @GetMapping("/kuangrui/oes/trades")
+    public Map<String, Object> kuangruiOesTrades() {
+        return oesOrDbOff(new OesCall() {
+            @Override
+            public Map<String, Object> call(KuangruiOesOpsFacade f) {
+                return f.trades();
+            }
+        });
+    }
+
+    /** OES 资金+持仓+委托+成交快照。 */
+    @GetMapping("/kuangrui/oes/snapshot")
+    public Map<String, Object> kuangruiOesSnapshot() {
+        return oesOrDbOff(new OesCall() {
+            @Override
+            public Map<String, Object> call(KuangruiOesOpsFacade f) {
+                return f.snapshot();
+            }
+        });
+    }
+
+    /** 本地纸面账本 vs OES 柜台只读对账（不改仓）。 */
+    @GetMapping("/kuangrui/oes/reconcile")
+    public Map<String, Object> kuangruiOesReconcile() {
+        return oesOrDbOff(new OesCall() {
+            @Override
+            public Map<String, Object> call(KuangruiOesOpsFacade f) {
+                return f.reconcile();
+            }
+        });
+    }
+
+    /** 关闭 OES 客户端连接。 */
+    @PostMapping("/kuangrui/oes/stop")
+    public Map<String, Object> kuangruiOesStop() {
+        return oesOrDbOff(new OesCall() {
+            @Override
+            public Map<String, Object> call(KuangruiOesOpsFacade f) {
+                return f.stop();
+            }
+        });
+    }
+
+    /** OES 报撤能力状态（M3；order-enabled 默认关）。 */
+    @GetMapping("/kuangrui/oes/order-status")
+    public Map<String, Object> kuangruiOesOrderStatus() {
+        return oesOrDbOff(new OesCall() {
+            @Override
+            public Map<String, Object> call(KuangruiOesOpsFacade f) {
+                return f.orderStatus();
+            }
+        });
+    }
+
+    private Map<String, Object> oesOrDbOff(OesCall call) {
+        KuangruiOesOpsFacade f = kuangruiOesOpsProvider.getIfAvailable();
+        if (f == null) {
+            Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("ok", false);
+            m.put("live", false);
+            m.put("message", "需要 quant.db-enabled=true");
+            return m;
+        }
+        return call.call(f);
+    }
+
+    private interface OesCall {
+        Map<String, Object> call(KuangruiOesOpsFacade f);
     }
 }

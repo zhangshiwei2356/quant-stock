@@ -36,6 +36,7 @@ import com.quant.stock.session.SessionStrategy;
 import com.quant.stock.strategy.BaseStrategy;
 import com.quant.stock.strategy.IndicatorSignalUtil;
 import com.quant.stock.strategy.StrategyRegistry;
+import com.quant.stock.kuangrui.KuangruiOesOpsFacade;
 import com.quant.stock.trade.CapacityThrottle;
 import com.quant.stock.trade.FillVolumeScale;
 import com.quant.stock.trade.LiveLedgerService;
@@ -96,6 +97,9 @@ public class StrategyTask {
 
     @Autowired(required = false)
     private TradePoolService tradePoolService;
+
+    @Autowired
+    private ObjectProvider<KuangruiOesOpsFacade> kuangruiOesOpsProvider;
 
     private final ObjectProvider<LiveLedgerService> liveLedgerProvider;
     private final StrategyRetirementService strategyRetirementService;
@@ -758,6 +762,7 @@ public class StrategyTask {
 
     /**
      * sdk 模式：推进网关 SUBMITTED→FILLED 并将待入账写入策略账本。
+     * 若宽睿 OES 只读 live，额外查询柜台委托/成交做对账日志（M2 不据此改仓；报撤见 M3）。
      *
      * @return false 表示锁忙未执行
      */
@@ -789,6 +794,11 @@ public class StrategyTask {
                 }
             }
             persistRuntimeState();
+            KuangruiOesOpsFacade oes = kuangruiOesOpsProvider == null
+                    ? null : kuangruiOesOpsProvider.getIfAvailable();
+            if (oes != null) {
+                oes.logReconcileIfLive("sync-orders");
+            }
             return true;
         } finally {
             redisLockUtil.unlock("strategy-scan");

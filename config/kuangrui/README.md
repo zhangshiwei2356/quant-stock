@@ -153,3 +153,53 @@ quant:
    - 或 `POST .../subscribe` 后由 `market-collect` / `flush` 落库
 
 实现位置：`src/main-kuangrui/java/.../KuangruiMdsMinuteIngestService.java`（仅 `-Pkuangrui` 编译）；主工程门面与换算在 `src/main/java/.../kuangrui/`。
+
+## M2 OES 只读对账（可选）
+
+默认业务路径不变；**不下单**（`oes.order-enabled` 保持 false）。启用步骤：
+
+1. 同 M1：安装 `quant360-all-api`、准备账号
+2. 准备 `local/oes_api_config.json`（可从 `examples/oes_api_config.example.json` 复制）
+3. `mvn -Pkuangrui spring-boot:run`
+4. 配置：
+
+```yaml
+quant:
+  kuangrui:
+    enabled: true
+    oes:
+      enabled: true
+      # order-enabled: false   # M3 才开
+```
+
+5. 运维验收：
+   - `GET /api/ops/kuangrui/oes/status` → `live=true`
+   - `GET /api/ops/kuangrui/oes/cash|holdings|orders|trades`
+   - `GET /api/ops/kuangrui/oes/reconcile` → 本地纸面 vs 柜台差异
+   - 定时任务 `sync-orders` / `position-pnl-sync` 在 OES live 时打对账日志（不改本地账本）
+
+实现：`src/main-kuangrui/.../KuangruiOesReadonlyService.java`；门面 `KuangruiOesOpsFacade`。
+
+## M3 OES 报撤（可选）
+
+默认仍不下单。启用步骤（仿真）：
+
+1. 同 M2：`-Pkuangrui`、OES 配置与账号
+2. 配置：
+
+```yaml
+quant:
+  trade-mode: sdk
+  kuangrui:
+    enabled: true
+    oes:
+      enabled: true
+      order-enabled: true
+```
+
+3. 验收：
+   - `GET /api/ops/kuangrui/oes/order-status` → `orderLive=true`
+   - `trade-mode=sdk` 下单走 `sendOrdReq`（限价）；撤单走 `sendOrdCancelReq`
+   - `sync-orders` 按回报/查询推进 FILLED（**不再假推进**）
+
+实现与 M2 共用 `KuangruiOesReadonlyService`（实现 `OesOrderService`）；网关 `TradeGatewayService` 在 orderLive 时切换路径。

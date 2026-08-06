@@ -2,6 +2,7 @@ package com.quant.stock.account;
 
 import com.quant.stock.config.ConfigFingerprint;
 import com.quant.stock.config.QuantProperties;
+import com.quant.stock.kuangrui.OesReadonlyService;
 import com.quant.stock.pool.TradePoolService;
 import com.quant.stock.trade.TradeCostModel;
 import org.springframework.beans.factory.ObjectProvider;
@@ -30,17 +31,20 @@ public class PaperLiveReconcileService {
     private final AccountOverviewService accountOverviewService;
     private final SlippageResidualService slippageResidualService;
     private final ObjectProvider<TradePoolService> tradePoolProvider;
+    private final ObjectProvider<OesReadonlyService> oesReadonlyProvider;
 
     public PaperLiveReconcileService(QuantProperties props,
                                      TradeCostModel tradeCostModel,
                                      AccountOverviewService accountOverviewService,
                                      SlippageResidualService slippageResidualService,
-                                     ObjectProvider<TradePoolService> tradePoolProvider) {
+                                     ObjectProvider<TradePoolService> tradePoolProvider,
+                                     ObjectProvider<OesReadonlyService> oesReadonlyProvider) {
         this.props = props;
         this.tradeCostModel = tradeCostModel;
         this.accountOverviewService = accountOverviewService;
         this.slippageResidualService = slippageResidualService;
         this.tradePoolProvider = tradePoolProvider;
+        this.oesReadonlyProvider = oesReadonlyProvider;
     }
 
     /** 生成纸面与实盘假设差异对账报告（费用、部成、目标池、撮合模式等） */
@@ -186,7 +190,8 @@ public class PaperLiveReconcileService {
         m.put("costRows", costRows);
         m.put("gaps", gaps);
         m.put("slippageResidual", slip);
-        m.put("dimensions", dimLegend());
+        m.put("dimensions", dimLegend(oesLive()));
+        m.put("brokerApi", oesBrokerMeta());
         return m;
     }
 
@@ -245,7 +250,7 @@ public class PaperLiveReconcileService {
         return g;
     }
 
-    private static List<Map<String, String>> dimLegend() {
+    private static List<Map<String, String>> dimLegend(boolean oesLive) {
         List<Map<String, String>> list = new ArrayList<Map<String, String>>();
         list.add(dim("FLICKER", "闪烁/部成/废单", "CANCELLED/REJECTED/PARTIAL"));
         list.add(dim("COST", "成本残差", "实际费用/成交价 vs TradeCostModel"));
@@ -254,8 +259,29 @@ public class PaperLiveReconcileService {
         list.add(dim("MODE", "模式闸门", "sim/sdk 与真柜台对账可用性"));
         list.add(dim("ENGINE_PATH", "引擎路径差",
                 "回测有部成/压力/结构突变；实盘另有换手/IC衰减；组合已对齐部成+AUM/POV+压力降仓"));
-        list.add(dim("BROKER_API", "真柜台对账", "UNAVAILABLE（待 OES/券商 API）"));
+        list.add(dim("BROKER_API", "真柜台对账",
+                oesLive
+                        ? "AVAILABLE（OES 只读 M2：/api/ops/kuangrui/oes/reconcile）"
+                        : "UNAVAILABLE（待开启 quant.kuangrui.oes 或 -Pkuangrui）"));
         return list;
+    }
+
+    private boolean oesLive() {
+        OesReadonlyService oes = oesReadonlyProvider == null ? null : oesReadonlyProvider.getIfAvailable();
+        return oes != null && oes.isLive();
+    }
+
+    private Map<String, Object> oesBrokerMeta() {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        OesReadonlyService oes = oesReadonlyProvider == null ? null : oesReadonlyProvider.getIfAvailable();
+        if (oes == null) {
+            m.put("live", false);
+            m.put("hint", "OES 服务未装配");
+            return m;
+        }
+        m.put("live", oes.isLive());
+        m.putAll(oes.status());
+        return m;
     }
 
     private static Map<String, String> dim(String id, String name, String desc) {

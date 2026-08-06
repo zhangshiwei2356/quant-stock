@@ -29,4 +29,37 @@ public final class KuangruiPriceScale {
         }
         return toYuan(milli.longValue());
     }
+
+    /**
+     * 毫级金额 → 元（允许 0，用于资金余额；负值按原样换算）。
+     */
+    public static BigDecimal toYuanAllowZero(long milli) {
+        return BigDecimal.valueOf(milli).divide(SCALE, 4, RoundingMode.HALF_UP);
+    }
+
+    /** null → {@code BigDecimal.ZERO}。 */
+    public static BigDecimal toYuanAllowZero(Long milli) {
+        if (milli == null) {
+            return BigDecimal.ZERO;
+        }
+        return toYuanAllowZero(milli.longValue());
+    }
+
+    /**
+     * 元 → 毫级整数（柜台申报价/金额）；非法或负数返回 0。
+     */
+    public static int toMilliInt(BigDecimal yuan) {
+        if (yuan == null || yuan.compareTo(BigDecimal.ZERO) <= 0) {
+            return 0;
+        }
+        return yuan.multiply(SCALE).setScale(0, RoundingMode.HALF_UP).intValue();
+    }
+
+    /** 元 → 毫级 long。 */
+    public static long toMilliLong(BigDecimal yuan) {
+        if (yuan == null) {
+            return 0L;
+        }
+        return yuan.multiply(SCALE).setScale(0, RoundingMode.HALF_UP).longValue();
+    }
 }

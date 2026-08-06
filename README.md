@@ -262,6 +262,7 @@ sequenceDiagram
 | `quant.pool-rebuild-backfill-minute` | `false`（默认）扫池后异步跑 TDX 池内分钟脚本；需同时开 `tdx-script.enabled` |
 | `quant.tdx-script.*` | 通达信 Python 灌数桥接（**默认 enabled=true**）；`python` / `working-dir` / `min1-script` / `daily-script` / `timeout-seconds`；无 Python/pytdx 时可改 `false` |
 | `quant.kuangrui.enabled` / `mds.enabled` | 宽睿旁路总闸 / MDS L1（**默认 false**）；真实客户端需 `mvn -Pkuangrui`；价÷10000 写 `market_1min(MDS)` |
+| `quant.kuangrui.oes.enabled` / `oes.order-enabled` | OES 只读 / 报单总闸（**默认 false**）；M3 报撤需二者+`trade-mode=sdk` |
 | `quant.kuangrui.config-dir` | MDS/OES JSON 目录（默认 `config/kuangrui/local`，可用 `QUANT_KUANGRUI_CONFIG_DIR`） |
 
 ---
@@ -297,6 +298,7 @@ sequenceDiagram
 | GET/POST `/api/ops/st-pit` | ST as-of 日切；财报时钟边界说明 |
 | GET/POST `/api/ops/industry-reclass*` | 行业 reclass as-of 日志 |
 | GET/POST `/api/ops/kuangrui/mds/*` | 宽睿 MDS 状态/pull/订阅/flush/stop（默认 noop；`-Pkuangrui`+开关） |
+| GET/POST `/api/ops/kuangrui/oes/*` | 宽睿 OES：只读查询/对账/stop；`order-status`（M3 报撤状态；默认 noop） |
 | GET `/api/account/turnover` | 换手门禁（日成交额/权益） |
 | GET `/api/account/ic-decay` | IC 衰减（半衰期/IR；只降仓） |
 | GET `/api/account/short-policy` | 禁空头边界（多头现货） |
@@ -333,12 +335,14 @@ sequenceDiagram
     - 仅刷新列表：`python scripts/sync_stock_basic.py`（东方财富优先，失败回退 TDX）
   - `pool-rebuild`：返回 `minuteBackfillHint`；可选 `pool-rebuild-backfill-minute` 异步补分钟
   - 运维：`GET/POST /api/ops/tdx-script/{status,backfill-min1,backfill-daily}`
-  - `sync-orders`：本地桩将 `SUBMITTED→FILLED` 并改仓；`trade-mode=sdk` 时策略在 sync 后才落现金/批次
-  - `position-pnl-sync`：本地成本 + 最新价浮盈日志
+  - `sync-orders`：`trade-mode=sdk` 时推进成交；默认本地桩；OES `order-enabled` live 时按回报/查询推进（不假推进）；OES 只读 live 时另打对账日志
+  - `position-pnl-sync`：本地成本 + 最新价浮盈日志；OES live 时附加柜台资金/持仓对账
 - 页面标「未实现/缺外部默认」：`market-collect`（本地骨架；**可选**宽睿 MDS live 时 pull/flush，见下）
-- 对照：**应用说明 → 能力与待办**；宽睿对接：**应用说明 → 宽睿文档梳理**（M0✓ → M1 MDS 可选✓ → OES 只读 → 报撤 → 静态/费率）
-- 宽睿 **M0**：资料包 `OESAPI-JAVA-v0.19.4.0`；`config/kuangrui/examples/aliyun-sim.md`；探针 **OES+MDS 登录成功** → `M0_STATUS=COMPLETE`
-- 宽睿 **M1**（可选，默认关）：`mvn -Pkuangrui` + `quant.kuangrui.enabled/mds.enabled=true`；L1 订阅/查询 → 价÷10000 → `market_1min(data_source=MDS)`；运维 `GET/POST /api/ops/kuangrui/mds/{status,pull,subscribe,flush,stop}`；关开关行为与改前一致；默认仍 `sim`+`db`
+- 对照：**应用说明 → 能力与待办**；宽睿对接：**应用说明 → 宽睿文档梳理**（M0✓ → M1✓ → M2✓ → M3 报撤可选✓ → 静态/费率）
+- 宽睿 **M0**：资料包 `OESAPI-JAVA-v0.19.4.0`；探针 **OES+MDS 登录成功** → `M0_STATUS=COMPLETE`
+- 宽睿 **M1**（可选，默认关）：MDS L1 → `market_1min(MDS)`；运维 `/api/ops/kuangrui/mds/*`
+- 宽睿 **M2**（可选，默认关）：OES 只读对账；运维 `/api/ops/kuangrui/oes/{status,cash,holdings,orders,trades,snapshot,reconcile,stop}`
+- 宽睿 **M3**（可选，默认关）：`oes.order-enabled=true` + `trade-mode=sdk`；限价报/撤；`sync-orders` 按柜台状态推进；`GET /api/ops/kuangrui/oes/order-status`
 
 ---
 
@@ -388,7 +392,7 @@ sequenceDiagram
 ## 扩展点
 
 - `KlineSdkClient` / `NoopKlineSdkClient` — 行情 SDK（`market-mode=sdk`）
-- `TradeGatewayService` — 券商 SDK（`trade-mode=sdk` 桩；真对接见宽睿 OES/MDS 资料）
+- `TradeGatewayService` — `sim` 即时；`sdk` 本地桩或可选宽睿 OES 报撤（`oes.order-enabled`）
 
 ---
 

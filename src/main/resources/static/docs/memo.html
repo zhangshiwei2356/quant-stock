@@ -10,8 +10,8 @@
   <p class="hint" style="margin:0 0 8px;">当前真正待推进的能力缺口（本地模拟无法替代）。</p>
   <ol>
     <li><b>真实行情 API（优先对接宽睿 MDS）</b> — <b>M1 可选已落地</b>（默认关）· <code>quant.kuangrui.enabled</code>+<code>mds.enabled</code>；<code>mvn -Pkuangrui</code> 编译真实客户端；L1 订阅/查询 → 价÷10000 → <code>market_1min(MDS)</code>；运维 <code>/api/ops/kuangrui/mds/*</code>；<code>market-collect</code> live 时优先 MDS；与 TDX 抽样对账已落地（运维「MDS/TDX 抽样对账」 / <code>POST /api/ops/data-health/mds-tdx-sample</code>）。待增强：断线重连、L2</li>
-    <li><b>券商交易 API（优先对接宽睿 OES）</b> — 未接入 · <code>quant.trade-mode=sdk</code> 仅为状态桩。待接：<code>sendOrdReq</code> / <code>sendBatchOrdsReq</code> / <code>sendOrdCancelReq</code> + <code>OesCallBack</code> 委托/成交回报与 <code>initRptSync</code></li>
-    <li><b>券商委托/持仓对账（OES 查询）</b> — 未接入 · <code>sync-orders</code> ← <code>queryOrder</code>/<code>queryTrade</code>；<code>position-pnl-sync</code> ← <code>queryCashAsset</code>/<code>queryStkHolding</code>（及可选 <code>queryClientOverview</code>）</li>
+    <li><b>券商交易 API（优先对接宽睿 OES）</b> — <b>M3 可选已落地</b>（默认关）· <code>oes.order-enabled</code>+<code>trade-mode=sdk</code>；限价 <code>sendOrdReq</code>/<code>sendOrdCancelReq</code>；<code>sync-orders</code> 按回报/查询推进 FILLED。待增强：批量、拒单细映射</li>
+    <li><b>券商委托/持仓对账（OES 查询）</b> — <b>M2 可选已落地</b>（默认关）· <code>quant.kuangrui.oes.enabled</code>；登录+<code>sendRptSync</code>+查资金/持仓/委托/成交；运维 <code>/api/ops/kuangrui/oes/*</code></li>
     <li><b>证券状态 / 静态信息（MDS+OES）</b> — 部分本地粗滤 · 待接 MDS <code>qrySecurityStatus</code>、<code>qryStockStaticInfo(List)</code>（涨跌停价、停牌标识）；OES <code>queryStock</code></li>
     <li><b>交易日 / 市场时段（OES+MDS）</b> — 部分静态表 · 待接 OES <code>queryTradingDay</code> / <code>queryMarketState</code>；MDS <code>qryTrdSessionStatus</code></li>
     <li><b>真实佣金费率（OES）</b> — 未落地 · 待接 <code>queryCommissionRate</code>（替换配置近似费率）</li>
@@ -25,7 +25,7 @@
     <li><b>两融 / 期权 / ETF 申赎 / 新股中签</b> — 未规划 · OES 有完整接口族，当前现货模拟策略范围外</li>
   </ol>
   <p style="margin:0"><b>一句总结</b>：本地模拟闭环已可跑；对接宽睿按「宽睿文档梳理」阶段表：
-    <strong>环境(M0✓) → MDS L1 落库(M1 可选✓) → OES 只读对账 → OES 报撤回报 → 静态/费率</strong>；复权/财报/舆情仍要其他数据源。默认业务仍 sim/db。</p>
+    <strong>环境(M0✓) → MDS L1 落库(M1 可选✓) → OES 只读对账(M2 可选✓) → OES 报撤回报(M3 可选✓) → 静态/费率</strong>；复权/财报/舆情仍要其他数据源。默认业务仍 sim/db。</p>
 </div>
 
 <div class="memo-todo memo-todo--focus">
@@ -106,9 +106,11 @@
     <li><b>文档 PDF</b> — 已落地 · 量化知识 / 应用说明介绍页一键导出（服务端 iText，<code>GET /api/docs/pdf/{stock|app}</code>）</li>
     <li><b>项目 README 在线查看</b> — 已落地 · 应用说明 →「项目 README」；<code>GET /api/docs/readme</code> 实时渲染仓库根目录 Markdown（含 Mermaid 架构图）</li>
     <li><b>本地可调度任务</b> — 已落地 · <code>scan-and-trade</code>、<code>pool-rebuild</code>、<code>after-market-batch-scan</code>、<code>settle-after-close</code>、<code>data-validate</code>、<code>factor-daily-rebuild</code>、<code>day-collect</code>、<code>pool-minute-backfill</code>、<code>sync-orders</code>、<code>position-pnl-sync</code>；入池粗筛可读 <code>factor_daily</code>；运维「执行一次」全部后台跑：弹框与页内横幅同步进度（可收起）；长任务（TDX / 因子 / 入池 / 校验 / 行情采集）上报 <code>i/n</code>（入池含因子预刷与粗筛扫描两段）；scan/sync/settle 锁忙与业务失败均返回错误而非假成功</li>
-    <li><b>宽睿资料梳理</b> — 已落地（文档）· 以 <code>OESAPI-JAVA-v0.19.4.0</code> 为准；「应用说明 → 宽睿文档梳理」仅展示当前手册要点与 M0/M1 接入记录</li>
+    <li><b>宽睿资料梳理</b> — 已落地（文档）· 以 <code>OESAPI-JAVA-v0.19.4.0</code> 为准；「应用说明 → 宽睿文档梳理」仅展示当前手册要点与 M0～M3 接入记录</li>
     <li><b>宽睿 M0 环境脚手架</b> — 已完成 · jar <code>0.19.4.0</code>；阿里云模拟地址见 <code>aliyun-sim.md</code>；本机探针 OES+MDS 登录成功，<code>M0_STATUS=COMPLETE</code>；主应用仍默认 sim/db</li>
-    <li><b>宽睿 M1 MDS L1 落库</b> — 可选已落地 · 开关默认关；<code>src/main-kuangrui</code> + <code>-Pkuangrui</code>；分钟桶聚合写 <code>market_1min(MDS)</code>；下一步 M2 OES 只读</li>
+    <li><b>宽睿 M1 MDS L1 落库</b> — 可选已落地 · 开关默认关；<code>src/main-kuangrui</code> + <code>-Pkuangrui</code>；分钟桶聚合写 <code>market_1min(MDS)</code></li>
+    <li><b>宽睿 M2 OES 只读对账</b> — 可选已落地 · 开关默认关；登录+<code>sendRptSync</code>+查资金/持仓/委托/成交；运维 <code>/api/ops/kuangrui/oes/*</code></li>
+    <li><b>宽睿 M3 OES 报撤</b> — 可选已落地 · <code>oes.order-enabled</code> 默认关；限价报/撤；<code>sync-orders</code> 按回报/查询推进；下一步 M4 静态/费率</li>
   </ol>
 </details>
 
@@ -124,8 +126,8 @@
       <tr><td><code>factor-daily-rebuild</code></td><td>已实现</td><td>日线→factor_daily；亦可 POST /api/ops/factor-daily/rebuild</td><td>—</td></tr>
       <tr><td><code>day-collect</code></td><td>已实现</td><td>全市场日线：已齐跳过 / 否则增量；默认4线程（需 tdx-script.enabled）</td><td>—</td></tr>
       <tr><td><code>pool-minute-backfill</code></td><td>已实现</td><td>目标池分钟尽量~90日并补到最近（需 tdx-script.enabled）</td><td>—</td></tr>
-      <tr><td><code>sync-orders</code></td><td>已实现</td><td>本地桩：SUBMITTED→FILLED，策略同步落现金/批次</td><td><b>OES</b> 查询+回报（生产）</td></tr>
-      <tr><td><code>position-pnl-sync</code></td><td>已实现</td><td>本地成本+市值浮盈日志</td><td><b>OES</b> 持仓/成本对账（可选）</td></tr>
+      <tr><td><code>sync-orders</code></td><td>已实现</td><td>本地桩或 OES 回报推进 FILLED</td><td>批量/拒单细映射</td></tr>
+      <tr><td><code>position-pnl-sync</code></td><td>已实现</td><td>本地成本+市值浮盈；OES live 时柜台对账</td><td>—</td></tr>
       <tr><td><code>market-collect</code></td><td>部分</td><td>默认骨架；MDS live 时 pull/flush</td><td>断线重连 / 全市场增量</td></tr>
     </tbody>
   </table>
