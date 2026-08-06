@@ -107,7 +107,8 @@ public final class ScheduleJobGuide {
                 "全市场 universe（stock_basic，粗过滤 ST）；可选预刷 factor_daily；按分数取 TopN 后整池替换。",
                 "默认工作日 15:10（CRON）；亦可在「当前池 / 扫描历史」点「扫描更新」手动触发同类逻辑。",
                 "写入/覆盖 trade_pool，并写入 trade_pool_report；返回 minuteBackfillHint 提示池内补分钟。",
-                "已实现。默认 quant.pool-rebuild-refresh-factors=true；入池后请执行 fetch_min1_tdx.py --from-pool。"
+                "已实现。默认 quant.pool-rebuild-refresh-factors=false、pool-rebuild-full-backtest=false（轻量扫池）；"
+                        + "需要时可开预刷因子/完整回测。入池后请执行 fetch_min1_tdx.py --from-pool。"
         ));
         m.put("after-market-batch-scan", new Detail(
                 "盘后再次扫描覆盖唯一目标池：与 pool-rebuild 同类，适合收盘后统一重算一遍入选名单。",
@@ -118,17 +119,18 @@ public final class ScheduleJobGuide {
         ));
         m.put("data-validate", new Detail(
                 "分层校验行情：全市场查日线，目标池查分钟。",
-                "universe → market_daily；trade_pool 活跃 → market_1min（非池不因缺分钟告警）。",
+                "universe → market_daily；trade_pool 活跃 → market_1min（非池不因缺分钟告警）。"
+                        + " 北交所空/疑似退市/停牌归特殊项；待处置=缺数/真滞后/池内分钟。",
                 "默认工作日 17:00（CRON）。",
                 "只读检查，默认不改业务表；问题写入日志；可顺带触发分钟行情自洽检查。",
-                "已实现本地分层检查；与外部行情 OHLC 抽样对账待 API。"
+                "已实现本地分层检查；运维可另跑 MDS/TDX 抽样对账 POST /api/ops/data-health/mds-tdx-sample。"
         ));
         m.put("factor-daily-rebuild", new Detail(
                 "由日线重算 factor_daily，供入池粗筛（ma5>ma20 / ma60向上 / 放量）。",
                 "有日线的全市场标的；亦可 POST /api/ops/factor-daily/rebuild。",
                 "默认工作日 15:00（CRON，种子关）；建议在 pool-rebuild 前。",
                 "覆盖写入 factor_daily。",
-                "已实现。pool-rebuild 默认也会预刷新（可关 quant.pool-rebuild-refresh-factors）。"
+                "已实现。pool-rebuild 默认不预刷（quant.pool-rebuild-refresh-factors=false）；需要时再开或单独跑本任务。"
         ));
         m.put("day-collect", new Detail(
                 "全市场日线补齐：无数据补近1年；已齐（最新日线≤3日历日）直接跳过；否则增量补缺口。默认 4 线程并行拉 TDX。",

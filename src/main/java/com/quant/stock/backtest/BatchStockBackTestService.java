@@ -58,17 +58,27 @@ public class BatchStockBackTestService {
         return scan(quantProperties.stockCodeList());
     }
 
-    /** 并发扫描指定代码列表 */
+    /** 并发扫描指定代码列表（完整回测，供批量扫描页）。 */
     public List<BatchScanResultDTO> scan(List<String> codes) {
-        return scan(codes, null);
+        return scan(codes, null, false);
     }
 
-    /** 并发扫描；可选进度回调（便于运维入池进度条）。 */
+    /** 并发扫描；可选进度回调。 */
     public List<BatchScanResultDTO> scan(List<String> codes, ProgressCallback progress) {
+        return scan(codes, progress, false);
+    }
+
+    /**
+     * 并发扫描。
+     *
+     * @param light true=入池轻量模式（不算完整回测，只指标/信号/动量）；false=含 BackTestEngine
+     */
+    public List<BatchScanResultDTO> scan(List<String> codes, ProgressCallback progress, boolean light) {
         if (codes == null || codes.isEmpty()) {
             return new ArrayList<BatchScanResultDTO>();
         }
         final int total = codes.size();
+        final boolean lightMode = light;
         if (progress != null) {
             try {
                 progress.onProgress(0, total, null);
@@ -83,10 +93,9 @@ public class BatchStockBackTestService {
                 @Override
                 public BatchScanResultDTO get() {
                     try {
-                        return scanOne(code);
+                        return scanOne(code, lightMode);
                     } finally {
                         int d = done.incrementAndGet();
-                        // 降频：每 10 只或首尾上报
                         if (progress != null && (d == 1 || d == total || d % 10 == 0)) {
                             try {
                                 progress.onProgress(d, total, code);
@@ -112,16 +121,16 @@ public class BatchStockBackTestService {
                     }
                 })
                 .collect(Collectors.toList());
-        log.info("批量扫描完成, 输入={} 有效={}", codes.size(), results.size());
+        log.info("批量扫描完成, 输入={} 有效={} light={}", codes.size(), results.size(), lightMode);
         return results;
     }
 
-    /** 单股日线扫描分析（供推荐详情等复用） */
+    /** 单股日线扫描分析（供推荐详情等复用；含完整回测）。 */
     public BatchScanResultDTO analyzeOne(String code) {
-        return scanOne(code);
+        return scanOne(code, false);
     }
 
-    private BatchScanResultDTO scanOne(String code) {
+    private BatchScanResultDTO scanOne(String code, boolean light) {
         try {
             List<BarDTO> bars = marketDataService.getKline(code,
                     com.quant.stock.market.BarPeriod.DAY, null, null);
@@ -129,8 +138,6 @@ public class BatchStockBackTestService {
                 log.debug("跳过K线不足20根: {}", code);
                 return null;
             }
-            BigDecimal init = new BigDecimal("100000");
-            BackTestResult bt = backTestEngine.run(code, bars, init);
             Map<String, BigDecimal> ind = IndicatorSignalUtil.calcLatestIndicators(bars);
             TradeSignal signal = strategyRegistry.active().calcSignal(code, bars);
             boolean canBuy = signal.getSignalType() == TradeSignal.Signal.BUY;
@@ -149,13 +156,26 @@ public class BatchStockBackTestService {
                 ma60SlopeUp = ma60.compareTo(ma60Prev5) > 0;
             }
 
+            BigDecimal totalRate = null;
+            BigDecimal maxDrawDown = null;
+            BigDecimal winRate = null;
+            Integer totalTradeNum = null;
+            if (!light) {
+                BigDecimal init = new BigDecimal("100000");
+                BackTestResult bt = backTestEngine.run(code, bars, init);
+                totalRate = bt.getTotalRate();
+                maxDrawDown = bt.getMaxDrawDown();
+                winRate = bt.getWinRate();
+                totalTradeNum = bt.getTotalTradeNum();
+            }
+
             return BatchScanResultDTO.builder()
                     .stockCode(code)
                     .lastClose(close)
-                    .totalRate(bt.getTotalRate())
-                    .maxDrawDown(bt.getMaxDrawDown())
-                    .winRate(bt.getWinRate())
-                    .totalTradeNum(bt.getTotalTradeNum())
+                    .totalRate(totalRate)
+                    .maxDrawDown(maxDrawDown)
+                    .winRate(winRate)
+                    .totalTradeNum(totalTradeNum)
                     .canBuyNow(canBuy)
                     .signalDesc(signal.getSignalDesc())
                     .ma5(ind.get("ma5"))

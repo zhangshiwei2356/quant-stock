@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * <ul>
  *   <li>全市场 / universe：检查 {@code market_daily} 覆盖与滞后</li>
  *   <li>目标池：额外检查 {@code market_1min}（非池标的不因缺分钟告警）</li>
- *   <li>明细仅返回告警行（正常不进表）</li>
+ *   <li>待处置告警进 {@code warnItems}；北交所空 / 疑似退市 / 停牌进 {@code specialItems}</li>
  * </ul>
  */
 @Slf4j
@@ -71,9 +71,12 @@ public class DataHealthService {
             out.put("universeSize", 0);
             out.put("okCount", 0);
             out.put("warnCount", 0);
+            out.put("specialCount", 0);
             out.put("items", new ArrayList<Map<String, Object>>());
+            out.put("specialItems", new ArrayList<Map<String, Object>>());
             out.put("itemsScope", "warn_only");
             out.put("hint", "尚未执行覆盖检查，请点「刷新覆盖检查」");
+            out.put("specialHint", "特殊项（北交所空/疑似退市/停牌）不计入待处置告警");
         }
         HealthRunState s = runRef.get();
         out.put("running", s != null && s.running);
@@ -108,9 +111,12 @@ public class DataHealthService {
                         state.phaseLabel = "已完成";
                         int warn = result.get("warnCount") instanceof Number
                                 ? ((Number) result.get("warnCount")).intValue() : 0;
+                        int special = result.get("specialCount") instanceof Number
+                                ? ((Number) result.get("specialCount")).intValue() : 0;
                         int uni = result.get("universeSize") instanceof Number
                                 ? ((Number) result.get("universeSize")).intValue() : 0;
-                        state.summary = "覆盖检查完成：共 " + uni + " 只，告警 " + warn + " 只（明细仅告警）";
+                        state.summary = "覆盖检查完成：共 " + uni + " 只，待处置告警 " + warn
+                                + " 只，特殊项 " + special + " 只（明细分表）";
                         state.detail = state.summary;
                         state.result = result;
                         log.info("数据健康覆盖检查完成: {}", state.summary);
@@ -169,6 +175,7 @@ public class DataHealthService {
         m.put("poolSize", s.poolSize);
         m.put("okSoFar", s.okSoFar);
         m.put("warnSoFar", s.warnSoFar);
+        m.put("specialSoFar", s.specialSoFar);
         m.put("startedAt", s.startedAt == null ? null : s.startedAt.format(DT_FMT));
         m.put("finishedAt", s.finishedAt == null ? null : s.finishedAt.format(DT_FMT));
         int total = Math.max(1, s.total);
@@ -221,7 +228,7 @@ public class DataHealthService {
         LocalDate today = LocalDate.now();
         LocalDateTime now = LocalDateTime.now();
 
-        Map<String, int[]> dailyStats = loadDailyStats();
+        Map<String, long[]> dailyStats = loadDailyStats();
         Map<String, Object[]> minuteStats = loadMinuteStats(pool);
 
         if (state != null) {
@@ -236,15 +243,18 @@ public class DataHealthService {
         }
 
         List<Map<String, Object>> warnItems = new ArrayList<Map<String, Object>>();
+        List<Map<String, Object>> specialItems = new ArrayList<Map<String, Object>>();
         int ok = 0;
         int warn = 0;
+        int special = 0;
         int dailyWarn = 0;
         int minuteWarn = 0;
         int emptyDaily = 0;
-        int emptyDailyBj = 0;
-        int emptyDailyLikelyDead = 0;
         int emptyDailyOther = 0;
         int staleDaily = 0;
+        int specialSuspended = 0;
+        int specialBj = 0;
+        int specialDelisted = 0;
 
         for (int i = 0; i < universe.size(); i++) {
             String code = universe.get(i);
@@ -256,17 +266,22 @@ public class DataHealthService {
                     String scope = inPool ? "（目标池，查日线+分钟）" : "（全市场，查日线）";
                     state.detail = "正在检查 " + (i + 1) + "/" + universe.size()
                             + " · " + code + " " + scope
-                            + " · 目前正常 " + ok + " / 告警 " + warn;
+                            + " · 目前正常 " + ok + " / 待处置 " + warn + " / 特殊 " + special;
                     state.summary = "逐只检查覆盖 " + (i + 1) + "/" + universe.size();
                     state.okSoFar = ok;
                     state.warnSoFar = warn;
+                    state.specialSoFar = special;
                 }
             }
             Map<String, Object> row = checkOneCached(
                     code, nameByCode.get(code), inPool, today, now,
                     dailyStats.get(code), minuteStats.get(code));
+            String severity = row.get("severity") == null ? null : String.valueOf(row.get("severity"));
             if (Boolean.TRUE.equals(row.get("ok"))) {
                 ok++;
+            } else if ("special".equals(severity)) {
+                special++;
+                specialItems.add(row);
             } else {
                 warn++;
                 warnItems.add(row);
@@ -280,13 +295,16 @@ public class DataHealthService {
             String emptyKind = row.get("emptyDailyKind") == null ? null : String.valueOf(row.get("emptyDailyKind"));
             if ("bj".equals(emptyKind)) {
                 emptyDaily++;
-                emptyDailyBj++;
+                specialBj++;
             } else if ("likely_delisted".equals(emptyKind)) {
                 emptyDaily++;
-                emptyDailyLikelyDead++;
+                specialDelisted++;
             } else if ("missing".equals(emptyKind)) {
                 emptyDaily++;
                 emptyDailyOther++;
+            }
+            if (Boolean.TRUE.equals(row.get("specialSuspended"))) {
+                specialSuspended++;
             }
             if (Boolean.TRUE.equals(row.get("dailyStale"))) {
                 staleDaily++;
@@ -301,16 +319,20 @@ public class DataHealthService {
             state.summary = state.detail;
             state.okSoFar = ok;
             state.warnSoFar = warn;
+            state.specialSoFar = special;
             state.currentIndex = universe.size();
         }
 
         Map<String, Object> breakdown = new LinkedHashMap<String, Object>();
         breakdown.put("emptyDaily", emptyDaily);
-        breakdown.put("emptyDailyBj", emptyDailyBj);
-        breakdown.put("emptyDailyLikelyDelisted", emptyDailyLikelyDead);
+        breakdown.put("emptyDailyBj", specialBj);
+        breakdown.put("emptyDailyLikelyDelisted", specialDelisted);
         breakdown.put("emptyDailyOther", emptyDailyOther);
         breakdown.put("staleDaily", staleDaily);
         breakdown.put("minuteWarn", minuteWarn);
+        breakdown.put("specialSuspended", specialSuspended);
+        breakdown.put("specialBj", specialBj);
+        breakdown.put("specialDelisted", specialDelisted);
         breakdown.put("symbolsInMarketDaily", dailyStats.size());
 
         Map<String, Object> m = new LinkedHashMap<String, Object>();
@@ -319,47 +341,59 @@ public class DataHealthService {
         m.put("poolSize", pool.size());
         m.put("okCount", ok);
         m.put("warnCount", warn);
+        m.put("specialCount", special);
         m.put("dailyWarnCount", dailyWarn);
         m.put("minuteWarnCount", minuteWarn);
         m.put("dailyStaleDays", DAILY_STALE_DAYS);
         m.put("minuteStaleHours", MINUTE_STALE_HOURS);
         m.put("breakdown", breakdown);
         m.put("itemsScope", "warn_only");
-        m.put("hint", buildHint(breakdown, dailyStats.size(), universe.size(), ok));
+        m.put("hint", buildHint(breakdown, dailyStats.size(), universe.size(), ok, warn, special));
+        m.put("specialHint", "特殊项：北交所空日线 / 疑似退市·PT / 停牌（名称含「停牌」或最新日线量≤0）。"
+                + " 不计入待处置告警，一般无需 day-collect 抢修；待处置告警=可行动的缺数/真滞后/池内分钟问题。");
         m.put("items", warnItems);
+        m.put("specialItems", specialItems);
         lastResult = m;
         return m;
     }
 
-    private String buildHint(Map<String, Object> breakdown, int symbolsInDaily, int universe, int ok) {
+    private String buildHint(Map<String, Object> breakdown, int symbolsInDaily, int universe,
+                             int ok, int warn, int special) {
         return "分层：universe 查 market_daily；目标池额外查 market_1min。"
-                + " 明细仅展示告警行（正常 " + ok + " 只不列表）。"
+                + " 待处置告警 " + warn + " 只进告警表；特殊项 " + special
+                + " 只（北交所/退市·PT/停牌）另表展示，不计入告警数。"
+                + " 正常 " + ok + " 只不列表。"
                 + " 库中有日线标的 " + symbolsInDaily + " 只 / 全市场 " + universe + " 只；"
                 + " 日线空 " + breakdown.get("emptyDaily")
-                + "（北交所 " + breakdown.get("emptyDailyBj")
-                + "、疑似退市/PT " + breakdown.get("emptyDailyLikelyDelisted")
-                + "、其它缺数 " + breakdown.get("emptyDailyOther") + "）。"
+                + "（北交所 " + breakdown.get("specialBj")
+                + "、疑似退市/PT " + breakdown.get("specialDelisted")
+                + "、其它缺数 " + breakdown.get("emptyDailyOther") + "）；"
+                + " 停牌特殊 " + breakdown.get("specialSuspended") + "。"
                 + " 「日线为空」= 库中该 symbol 行数为 0（非误报）。"
                 + " 修复：沪深缺数重跑 day-collect；北交所暂非 TDX 覆盖；幽灵代码"
                 + " python scripts/sync_stock_basic.py --deactivate-missing。"
                 + " 池内分钟：fetch_min1_tdx.py --from-pool。";
     }
 
-    /** symbol -> [count, epochDay of max trade_date]；无数据不入 map。 */
-    private Map<String, int[]> loadDailyStats() {
-        Map<String, int[]> map = new HashMap<String, int[]>();
+    /** symbol -> [count, epochDay of max trade_date, lastVol]；无数据不入 map。 */
+    private Map<String, long[]> loadDailyStats() {
+        Map<String, long[]> map = new HashMap<String, long[]>();
         try {
             jdbc.query(
-                    "SELECT symbol, COUNT(1) cnt, MAX(trade_date) mx FROM market_daily GROUP BY symbol",
+                    "SELECT d.symbol, d.cnt, d.mx, COALESCE(v.volume, 0) last_vol "
+                            + "FROM (SELECT symbol, COUNT(1) cnt, MAX(trade_date) mx "
+                            + "FROM market_daily GROUP BY symbol) d "
+                            + "LEFT JOIN market_daily v ON v.symbol = d.symbol AND v.trade_date = d.mx",
                     rs -> {
                         while (rs.next()) {
                             String sym = rs.getString(1);
-                            int cnt = rs.getInt(2);
+                            long cnt = rs.getLong(2);
                             java.sql.Date mx = rs.getDate(3);
+                            long lastVol = rs.getLong(4);
                             if (sym == null || cnt <= 0 || mx == null) {
                                 continue;
                             }
-                            map.put(sym, new int[]{cnt, (int) mx.toLocalDate().toEpochDay()});
+                            map.put(sym, new long[]{cnt, mx.toLocalDate().toEpochDay(), lastVol});
                         }
                         return null;
                     });
@@ -414,7 +448,7 @@ public class DataHealthService {
 
     private Map<String, Object> checkOneCached(String code, String name, boolean inPool,
                                               LocalDate today, LocalDateTime now,
-                                              int[] daily, Object[] minute) {
+                                              long[] daily, Object[] minute) {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.put("code", code);
         m.put("name", name);
@@ -423,33 +457,58 @@ public class DataHealthService {
         boolean dailyWarn = false;
         boolean minuteWarn = false;
         boolean dailyStale = false;
+        boolean special = false;
+        boolean specialSuspendedFlag = false;
 
-        int dayCnt = daily == null ? 0 : daily[0];
+        long dayCnt = daily == null ? 0L : daily[0];
         LocalDate maxDaily = daily == null ? null : LocalDate.ofEpochDay(daily[1]);
+        long lastVol = daily == null ? 0L : daily[2];
         m.put("dailyCount", dayCnt);
         m.put("maxDaily", maxDaily == null ? null : maxDaily.toString());
+        m.put("lastDailyVolume", lastVol);
 
         if (dayCnt <= 0 || maxDaily == null) {
-            dailyWarn = true;
             String kind = classifyEmptyDaily(code, name);
             m.put("emptyDailyKind", kind);
             if ("bj".equals(kind)) {
+                special = true;
                 issues.add("日线为空（北交所，当前 TDX 日线未覆盖）");
             } else if ("likely_delisted".equals(kind)) {
+                special = true;
                 issues.add("日线为空（名称含退市/PT等，库中确无0行）");
+            } else if (isSuspendedName(name)) {
+                special = true;
+                specialSuspendedFlag = true;
+                m.put("emptyDailyKind", "suspended");
+                issues.add("日线为空（名称含停牌）");
             } else {
+                dailyWarn = true;
                 issues.add("日线为空（库中该代码0行，可重跑 day-collect）");
             }
         } else {
             long lagDays = ChronoUnit.DAYS.between(maxDaily, today);
             m.put("dailyLagDays", lagDays);
-            if (lagDays > DAILY_STALE_DAYS) {
+            boolean suspended = isSuspendedName(name) || lastVol <= 0L;
+            if (suspended) {
+                special = true;
+                specialSuspendedFlag = true;
+                if (isSuspendedName(name)) {
+                    issues.add("名称含停牌");
+                }
+                if (lastVol <= 0L) {
+                    issues.add("最新日线成交量≤0（停牌/无量）");
+                }
+                if (lagDays > DAILY_STALE_DAYS) {
+                    issues.add("日线滞后" + lagDays + "天（停牌，不计入待处置）");
+                }
+            } else if (lagDays > DAILY_STALE_DAYS) {
                 dailyWarn = true;
                 dailyStale = true;
                 issues.add("日线滞后" + lagDays + "天");
             }
         }
         m.put("dailyStale", dailyStale);
+        m.put("specialSuspended", specialSuspendedFlag);
 
         int oneMinCnt = 0;
         LocalDateTime maxOneMin = null;
@@ -462,7 +521,8 @@ public class DataHealthService {
         m.put("maxOneMin", maxOneMin == null ? null : maxOneMin.format(DT_FMT));
         m.put("maxMinute", maxOneMin == null ? null : maxOneMin.format(DT_FMT));
 
-        if (inPool) {
+        // 特殊项（北交所/退市/停牌）不把池内分钟问题计入待处置告警
+        if (inPool && !special) {
             if (oneMinCnt <= 0 || maxOneMin == null) {
                 minuteWarn = true;
                 issues.add("池内1分钟为空");
@@ -479,11 +539,30 @@ public class DataHealthService {
                     issues.add("池内1分钟滞后" + lagHours + "小时");
                 }
             }
+        } else if (inPool && special) {
+            if (oneMinCnt <= 0 || maxOneMin == null) {
+                issues.add("池内1分钟为空（特殊项附注）");
+            }
         }
 
         m.put("dailyWarn", dailyWarn);
         m.put("minuteWarn", minuteWarn);
-        m.put("ok", issues.isEmpty());
+        boolean actionable = dailyWarn || minuteWarn;
+        if (issues.isEmpty()) {
+            m.put("ok", true);
+            m.put("severity", "ok");
+            m.put("actionNeeded", false);
+        } else if (special && !actionable) {
+            m.put("ok", false);
+            m.put("severity", "special");
+            m.put("actionNeeded", false);
+        } else {
+            // 有可行动问题则进待处置（即使同时带特殊标签也不进 specialItems）
+            m.put("ok", false);
+            m.put("severity", "warn");
+            m.put("actionNeeded", true);
+            // 若同时被标 special（理论上 special&&actionable 仅在未来扩展），仍以 warn 为准
+        }
         m.put("issues", issues);
         m.put("issueText", issues.isEmpty() ? "正常" : String.join("；", issues));
         return m;
@@ -502,6 +581,11 @@ public class DataHealthService {
         return "missing";
     }
 
+    /** 证券简称是否含停牌字样。 */
+    static boolean isSuspendedName(String name) {
+        return name != null && name.contains("停牌");
+    }
+
     private static final class HealthRunState {
         volatile boolean running;
         volatile Boolean ok;
@@ -516,6 +600,7 @@ public class DataHealthService {
         volatile int poolSize;
         volatile int okSoFar;
         volatile int warnSoFar;
+        volatile int specialSoFar;
         volatile LocalDateTime startedAt;
         volatile LocalDateTime finishedAt;
         volatile Map<String, Object> result;

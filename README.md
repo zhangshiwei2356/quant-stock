@@ -177,7 +177,7 @@ sequenceDiagram
 | 二级 | 功能 |
 |------|------|
 | 任务管理 | `sys_schedule_job` 启停 / cron / 立即执行（种子默认全关；执行一次弹进度框+页内横幅，可「收起到页内」；长任务 `i/n`） |
-| 数据健康 | 覆盖检查（异步进度；明细仅告警；日线空区分北交所/疑似退市/缺数）+ 分钟自洽（默认不阻断开仓） |
+| 数据健康 | 覆盖检查（异步进度；待处置告警 vs 特殊项分表；北交所空/退市·PT/停牌不计入待处置）+ 分钟自洽 + MDS/TDX 抽样对账（默认不阻断开仓） |
 | 运行参数 | 全局白名单可写（`quant.prop.*`）+ **按策略稀疏参数包**（表 `strategy_param`）；回测还可带 **本次临时改参**（`paramOverrides`，不落库） |
 
 总闸：`quant.schedule.enabled`（默认 true）。
@@ -224,7 +224,7 @@ sequenceDiagram
   - `market_1min`：池内交易 / 分钟回测物理真相源（价额为**元**；`data_source`=`MOCK`/`TDX`/`MDS`）；5/15/30/60 由分钟内存聚合
   - `market_daily`：全市场选股 / `pool-rebuild` 日线真相源（价额为**元**；首期 `adj_flag=NONE`）；`quant.day-source` 默认 `auto`（优先日线表，空则分钟聚日）
 - 日线回填：`python scripts/fetch_daily_tdx.py --from-basic --years 1`（默认增量、已齐跳过、`--workers 4`；升级脚本 `scripts/sql/20260805_market_daily.sql`）
-- 日频因子：`POST /api/ops/factor-daily/rebuild` 或定时任务 `factor-daily-rebuild`；`pool-rebuild` 默认会预刷新（`quant.pool-rebuild-refresh-factors`）
+- 日频因子：`POST /api/ops/factor-daily/rebuild` 或定时任务 `factor-daily-rebuild`；`pool-rebuild` 默认**不**预刷（`quant.pool-rebuild-refresh-factors=false`，可开）
 - 1 分钟回填：`python scripts/fetch_min1_tdx.py --from-pool`（写入 `data_source=TDX`）；升级脚本 `scripts/sql/20260803_market_1min_data_source.sql`
 - 回测历史/分析：`bt_backtest_record` / `bt_backtest_analysis`（亦可落盘 `quant.history-dir`）；落库时写入注册策略 `strategy_id`
 - 重新生成模拟种子：`mvn -q compile exec:java -Dexec.mainClass=com.quant.stock.market.mock.MockKlineDataGenerator`
@@ -256,7 +256,8 @@ sequenceDiagram
 | `quant.trade-mode` | `sim`（默认）本地模拟、即时 FILLED 并记账，不连柜台；`sdk` 先 SUBMITTED（占资/占仓），`sync-orders` 推进 FILLED 后再落账（当前为桩） |
 | `quant.market-mode` | `db`（默认）读 MySQL：DAY 优先 `market_daily`，分钟读 `market_1min`；`json` 读 classpath JSON；`sdk` 走 `KlineSdkClient`（多为桩） |
 | `quant.day-source` | `auto`（默认）优先日线表，空则分钟聚日；`table` 仅日线表；`aggregate` 仅分钟聚日 |
-| `quant.pool-rebuild-refresh-factors` | `true`（默认）pool-rebuild 前重算 `factor_daily`；全市场较慢时可关 |
+| `quant.pool-rebuild-refresh-factors` | `false`（默认）pool-rebuild 前不重算 `factor_daily`（加速入池；需要时可开或单独跑 `factor-daily-rebuild`） |
+| `quant.pool-rebuild-full-backtest` | `false`（默认）轻量扫池只算指标/信号/动量；`true` 时每只跑完整 `BackTestEngine`（很慢） |
 | `quant.pool-rebuild-backfill-minute` | `false`（默认）扫池后异步跑 TDX 池内分钟脚本；需同时开 `tdx-script.enabled` |
 | `quant.tdx-script.*` | 通达信 Python 灌数桥接（**默认 enabled=true**）；`python` / `working-dir` / `min1-script` / `daily-script` / `timeout-seconds`；无 Python/pytdx 时可改 `false` |
 | `quant.kuangrui.enabled` / `mds.enabled` | 宽睿旁路总闸 / MDS L1（**默认 false**）；真实客户端需 `mvn -Pkuangrui`；价÷10000 写 `market_1min(MDS)` |
@@ -304,8 +305,9 @@ sequenceDiagram
 | POST `/api/account/orders/{id}/partial-fill?qty=` | 本地部成桩 |
 | POST `/api/account/orders/{id}/replace?price=&volume=` | 改价=撤补（新单队尾） |
 | GET/PUT/POST `/api/schedule/**` | 定时任务（长任务「执行一次」后台跑；`GET /api/schedule/run-status` 轮询进度） |
-| GET `/api/ops/data-health` · `/params` · `/strategies` | 最近覆盖检查结果 / 运行参数（`?strategyId=` 含稀疏/生效预览） / 已注册策略 |
-| POST `/api/ops/data-health/run` · GET `/status` | 异步覆盖检查 + 进度（弹框：加载标的→逐只日线/分钟） |
+| GET `/api/ops/data-health` · `/params` · `/strategies` | 最近覆盖检查结果（含 `warnItems`/`specialItems`） / 运行参数（`?strategyId=` 含稀疏/生效预览） / 已注册策略 |
+| POST `/api/ops/data-health/run` · GET `/status` | 异步覆盖检查 + 进度（弹框：加载标的→逐只日线/分钟；完成文案含待处置告警数） |
+| POST `/api/ops/data-health/mds-tdx-sample?limit=` | 抽样对账 `market_1min` TDX vs MDS（条数/最新时间/重叠收盘 bp，阈 50） |
 | POST `/api/ops/params` | 全局白名单热写（`quant.prop.*`，`confirm:true`） |
 | POST `/api/ops/strategy-params` | 策略稀疏包热写（`strategyId` + `updates`/`clearKeys` + `confirm:true`） |
 | POST `/api/ops/active-strategy` | 纸面激活策略热切换（须 `confirm:true`） |
@@ -324,7 +326,7 @@ sequenceDiagram
 - 已实现：`scan-and-trade` / `pool-rebuild` / `after-market-batch-scan` / `settle-after-close` / `data-validate` / `factor-daily-rebuild` / `day-collect` / `pool-minute-backfill` / `sync-orders` / `position-pnl-sync`
   - `settle-after-close`：权益日记最近交易日；刷新/落库 `market_1min`（更大周期查询时内存聚合）
   - `data-validate`：分层——universe 查 `market_daily`，目标池查 `market_1min`
-  - `factor-daily-rebuild`：日线 → `factor_daily`；`pool-rebuild` 默认同预刷新
+  - `factor-daily-rebuild`：日线 → `factor_daily`；`pool-rebuild` 默认不预刷（可开 `pool-rebuild-refresh-factors`）
   - `day-collect` / `pool-minute-backfill`：TDX 脚本补齐（依赖本机 `python` + `pytdx`/`pymysql`；`quant.tdx-script.enabled` 默认 true）
     - **推荐手动三步**：① `day-collect`（同步列表；已齐日线跳过，否则增量；默认 4 线程）→ ② `pool-rebuild`（入池）→ ③ `pool-minute-backfill`（池内分钟尽量拉满~90日并补到最近）
     - 仅刷新列表：`python scripts/sync_stock_basic.py`（东方财富优先，失败回退 TDX）

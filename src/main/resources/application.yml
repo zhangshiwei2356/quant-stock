@@ -48,8 +48,10 @@ quant:
   market-mode: db
   # 日线：auto=优先 market_daily（选股），空则 market_1min 聚日；table=仅日线表；aggregate=仅分钟聚日
   day-source: auto
-  # pool-rebuild 前是否重算 factor_daily（全市场有日线时较慢，可关）
-  pool-rebuild-refresh-factors: true
+  # pool-rebuild 前是否重算 factor_daily（默认关加速；需要时可开或单独跑 factor-daily-rebuild）
+  pool-rebuild-refresh-factors: false
+  # pool-rebuild 是否每只跑完整日线回测（默认关=轻量扫池只算指标/信号；开则很慢）
+  pool-rebuild-full-backtest: false
   # pool-rebuild 后是否异步跑 TDX 池内分钟脚本（需 tdx-script.enabled=true）
   pool-rebuild-backfill-minute: false
   # 通达信 Python 灌数（day-collect / pool-minute-backfill；需 pip install pytdx pymysql）

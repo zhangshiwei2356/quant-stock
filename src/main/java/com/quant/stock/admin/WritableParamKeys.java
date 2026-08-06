@@ -39,6 +39,8 @@ public final class WritableParamKeys {
         w.put("maxParticipationAdv", "decimal");
         w.put("limitPriceProtectEnabled", "bool");
         w.put("nextBarOpenFill", "bool");
+        w.put("poolRebuildRefreshFactors", "bool");
+        w.put("poolRebuildFullBacktest", "bool");
         w.put("dailyLossLimitPct", "decimal");
         w.put("consecutiveLossLimit", "int");
         w.put("drawdownReducePct", "decimal");

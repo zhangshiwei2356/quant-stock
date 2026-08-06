@@ -38,6 +38,10 @@ public final class WritableParamApplier {
                 props.setLimitPriceProtectEnabled(v);
             } else if ("nextBarOpenFill".equals(key)) {
                 props.setNextBarOpenFill(v);
+            } else if ("poolRebuildRefreshFactors".equals(key)) {
+                props.setPoolRebuildRefreshFactors(v);
+            } else if ("poolRebuildFullBacktest".equals(key)) {
+                props.setPoolRebuildFullBacktest(v);
             } else {
                 throw new IllegalArgumentException("未绑定 bool 键");
             }
@@ -214,6 +218,12 @@ public final class WritableParamApplier {
         }
         if ("nextBarOpenFill".equals(key)) {
             return String.valueOf(props.isNextBarOpenFill());
+        }
+        if ("poolRebuildRefreshFactors".equals(key)) {
+            return String.valueOf(props.isPoolRebuildRefreshFactors());
+        }
+        if ("poolRebuildFullBacktest".equals(key)) {
+            return String.valueOf(props.isPoolRebuildFullBacktest());
         }
         if ("dailyLossLimitPct".equals(key)) {
             return props.getDailyLossLimitPct() == null ? null : props.getDailyLossLimitPct().toPlainString();
