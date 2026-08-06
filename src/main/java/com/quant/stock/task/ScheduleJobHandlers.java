@@ -208,14 +208,18 @@ public class ScheduleJobHandlers {
      * TODO(api): 全市场行情源就绪后，universe 来自外部列表；筛选因子可接更多 API。
      */
     public void poolRebuild() {
-        runWithLock("job:pool-rebuild", 600, new Runnable() {
+        // 全市场因子预刷 + 粗筛扫描常需数十分钟；锁 TTL 须覆盖整段，避免中途锁过期被二次触发
+        runWithLock("job:pool-rebuild", 7200, new Runnable() {
             @Override
             public void run() {
                 jobProgressHub.phase("running", "执行中", "全市场入池扫描进行中…");
-                Map<String, Object> out = tradePoolService.rebuildFromUniverse();
-                log.info("[pool-rebuild] selected={} codes={} minuteHint={}",
-                        out.get("selected"), out.get("codes"), out.get("minuteBackfillHint"));
-                jobProgressHub.note("入池完成 selected=" + out.get("selected"));
+                // 与目标池页「扫描更新」一致：覆盖池 + 写批次 + Markdown 报告
+                Map<String, Object> out = tradePoolService.analyzeAndRecommend();
+                log.info("[pool-rebuild] selected={} codes={} report={} minuteHint={}",
+                        out.get("selected"), out.get("codes"), out.get("reportFileName"),
+                        out.get("minuteBackfillHint"));
+                jobProgressHub.note("入池完成 selected=" + out.get("selected")
+                        + (out.get("batchId") != null ? (" batchId=" + out.get("batchId")) : ""));
             }
         });
     }

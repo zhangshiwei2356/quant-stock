@@ -524,10 +524,10 @@
     <div id="viewTradePool" class="workspace-view" hidden>
       <section class="panel">
         <h3>当前池 <span id="tpPoolBadge" class="trade-pool-count">0</span></h3>
-        <p class="hint">当前生效的可买名单（盘后扫描自动覆盖）。实盘分钟扫描只盯本列表；「移出」仅退出池，不停仓、不卖出。点击一行展开分析。</p>
+        <p class="hint">当前生效的可买名单（盘后扫描自动覆盖）。实盘分钟扫描只盯本列表；「移出」仅退出池，不停仓、不卖出。点击一行展开分析。「扫描更新」走运维任务 <code>pool-rebuild</code>（异步进度弹框）。</p>
         <div class="toolbar" style="margin-top:8px;">
           <button type="button" id="btnTpRebuild"
-                  title="立即全市场扫描并覆盖当前目标池（写入新批次，可生成 Markdown 报告）">扫描更新</button>
+                  title="提交 pool-rebuild：全市场扫描并覆盖当前目标池（异步进度弹框；写入新批次与 Markdown 报告）">扫描更新</button>
           <button type="button" id="btnTpRefresh" class="secondary"
                   title="仅重新加载当前池名单，不发起扫描">刷新列表</button>
           <a id="tpReportLink" class="secondary" href="#" hidden
@@ -567,10 +567,10 @@
     <div id="viewTpHistory" class="workspace-view" hidden>
       <section class="panel">
         <h3>扫描历史</h3>
-        <p class="hint" id="tpHistHint">查看历次扫描批次与入选明细。可在此手动「扫描更新」生成新批次；「刷新列表」只重新拉取历史，不扫描。</p>
+        <p class="hint" id="tpHistHint">查看历次扫描批次与入选明细。「扫描更新」与运维 <code>pool-rebuild</code> 相同（异步进度弹框）；「刷新列表」只重新拉取历史，不扫描。</p>
         <div class="toolbar" style="margin-top:8px;">
           <button type="button" id="btnTpHistRebuild"
-                  title="立即全市场扫描并覆盖当前目标池，同时写入本页可查看的新批次">扫描更新</button>
+                  title="提交 pool-rebuild：全市场扫描并覆盖目标池，写入本页可查看的新批次（异步进度弹框）">扫描更新</button>
           <button type="button" id="btnTpHistRefresh" class="secondary"
                   title="仅重新加载下方批次列表，不发起扫描、不改动目标池">刷新列表</button>
           <span class="field-hint" id="tpHistMeta"></span>
@@ -619,6 +619,7 @@
               结果写入下方「覆盖汇总」与明细表；全市场较多时会弹出进度框。
             </p>
             <ul class="ops-action-points">
+              <li>结果明细<strong>只列告警</strong>（正常不展示）</li>
               <li>全市场 → 查日线表 <code>market_daily</code></li>
               <li>目标池 → 额外查分钟表 <code>market_1min</code></li>
               <li>不改库，只读检查</li>
@@ -663,7 +664,7 @@
           <table class="tp-table">
             <thead>
             <tr>
-              <th>代码</th><th>状态</th><th>日线条数</th><th>日线最新</th><th>分钟条数</th><th>分钟最新</th><th>问题</th>
+              <th>代码</th><th>状态</th><th>日线条数</th><th>日线最新</th><th>分钟条数</th><th>分钟最新</th><th>问题（仅告警）</th>
             </tr>
             </thead>
             <tbody id="healthBody">

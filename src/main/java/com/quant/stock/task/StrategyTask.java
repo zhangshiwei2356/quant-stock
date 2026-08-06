@@ -1170,12 +1170,12 @@ public class StrategyTask {
             batchStockBackTestService.scanAll();
             return;
         }
-        // 与 ScheduleJobHandlers.poolRebuild 同锁键
-        if (!redisLockUtil.tryLock("job:pool-rebuild", 600)) {
+        // 与 ScheduleJobHandlers.poolRebuild 同锁键；TTL 须覆盖因子预刷+全市场扫描
+        if (!redisLockUtil.tryLock("job:pool-rebuild", 7200)) {
             throw new IllegalStateException("目标池重建忙，请稍后重试");
         }
         try {
-            tradePoolService.rebuildFromUniverse();
+            tradePoolService.analyzeAndRecommend();
         } finally {
             redisLockUtil.unlock("job:pool-rebuild");
         }

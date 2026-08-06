@@ -1049,6 +1049,9 @@
       $('#sidePoolCount, #tpPoolBadge').text(String(count));
       $('#tpPoolHint').text('目标池 ' + count + ' / 上限 ' + maxFinal);
       applyTradePoolForBacktest(items);
+      if (data && data.lastScan) {
+        renderTpFunnel(data.lastScan);
+      }
 
       var $tb = $('#tpPoolBody').empty();
       if (!items.length) {
@@ -3864,6 +3867,8 @@
   var scheduleRunIdleStreak = 0;
   var scheduleRunPollOkAt = 0;
   var scheduleRunPollFail = 0;
+  /** 目标池页发起的 pool-rebuild：完成后刷新列表/漏斗 */
+  var pendingTradePoolScanOpts = null;
 
   function formatElapsedSec(sec) {
     sec = Math.max(0, Number(sec) || 0);
@@ -3898,6 +3903,14 @@
       var busy = !!(runningCode && code === runningCode);
       $(this).prop('disabled', busy).text(busy ? '执行中…' : '执行一次');
     });
+    var tpBusy = !!(runningCode && (runningCode === 'pool-rebuild' || runningCode === 'after-market-batch-scan'));
+    $('#btnTpRebuild, #btnTpHistRebuild').each(function () {
+      var $b = $(this);
+      if (!$b.data('tpScanIdleText')) {
+        $b.data('tpScanIdleText', $.trim($b.text()) || '扫描更新');
+      }
+      $b.prop('disabled', tpBusy).text(tpBusy ? '扫描中…' : $b.data('tpScanIdleText'));
+    });
   }
 
   function isTdxProgressJob(jobCode) {
@@ -3911,7 +3924,7 @@
       $phases.find('[data-phase="sync"]').text('① 同步列表');
       $phases.find('[data-phase="fetch"]').text(jobCode === 'day-collect' ? '② 拉取日线' : '② 拉取分钟');
     } else {
-      $phases.find('[data-phase="sync"]').text('① 已受理');
+      $phases.find('[data-phase="sync"]').text('① 排队/受理');
       $phases.find('[data-phase="fetch"]').text('② 执行中');
     }
     $phases.find('[data-phase="done"]').text('③ 完成');
@@ -3922,10 +3935,11 @@
     if (!$phases.length) return;
     applyPhaseLabels(jobCode || scheduleRunPollCode);
     var show = running || phase === 'sync' || phase === 'fetch' || phase === 'done' || phase === 'error'
-      || phase === 'starting' || phase === 'running';
+      || phase === 'starting' || phase === 'queued' || phase === 'running';
     if (show) $phases.show(); else $phases.hide();
     var map = {
       starting: 'sync',
+      queued: 'sync',
       idle: 'sync',
       running: 'fetch',
       sync: 'sync',
@@ -3997,11 +4011,12 @@
       $phases.find('[data-phase="fetch"]').text(
         (jobCode || scheduleRunPollCode) === 'day-collect' ? '② 拉取日线' : '② 拉取分钟');
     } else {
-      $phases.find('[data-phase="sync"]').text('① 已受理');
+      $phases.find('[data-phase="sync"]').text('① 排队/受理');
       $phases.find('[data-phase="fetch"]').text('② 执行中');
     }
     var map = {
       starting: 'sync',
+      queued: 'sync',
       idle: 'sync',
       running: 'fetch',
       sync: 'sync',
@@ -4292,6 +4307,14 @@
           }
           scheduleRunStartedAtMs = 0;
           loadScheduleJobs();
+          // 目标池「扫描更新」走 pool-rebuild：完成后刷新池/历史/漏斗
+          if (mr.ok === true && (mr.jobCode === 'pool-rebuild' || mr.jobCode === 'after-market-batch-scan')) {
+            pendingTradePoolScanOpts = null;
+            loadTradePoolManage();
+            loadTpScanHistory();
+          } else if (mr.ok === false) {
+            pendingTradePoolScanOpts = null;
+          }
         } else {
           renderScheduleRunBanner(data);
         }
@@ -4900,21 +4923,41 @@
     $('#healthWarn').attr('class', 'value ' + (data.warnCount > 0 ? 'pnl-neg' : ''))
       .text(String(data.warnCount == null ? '—' : data.warnCount));
     $('#healthBadge').text(String(data.warnCount == null ? 0 : data.warnCount));
-    $('#healthMeta').text(data.asOf ? ('检查时间：' + fmtDateTimeDisplay(data.asOf)) : '');
+    $('#healthMeta').text(data.asOf ? ('检查时间：' + fmtDateTimeDisplay(data.asOf) + ' · 明细仅告警') : '');
+    var bd = data.breakdown || {};
+    if (bd.emptyDaily != null) {
+      var parts = [];
+      if (bd.emptyDailyBj) parts.push('北交所空 ' + bd.emptyDailyBj);
+      if (bd.emptyDailyLikelyDelisted) parts.push('疑似退市空 ' + bd.emptyDailyLikelyDelisted);
+      if (bd.emptyDailyOther) parts.push('其它空 ' + bd.emptyDailyOther);
+      if (bd.minuteWarn) parts.push('分钟告警 ' + bd.minuteWarn);
+      if (parts.length) {
+        $('#healthMeta').text(($('#healthMeta').text() || '') + ' · ' + parts.join(' / '));
+      }
+    }
     var items = data.items || [];
+    // 后端已 warn_only；前端再滤一层，避免旧结果夹带正常行
+    items = items.filter(function (it) { return !it.ok; });
     var $tb = $('#healthBody').empty();
     if (!items.length) {
-      $tb.html('<tr><td colspan="7" class="empty-state">无标的或尚未执行覆盖检查</td></tr>');
+      var emptyMsg = (data.warnCount === 0 && data.okCount > 0)
+        ? '全部正常，无告警明细'
+        : '无告警标的或尚未执行覆盖检查';
+      $tb.html('<tr><td colspan="7" class="empty-state">' + emptyMsg + '</td></tr>');
       return;
     }
     items.sort(function (a, b) {
-      return (a.ok === b.ok) ? 0 : (a.ok ? 1 : -1);
+      var ka = String(a.emptyDailyKind || '') + String(a.code || '');
+      var kb = String(b.emptyDailyKind || '') + String(b.code || '');
+      return ka < kb ? -1 : (ka > kb ? 1 : 0);
     });
     items.forEach(function (it) {
       $tb.append(
         '<tr>'
-        + '<td><b>' + escHtml(it.code) + '</b></td>'
-        + '<td>' + (it.ok ? '<span class="tag-buy">正常</span>' : '<span class="tag-wait">告警</span>') + '</td>'
+        + '<td><b>' + escHtml(it.code) + '</b>'
+        + (it.name ? (' <span class="muted">' + escHtml(it.name) + '</span>') : '')
+        + '</td>'
+        + '<td><span class="tag-wait">告警</span></td>'
         + '<td class="mono">' + escHtml(String(it.dailyCount == null ? '—' : it.dailyCount)) + '</td>'
         + '<td class="mono">' + escHtml(it.maxDaily || '—') + '</td>'
         + '<td class="mono">' + escHtml(String(it.minuteCount == null ? '—' : it.minuteCount)) + '</td>'
@@ -5620,41 +5663,103 @@
   }
 
   /**
-   * 手动触发目标池扫描（analyze：覆盖池 + 写批次/报告）。
+   * 手动触发目标池扫描：与运维「pool-rebuild / 全市场入池扫描」同一异步任务 + 进度弹框。
+   * （不再同步 POST /analyze，否则无进度且易超时。）
    * @param {JQuery} $btn
    * @param {{refreshHistory?: boolean, showFunnel?: boolean}} [opts]
    */
   function runTradePoolScan($btn, opts) {
     opts = opts || {};
-    var oldText = $btn && $btn.length ? $.trim($btn.text()) : '扫描更新';
+    var code = 'pool-rebuild';
+    var jobName = (scheduleJobsByCode[code] && scheduleJobsByCode[code].jobName) || '全市场入池扫描';
+    var asyncStarted = false;
     if ($btn && $btn.length) {
-      $btn.prop('disabled', true).text('扫描中…');
+      if (!$btn.data('tpScanIdleText')) {
+        $btn.data('tpScanIdleText', $.trim($btn.text()) || '扫描更新');
+      }
+      $btn.prop('disabled', true).text('提交中…');
     }
-    toast('正在全市场扫描并覆盖目标池…', 'info');
-    $.post('/api/stock/trade-pool/analyze').done(function (res) {
+    pendingTradePoolScanOpts = {
+      refreshHistory: !!opts.refreshHistory,
+      showFunnel: opts.showFunnel !== false
+    };
+    var startSummary = '已受理「' + jobName + '」，正在启动全市场入池扫描…';
+    scheduleProgressModalMinimized = false;
+    renderScheduleRunBanner({
+      manualRun: {
+        jobCode: code,
+        jobName: jobName,
+        running: true,
+        progressKind: 'generic',
+        phase: 'starting',
+        phaseLabel: '已受理',
+        summary: startSummary,
+        message: startSummary,
+        elapsedSec: 0
+      },
+      tdxScript: { running: false }
+    }, { forceRunning: true });
+    toast('正在提交「' + jobName + '」…', 'info');
+    $.post('/api/schedule/jobs/' + encodeURIComponent(code) + '/run').done(function (res) {
+      if (res && res.async) {
+        asyncStarted = true;
+        scheduleRunStartedAtMs = Date.now();
+        scheduleRunSeenFinishedKey = '';
+        toast((res.message) || ('已开始「' + jobName + '」，请看进度弹框'), 'info', { duration: 6500 });
+        var summary2 = (res.manualRun && res.manualRun.summary) || startSummary;
+        renderScheduleRunBanner({
+          manualRun: Object.assign({
+            jobCode: code,
+            jobName: jobName,
+            running: true,
+            progressKind: 'generic',
+            phase: 'starting',
+            phaseLabel: '已受理',
+            elapsedSec: 0
+          }, res.manualRun || {}, {
+            summary: summary2,
+            message: res.message || summary2,
+            running: true
+          }),
+          tdxScript: { running: false }
+        }, { forceRunning: true });
+        applyScheduleRunButtons(code);
+        startScheduleRunPoll(code);
+        return;
+      }
+      // 兜底：同步完成（旧后端）
+      showScheduleProgressModal(false);
+      pendingTradePoolScanOpts = null;
       if (opts.showFunnel !== false) {
-        renderTpFunnel(res);
+        renderTpFunnel(res || {});
       }
-      var msg = '目标池已更新：' + (res.selected != null ? res.selected : 0)
-        + ' 只 · 全市场 ' + (res.universe || 0)
-        + ' → 入选 ' + (res.selected || 0)
-        + (res.batchId ? (' · 批次 ' + res.batchId) : '');
-      toast(msg, 'ok');
-      if (res.minuteBackfill && res.minuteBackfill.async) {
-        toast('已提交池内分钟异步回填（TDX 脚本）', 'info');
-      } else if (res.minuteBackfillHint && (res.selected || 0) > 0) {
-        toast('请补池内分钟：' + res.minuteBackfillHint
-          + '（或运维开启 tdx-script 后 POST /api/ops/tdx-script/backfill-min1）', 'info');
-      }
+      toast((res && res.message) ? res.message : ('已执行 ' + jobName), 'ok');
       loadTradePoolManage();
       if (opts.refreshHistory) {
         loadTpScanHistory();
       }
     }).fail(function (xhr) {
-      toast((xhr.responseJSON && xhr.responseJSON.message) || '扫描失败', 'err');
+      pendingTradePoolScanOpts = null;
+      var msg = (xhr.responseJSON && (xhr.responseJSON.message || xhr.responseJSON.error))
+        || '扫描提交失败';
+      renderScheduleRunBanner({
+        manualRun: {
+          jobCode: code,
+          jobName: jobName,
+          running: false,
+          ok: false,
+          phase: 'error',
+          phaseLabel: '失败',
+          finishedAt: new Date().toISOString().slice(0, 19).replace(' ', 'T').replace('T', ' '),
+          summary: msg,
+          message: msg
+        },
+        tdxScript: { running: false }
+      });
+      toast(msg, 'err', { duration: 5000 });
     }).always(function () {
-      if ($btn && $btn.length) {
-        $btn.prop('disabled', false).text(oldText || '扫描更新');
+      if (!asyncStarted && $btn && $btn.length) {
+        $btn.prop('disabled', false).text($btn.data('tpScanIdleText') || '扫描更新');
       }
     });
   }

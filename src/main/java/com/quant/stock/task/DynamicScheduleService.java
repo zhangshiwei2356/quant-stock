@@ -243,6 +243,10 @@ public class DynamicScheduleService implements ApplicationRunner {
 
     /** 手动执行进度（含 TDX 脚本行进度），供页面轮询。 */
     public Map<String, Object> runStatus() {
+        // 轮询时也顺带回收僵尸，避免页面一直「已受理」
+        synchronized (manualRunRef) {
+            clearZombieManualRunLocked();
+        }
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.put("manualRun", snapshotManualRun());
         m.put("tdxScript", tdxScriptBackfillService.status());
@@ -252,10 +256,12 @@ public class DynamicScheduleService implements ApplicationRunner {
 
     private Map<String, Object> startAsyncManual(String jobCode) {
         synchronized (manualRunRef) {
+            clearZombieManualRunLocked();
             ManualRunState cur = manualRunRef.get();
             if (cur != null && cur.running) {
                 throw new IllegalStateException("已有手动任务在执行: " + cur.jobCode
-                        + "（请等待完成后再点）");
+                        + "（阶段 " + (cur.phaseLabel == null ? cur.phase : cur.phaseLabel)
+                        + "，已用时 " + elapsedSecOf(cur) + "s；请等待完成后再点）");
             }
             Map<String, Object> tdxSt = tdxScriptBackfillService.status();
             if (Boolean.TRUE.equals(tdxSt.get("running")) && TDX_PROGRESS_JOBS.contains(jobCode)) {
@@ -267,8 +273,8 @@ public class DynamicScheduleService implements ApplicationRunner {
             state.running = true;
             state.ok = null;
             state.progressKind = TDX_PROGRESS_JOBS.contains(jobCode) ? "tdx" : "generic";
-            state.phase = "starting";
-            state.phaseLabel = "已受理";
+            state.phase = "queued";
+            state.phaseLabel = "排队中";
             state.summary = manualStartSummary(jobCode);
             state.message = longJobStartMessage(jobCode);
             state.startedAt = LocalDateTime.now();
@@ -279,87 +285,22 @@ public class DynamicScheduleService implements ApplicationRunner {
             state.currentSymbol = null;
             state.detail = state.summary;
             manualRunRef.set(state);
-            jobProgressHub.attach(new JobProgressHub.Listener() {
-                @Override
-                public void onPhase(String phase, String phaseLabel, String summary) {
-                    if (phase != null) {
-                        state.phase = phase;
-                    }
-                    if (phaseLabel != null) {
-                        state.phaseLabel = phaseLabel;
-                    }
-                    if (summary != null) {
-                        state.summary = summary;
-                        state.message = summary;
-                        state.detail = summary;
-                    }
-                }
-
-                @Override
-                public void onTick(int index, int total, String current, String detail) {
-                    if (total > 0) {
-                        int idx = Math.max(0, index);
-                        int tot = total;
-                        if (idx > tot) {
-                            idx = tot;
-                        }
-                        state.progressIndex = idx;
-                        state.progressTotal = tot;
-                        state.progressPct = (int) Math.min(100L, Math.round(100.0 * idx / tot));
-                        state.phase = "running";
-                        state.phaseLabel = "执行中";
-                    }
-                    if (current != null && !current.isEmpty()) {
-                        state.currentSymbol = current;
-                    }
-                    if (detail != null && !detail.isEmpty()) {
-                        state.detail = detail;
-                        state.summary = detail;
-                        state.message = detail;
-                    } else if (total > 0) {
-                        String line = "进度 " + state.progressIndex + " / " + state.progressTotal
-                                + (state.currentSymbol != null ? (" · 当前 " + state.currentSymbol) : "");
-                        state.detail = line;
-                        state.summary = line;
-                        state.message = line;
-                    }
-                }
-            });
-            manualRunExecutor.submit(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        state.phase = "running";
-                        state.phaseLabel = "执行中";
-                        state.summary = "正在执行「" + state.jobName + "」…";
-                        state.message = state.summary;
-                        state.detail = state.summary;
-                        invoke(jobCode, true);
-                        state.ok = true;
-                        state.phase = "done";
-                        state.phaseLabel = "已完成";
-                        if (state.progressTotal != null && state.progressTotal > 0) {
-                            state.progressIndex = state.progressTotal;
-                            state.progressPct = 100;
-                        }
-                        state.summary = "「" + state.jobName + "」已完成";
-                        state.message = "执行完成";
-                        state.detail = state.summary;
-                    } catch (Exception e) {
-                        state.ok = false;
-                        state.phase = "error";
-                        state.phaseLabel = "失败";
-                        state.message = e.getMessage() == null ? "执行失败" : e.getMessage();
-                        state.summary = "「" + state.jobName + "」失败：" + state.message;
-                        state.detail = state.summary;
-                        log.warn("手动任务后台失败 {}: {}", jobCode, state.message);
-                    } finally {
-                        jobProgressHub.detach();
-                        state.running = false;
-                        state.finishedAt = LocalDateTime.now();
-                    }
-                }
-            });
+            try {
+                jobProgressHub.attach(new ManualRunProgressListener(state));
+                manualRunExecutor.submit(new ManualRunTask(state, jobCode));
+            } catch (RuntimeException e) {
+                // 避免 set 成功但提交失败留下永远「已受理/排队中」的僵尸任务
+                jobProgressHub.detach();
+                state.running = false;
+                state.ok = false;
+                state.phase = "error";
+                state.phaseLabel = "失败";
+                state.message = e.getMessage() == null ? "提交后台任务失败" : e.getMessage();
+                state.summary = "「" + state.jobName + "」启动失败：" + state.message;
+                state.detail = state.summary;
+                state.finishedAt = LocalDateTime.now();
+                throw e;
+            }
         }
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.put("ok", true);
@@ -371,6 +312,41 @@ public class DynamicScheduleService implements ApplicationRunner {
         m.put("poll", "/api/schedule/run-status");
         m.put("manualRun", snapshotManualRun());
         return m;
+    }
+
+    /**
+     * 回收「已标记 running 但执行线程从未接手」的僵尸态（常见于热加载 NoSuchMethodError）。
+     * 须在持有 {@code manualRunRef} 锁时调用。
+     */
+    private void clearZombieManualRunLocked() {
+        ManualRunState cur = manualRunRef.get();
+        if (cur == null || !cur.running) {
+            return;
+        }
+        String ph = cur.phase == null ? "" : cur.phase;
+        boolean notStarted = "starting".equals(ph) || "queued".equals(ph);
+        long elapsed = elapsedSecOf(cur);
+        // 超过 20s 仍停在排队/已受理 → 判定未真正开跑
+        if (notStarted && elapsed >= 20L) {
+            log.warn("回收僵尸手动任务 {} phase={} elapsed={}s", cur.jobCode, ph, elapsed);
+            jobProgressHub.detach();
+            cur.running = false;
+            cur.ok = false;
+            cur.phase = "error";
+            cur.phaseLabel = "失败";
+            cur.message = "任务未真正启动（可能热加载中断），已自动清理，请再点一次「执行一次」";
+            cur.summary = "「" + cur.jobName + "」" + cur.message;
+            cur.detail = cur.summary;
+            cur.finishedAt = LocalDateTime.now();
+        }
+    }
+
+    private static long elapsedSecOf(ManualRunState state) {
+        if (state == null || state.startedAt == null) {
+            return 0L;
+        }
+        LocalDateTime end = state.finishedAt != null ? state.finishedAt : LocalDateTime.now();
+        return java.time.Duration.between(state.startedAt, end).getSeconds();
     }
 
     private String longJobStartMessage(String jobCode) {
@@ -454,6 +430,108 @@ public class DynamicScheduleService implements ApplicationRunner {
             m.put("elapsedSec", java.time.Duration.between(state.startedAt, end).getSeconds());
         }
         return m;
+    }
+
+    private static final class ManualRunProgressListener implements JobProgressHub.Listener {
+        private final ManualRunState state;
+
+        private ManualRunProgressListener(ManualRunState state) {
+            this.state = state;
+        }
+
+        @Override
+        public void onPhase(String phase, String phaseLabel, String summary) {
+            if (phase != null) {
+                state.phase = phase;
+            }
+            if (phaseLabel != null) {
+                state.phaseLabel = phaseLabel;
+            }
+            if (summary != null) {
+                state.summary = summary;
+                state.message = summary;
+                state.detail = summary;
+            }
+        }
+
+        @Override
+        public void onTick(int index, int total, String current, String detail) {
+            if (total > 0) {
+                int idx = Math.max(0, index);
+                int tot = total;
+                if (idx > tot) {
+                    idx = tot;
+                }
+                state.progressIndex = idx;
+                state.progressTotal = tot;
+                state.progressPct = tot <= 0 ? 0
+                        : (int) Math.min(100L, Math.round(100.0 * idx / tot));
+                if (state.progressPct < 1 && idx > 0) {
+                    state.progressPct = 1;
+                }
+                state.phase = "running";
+                state.phaseLabel = "执行中";
+            }
+            if (current != null && !current.isEmpty()) {
+                state.currentSymbol = current;
+            }
+            if (detail != null && !detail.isEmpty()) {
+                state.detail = detail;
+                state.summary = detail;
+                state.message = detail;
+            } else if (total > 0) {
+                String line = "进度 " + state.progressIndex + " / " + state.progressTotal
+                        + (state.currentSymbol != null ? (" · 当前 " + state.currentSymbol) : "");
+                state.detail = line;
+                state.summary = line;
+                state.message = line;
+            }
+        }
+    }
+
+    private final class ManualRunTask implements Runnable {
+        private final ManualRunState state;
+        private final String jobCode;
+
+        private ManualRunTask(ManualRunState state, String jobCode) {
+            this.state = state;
+            this.jobCode = jobCode;
+        }
+
+        @Override
+        public void run() {
+            try {
+                state.phase = "running";
+                state.phaseLabel = "执行中";
+                state.summary = "正在执行「" + state.jobName + "」…";
+                state.message = state.summary;
+                state.detail = state.summary;
+                log.info("手动任务开始执行 {}", jobCode);
+                invoke(jobCode, true);
+                state.ok = true;
+                state.phase = "done";
+                state.phaseLabel = "已完成";
+                if (state.progressTotal != null && state.progressTotal > 0) {
+                    state.progressIndex = state.progressTotal;
+                    state.progressPct = 100;
+                }
+                state.summary = "「" + state.jobName + "」已完成";
+                state.message = "执行完成";
+                state.detail = state.summary;
+            } catch (Exception e) {
+                state.ok = false;
+                state.phase = "error";
+                state.phaseLabel = "失败";
+                state.message = e.getMessage() == null ? "执行失败" : e.getMessage();
+                state.summary = "「" + state.jobName + "」失败：" + state.message;
+                state.detail = state.summary;
+                log.warn("手动任务后台失败 {}: {}", jobCode, state.message);
+            } finally {
+                jobProgressHub.detach();
+                state.running = false;
+                state.finishedAt = LocalDateTime.now();
+            }
+        }
     }
 
     private static final class ManualRunState {

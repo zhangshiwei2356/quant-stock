@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /**
@@ -46,6 +47,12 @@ public class BatchStockBackTestService {
         this.batchScanExecutor = batchScanExecutor;
     }
 
+    /** 扫描进度回调（完成一只报一次；调用方可降频）。 */
+    @FunctionalInterface
+    public interface ProgressCallback {
+        void onProgress(int done, int total, String symbol);
+    }
+
     /** 扫描配置股票池（默认 quant.stock-codes） */
     public List<BatchScanResultDTO> scanAll() {
         return scan(quantProperties.stockCodeList());
@@ -53,15 +60,41 @@ public class BatchStockBackTestService {
 
     /** 并发扫描指定代码列表 */
     public List<BatchScanResultDTO> scan(List<String> codes) {
+        return scan(codes, null);
+    }
+
+    /** 并发扫描；可选进度回调（便于运维入池进度条）。 */
+    public List<BatchScanResultDTO> scan(List<String> codes, ProgressCallback progress) {
         if (codes == null || codes.isEmpty()) {
             return new ArrayList<BatchScanResultDTO>();
         }
+        final int total = codes.size();
+        if (progress != null) {
+            try {
+                progress.onProgress(0, total, null);
+            } catch (Exception ignored) {
+                // 进度不影响主流程
+            }
+        }
+        final AtomicInteger done = new AtomicInteger();
         List<CompletableFuture<BatchScanResultDTO>> futures = new ArrayList<CompletableFuture<BatchScanResultDTO>>();
         for (final String code : codes) {
             futures.add(CompletableFuture.supplyAsync(new java.util.function.Supplier<BatchScanResultDTO>() {
                 @Override
                 public BatchScanResultDTO get() {
-                    return scanOne(code);
+                    try {
+                        return scanOne(code);
+                    } finally {
+                        int d = done.incrementAndGet();
+                        // 降频：每 10 只或首尾上报
+                        if (progress != null && (d == 1 || d == total || d % 10 == 0)) {
+                            try {
+                                progress.onProgress(d, total, code);
+                            } catch (Exception ignored) {
+                                // 进度不影响主流程
+                            }
+                        }
+                    }
                 }
             }, batchScanExecutor));
         }

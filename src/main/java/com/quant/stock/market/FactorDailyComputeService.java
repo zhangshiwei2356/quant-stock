@@ -82,6 +82,13 @@ public class FactorDailyComputeService {
             targets = listSymbolsWithDailyBars();
         }
         final int total = targets.size();
+        if (progress != null) {
+            try {
+                progress.onProgress(0, total, null);
+            } catch (Exception ignored) {
+                // ignore
+            }
+        }
         final AtomicInteger ok = new AtomicInteger();
         final AtomicInteger skip = new AtomicInteger();
         final AtomicInteger fail = new AtomicInteger();
@@ -103,7 +110,8 @@ public class FactorDailyComputeService {
                         log.warn("factor_daily 重算失败 {}: {}", code, e.getMessage());
                     } finally {
                         int d = done.incrementAndGet();
-                        if (progress != null) {
+                        // 降频：每 10 只或首尾上报，减轻进度槽竞争
+                        if (progress != null && (d == 1 || d == total || d % 10 == 0)) {
                             try {
                                 progress.onProgress(d, total, code);
                             } catch (Exception ignored) {

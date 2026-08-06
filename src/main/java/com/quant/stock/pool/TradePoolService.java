@@ -44,6 +44,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 唯一交易目标池：盘后全市场扫描按分数 TopN 自动覆盖 {@code trade_pool}；
@@ -67,6 +68,10 @@ public class TradePoolService {
     private final JdbcTemplate jdbcTemplate;
     private final PlatformTransactionManager transactionManager;
     private final JobProgressHub jobProgressHub;
+
+    /** 最近一次入池扫描漏斗（内存；供页面刷新后回填「扫描漏斗」） */
+    private final AtomicReference<Map<String, Object>> lastScanStatsRef =
+            new AtomicReference<Map<String, Object>>();
 
     /** 启动时确保目标池相关表结构存在并清理废弃表名 */
     @PostConstruct
@@ -286,6 +291,10 @@ public class TradePoolService {
         m.put("items", items);
         m.put("count", items.size());
         m.put("maxFinal", quantProperties.getTradePoolMax());
+        Map<String, Object> lastScan = lastScanStatsRef.get();
+        if (lastScan != null) {
+            m.put("lastScan", lastScan);
+        }
         return m;
     }
 
@@ -428,8 +437,9 @@ public class TradePoolService {
 
     /**
      * 全市场扫描分析报告：打分、覆盖唯一目标池，并落盘 Markdown。
+     * <p>
+     * 注意：扫描本身可能数十分钟，不可包在长事务里；池替换由 {@link #replaceActivePool} 自管短事务。
      */
-    @Transactional
     public Map<String, Object> analyzeAndRecommend() {
         Map<String, Object> rebuild = rebuildFromUniverse();
         List<Map<String, Object>> rows = new ArrayList<Map<String, Object>>();
@@ -457,7 +467,34 @@ public class TradePoolService {
                 // leave unset
             }
         }
+        rememberLastScan(out);
         return out;
+    }
+
+    /** 缓存漏斗字段，供目标池页刷新后回填。 */
+    private void rememberLastScan(Map<String, Object> src) {
+        if (src == null || src.isEmpty()) {
+            return;
+        }
+        Map<String, Object> slim = new LinkedHashMap<String, Object>();
+        copyIfPresent(src, slim, "universe");
+        copyIfPresent(src, slim, "afterCoarse");
+        copyIfPresent(src, slim, "afterScan");
+        copyIfPresent(src, slim, "afterLiquidity");
+        copyIfPresent(src, slim, "scanned");
+        copyIfPresent(src, slim, "selected");
+        copyIfPresent(src, slim, "batchId");
+        copyIfPresent(src, slim, "scoreMin");
+        copyIfPresent(src, slim, "tradePoolMax");
+        copyIfPresent(src, slim, "reportFileName");
+        copyIfPresent(src, slim, "reportPath");
+        lastScanStatsRef.set(slim);
+    }
+
+    private static void copyIfPresent(Map<String, Object> src, Map<String, Object> dst, String key) {
+        if (src.containsKey(key)) {
+            dst.put(key, src.get(key));
+        }
     }
 
     /**
@@ -510,10 +547,20 @@ public class TradePoolService {
         }
         List<String> codes = coarseFilter(uni);
         int afterCoarse = codes.size();
-        jobProgressHub.note("粗筛后 " + afterCoarse + " 只，开始扫描…");
+        // 重置进度：因子预刷可能已到 100%，否则页面会一直显示「5200/5200 · 开始扫描」像卡住
+        jobProgressHub.tick(0, Math.max(1, afterCoarse), null,
+                "粗筛后 " + afterCoarse + " 只，开始扫描…");
         List<BatchScanResultDTO> scanned = codes.isEmpty()
                 ? new ArrayList<BatchScanResultDTO>()
-                : new ArrayList<BatchScanResultDTO>(batchStockBackTestService.scan(codes));
+                : new ArrayList<BatchScanResultDTO>(batchStockBackTestService.scan(codes,
+                new BatchStockBackTestService.ProgressCallback() {
+                    @Override
+                    public void onProgress(int done, int total, String symbol) {
+                        jobProgressHub.tick(done, total, symbol,
+                                "入池扫描 " + done + "/" + total
+                                        + (symbol != null ? (" · " + symbol) : ""));
+                    }
+                }));
         int afterScan = scanned.size();
         filterByAvgAmount(scanned);
         int afterLiquidity = scanned.size();
@@ -556,6 +603,7 @@ public class TradePoolService {
             }
         }
         jobProgressHub.note("入池完成 selected=" + selected.size() + " batchId=" + batchId);
+        rememberLastScan(out);
         return out;
     }
 

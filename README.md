@@ -160,7 +160,7 @@ sequenceDiagram
 
 | 二级菜单 | 功能 |
 |----------|------|
-| 当前池 | 查看入选、移出（**移出≠卖出**）、手动「扫描更新」 |
+| 当前池 | 查看入选、移出（**移出≠卖出**）、手动「扫描更新」（提交 `pool-rebuild` 异步任务 + 进度弹框） |
 | 扫描历史 | 批次与报告；亦可手动扫描 |
 
 - 盘后任务 `pool-rebuild` / `after-market-batch-scan` 自动覆盖 `trade_pool`
@@ -177,7 +177,7 @@ sequenceDiagram
 | 二级 | 功能 |
 |------|------|
 | 任务管理 | `sys_schedule_job` 启停 / cron / 立即执行（种子默认全关；执行一次弹进度框+页内横幅，可「收起到页内」；长任务 `i/n`） |
-| 数据健康 | 覆盖检查（异步进度弹框：加载标的→逐只日线/分钟）+ 分钟自洽检查（默认不阻断开仓） |
+| 数据健康 | 覆盖检查（异步进度；明细仅告警；日线空区分北交所/疑似退市/缺数）+ 分钟自洽（默认不阻断开仓） |
 | 运行参数 | 全局白名单可写（`quant.prop.*`）+ **按策略稀疏参数包**（表 `strategy_param`）；回测还可带 **本次临时改参**（`paramOverrides`，不落库） |
 
 总闸：`quant.schedule.enabled`（默认 true）。
@@ -318,7 +318,7 @@ sequenceDiagram
 ## 运维中心 · 定时任务
 
 - 表：`sys_schedule_job`（启动自动建表+种子，**默认全关**）
-- 运维「执行一次」：全部任务后台执行；弹框与任务管理页顶部横幅同步展示阶段/摘要/进度条；执行中可「收起到页内」；长任务（日线/分钟 TDX、因子重算、入池、数据校验、行情采集）上报 `i/n` 百分比；其余短任务为不确定进度 + 已用时（`GET /api/schedule/run-status`）
+- 运维「执行一次」：全部任务后台执行；弹框与任务管理页顶部横幅同步展示阶段/摘要/进度条；执行中可「收起到页内」；长任务（日线/分钟 TDX、因子重算、入池、数据校验、行情采集）上报 `i/n` 百分比；**入池**分两段进度（因子预刷 → 粗筛扫描，扫描段会重置计数，避免停在 100% 像卡住）；批量线程池队列约 1 万，避免全市场任务挤到提交线程串行；其余短任务为不确定进度 + 已用时（`GET /api/schedule/run-status`）
 - **唯一目标池**：`pool-rebuild` / `after-market-batch-scan` 扫描后覆盖；启用其一会自动关闭另一（互斥）
 - `scan-and-trade`：只扫池内活跃标的 + 本地模拟账本
 - 已实现：`scan-and-trade` / `pool-rebuild` / `after-market-batch-scan` / `settle-after-close` / `data-validate` / `factor-daily-rebuild` / `day-collect` / `pool-minute-backfill` / `sync-orders` / `position-pnl-sync`

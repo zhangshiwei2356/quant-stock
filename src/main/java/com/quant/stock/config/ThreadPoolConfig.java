@@ -26,6 +26,10 @@ public class ThreadPoolConfig {
 
     /**
      * 批量扫描专用执行器，Bean 名 {@code batchScanExecutor}，供 {@code @Async} 或显式注入使用。
+     * <p>
+     * 队列容量须覆盖全市场规模（约 5000+）：若队列过小，{@link ThreadPoolExecutor.CallerRunsPolicy}
+     * 会把大量任务挤到提交线程串行执行，入池扫描会「假卡死」数十分钟。
+     * </p>
      *
      * @return 已初始化的 {@link ThreadPoolTaskExecutor} 包装为 {@link Executor}
      */
@@ -34,7 +38,7 @@ public class ThreadPoolConfig {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(batchPoolSize);
         executor.setMaxPoolSize(batchPoolSize);
-        executor.setQueueCapacity(2000);
+        executor.setQueueCapacity(10000);
         executor.setThreadNamePrefix("batch-scan-");
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         executor.initialize();
