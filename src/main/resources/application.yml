@@ -203,6 +203,7 @@ quant:
       enabled: false
       order-enabled: false
       config-file: oes_api_config.json
+      # encrypt-type:  # 可选，对齐 OesLogonEncryptType；不设则跟 JSON
 
   # ---- 安全与运维 ----
   api-key: ${QUANT_API_KEY:}

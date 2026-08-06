@@ -15,6 +15,7 @@ class KuangruiMdsHelpersTest {
         assertEquals(new BigDecimal("12.3400"), KuangruiPriceScale.toYuan(123400L));
         assertNull(KuangruiPriceScale.toYuan(0L));
         assertNull(KuangruiPriceScale.toYuan(-1L));
+        assertEquals(new BigDecimal("0.0000"), KuangruiPriceScale.toYuanAllowZero(0L));
     }
 
     @Test
