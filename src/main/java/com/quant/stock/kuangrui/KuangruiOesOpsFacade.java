@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 运维侧 OES 只读辅助：状态/查询/纸面对账（主工程可编译，不依赖 quant360）。
+ * 运维侧 OES 辅助：只读查询/纸面对账/报撤状态（主工程可编译，不依赖 quant360）。
  */
 @Slf4j
 @Service
@@ -26,6 +26,7 @@ import java.util.Map;
 public class KuangruiOesOpsFacade {
 
     private final OesReadonlyService oesReadonlyService;
+    private final OesOrderService oesOrderService;
     private final QuantProperties quantProperties;
     private final StrategyTask strategyTask;
     private final TradeGatewayService tradeGatewayService;
@@ -36,7 +37,34 @@ public class KuangruiOesOpsFacade {
         m.put("quantKuangruiEnabled", k != null && k.isEnabled());
         m.put("quantOesEnabled", k != null && k.getOes() != null && k.getOes().isEnabled());
         m.put("orderEnabled", k != null && k.getOes() != null && k.getOes().isOrderEnabled());
+        m.put("orderLive", oesOrderService != null && oesOrderService.isOrderLive());
+        if (oesOrderService != null) {
+            Map<String, Object> os = oesOrderService.status();
+            for (Map.Entry<String, Object> e : os.entrySet()) {
+                if (!m.containsKey(e.getKey())) {
+                    m.put(e.getKey(), e.getValue());
+                }
+            }
+            m.put("orderImpl", os.get("impl"));
+            m.put("orderHint", os.get("hint"));
+        }
         m.put("configDir", k == null ? null : k.getConfigDir());
+        return m;
+    }
+
+    /** 报撤能力状态（M3）。 */
+    public Map<String, Object> orderStatus() {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        if (oesOrderService == null) {
+            m.put("orderLive", false);
+            m.put("hint", "OES 报撤服务未装配");
+            return m;
+        }
+        m.putAll(oesOrderService.status());
+        m.put("orderLive", oesOrderService.isOrderLive());
+        QuantProperties.Kuangrui k = quantProperties.getKuangrui();
+        m.put("tradeMode", quantProperties.getTradeMode());
+        m.put("orderEnabled", k != null && k.getOes() != null && k.getOes().isOrderEnabled());
         return m;
     }
 

@@ -104,29 +104,50 @@ public final class OesViewMapper {
     }
 
     /**
-     * OES 委托状态粗映射（现货常用；未知保留数字）。
-     * 对齐资料包常见枚举：申报中/已报/部成/已成/部撤/已撤/废单等。
+     * OES 委托状态粗映射（对齐 eOesOrdStatusT）。
      */
     public static String ordStatusLabel(int status) {
         switch (status) {
             case 0:
-                return "PENDING_NEW";
+                return "PENDING";
             case 1:
                 return "NEW";
             case 2:
-                return "PARTIAL";
+                return "DECLARED";
             case 3:
-                return "FILLED";
-            case 4:
-                return "CANCELLED";
+                return "PARTIAL";
             case 5:
-                return "PARTIAL_CANCELLED";
+                return "CANCEL_DONE";
             case 6:
-                return "PARTIAL_FILLED_CANCELLED";
+                return "PARTIAL_CANCELLED";
+            case 7:
+                return "CANCELLED";
             case 8:
-                return "REJECTED";
+                return "FILLED";
             default:
+                if (status >= 10) {
+                    return "REJECTED";
+                }
                 return "STATUS_" + status;
+        }
+    }
+
+    /** 柜台状态 → 本地 {@code OrderDTO.Status} 名（未知保持 SUBMITTED）。 */
+    public static String toLocalStatusName(int oesStatus) {
+        switch (oesStatus) {
+            case 3:
+            case 6:
+                return "PARTIAL";
+            case 8:
+                return "FILLED";
+            case 5:
+            case 7:
+                return "CANCELLED";
+            default:
+                if (oesStatus >= 10) {
+                    return "REJECTED";
+                }
+                return "SUBMITTED";
         }
     }
 

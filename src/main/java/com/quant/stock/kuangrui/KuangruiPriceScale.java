@@ -44,4 +44,22 @@ public final class KuangruiPriceScale {
         }
         return toYuanAllowZero(milli.longValue());
     }
+
+    /**
+     * 元 → 毫级整数（柜台申报价/金额）；非法或负数返回 0。
+     */
+    public static int toMilliInt(BigDecimal yuan) {
+        if (yuan == null || yuan.compareTo(BigDecimal.ZERO) <= 0) {
+            return 0;
+        }
+        return yuan.multiply(SCALE).setScale(0, RoundingMode.HALF_UP).intValue();
+    }
+
+    /** 元 → 毫级 long。 */
+    public static long toMilliLong(BigDecimal yuan) {
+        if (yuan == null) {
+            return 0L;
+        }
+        return yuan.multiply(SCALE).setScale(0, RoundingMode.HALF_UP).longValue();
+    }
 }

@@ -179,3 +179,27 @@ quant:
    - 定时任务 `sync-orders` / `position-pnl-sync` 在 OES live 时打对账日志（不改本地账本）
 
 实现：`src/main-kuangrui/.../KuangruiOesReadonlyService.java`；门面 `KuangruiOesOpsFacade`。
+
+## M3 OES 报撤（可选）
+
+默认仍不下单。启用步骤（仿真）：
+
+1. 同 M2：`-Pkuangrui`、OES 配置与账号
+2. 配置：
+
+```yaml
+quant:
+  trade-mode: sdk
+  kuangrui:
+    enabled: true
+    oes:
+      enabled: true
+      order-enabled: true
+```
+
+3. 验收：
+   - `GET /api/ops/kuangrui/oes/order-status` → `orderLive=true`
+   - `trade-mode=sdk` 下单走 `sendOrdReq`（限价）；撤单走 `sendOrdCancelReq`
+   - `sync-orders` 按回报/查询推进 FILLED（**不再假推进**）
+
+实现与 M2 共用 `KuangruiOesReadonlyService`（实现 `OesOrderService`）；网关 `TradeGatewayService` 在 orderLive 时切换路径。

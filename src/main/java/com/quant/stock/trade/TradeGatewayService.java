@@ -2,6 +2,8 @@ package com.quant.stock.trade;
 
 import cn.hutool.core.util.IdUtil;
 import com.quant.stock.config.QuantProperties;
+import com.quant.stock.kuangrui.OesOrderService;
+import com.quant.stock.kuangrui.OesViewMapper;
 import com.quant.stock.trade.dto.OrderDTO;
 import com.quant.stock.util.RedisLockUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -16,11 +18,13 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 交易网关：下单幂等 + 订单状态机。
  * {@code quant.trade-mode=sim}：即时 FILLED 并改仓；
  * {@code sdk}：SUBMITTED 不改仓，由 {@link #syncOrderStatus()} 推进 FILLED 后再改仓。
+ * 若宽睿 OES {@code order-enabled} live：限价报撤走柜台，sync 按回报/查询推进（不再假推进）。
  */
 @Slf4j
 @Service
@@ -29,17 +33,31 @@ public class TradeGatewayService {
     private final RedisLockUtil redisLockUtil;
     private final QuantProperties props;
     private final ObjectProvider<LiveLedgerService> liveLedgerProvider;
+    private final ObjectProvider<OesOrderService> oesOrderProvider;
 
     private final Map<String, Integer> positions = new ConcurrentHashMap<String, Integer>();
     private final Map<String, OrderDTO> orders = new ConcurrentHashMap<String, OrderDTO>();
     private final Map<String, String> idempotentIndex = new ConcurrentHashMap<String, String>();
+    /** 本地 orderId → OES clSeqNo */
+    private final Map<String, Integer> orderIdToClSeq = new ConcurrentHashMap<String, Integer>();
+    private final Map<Integer, String> clSeqToOrderId = new ConcurrentHashMap<Integer, String>();
+    private final AtomicInteger clSeqGen = new AtomicInteger(1);
 
     public TradeGatewayService(RedisLockUtil redisLockUtil,
                                QuantProperties props,
-                               ObjectProvider<LiveLedgerService> liveLedgerProvider) {
+                               ObjectProvider<LiveLedgerService> liveLedgerProvider,
+                               ObjectProvider<OesOrderService> oesOrderProvider) {
         this.redisLockUtil = redisLockUtil;
         this.props = props;
         this.liveLedgerProvider = liveLedgerProvider;
+        this.oesOrderProvider = oesOrderProvider;
+    }
+
+    /** 兼容旧测试：无 OES 门面时使用。 */
+    public TradeGatewayService(RedisLockUtil redisLockUtil,
+                               QuantProperties props,
+                               ObjectProvider<LiveLedgerService> liveLedgerProvider) {
+        this(redisLockUtil, props, liveLedgerProvider, emptyOesProvider());
     }
 
     /**
@@ -86,8 +104,11 @@ public class TradeGatewayService {
                     order.setStatus(OrderDTO.Status.FILLED);
                     order.setFilledVolume(volume);
                     applyPosition(side, stockCode, volume);
+                } else if (order.getStatus() == OrderDTO.Status.REJECTED) {
+                    if (order.getFilledVolume() == null) {
+                        order.setFilledVolume(0);
+                    }
                 } else {
-                    // sdk：已报未成，仓位待 sync 确认
                     order.setStatus(OrderDTO.Status.SUBMITTED);
                     order.setFilledVolume(0);
                 }
@@ -116,6 +137,16 @@ public class TradeGatewayService {
         if (st != OrderDTO.Status.SUBMITTED && st != OrderDTO.Status.PARTIAL) {
             log.warn("不可撤单 orderId={} status={}", orderId, st);
             return null;
+        }
+        OesOrderService oes = oesOrder();
+        Integer clSeq = orderIdToClSeq.get(order.getOrderId());
+        if (oes != null && oes.isOrderLive() && clSeq != null) {
+            boolean sent = oes.cancelByClSeqNo(clSeq.intValue(), order.getStockCode());
+            if (!sent) {
+                log.warn("OES 撤单请求失败 orderId={} clSeqNo={}", orderId, clSeq);
+                return null;
+            }
+            // 请求已发：先本地置 CANCELLED（与原桩行为一致）；回报若拒绝可在后续增强
         }
         order.setStatus(OrderDTO.Status.CANCELLED);
         if (order.getFilledVolume() == null) {
@@ -222,10 +253,36 @@ public class TradeGatewayService {
     }
 
     /**
-     * 模拟/桩：生成委托号并记录日志；子类可对接真实 SDK。
+     * sdk 下单：OES live 时发限价单；否则本地生成委托号（桩）。
      */
     protected String placeOrderSdk(OrderDTO order) {
-        // 控制在 VARCHAR(32) 内：S + 31 位 hex
+        OesOrderService oes = oesOrder();
+        if (oes != null && oes.isOrderLive()) {
+            int clSeq = clSeqGen.getAndIncrement();
+            if (clSeq <= 0) {
+                clSeq = clSeqGen.incrementAndGet();
+            }
+            OesOrderService.OesPlaceResult r = oes.placeLimit(
+                    order.getStockCode(), order.getSide(), order.getPrice(),
+                    order.getVolume() == null ? 0 : order.getVolume(),
+                    clSeq, order.getClientOrderId());
+            String orderId = "O" + clSeq;
+            if (orderId.length() > 32) {
+                orderId = orderId.substring(0, 32);
+            }
+            if (!r.isAccepted()) {
+                order.setStatus(OrderDTO.Status.REJECTED);
+                order.setFilledVolume(0);
+                log.warn("OES 报单拒绝 orderId={} clSeqNo={} msg={}", orderId, clSeq, r.getMessage());
+                return orderId;
+            }
+            orderIdToClSeq.put(orderId, Integer.valueOf(clSeq));
+            clSeqToOrderId.put(Integer.valueOf(clSeq), orderId);
+            log.info("OES 报单已发 orderId={} clSeqNo={} clOrdId={} {} {}@{} x{}",
+                    orderId, clSeq, r.getClOrdId(), order.getSide(),
+                    order.getStockCode(), order.getPrice(), order.getVolume());
+            return orderId;
+        }
         String u = IdUtil.fastSimpleUUID();
         String orderId = "S" + (u.length() > 31 ? u.substring(0, 31) : u);
         log.info("模拟下单成功 orderId={} clientId={} {} {}@{} x{}",
@@ -259,13 +316,94 @@ public class TradeGatewayService {
     }
 
     /**
-     * sdk 模式：SUBMITTED → FILLED，改本地仓位并回写 DB。
+     * sdk 模式同步：OES live 时按回报/查询推进；否则本地桩 SUBMITTED→FILLED。
      *
-     * @return 本轮新成交的委托列表
-     * <p>
-     * TODO(api): 对接券商委托查询 / 成交回报；当前为本地桩。
+     * @return 本轮新成交至 FILLED 的委托列表（供策略落账）
      */
     public List<OrderDTO> syncOrderStatus() {
+        OesOrderService oes = oesOrder();
+        if (oes != null && oes.isOrderLive()) {
+            return syncFromOes(oes);
+        }
+        return syncStubFillAll();
+    }
+
+    private List<OrderDTO> syncFromOes(OesOrderService oes) {
+        List<OrderDTO> newlyFilled = new ArrayList<OrderDTO>();
+        List<OesOrderService.OesOrderEvent> events = oes.pollEvents();
+        for (OesOrderService.OesOrderEvent ev : events) {
+            if (ev == null) {
+                continue;
+            }
+            String oid = clSeqToOrderId.get(Integer.valueOf(ev.getClSeqNo()));
+            if (oid == null) {
+                continue;
+            }
+            OrderDTO order = orders.get(oid);
+            if (order == null) {
+                continue;
+            }
+            OrderDTO.Status before = order.getStatus();
+            if (before == OrderDTO.Status.FILLED || before == OrderDTO.Status.CANCELLED
+                    || before == OrderDTO.Status.REJECTED) {
+                continue;
+            }
+            if (ev.getKind() == OesOrderService.OesOrderEvent.Kind.TRADE && ev.getTrdQty() > 0) {
+                int vol = order.getVolume() == null ? 0 : order.getVolume();
+                int filled = order.getFilledVolume() == null ? 0 : order.getFilledVolume();
+                int delta = Math.min(ev.getTrdQty(), Math.max(0, vol - filled));
+                if (delta > 0) {
+                    applyPosition(order.getSide(), order.getStockCode(), delta);
+                    filled += delta;
+                    order.setFilledVolume(filled);
+                    order.setStatus(filled >= vol ? OrderDTO.Status.FILLED : OrderDTO.Status.PARTIAL);
+                    if (ev.getTrdPrice() != null) {
+                        order.setPrice(ev.getTrdPrice());
+                    }
+                    persistOrder(order, null, null);
+                }
+            } else if (ev.getKind() == OesOrderService.OesOrderEvent.Kind.ORDER) {
+                String local = OesViewMapper.toLocalStatusName(ev.getOrdStatus());
+                int vol = order.getVolume() == null ? 0 : order.getVolume();
+                int cum = Math.max(0, ev.getCumQty());
+                int prevFilled = order.getFilledVolume() == null ? 0 : order.getFilledVolume();
+                if (cum > prevFilled) {
+                    int delta = Math.min(cum - prevFilled, Math.max(0, vol - prevFilled));
+                    if (delta > 0) {
+                        applyPosition(order.getSide(), order.getStockCode(), delta);
+                    }
+                    order.setFilledVolume(Math.min(cum, vol));
+                }
+                if ("FILLED".equals(local)) {
+                    int filled = order.getFilledVolume() == null ? 0 : order.getFilledVolume();
+                    int remain = Math.max(0, vol - filled);
+                    if (remain > 0) {
+                        applyPosition(order.getSide(), order.getStockCode(), remain);
+                        order.setFilledVolume(vol);
+                    }
+                    order.setStatus(OrderDTO.Status.FILLED);
+                } else if ("CANCELLED".equals(local)) {
+                    order.setStatus(OrderDTO.Status.CANCELLED);
+                } else if ("REJECTED".equals(local)) {
+                    order.setStatus(OrderDTO.Status.REJECTED);
+                } else if ("PARTIAL".equals(local)) {
+                    order.setStatus(OrderDTO.Status.PARTIAL);
+                }
+                persistOrder(order, null, null);
+            }
+            if (before != OrderDTO.Status.FILLED && order.getStatus() == OrderDTO.Status.FILLED) {
+                newlyFilled.add(order);
+            }
+        }
+        if (!newlyFilled.isEmpty()) {
+            log.info("OES 同步委托：新 FILLED {} 笔（事件/查询）", newlyFilled.size());
+        } else {
+            log.debug("OES 同步委托, 事件={} 当前委托数={}", events.size(), orders.size());
+        }
+        return newlyFilled;
+    }
+
+    private List<OrderDTO> syncStubFillAll() {
         List<OrderDTO> advanced = new ArrayList<OrderDTO>();
         for (OrderDTO order : orders.values()) {
             if (order == null) {
@@ -275,6 +413,7 @@ public class TradeGatewayService {
             if (st != OrderDTO.Status.SUBMITTED && st != OrderDTO.Status.PARTIAL) {
                 continue;
             }
+            // OES 跟踪的单在 orderLive 关闭后仍可能残留映射：桩模式也允许推进
             order.setStatus(OrderDTO.Status.FILLED);
             int vol = order.getVolume() == null ? 0 : order.getVolume();
             int filled = order.getFilledVolume() == null ? 0 : order.getFilledVolume();
@@ -301,5 +440,33 @@ public class TradeGatewayService {
         } else {
             positions.put(stockCode, Math.max(0, cur - volume));
         }
+    }
+
+    private OesOrderService oesOrder() {
+        return oesOrderProvider == null ? null : oesOrderProvider.getIfAvailable();
+    }
+
+    private static ObjectProvider<OesOrderService> emptyOesProvider() {
+        return new ObjectProvider<OesOrderService>() {
+            @Override
+            public OesOrderService getObject(Object... args) {
+                return null;
+            }
+
+            @Override
+            public OesOrderService getObject() {
+                return null;
+            }
+
+            @Override
+            public OesOrderService getIfAvailable() {
+                return null;
+            }
+
+            @Override
+            public OesOrderService getIfUnique() {
+                return null;
+            }
+        };
     }
 }

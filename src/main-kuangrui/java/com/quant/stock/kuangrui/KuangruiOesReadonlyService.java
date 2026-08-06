@@ -1,6 +1,7 @@
 package com.quant.stock.kuangrui;
 
 import com.quant.stock.config.QuantProperties;
+import com.quant.stock.trade.dto.OrderDTO;
 import com.quant360.api.callback.OesCallBack;
 import com.quant360.api.client.impl.OesClientImpl;
 import com.quant360.api.model.ClientLogonReq;
@@ -14,7 +15,10 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PreDestroy;
+import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -24,12 +28,13 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * 宽睿 OES 只读：登录 + {@code sendRptSync} + 查资金/持仓/委托/成交。
- * 仅 {@code -Pkuangrui} 编译；查询经反射适配资料包方法签名差异，不下单（M3）。
+ * 宽睿 OES：登录 + {@code sendRptSync} + 只读查询（M2）；可选报撤与回报队列（M3，{@code oes.order-enabled}）。
+ * 仅 {@code -Pkuangrui} 编译；API 调用经反射适配资料包签名差异。
  */
 @Slf4j
 @Service
@@ -39,7 +44,11 @@ import java.util.concurrent.atomic.AtomicReference;
         "quant.kuangrui.enabled",
         "quant.kuangrui.oes.enabled"
 }, havingValue = "true")
-public class KuangruiOesReadonlyService implements OesReadonlyService {
+public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderService {
+
+    private static final int OES_ORD_TYPE_LMT = 0;
+    private static final int OES_BS_BUY = 1;
+    private static final int OES_BS_SELL = 2;
 
     private final QuantProperties quantProperties;
 
@@ -47,6 +56,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService {
     private final AtomicBoolean rptSynced = new AtomicBoolean(false);
     private final AtomicReference<String> lastError = new AtomicReference<String>();
     private final AtomicReference<String> applVerId = new AtomicReference<String>();
+    private final ConcurrentLinkedQueue<OesOrderEvent> eventQueue = new ConcurrentLinkedQueue<OesOrderEvent>();
     private volatile OesClientImpl client;
     private volatile long lastInMsgSeq;
 
@@ -60,22 +70,33 @@ public class KuangruiOesReadonlyService implements OesReadonlyService {
     }
 
     @Override
+    public boolean isOrderLive() {
+        return isLive() && quantProperties.getKuangrui() != null
+                && quantProperties.getKuangrui().getOes() != null
+                && quantProperties.getKuangrui().getOes().isOrderEnabled();
+    }
+
+    @Override
     public Map<String, Object> status() {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.put("live", true);
+        m.put("orderLive", isOrderLive());
         m.put("impl", "kuangrui-oes");
         m.put("loggedIn", client != null);
         m.put("rptSynced", rptSynced.get());
         m.put("lastInMsgSeq", lastInMsgSeq);
         m.put("applVerId", applVerId.get());
         m.put("lastError", lastError.get());
+        m.put("pendingEvents", eventQueue.size());
         m.put("configPath", resolveOesConfig().toString());
         m.put("configExists", Files.isRegularFile(resolveOesConfig()));
         m.put("hasCred", env("QUANT_KUANGRUI_USER") != null && env("QUANT_KUANGRUI_PASSWORD") != null);
         m.put("orderEnabled", quantProperties.getKuangrui() != null
                 && quantProperties.getKuangrui().getOes() != null
                 && quantProperties.getKuangrui().getOes().isOrderEnabled());
-        m.put("hint", "M2 只读对账；报撤需 oes.order-enabled（M3，默认关）");
+        m.put("hint", isOrderLive()
+                ? "M3 报撤已开：限价 sendOrdReq/撤单 + 回报/查询推进"
+                : "M2 只读；报撤需 oes.order-enabled=true（M3，默认关）");
         return m;
     }
 
@@ -211,9 +232,148 @@ public class KuangruiOesReadonlyService implements OesReadonlyService {
     }
 
     @Override
+    public OesPlaceResult placeLimit(String stockCode, OrderDTO.Side side, BigDecimal priceYuan, int qty,
+                                     int clSeqNo, String clientOrderId) {
+        if (!isOrderLive()) {
+            return OesPlaceResult.fail(clSeqNo, "oes.order-enabled=false");
+        }
+        try {
+            ensureReadyOrThrow();
+            String code = OesViewMapper.normalizeCode(stockCode);
+            int mkt = KuangruiExchangeIds.fromStockCode(code);
+            if (mkt == 0 || qty < 100 || priceYuan == null) {
+                return OesPlaceResult.fail(clSeqNo, "非法标的/数量/价格");
+            }
+            int pxMilli = KuangruiPriceScale.toMilliInt(priceYuan);
+            if (pxMilli <= 0) {
+                return OesPlaceResult.fail(clSeqNo, "价格毫级无效");
+            }
+            Object req = newInstance("com.quant360.api.model.oes.OesOrdReq");
+            if (req == null) {
+                return OesPlaceResult.fail(clSeqNo, "无法创建 OesOrdReq");
+            }
+            setBean(req, "setClSeqNo", Integer.valueOf(clSeqNo));
+            setBean(req, "setMktId", Integer.valueOf(mkt));
+            setBean(req, "setOrdType", Integer.valueOf(OES_ORD_TYPE_LMT));
+            setBean(req, "setBsType", Integer.valueOf(side == OrderDTO.Side.SELL ? OES_BS_SELL : OES_BS_BUY));
+            setBean(req, "setSecurityId", code);
+            setBean(req, "setOrdQty", Integer.valueOf(qty));
+            setBean(req, "setOrdPrice", Integer.valueOf(pxMilli));
+            Object ret = invokeReturning(client, "sendOrdReq", req);
+            if (ret == null) {
+                ret = invokeReturning(client, "sendOrderReq", req);
+            }
+            if (ret instanceof Number && ((Number) ret).intValue() < 0) {
+                return OesPlaceResult.fail(clSeqNo, "sendOrdReq 返回 " + ret);
+            }
+            long clOrdId = lng(invokeGetter(ret, "getClOrdId"));
+            if (clOrdId == 0L && ret instanceof Number) {
+                // 部分版本返回 int 错误码 0=成功
+                clOrdId = 0L;
+            }
+            log.info("[oes] 报单已发 clSeqNo={} {} {}@{} x{} clientId={}",
+                    clSeqNo, side, code, priceYuan, qty, clientOrderId);
+            lastError.set(null);
+            return OesPlaceResult.ok(clSeqNo, clOrdId);
+        } catch (Exception e) {
+            lastError.set(e.getMessage());
+            log.warn("[oes] 报单失败 clSeqNo={}: {}", clSeqNo, e.getMessage());
+            return OesPlaceResult.fail(clSeqNo, e.getMessage());
+        }
+    }
+
+    @Override
+    public boolean cancelByClSeqNo(int origClSeqNo, String stockCode) {
+        if (!isOrderLive()) {
+            return false;
+        }
+        try {
+            ensureReadyOrThrow();
+            String code = OesViewMapper.normalizeCode(stockCode);
+            int mkt = KuangruiExchangeIds.fromStockCode(code);
+            Object req = newInstance("com.quant360.api.model.oes.OesOrdCancelReq");
+            if (req == null) {
+                // 部分版本撤单也用 OesOrdReq + origClSeqNo
+                req = newInstance("com.quant360.api.model.oes.OesOrdReq");
+            }
+            if (req == null) {
+                throw new IllegalStateException("无法创建撤单请求对象");
+            }
+            setBean(req, "setClSeqNo", Integer.valueOf(nextInternalCancelSeq(origClSeqNo)));
+            setBean(req, "setOrigClSeqNo", Integer.valueOf(origClSeqNo));
+            if (mkt > 0) {
+                setBean(req, "setMktId", Integer.valueOf(mkt));
+            }
+            if (code != null && !code.isEmpty()) {
+                setBean(req, "setSecurityId", code);
+            }
+            Object ret = invokeReturning(client, "sendOrdCancelReq", req);
+            if (ret == null) {
+                ret = invokeReturning(client, "sendOrderCancelReq", req);
+            }
+            if (ret instanceof Number && ((Number) ret).intValue() < 0) {
+                log.warn("[oes] 撤单返回码 {}", ret);
+                return false;
+            }
+            log.info("[oes] 撤单已发 origClSeqNo={} code={}", origClSeqNo, code);
+            return true;
+        } catch (Exception e) {
+            lastError.set(e.getMessage());
+            log.warn("[oes] 撤单失败 origClSeqNo={}: {}", origClSeqNo, e.getMessage());
+            return false;
+        }
+    }
+
+    @Override
+    public List<OesOrderEvent> pollEvents() {
+        List<OesOrderEvent> out = new ArrayList<OesOrderEvent>();
+        OesOrderEvent e;
+        while ((e = eventQueue.poll()) != null) {
+            out.add(e);
+        }
+        // 查询通道补强：把柜台委托现状也转成事件，避免回调签名不适配时无法推进
+        if (isOrderLive() && client != null && rptSynced.get()) {
+            try {
+                for (Map<String, Object> row : queryOrders()) {
+                    Object seqObj = row.get("clSeqNo");
+                    Object stObj = row.get("ordStatus");
+                    Object cumObj = row.get("cumQty");
+                    Object clOrdObj = row.get("clOrdId");
+                    if (!(seqObj instanceof Number) || !(stObj instanceof Number)) {
+                        continue;
+                    }
+                    out.add(new OesOrderEvent(
+                            OesOrderEvent.Kind.ORDER,
+                            ((Number) seqObj).intValue(),
+                            clOrdObj instanceof Number ? ((Number) clOrdObj).longValue() : 0L,
+                            String.valueOf(row.get("code")),
+                            ((Number) stObj).intValue(),
+                            cumObj instanceof Number ? ((Number) cumObj).intValue() : 0,
+                            0,
+                            null
+                    ));
+                }
+            } catch (Exception ex) {
+                log.debug("[oes] poll 查询补强失败: {}", ex.getMessage());
+            }
+        }
+        return out;
+    }
+
+    /** 撤单自身也需要新的 clSeqNo；用 orig + 大偏移避免与主流水冲突。 */
+    private static int nextInternalCancelSeq(int origClSeqNo) {
+        long v = 800_000_000L + (origClSeqNo & 0x7fffffff);
+        if (v > Integer.MAX_VALUE) {
+            v = Integer.MAX_VALUE - (origClSeqNo & 0xffff);
+        }
+        return (int) v;
+    }
+
+    @Override
     public void stop() {
         synchronized (clientLock) {
             rptSynced.set(false);
+            eventQueue.clear();
             closeClient();
         }
     }
@@ -249,9 +409,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService {
             }
             String driver = envOr("QUANT_KUANGRUI_DRIVER_ID", "DAEB7F56");
             OesClientImpl c = new OesClientImpl(1, cfg.toAbsolutePath().toString());
-            // 回调签名随资料包略有差异；空实现对齐 Demo/LoginProbe。断线时下次 ensureReady 重登。
-            c.initCallBack(new OesCallBack() {
-            });
+            c.initCallBack(buildCallback());
             ClientLogonReq logon = new ClientLogonReq();
             logon.setHeartBtInt(30);
             logon.setUsername(user);
@@ -286,6 +444,169 @@ public class KuangruiOesReadonlyService implements OesReadonlyService {
             log.info("[oes] 登录成功 applVerId={} lastInMsgSeq={}", rsp.getApplVerId(), lastInMsgSeq);
             doRptSync(lastInMsgSeq);
         }
+    }
+
+    private OesCallBack buildCallback() {
+        if (OesCallBack.class.isInterface()) {
+            return (OesCallBack) Proxy.newProxyInstance(
+                    OesCallBack.class.getClassLoader(),
+                    new Class[]{OesCallBack.class},
+                    new InvocationHandler() {
+                        @Override
+                        public Object invoke(Object proxy, Method method, Object[] args) {
+                            handleCallback(method.getName(), args);
+                            Class<?> rt = method.getReturnType();
+                            if (rt == Void.TYPE) {
+                                return null;
+                            }
+                            if (rt == boolean.class) {
+                                return Boolean.FALSE;
+                            }
+                            if (rt.isPrimitive()) {
+                                return 0;
+                            }
+                            return null;
+                        }
+                    });
+        }
+        return new OesCallBack() {
+        };
+    }
+
+    private void handleCallback(String name, Object[] args) {
+        if (name == null) {
+            return;
+        }
+        String n = name.toLowerCase();
+        if (n.contains("disconn")) {
+            log.warn("[oes] 连接中断");
+            rptSynced.set(false);
+            lastError.set("disconnected");
+            client = null;
+            return;
+        }
+        if (args == null || args.length == 0) {
+            return;
+        }
+        Object body = args[0];
+        if (n.contains("trd") || n.contains("trade")) {
+            enqueueTrade(body);
+        } else if (n.contains("ord") || n.contains("order") || n.contains("rpt")) {
+            enqueueOrder(body);
+        }
+    }
+
+    private void enqueueOrder(Object item) {
+        try {
+            String code = str(invokeGetter(item, "getSecurityId"));
+            if (code == null || code.isEmpty()) {
+                code = str(invokeGetter(item, "getSecurityID"));
+            }
+            eventQueue.offer(new OesOrderEvent(
+                    OesOrderEvent.Kind.ORDER,
+                    (int) lng(invokeGetter(item, "getClSeqNo")),
+                    lng(invokeGetter(item, "getClOrdId")),
+                    OesViewMapper.normalizeCode(code),
+                    toStatusInt(invokeGetter(item, "getOrdStatus")),
+                    (int) lng(invokeGetter(item, "getCumQty")),
+                    0,
+                    null
+            ));
+        } catch (Exception e) {
+            log.debug("[oes] enqueueOrder: {}", e.getMessage());
+        }
+    }
+
+    private void enqueueTrade(Object item) {
+        try {
+            String code = str(invokeGetter(item, "getSecurityId"));
+            if (code == null || code.isEmpty()) {
+                code = str(invokeGetter(item, "getSecurityID"));
+            }
+            long px = lng(invokeGetter(item, "getTrdPrice"));
+            eventQueue.offer(new OesOrderEvent(
+                    OesOrderEvent.Kind.TRADE,
+                    (int) lng(invokeGetter(item, "getClSeqNo")),
+                    lng(invokeGetter(item, "getClOrdId")),
+                    OesViewMapper.normalizeCode(code),
+                    -1,
+                    (int) lng(invokeGetter(item, "getCumQty")),
+                    (int) lng(invokeGetter(item, "getTrdQty")),
+                    KuangruiPriceScale.toYuan(px)
+            ));
+        } catch (Exception e) {
+            log.debug("[oes] enqueueTrade: {}", e.getMessage());
+        }
+    }
+
+    private void setBean(Object target, String setter, Object value) {
+        if (target == null || value == null) {
+            return;
+        }
+        for (Method m : target.getClass().getMethods()) {
+            if (!m.getName().equals(setter) || m.getParameterTypes().length != 1) {
+                continue;
+            }
+            Class<?> pt = m.getParameterTypes()[0];
+            try {
+                Object arg = coerceArg(value, pt);
+                if (arg == null && pt.isPrimitive()) {
+                    continue;
+                }
+                m.invoke(target, arg);
+                return;
+            } catch (Exception e) {
+                log.debug("[oes] setBean {} 失败: {}", setter, e.getMessage());
+            }
+        }
+    }
+
+    private static Object coerceArg(Object value, Class<?> pt) {
+        if (pt.isInstance(value)) {
+            return value;
+        }
+        if (pt.isEnum() && value instanceof Number) {
+            int v = ((Number) value).intValue();
+            try {
+                Method valueOf = pt.getMethod("valueOf", int.class);
+                return valueOf.invoke(null, Integer.valueOf(v));
+            } catch (Exception ignore) {
+                // try name/ordinal
+            }
+            Object[] constants = pt.getEnumConstants();
+            if (constants != null) {
+                for (Object c : constants) {
+                    try {
+                        Method vm = c.getClass().getMethod("value");
+                        Object cv = vm.invoke(c);
+                        if (cv instanceof Number && ((Number) cv).intValue() == v) {
+                            return c;
+                        }
+                    } catch (Exception ignore) {
+                        // ignore
+                    }
+                }
+                if (v >= 0 && v < constants.length) {
+                    return constants[v];
+                }
+            }
+        }
+        if ((pt == Integer.TYPE || pt == Integer.class) && value instanceof Number) {
+            return Integer.valueOf(((Number) value).intValue());
+        }
+        if ((pt == Long.TYPE || pt == Long.class) && value instanceof Number) {
+            return Long.valueOf(((Number) value).longValue());
+        }
+        if ((pt == Byte.TYPE || pt == Byte.class) && value instanceof Number) {
+            return Byte.valueOf(((Number) value).byteValue());
+        }
+        if ((pt == Short.TYPE || pt == Short.class) && value instanceof Number) {
+            return Short.valueOf(((Number) value).shortValue());
+        }
+        if (pt == String.class) {
+            return String.valueOf(value);
+        }
+        return null;
     }
 
     private void doRptSync(long seq) throws Exception {

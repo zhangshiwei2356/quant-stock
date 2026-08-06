@@ -345,7 +345,10 @@ public class QuantProperties {
              * 真实客户端仅 {@code -Pkuangrui} 编译；默认 false。
              */
             private boolean enabled = false;
-            /** 报单总闸（M3）；默认 false，M2 不打开 */
+            /**
+             * 报单总闸（M3）；默认 false。
+             * 为 true 且 {@link #enabled} 时，{@code trade-mode=sdk} 限价报撤走 OES。
+             */
             private boolean orderEnabled = false;
             /** 相对 {@link Kuangrui#configDir} 的 OES JSON 文件名 */
             private String configFile = "oes_api_config.json";

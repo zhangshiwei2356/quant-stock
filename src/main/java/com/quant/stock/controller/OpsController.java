@@ -502,6 +502,17 @@ public class OpsController {
         });
     }
 
+    /** OES 报撤能力状态（M3；order-enabled 默认关）。 */
+    @GetMapping("/kuangrui/oes/order-status")
+    public Map<String, Object> kuangruiOesOrderStatus() {
+        return oesOrDbOff(new OesCall() {
+            @Override
+            public Map<String, Object> call(KuangruiOesOpsFacade f) {
+                return f.orderStatus();
+            }
+        });
+    }
+
     private Map<String, Object> oesOrDbOff(OesCall call) {
         KuangruiOesOpsFacade f = kuangruiOesOpsProvider.getIfAvailable();
         if (f == null) {

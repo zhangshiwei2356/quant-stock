@@ -218,7 +218,7 @@
       运维「执行一次」对 <code>scan-and-trade</code>/<code>sync-orders</code>/<code>settle-after-close</code> 锁忙均 failLoud</li>
   <li><code>trade-mode=sim</code>：下单即时成交并记账；<code>sdk</code>：SUBMITTED 预留资金/可卖量，由 <code>sync-orders</code> 推进 FILLED 后再落账；
       可 <code>POST /api/account/orders/{id}/cancel</code> 撤单、<code>partial-fill</code> 部成或 <code>replace</code> 改价撤补。
-      可选宽睿 OES 只读（默认关）：对账可见柜台资金/持仓/委托，不据此改仓、不下单</li>
+      可选宽睿 OES（默认关）：只读对账；再开 <code>oes.order-enabled</code> 后限价报撤并由 sync 按柜台状态推进（不假推进）</li>
   <li>本地模拟持仓/现金在成交后落库：<code>trade_positions</code> / <code>trade_position_lots</code>、<code>system_config(sim.cash)</code>；
       另持久化风控/退役/挂单元数据（<code>sim.risk.state</code> / <code>sim.retirement</code> / <code>sim.books.meta</code>）；收盘写 <code>trade_cashflows</code>；启动可恢复（含现金=0）</li>
   <li>收盘后任务：约 15:30 相关清算；16:00 可触发批量扫描日志等</li>

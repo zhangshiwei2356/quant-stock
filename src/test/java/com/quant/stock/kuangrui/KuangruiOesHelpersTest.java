@@ -34,14 +34,17 @@ class KuangruiOesHelpersTest {
     void viewMapper_normalizeCodeAndOrdStatus() {
         assertEquals("600036", OesViewMapper.normalizeCode("600036.SH"));
         assertEquals("000001", OesViewMapper.normalizeCode("1"));
-        assertEquals("FILLED", OesViewMapper.ordStatusLabel(3));
-        assertEquals("CANCELLED", OesViewMapper.ordStatusLabel(4));
-        assertEquals("STATUS_99", OesViewMapper.ordStatusLabel(99));
+        assertEquals("PARTIAL", OesViewMapper.ordStatusLabel(3));
+        assertEquals("FILLED", OesViewMapper.ordStatusLabel(8));
+        assertEquals("CANCELLED", OesViewMapper.ordStatusLabel(7));
+        assertEquals("REJECTED", OesViewMapper.ordStatusLabel(11));
+        assertEquals("FILLED", OesViewMapper.toLocalStatusName(8));
+        assertEquals("CANCELLED", OesViewMapper.toLocalStatusName(7));
     }
 
     @Test
     void viewMapper_orderAndTrade() {
-        Map<String, Object> o = OesViewMapper.order("000001", 9L, 1, 3, 100000L, 200, 200);
+        Map<String, Object> o = OesViewMapper.order("000001", 9L, 1, 8, 100000L, 200, 200);
         assertEquals("000001", o.get("code"));
         assertEquals("FILLED", o.get("ordStatusLabel"));
         assertEquals(new BigDecimal("10.0000"), o.get("ordPrice"));
@@ -51,6 +54,23 @@ class KuangruiOesHelpersTest {
         assertEquals(new BigDecimal("10.0000"), t.get("trdPrice"));
         assertEquals(100, t.get("trdQty"));
         assertEquals(new BigDecimal("1000.0000"), t.get("trdAmt"));
+    }
+
+    @Test
+    void priceScale_toMilli() {
+        assertEquals(123400, KuangruiPriceScale.toMilliInt(new BigDecimal("12.34")));
+        assertEquals(0, KuangruiPriceScale.toMilliInt(null));
+        assertEquals(0, KuangruiPriceScale.toMilliInt(BigDecimal.ZERO));
+    }
+
+    @Test
+    void noopOrder_isNotLive() {
+        NoopOesOrderService noop = new NoopOesOrderService();
+        assertFalse(noop.isOrderLive());
+        assertTrue(noop.pollEvents().isEmpty());
+        assertFalse(noop.cancelByClSeqNo(1, "600036"));
+        assertFalse(noop.placeLimit("600036", com.quant.stock.trade.dto.OrderDTO.Side.BUY,
+                new BigDecimal("10"), 100, 1, "c").isAccepted());
     }
 
     @Test

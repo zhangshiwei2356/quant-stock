@@ -745,7 +745,7 @@ public class DynamicScheduleService implements ApplicationRunner {
         seed("scan-and-trade", "实盘分钟扫描交易", "CRON",
                 "0 */1 9-11,13-15 * * MON-FRI", null, 1, "工作日交易时段每分钟扫描（模拟账本）");
         seed("sync-orders", "订单状态同步", "FIXED_RATE", null, 10000L, 1,
-                "本地桩 SUBMITTED→FILLED；可选 OES 只读对账日志（M2，默认关）");
+                "sdk：本地桩或 OES 回报推进 FILLED（order-enabled 默认关）");
         seed("position-pnl-sync", "持仓盈亏同步", "CRON",
                 "0 */1 9-15 * * MON-FRI", null, 1,
                 "本地成本+市值浮盈；可选 OES 只读对账（M2，默认关）");
@@ -790,7 +790,7 @@ public class DynamicScheduleService implements ApplicationRunner {
                 "UPDATE sys_schedule_job SET job_name=? WHERE job_code=?",
                 "目标池分钟补齐(TDX)", "pool-minute-backfill");
         syncJobMeta("scan-and-trade", 1, "仅扫描唯一目标池（trade_pool status=1）");
-        syncJobMeta("sync-orders", 1, "本地桩 SUBMITTED→FILLED；可选 OES 只读对账日志（M2，默认关）");
+        syncJobMeta("sync-orders", 1, "sdk：本地桩或 OES 回报推进 FILLED（order-enabled 默认关）");
         syncJobMeta("settle-after-close", 1,
                 "本地权益日结 + K 线聚合；真实行情增量仍依赖 market-collect/外部 API");
         syncJobMeta("pool-rebuild", 1, "全市场扫描覆盖唯一目标池；与 after-market-batch-scan 互斥（启用其一自动关另一）");
