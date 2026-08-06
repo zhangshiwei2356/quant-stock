@@ -27,4 +27,8 @@
             version = version + 1,
             updated_at = CURRENT_TIMESTAMP
     </insert>
+
+    <delete id="deleteByStrategyId">
+        DELETE FROM strategy_param WHERE strategy_id = #{strategyId}
+    </delete>
 </mapper>

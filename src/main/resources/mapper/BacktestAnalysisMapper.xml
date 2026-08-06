@@ -51,4 +51,12 @@
     <delete id="deleteAllByKind">
         DELETE FROM bt_backtest_analysis WHERE kind = #{kind}
     </delete>
+
+    <delete id="deleteByRecordIds">
+        DELETE FROM bt_backtest_analysis
+        WHERE record_id IN
+        <foreach collection="recordIds" item="rid" open="(" separator="," close=")">
+            #{rid}
+        </foreach>
+    </delete>
 </mapper>

@@ -55,7 +55,7 @@
     <li><b>账本/退出/运维补强</b> — 已落地 · 信号日≠成交日落库；熔断/时间止损可抢占死叉挂单；持仓以批次为准；委托撤/部成/改价与分钟自洽检查挂 UI；schema 任务 implemented 与运行时对齐；Redis 锁 token</li>
     <li><b>收盘权益日表</b> — 已落地 · <code>settle-after-close</code> 写 <code>trade_cashflows</code>；账户概览 →「权益日结」可查看</li>
     <li><b>风控日志</b> — 已落地 · 峰值回撤熔断写入 <code>risk_control_log</code>；账户概览 →「风控事件」</li>
-    <li><b>单活策略可切换</b> — 已落地 · <code>StrategyRegistry</code> + <code>quant.active-strategy</code>（默认 <code>maCross</code>）；对照画像 <code>maCrossTrend/Volume/Balanced/Strict</code>（固定过滤，不改原版类）；回测下拉对比；扫池/纸面仍用配置激活；占位 <code>holdNothing</code>；多策略并行分账本仍不做</li>
+    <li><b>单活策略可切换</b> — 已落地 · <code>StrategyRegistry</code> + <code>quant.active-strategy</code>（默认 <code>maCross</code>）；对照画像仅 <code>maCrossBalanced</code>（固定过滤，不改原版类）；已下线 <code>maCrossTrend/Volume/Strict</code> 并启动清理其回测报告；回测下拉对比；扫池/纸面仍用配置激活；占位 <code>holdNothing</code>；多策略并行分账本仍不做</li>
     <li><b>行情分层（日线选股 + 分钟交易）</b> — 已落地 · <code>market_daily</code> 供全市场扫池；<code>market_1min</code> 供池内分钟交易；<code>quant.day-source=auto</code> 日线优先，空则分钟聚日</li>
     <li><b>TDX 日线回填</b> — 已落地 · <code>scripts/fetch_daily_tdx.py</code>（<code>--from-basic --years 1</code> / <code>--codes</code>）写 <code>market_daily</code>（adj=NONE）；升级 <code>scripts/sql/20260805_market_daily.sql</code></li>
     <li><b>TDX 脚本桥接</b> — 已落地 · 默认开 · <code>quant.tdx-script.enabled</code>；任务 <code>day-collect</code>（同步列表；已齐日线跳过、否则增量；默认4线程）、<code>pool-minute-backfill</code>（池内分钟尽量~90日）；运维 <code>/api/ops/tdx-script/*</code>；亦可单独跑 <code>scripts/sync_stock_basic.py</code>；推荐手动三步：日线→扫池→池内分钟；无本机 Python/pytdx 时可关</li>

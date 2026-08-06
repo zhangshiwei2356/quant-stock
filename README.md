@@ -341,7 +341,7 @@ sequenceDiagram
 
 ## 策略与风控（已实现）
 
-- **单活策略可切换**：`quant.active-strategy` 默认 **`maCross`**（读全局 quant 过滤；实现仍在 `MaCrossStrategy`，不静默改规则）。另有对照画像 **`maCrossTrend` / `maCrossVolume` / `maCrossBalanced` / `maCrossStrict`**（固定过滤包，不读 yml 过滤开关）+ `holdNothing` + 会话脚手架 **`branchScaffold`**（旁路 session 引擎，无真实成交）。回测工作台下拉切换 `strategyId` 做对比；扫池/纸面仍用配置激活。隔日高开公式仍不实现；见「能力与待办」
+- **单活策略可切换**：`quant.active-strategy` 默认 **`maCross`**（读全局 quant 过滤；实现仍在 `MaCrossStrategy`，不静默改规则）。另有对照画像 **`maCrossBalanced`**（固定过滤包，不读 yml 过滤开关）+ `holdNothing` + 会话脚手架 **`branchScaffold`**（旁路 session 引擎，无真实成交）。已下线不成功的 `maCrossTrend` / `maCrossVolume` / `maCrossStrict`（启动幂等清理其回测历史与分析）。回测工作台下拉切换 `strategyId` 做对比；扫池/纸面仍用配置激活。隔日高开公式仍不实现；见「能力与待办」
 - 止损：相对综合成本的 ATR + 权益硬止损；移动止盈盘后上移；**跳空穿价按开盘价**成交（盘中触及按止损价）
 - 组合相关监控：成分日收益两两相关（回看 60 日，均值≥0.75 告警）；组合回测结果字段 `correlation`；`GET /api/account/correlation`
 - **T+1 分档**：仅非当日买入批次可卖/可止损

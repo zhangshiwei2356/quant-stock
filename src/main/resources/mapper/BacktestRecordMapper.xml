@@ -112,4 +112,20 @@
             #{fid}
         </foreach>
     </update>
+
+    <select id="selectRecordIdsByStrategyIds" resultType="string">
+        SELECT record_id FROM bt_backtest_record
+        WHERE strategy_id IN
+        <foreach collection="strategyIds" item="sid" open="(" separator="," close=")">
+            #{sid}
+        </foreach>
+    </select>
+
+    <delete id="deleteByStrategyIds">
+        DELETE FROM bt_backtest_record
+        WHERE strategy_id IN
+        <foreach collection="strategyIds" item="sid" open="(" separator="," close=")">
+            #{sid}
+        </foreach>
+    </delete>
 </mapper>

@@ -46,4 +46,10 @@ public interface BacktestRecordMapper {
     /** 将 fromIds 中的取值统一改为 toId。 */
     int updateStrategyIdAliases(@Param("fromIds") List<String> fromIds,
                                 @Param("toId") String toId);
+
+    /** 按 strategy_id 列表查询 record_id（用于级联删分析）。 */
+    List<String> selectRecordIdsByStrategyIds(@Param("strategyIds") List<String> strategyIds);
+
+    /** 按 strategy_id 列表删除回测历史。 */
+    int deleteByStrategyIds(@Param("strategyIds") List<String> strategyIds);
 }

@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 金叉参数画像：原版不动；副本固定过滤；注册表可发现。
+ * 金叉参数画像：原版不动；仅保留 Balanced 对照；Trend/Volume/Strict 已下线。
  */
 class MaCrossProfileStrategyTest {
 
@@ -21,26 +21,22 @@ class MaCrossProfileStrategyTest {
         List<BaseStrategy> all = Arrays.asList(
                 new MaCrossStrategy(props),
                 new HoldNothingStrategy(),
-                new MaCrossTrendStrategy(),
-                new MaCrossVolumeStrategy(),
-                new MaCrossBalancedStrategy(),
-                new MaCrossStrictStrategy());
+                new MaCrossBalancedStrategy());
         StrategyRegistry reg = new StrategyRegistry(all, props);
         assertTrue(reg.contains("maCross"));
-        assertTrue(reg.contains("maCrossTrend"));
-        assertTrue(reg.contains("maCrossVolume"));
         assertTrue(reg.contains("maCrossBalanced"));
-        assertTrue(reg.contains("maCrossStrict"));
+        assertFalse(reg.contains("maCrossTrend"));
+        assertFalse(reg.contains("maCrossVolume"));
+        assertFalse(reg.contains("maCrossStrict"));
         assertEquals("maCross", reg.active().name());
-        assertEquals(MaCrossFilterProfile.STRICT.getId(), reg.resolve("maCrossStrict").name());
+        assertEquals(MaCrossFilterProfile.BALANCED.getId(), reg.resolve("maCrossBalanced").name());
     }
 
     @Test
-    void strictRejectsWhenTrendDownEvenIfCrossUpBundleLies() {
-        // 构造：isMaCrossUp 需真实 bundle；这里只测 rejectReason 对趋势开关
-        MaCrossStrictStrategy s = new MaCrossStrictStrategy();
-        assertEquals("maCrossStrict", s.name());
-        assertTrue(s.uiLabel().contains("严格"));
+    void balancedProfileHasLabelAndSummary() {
+        MaCrossBalancedStrategy s = new MaCrossBalancedStrategy();
+        assertEquals("maCrossBalanced", s.name());
+        assertTrue(s.uiLabel().contains("均衡"));
         assertFalse(s.profileSummary().isEmpty());
     }
 

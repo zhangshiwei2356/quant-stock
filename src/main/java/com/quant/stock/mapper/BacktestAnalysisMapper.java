@@ -25,4 +25,7 @@ public interface BacktestAnalysisMapper {
 
     /** 按 kind 清空该类型的全部分析。 */
     int deleteAllByKind(@Param("kind") String kind);
+
+    /** 按 record_id 列表删除分析（与回测历史级联清理）。 */
+    int deleteByRecordIds(@Param("recordIds") List<String> recordIds);
 }
