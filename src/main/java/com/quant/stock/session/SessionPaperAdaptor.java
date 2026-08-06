@@ -99,7 +99,7 @@ public class SessionPaperAdaptor {
             if (state.sessionDay != null && state.lastBar != null) {
                 SessionContext closeCtx = ctx(stockCode, state.sessionDay, SessionBranch.CLOSE,
                         state.lastBar, state.lastBarIndex, hold, equity, cash, positionShares,
-                        sellableShares, degraded, sess.isMatchingEnabled());
+                        sellableShares, degraded, sess.isMatchingEnabled(), bars);
                 strategy.onSessionClose(closeCtx, out.events);
                 hold = closeCtx.getHoldState() == null ? hold : closeCtx.getHoldState();
                 appendIntents(strategy, closeCtx, out);
@@ -107,7 +107,7 @@ public class SessionPaperAdaptor {
             state.sessionDay = day;
             state.seenBranchesToday = EnumSet.noneOf(SessionBranch.class);
             SessionContext openCtx = ctx(stockCode, day, branch, bar, index, hold, equity, cash,
-                    positionShares, sellableShares, degraded, sess.isMatchingEnabled());
+                    positionShares, sellableShares, degraded, sess.isMatchingEnabled(), bars);
             strategy.onSessionOpen(openCtx, out.events);
             hold = openCtx.getHoldState() == null ? hold : openCtx.getHoldState();
             appendIntents(strategy, openCtx, out);
@@ -115,7 +115,7 @@ public class SessionPaperAdaptor {
 
         boolean firstOfBranch = state.seenBranchesToday.add(branch);
         SessionContext barCtx = ctx(stockCode, day, branch, bar, index, hold, equity, cash,
-                positionShares, sellableShares, degraded, sess.isMatchingEnabled());
+                positionShares, sellableShares, degraded, sess.isMatchingEnabled(), bars);
         if (barCtx.isBranchDegraded()) {
             if (firstOfBranch) {
                 out.events.add(SessionEvent.builder()
@@ -151,8 +151,8 @@ public class SessionPaperAdaptor {
     private static SessionContext ctx(String code, LocalDate day, SessionBranch branch, BarDTO bar, int i,
                                       HoldDayState hold, BigDecimal equity, BigDecimal cash,
                                       int shares, int sellable, Set<SessionBranch> degraded,
-                                      boolean matchingEnabled) {
-        return SessionContext.builder()
+                                      boolean matchingEnabled, List<BarDTO> bars) {
+        SessionContext.SessionContextBuilder b = SessionContext.builder()
                 .stockCode(code)
                 .sessionDay(day)
                 .branch(branch)
@@ -164,7 +164,8 @@ public class SessionPaperAdaptor {
                 .positionShares(shares)
                 .sellableShares(sellable)
                 .matchingEnabled(matchingEnabled)
-                .degradedBranches(new LinkedHashSet<SessionBranch>(degraded))
-                .build();
+                .degradedBranches(new LinkedHashSet<SessionBranch>(degraded));
+        SessionBarAnchors.applyTo(b, bars, i);
+        return b.build();
     }
 }

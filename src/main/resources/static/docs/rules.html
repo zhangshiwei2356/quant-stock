@@ -15,7 +15,7 @@
 
 <h4>二、买入何时触发</h4>
 <ul>
-  <li><b>单活策略</b>：同一时刻只跑 <code>quant.active-strategy</code>（默认 <code>maCross</code>，读全局 quant 过滤）。另有对照画像 <code>maCrossTrend</code>（仅MA60）、<code>maCrossVolume</code>（放量1.5）、<code>maCrossBalanced</code>（趋势+放量/RSI55）、<code>maCrossStrict</code>（趋势+放量+ADX/RSI50），买卖公式同金叉、过滤包固定，供回测下拉对比；不改原版 <code>MaCrossStrategy</code>。纸面扫描仍用配置激活。列表见 <code>GET /api/config/strategies</code></li>
+  <li><b>单活策略</b>：同一时刻只跑 <code>quant.active-strategy</code>（默认 <code>maCross</code>，读全局 quant 过滤）。另有对照画像 <code>maCrossTrend</code>（仅MA60）、<code>maCrossVolume</code>（放量1.5）、<code>maCrossBalanced</code>（趋势+放量/RSI55）、<code>maCrossStrict</code>（趋势+放量+ADX/RSI50），买卖公式同金叉、过滤包固定；以及会话策略 <code>overnightGap</code>（隔日高开三分支，见下文）。不改原版 <code>MaCrossStrategy</code>。纸面扫描仍用配置激活。列表见 <code>GET /api/config/strategies</code></li>
   <li><b>金叉首开</b>：上一根 MA5≤MA20，本根 MA5&gt;MA20（收盘确认；单股引擎有效回测通常需 K 线约≥65 根）</li>
   <li><b>必过过滤</b>：RSI14 &lt; 60；ATR14 &gt; 0.001；
     <b>硬过滤</b>（可关 <code>market-cap-filter-enabled</code>）：模拟市值 &lt; 50 亿 → <strong>直接跳过、不开仓</strong></li>
@@ -159,16 +159,17 @@
   <li>成交股数 = 挂单股 × <b>当前仓位系数</b> 后再取整手</li>
   <li>结果含：权益曲线、买卖点、成交明细、tradeStats、决策分析事件</li>
   <li>历史与分析一一对应，写入 MySQL：<code>bt_backtest_record</code> / <code>bt_backtest_analysis</code></li>
-  <li><b>旁路会话引擎</b>（<code>engine=session</code> 或策略 <code>branchScaffold</code>）：强制 <b>MIN_1</b>；三分支 OPEN/MID/CLOSE（窗口 <code>quant.session.*</code>）；
+  <li><b>旁路会话引擎</b>（<code>engine=session</code> 或实现 <code>SessionStrategy</code> 的策略如 <code>overnightGap</code>）：强制 <b>MIN_1</b>；三分支 OPEN/MID/CLOSE（窗口 <code>quant.session.*</code>）；
       策略可经 <code>pollIntents</code> 下单，撮合子集含佣金/印花税/分级滑点、T+1 可卖、涨跌停夹紧、ADV 参与率；
-      成交模式 <code>quant.session.fill-mode</code> 默认 <code>AUTO</code>（跟随 <code>next-bar-open-fill</code>→<code>NEXT_EFFECTIVE</code>：挂单，次日且≥09:45 开盘；或 <code>BAR_CLOSE</code> 当根收盘即时）；脚手架默认不发意图；结果含 <code>sessionBranchStats</code> / 会话事件表；
-      <strong>不</strong>跑金叉五步时序；纸面：激活策略为 <code>SessionStrategy</code> 且 <code>paper-enabled</code> 时经适配器挂单，仍走模拟账本撮合；组合 session 为 MIN_1 共享资金池；隔日高开公式未实现</li>
+      成交模式 <code>quant.session.fill-mode</code> 默认 <code>AUTO</code>（跟随 <code>next-bar-open-fill</code>→<code>NEXT_EFFECTIVE</code>：挂单，次日且≥09:45 开盘；或 <code>BAR_CLOSE</code> 当根收盘即时）；结果含 <code>sessionBranchStats</code> / 会话事件表；
+      <strong>不</strong>跑金叉五步时序；纸面：激活策略为 <code>SessionStrategy</code> 且 <code>paper-enabled</code> 时经适配器挂单，仍走模拟账本撮合；组合 session 为 MIN_1 共享资金池</li>
+  <li><b>隔日高开三分支（overnightGap）</b>：CLOSE 尾盘在温和日收益且收盘≥开盘时布局隔夜；OPEN 次日高开≥<code>gap-take-profit</code>（默认 1.5%）兑现、低开≤<code>gap-stop</code>（默认 -1%）止损，否则隔日退出；MID 相对当日开盘回撤≥<code>mid-stop-from-open</code>（默认 2%）止损；最长持有 2 个交易日。阈值见 <code>quant.session.overnight-gap.*</code></li>
 </ul>
 
 <h4>九、组合回测（多股共享资金池）</h4>
 <ul>
   <li>工作台内<strong>仅从目标池</strong>搜索多选成分股；默认 <b>共用一份现金</b>与同一套账户风控（熔断/连亏/单日亏/仓位系数）</li>
-  <li><b>session 旁路</b>（<code>engine=session</code> / <code>branchScaffold</code>）：MIN_1 并集分钟轴 + <strong>共享现金池</strong>（<code>SessionPortfolioBackTestEngine</code>）+ <code>AccountRiskState</code>（熔断/连亏/单日亏/仓位系数，含 ADV 断崖与结构突变降仓）与单票/总仓上限；撮合 ADV 经 AUM 收紧 + 当根 POV；熔断后禁开并挂卖持仓；撮合同会话子集（含 <code>fill-mode</code>）；<strong>不</strong>跑金叉五步/止损金字塔；脚手架默认 0 成交；结果 <code>mode=SHARED_CASH_SESSION</code>，含会话事件与相关摘要</li>
+  <li><b>session 旁路</b>（<code>engine=session</code> / <code>SessionStrategy</code> 如 <code>overnightGap</code>）：MIN_1 并集分钟轴 + <strong>共享现金池</strong>（<code>SessionPortfolioBackTestEngine</code>）+ <code>AccountRiskState</code>（熔断/连亏/单日亏/仓位系数，含 ADV 断崖与结构突变降仓）与单票/总仓上限；撮合 ADV 经 AUM 收紧 + 当根 POV；熔断后禁开并挂卖持仓；撮合同会话子集（含 <code>fill-mode</code>）；<strong>不</strong>跑金叉五步/止损金字塔；结果 <code>mode=SHARED_CASH_SESSION</code>，含会话事件与相关摘要</li>
   <li>经典路径强制用 <b>DAY</b> 行情；按各股交易日并集时间轴推进；某股当日无 K 则跳过该股</li>
   <li>单股 K 线不足约 65 根则不进入组合</li>
   <li>每只股票独立：持仓 lot、金字塔档位、挂单、止损/trail、<code>stoppedOutToday</code></li>

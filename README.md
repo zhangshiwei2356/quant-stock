@@ -94,7 +94,7 @@ flowchart LR
 | 包 | 职责 |
 |----|------|
 | `market` | K 线统一入口：MySQL → Redis → JSON → mock/SDK |
-| `strategy` | 策略注册表 `StrategyRegistry` + 单活 `quant.active-strategy`（默认 `maCross` 金叉；可切换如 `holdNothing`） |
+| `strategy` | 策略注册表 `StrategyRegistry` + 单活 `quant.active-strategy`（默认 `maCross` 金叉；可切换对照画像或 `overnightGap`） |
 | `backtest` | 单股/组合引擎、批量扫描、历史与分析落盘 |
 | `pool` | 唯一目标池：盘后扫描覆盖、打分、报告 |
 | `trade` | 交易网关、成本模型、模拟账本落库 |
@@ -143,8 +143,8 @@ sequenceDiagram
 | 回测历史 | 落盘记录与分析；可跨股查看 |
 
 引擎默认 `BackTestEngine`（`engine=classic`：次日开盘撮合、止损/移动止盈、金字塔、T+1 分档、账户熔断）。  
-可选旁路 **`SessionBackTestEngine`**（`engine=session` 或策略 `branchScaffold`）：强制 **MIN_1** 三分支（OPEN/MID/CLOSE，窗口见 `quant.session.*`）+ 持仓日态事件 + **撮合子集**（`pollIntents` → 费用/T+1/涨跌停夹紧/ADV；`quant.session.fill-mode` 默认 **`AUTO`**：跟随 `next-bar-open-fill`→`NEXT_EFFECTIVE`（挂单，次日且分钟≥09:45 按开盘价）或 `BAR_CLOSE`（当根收盘即时）；脚手架默认不发意图故 0 成交）+ 分分支绩效（`sessionBranchStats`）与事件表。缺 INDEX/竞价/封单时分支 `UNAVAILABLE`（`failOnMissingDep=true` 可整单失败）。
-纸面：`quant.session.paper-enabled=true`（默认）且激活策略实现 `SessionStrategy` 时，`scan-and-trade` 经 `SessionPaperAdaptor` 走会话钩子，意图转为挂买/挂卖后仍走原模拟账本撮合；金叉激活时行为不变。组合 `engine=session` 经 `SessionPortfolioBackTestEngine` 为 **MIN_1 共享资金池**（统一现金 + `AccountRiskState`/单票总仓/压力降仓/AUM+POV，熔断挂卖，无金叉五步；结果含 `sessionEvents` 与日收益相关摘要）；隔日高开公式不实现。
+可选旁路 **`SessionBackTestEngine`**（`engine=session` 或策略实现 `SessionStrategy` 如 **`overnightGap`**）：强制 **MIN_1** 三分支（OPEN/MID/CLOSE，窗口见 `quant.session.*`）+ 持仓日态事件 + **撮合子集**（`pollIntents` → 费用/T+1/涨跌停夹紧/ADV；`quant.session.fill-mode` 默认 **`AUTO`**：跟随 `next-bar-open-fill`→`NEXT_EFFECTIVE`（挂单，次日且分钟≥09:45 按开盘价）或 `BAR_CLOSE`（当根收盘即时））+ 分分支绩效（`sessionBranchStats`）与事件表。缺 INDEX/竞价/封单时分支 `UNAVAILABLE`（`failOnMissingDep=true` 可整单失败）。
+纸面：`quant.session.paper-enabled=true`（默认）且激活策略实现 `SessionStrategy` 时，`scan-and-trade` 经 `SessionPaperAdaptor` 走会话钩子，意图转为挂买/挂卖后仍走原模拟账本撮合；金叉激活时行为不变。组合 `engine=session` 经 `SessionPortfolioBackTestEngine` 为 **MIN_1 共享资金池**（统一现金 + `AccountRiskState`/单票总仓/压力降仓/AUM+POV，熔断挂卖，无金叉五步；结果含 `sessionEvents` 与日收益相关摘要）。**隔日高开三分支**见策略 `overnightGap`（阈值 `quant.session.overnight-gap.*`）。
 
 ### 3. 组合回测
 
@@ -154,7 +154,7 @@ sequenceDiagram
 | 回测历史 | 组合历史与分析 |
 
 引擎：`PortfolioBackTestEngine`（默认日 K **共享资金池**）。  
-`engine=session` 或策略 `branchScaffold`：MIN_1 **共享资金池**旁路（并集分钟轴 + 统一现金/账户风控/熔断；`sessionBranchStats.mode=SHARED_CASH_SESSION`；工作台展示会话事件面板）；仍无金叉五步。
+`engine=session` 或 `SessionStrategy`（如 `overnightGap`）：MIN_1 **共享资金池**旁路（并集分钟轴 + 统一现金/账户风控/熔断；`sessionBranchStats.mode=SHARED_CASH_SESSION`；工作台展示会话事件面板）；仍无金叉五步。
 
 ### 4. 目标池（唯一池）
 
@@ -191,7 +191,7 @@ sequenceDiagram
 - **职责分离**：本菜单只做效果总览与评分；全局/按策略改参、纸面激活切换仍在 **运维中心 → 运行参数**
 - 数据：`GET /api/strategy/overview`（含 `detailIntro`、加权 `score`/`scoreComponents`）、`GET /api/strategy/{id}/history?kind=`、`GET /api/strategy/history/{recordId}`；按注册 `strategy_id` 聚合（查询含历史别名如 `MaCrossStrategy`）；启动自动补全空白→`maCross`、旧名→注册 id；运维 `POST /api/ops/backtest/backfill-strategy-id`；overview 仍可含 `unknownCount`
 - **评分（满分 100）**：收益 30 + 回撤 25 + 胜率 20 + 盈利占比 15 + 样本 10；无回测则不评分；样本少时仅供对照
-- **无回测补种**：选中 `runCount=0` 的策略时自动（亦可手动）`POST /api/strategy/{id}/seed-pool-backtest`：对目标池活跃股逐只单股回测 + 全池组合回测一次（初始资金默认 10 万；经典策略用日线，`branchScaffold` 走 session）；进度 `GET /api/strategy/seed-status`；已有记录需 `force=true`
+- **无回测补种**：选中 `runCount=0` 的策略时自动（亦可手动）`POST /api/strategy/{id}/seed-pool-backtest`：对目标池活跃股逐只单股回测 + 全池组合回测一次（初始资金默认 10 万；经典策略用日线，`SessionStrategy` 如 `overnightGap` 走 session）；进度 `GET /api/strategy/seed-status`；已有记录需 `force=true`
 
 ### 8. 数据表
 
@@ -341,7 +341,7 @@ sequenceDiagram
 
 ## 策略与风控（已实现）
 
-- **单活策略可切换**：`quant.active-strategy` 默认 **`maCross`**（读全局 quant 过滤；实现仍在 `MaCrossStrategy`，不静默改规则）。另有对照画像 **`maCrossTrend` / `maCrossVolume` / `maCrossBalanced` / `maCrossStrict`**（固定过滤包，不读 yml 过滤开关）+ `holdNothing` + 会话脚手架 **`branchScaffold`**（旁路 session 引擎，无真实成交）。回测工作台下拉切换 `strategyId` 做对比；扫池/纸面仍用配置激活。隔日高开公式仍不实现；见「能力与待办」
+- **单活策略可切换**：`quant.active-strategy` 默认 **`maCross`**（读全局 quant 过滤；实现仍在 `MaCrossStrategy`，不静默改规则）。另有对照画像 **`maCrossTrend` / `maCrossVolume` / `maCrossBalanced` / `maCrossStrict`**（固定过滤包，不读 yml 过滤开关）+ 会话策略 **`overnightGap`**（隔日高开三分支：尾盘布局 / 早盘兑现或止损 / 盘中回撤；最长持有 2 日；阈值 `quant.session.overnight-gap.*`）。回测工作台下拉切换 `strategyId` 做对比；扫池/纸面仍用配置激活；见「能力与待办」
 - 止损：相对综合成本的 ATR + 权益硬止损；移动止盈盘后上移；**跳空穿价按开盘价**成交（盘中触及按止损价）
 - 组合相关监控：成分日收益两两相关（回看 60 日，均值≥0.75 告警）；组合回测结果字段 `correlation`；`GET /api/account/correlation`
 - **T+1 分档**：仅非当日买入批次可卖/可止损

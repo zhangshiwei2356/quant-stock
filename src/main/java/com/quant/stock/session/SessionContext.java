@@ -22,6 +22,14 @@ public class SessionContext {
     private HoldDayState holdState;
     private BigDecimal equity;
     private BigDecimal cash;
+    /** 上一交易日最后一根分钟收盘（昨收近似）。 */
+    private BigDecimal prevClose;
+    /** 当日第一根交易分钟开盘价。 */
+    private BigDecimal dayOpen;
+    /** 开盘相对昨收：dayOpen/prevClose - 1。 */
+    private BigDecimal gapPct;
+    /** 当前 bar 收盘相对昨收：close/prevClose - 1。 */
+    private BigDecimal dayRet;
     @Builder.Default
     private int positionShares = 0;
     @Builder.Default

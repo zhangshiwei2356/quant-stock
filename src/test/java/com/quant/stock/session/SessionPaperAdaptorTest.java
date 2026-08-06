@@ -24,31 +24,28 @@ import static org.mockito.Mockito.when;
 class SessionPaperAdaptorTest {
 
     @Test
-    void scaffoldAdvancesHoldWithoutIntents() {
+    void overnightGapFlatWithoutPositionAdvancesOnlyWhenHeld() {
         List<BarDTO> bars = twoDays();
         MarketDataService mds = mock(MarketDataService.class);
         when(mds.getKline(eq("600036"), eq(BarPeriod.MIN_1), any(), any())).thenReturn(bars);
         QuantProperties props = new QuantProperties();
         props.getSession().setPaperEnabled(true);
+        OvernightGapStrategy strat = new OvernightGapStrategy(props);
         SessionPaperAdaptor adaptor = new SessionPaperAdaptor(props, new SessionDepProbe(mds));
         SessionPaperAdaptor.State state = new SessionPaperAdaptor.State();
 
-        SessionPaperAdaptor.Outcome d0 = adaptor.onBar(new BranchScaffoldStrategy(), "600036", bars, 0,
+        SessionPaperAdaptor.Outcome d0 = adaptor.onBar(strat, "600036", bars, 0,
                 state, new BigDecimal("100000"), 0, 0, new BigDecimal("100000"));
-        assertEquals(HoldDayState.HOLD_D0, d0.hold);
-        assertTrue(d0.intents.isEmpty());
+        assertEquals(HoldDayState.FLAT, d0.hold);
 
-        // 同日 MID 首根
-        SessionPaperAdaptor.Outcome mid = adaptor.onBar(new BranchScaffoldStrategy(), "600036", bars, 2,
-                state, new BigDecimal("100000"), 0, 0, new BigDecimal("100000"));
-        assertTrue(mid.events.stream().anyMatch(e -> "BRANCH_TICK".equals(e.getType())));
-
-        // 次日 OPEN → HOLD_ADVANCE
-        SessionPaperAdaptor.Outcome d1 = adaptor.onBar(new BranchScaffoldStrategy(), "600036", bars, 6,
-                state, new BigDecimal("100000"), 0, 0, new BigDecimal("100000"));
+        // 有持仓时次日 OPEN 推进持仓日态
+        state.hold = HoldDayState.HOLD_D0;
+        SessionPaperAdaptor.Outcome d1 = adaptor.onBar(strat, "600036", bars, 6,
+                state, new BigDecimal("100000"), 100, 100, new BigDecimal("100000"));
         assertTrue(d1.events.stream().anyMatch(e ->
                 "HOLD_ADVANCE".equals(e.getType()) || "FORCE_FLAT".equals(e.getType())
                         || "ENTER_HOLD".equals(e.getType()) || "SESSION_CLOSE".equals(e.getType())));
+        assertTrue(d1.intents.stream().anyMatch(i -> i.getSide() == SessionOrderIntent.Side.SELL));
     }
 
     @Test
@@ -60,7 +57,7 @@ class SessionPaperAdaptorTest {
         props.getSession().setPaperEnabled(false);
         SessionPaperAdaptor adaptor = new SessionPaperAdaptor(props, new SessionDepProbe(mds));
         SessionPaperAdaptor.State state = new SessionPaperAdaptor.State();
-        SessionPaperAdaptor.Outcome out = adaptor.onBar(new BranchScaffoldStrategy(), "600036", bars, 0,
+        SessionPaperAdaptor.Outcome out = adaptor.onBar(new OvernightGapStrategy(props), "600036", bars, 0,
                 state, new BigDecimal("100000"), 0, 0, new BigDecimal("100000"));
         assertTrue(out.events.isEmpty());
         assertEquals(HoldDayState.FLAT, out.hold);
