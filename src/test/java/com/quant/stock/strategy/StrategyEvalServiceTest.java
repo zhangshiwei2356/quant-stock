@@ -46,8 +46,8 @@ class StrategyEvalServiceTest {
         props.setDbEnabled(true);
         props.setActiveStrategy("maCross");
         MaCrossStrategy ma = new MaCrossStrategy(props);
-        HoldNothingStrategy hold = new HoldNothingStrategy();
-        registry = new StrategyRegistry(Arrays.asList(ma, hold), props);
+        MaCrossTrendStrategy trend = new MaCrossTrendStrategy();
+        registry = new StrategyRegistry(Arrays.asList(ma, trend), props);
 
         mapper = mock(BacktestRecordMapper.class);
         ObjectProvider<BacktestRecordMapper> mapperProvider = mock(ObjectProvider.class);
@@ -110,13 +110,13 @@ class StrategyEvalServiceTest {
         List<Map<String, Object>> strategies = (List<Map<String, Object>>) overview.get("strategies");
         assertNotNull(strategies);
         Map<String, Object> ma = null;
-        Map<String, Object> hold = null;
+        Map<String, Object> trend = null;
         for (Map<String, Object> row : strategies) {
             if ("maCross".equals(row.get("strategyId"))) {
                 ma = row;
             }
-            if ("holdNothing".equals(row.get("strategyId"))) {
-                hold = row;
+            if ("maCrossTrend".equals(row.get("strategyId"))) {
+                trend = row;
             }
         }
         assertNotNull(ma);
@@ -129,9 +129,9 @@ class StrategyEvalServiceTest {
         assertFalse(((BigDecimal) ma.get("avgTotalRate")).compareTo(bd("1")) == 0
                 || ((BigDecimal) ma.get("avgTotalRate")).compareTo(bd("0.55")) == 0);
 
-        assertNotNull(hold);
-        assertEquals(0, hold.get("runCount"));
-        assertNull(hold.get("score"));
+        assertNotNull(trend);
+        assertEquals(0, trend.get("runCount"));
+        assertNull(trend.get("score"));
     }
 
     @Test

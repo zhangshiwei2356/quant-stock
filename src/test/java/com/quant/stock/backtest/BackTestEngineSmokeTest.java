@@ -8,7 +8,6 @@ import com.quant.stock.config.ConfigFingerprint;
 import com.quant.stock.config.QuantProperties;
 import com.quant.stock.market.dto.BarDTO;
 import com.quant.stock.risk.OpenFilterService;
-import com.quant.stock.strategy.HoldNothingStrategy;
 import com.quant.stock.strategy.MaCrossStrategy;
 import com.quant.stock.strategy.StrategyRegistry;
 import com.quant.stock.trade.TradeCostModel;
@@ -49,7 +48,7 @@ class BackTestEngineSmokeTest {
         props.setActiveStrategy("maCross");
         OpenFilterService openFilter = new OpenFilterService(props);
         StrategyRegistry registry = new StrategyRegistry(
-                Arrays.asList(new MaCrossStrategy(props), new HoldNothingStrategy()), props);
+                Arrays.asList(new MaCrossStrategy(props)), props);
         EffectiveParamsService eps = mockEffectiveParams(props);
         BackTestEngine engine = new BackTestEngine(
                 props,
@@ -73,31 +72,6 @@ class BackTestEngineSmokeTest {
         assertNotNull(result.getAtrRisk());
         assertTrue(result.getAtrRisk().containsKey("atrStopMultiplier"));
         assertTrue(result.getAtrRisk().containsKey("stopExitEvents"));
-    }
-
-    @Test
-    void holdNothingProducesNoTrades() {
-        QuantProperties props = new QuantProperties();
-        props.setQuietOpenEnabled(false);
-        props.setQuietCloseEnabled(false);
-        props.setMarketCapFilterEnabled(false);
-        props.setMinAvgVolume20(1L);
-        props.setStopLossEnabled(false);
-        props.setActiveStrategy("holdNothing");
-        StrategyRegistry registry = new StrategyRegistry(
-                Arrays.asList(new MaCrossStrategy(props), new HoldNothingStrategy()), props);
-        BackTestEngine engine = new BackTestEngine(
-                props,
-                mockEffectiveParams(props),
-                new PositionAmountUtil(props),
-                registry,
-                new TradeCostModel(props),
-                new OpenFilterService(props),
-                new TradingCalendar());
-        BackTestResult result = engine.run("600036", syntheticUptrendDays("600036", 120),
-                new BigDecimal("100000"));
-        assertNotNull(result);
-        assertTrue(result.getTotalTradeNum() == null || result.getTotalTradeNum() == 0);
     }
 
     private static EffectiveParamsService mockEffectiveParams(final QuantProperties props) {

@@ -20,7 +20,6 @@ class MaCrossProfileStrategyTest {
         QuantProperties props = new QuantProperties();
         List<BaseStrategy> all = Arrays.asList(
                 new MaCrossStrategy(props),
-                new HoldNothingStrategy(),
                 new MaCrossTrendStrategy(),
                 new MaCrossVolumeStrategy(),
                 new MaCrossBalancedStrategy(),

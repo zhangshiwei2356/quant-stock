@@ -77,7 +77,7 @@ public class QuantProperties {
     private TdxScript tdxScript = new TdxScript();
     /**
      * 当前激活策略 id（单活可切换），对应 {@link com.quant.stock.strategy.BaseStrategy#name()}。
-     * 默认 {@code maCross}；可选已注册策略如 {@code holdNothing}。
+     * 默认 {@code maCross}；可选已注册策略如对照画像或 {@code branchScaffold}。
      */
     private String activeStrategy = "maCross";
     /** mock/JSON 模式下生成的 K 线天数 */

@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 策略注册表：默认 maCross、切换 holdNothing、指纹兼容。
+ * 策略注册表：默认 maCross、切换对照画像、未知 id 回退。
  */
 class StrategyRegistryTest {
 
@@ -19,8 +19,8 @@ class StrategyRegistryTest {
     void activeDefaultsToMaCross() {
         QuantProperties props = new QuantProperties();
         MaCrossStrategy ma = new MaCrossStrategy(props);
-        HoldNothingStrategy hold = new HoldNothingStrategy();
-        StrategyRegistry reg = new StrategyRegistry(Arrays.asList(ma, hold), props);
+        MaCrossTrendStrategy trend = new MaCrossTrendStrategy();
+        StrategyRegistry reg = new StrategyRegistry(Arrays.asList(ma, trend), props);
         assertEquals("maCross", reg.active().name());
         assertSame(ma, reg.active());
         assertEquals("MaCrossStrategy", reg.active().fingerprintId());
@@ -28,16 +28,16 @@ class StrategyRegistryTest {
     }
 
     @Test
-    void switchToHoldNothing() {
+    void switchToMaCrossTrend() {
         QuantProperties props = new QuantProperties();
-        props.setActiveStrategy("holdNothing");
+        props.setActiveStrategy("maCrossTrend");
         MaCrossStrategy ma = new MaCrossStrategy(props);
-        HoldNothingStrategy hold = new HoldNothingStrategy();
-        StrategyRegistry reg = new StrategyRegistry(Arrays.asList(ma, hold), props);
-        assertEquals("holdNothing", reg.active().name());
-        assertSame(hold, reg.resolve("HOLDNOTHING"));
+        MaCrossTrendStrategy trend = new MaCrossTrendStrategy();
+        StrategyRegistry reg = new StrategyRegistry(Arrays.asList(ma, trend), props);
+        assertEquals("maCrossTrend", reg.active().name());
+        assertSame(trend, reg.resolve("MACROSSTREND"));
         assertTrue(reg.ids().contains("maCross"));
-        assertTrue(reg.ids().contains("holdNothing"));
+        assertTrue(reg.ids().contains("maCrossTrend"));
     }
 
     @Test
@@ -45,7 +45,7 @@ class StrategyRegistryTest {
         QuantProperties props = new QuantProperties();
         props.setActiveStrategy("does-not-exist");
         MaCrossStrategy ma = new MaCrossStrategy(props);
-        StrategyRegistry reg = new StrategyRegistry(Arrays.asList(ma, new HoldNothingStrategy()), props);
+        StrategyRegistry reg = new StrategyRegistry(Arrays.asList(ma, new MaCrossTrendStrategy()), props);
         assertSame(ma, reg.active());
     }
 }

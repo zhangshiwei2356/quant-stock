@@ -36,11 +36,11 @@ class ConfigFingerprintTest {
     }
 
     @Test
-    void holdNothingChangesFingerprintStrategyField() {
+    void otherActiveStrategyChangesFingerprintStrategyField() {
         QuantProperties a = new QuantProperties();
         QuantProperties b = new QuantProperties();
-        b.setActiveStrategy("holdNothing");
-        assertEquals("holdNothing", ConfigFingerprint.fingerprintStrategyId(b));
+        b.setActiveStrategy("maCrossTrend");
+        assertEquals("maCrossTrend", ConfigFingerprint.fingerprintStrategyId(b));
         assertNotEquals(ConfigFingerprint.of(a), ConfigFingerprint.of(b));
     }
 }
