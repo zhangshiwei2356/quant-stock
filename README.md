@@ -96,13 +96,13 @@ flowchart LR
 | `market` | K 线统一入口：MySQL → Redis → JSON → mock/SDK |
 | `strategy` | 策略注册表 `StrategyRegistry` + 单活 `quant.active-strategy`（默认 `maCross` 金叉；可切换如 `holdNothing`） |
 | `backtest` | 单股/组合引擎、批量扫描、历史与分析落盘 |
-| `pool` | 唯一目标池：盘后扫描覆盖、打分、报告 |
+| `pool` | 唯一目标池：盘后扫描覆盖、打分、PDF 报告 |
 | `trade` | 交易网关、成本模型、模拟账本落库 |
 | `risk` | 开仓过滤、涨跌停、账户熔断、风控日志 |
 | `account` | 账户概览只读汇总 |
 | `task` | `sys_schedule_job` 动态调度 + `StrategyTask` |
 | `admin` | 数据健康、运行参数、表白名单浏览 |
-| `pdf` | 知识/应用说明 PDF；README Markdown→HTML |
+| `pdf` | 知识/应用说明 PDF；目标池扫描报告 PDF；README Markdown→HTML |
 | `calendar` | 静态交易日历（按上交所公告维护节假日） |
 | `config` / `controller` / `mapper` | 配置、REST、MyBatis |
 
@@ -160,10 +160,11 @@ sequenceDiagram
 
 | 二级菜单 | 功能 |
 |----------|------|
-| 当前池 | 查看入选、移出（**移出≠卖出**）、手动「扫描更新」（提交 `pool-rebuild` 异步任务 + 进度弹框） |
+| 当前池 | 查看入选、移出（**移出≠卖出**）、手动「扫描更新」（提交 `pool-rebuild` 异步任务 + 进度弹框）、下载 PDF 报告 |
 | 扫描历史 | 批次与报告；亦可手动扫描 |
 
-- 盘后任务 `pool-rebuild` / `after-market-batch-scan` 自动覆盖 `trade_pool`
+- 盘后任务 `pool-rebuild` / `after-market-batch-scan` 自动覆盖 `trade_pool`，并落盘 `historyDir/reports/pool-yyyyMMdd-HHmmss.pdf`
+- 「下载报告」：`GET /api/stock/trade-pool/reports/{fileName}`（`Content-Type: application/pdf`；兼容历史 `.md`）
 - 打分：均线趋势 / MA60 / ADX / 动量 / ATR / 流动性（默认 ≥ `pool-score-min`）
 - **个股/组合回测工作台选股只读本池**（行情浏览仍为全市场）
 
@@ -284,7 +285,7 @@ sequenceDiagram
 | GET `/api/strategy/{id}/history?kind=` | 某策略回测摘要（`ALL\|SINGLE\|PORTFOLIO`；未知 id → 404） |
 | GET `/api/strategy/history/{recordId}` | 单条详情（trades + 内嵌 analysis；未知 → 404） |
 | GET `/api/stock/universe` | 全市场 |
-| GET/POST `/api/stock/trade-pool*` | 目标池查询/重建/移出/报告 |
+| GET/POST `/api/stock/trade-pool*` | 目标池查询/重建/移出/报告（含 `GET .../reports/{pool-*.pdf}` 下载 PDF） |
 | GET `/api/account/**` | 账户资金/持仓/委托/日结/风控；页面「风控日报」聚合 alerts/turnover/ic-decay 等 |
 | GET `/api/account/alerts` | 风控告警环形缓冲（分级+冷却） |
 | GET `/api/account/slippage-residual` | 滑点/费用残差日报（不回写改价） |

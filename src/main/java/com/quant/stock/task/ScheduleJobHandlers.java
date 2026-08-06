@@ -213,7 +213,7 @@ public class ScheduleJobHandlers {
             @Override
             public void run() {
                 jobProgressHub.phase("running", "执行中", "全市场入池扫描进行中…");
-                // 与目标池页「扫描更新」一致：覆盖池 + 写批次 + Markdown 报告
+                // 与目标池页「扫描更新」一致：覆盖池 + 写批次 + PDF 报告
                 Map<String, Object> out = tradePoolService.analyzeAndRecommend();
                 log.info("[pool-rebuild] selected={} codes={} report={} minuteHint={}",
                         out.get("selected"), out.get("codes"), out.get("reportFileName"),
