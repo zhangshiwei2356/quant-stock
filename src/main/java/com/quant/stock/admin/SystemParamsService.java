@@ -266,7 +266,11 @@ public class SystemParamsService {
                 kv("tradePoolMax", "目标池上限", g, e, sparse, "盘后扫描入选 TopN"),
                 kv("poolScoreMin", "入池最低综合分", g, e, sparse, "多因子打分门槛"),
                 kv("poolMinListDays", "最短上市天数", g, e, sparse, null),
-                kv("poolMinAvgAmount20", "20日均成交额下限(元)", g, e, sparse, "0=关闭过滤")));
+                kv("poolMinAvgAmount20", "20日均成交额下限(元)", g, e, sparse, "0=关闭过滤"),
+                kv("poolRebuildRefreshFactors", "入池前重算因子", g, e, sparse,
+                        "默认关加速；开则 pool-rebuild 先刷 factor_daily"),
+                kv("poolRebuildFullBacktest", "入池完整回测", g, e, sparse,
+                        "默认关=轻量扫池（指标/信号）；开则每只跑 BackTestEngine")));
         groups.add(group("风控",
                 kv("dailyLossLimitPct", "单日亏损上限", g, e, sparse, "相对权益"),
                 kv("consecutiveLossLimit", "连亏笔数上限", g, e, sparse, null),

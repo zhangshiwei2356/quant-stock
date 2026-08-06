@@ -4905,13 +4905,84 @@
     if (st.total != null && st.total > 0) {
       counts = '进度 ' + (st.currentIndex != null ? st.currentIndex : 0) + '/' + st.total;
       if (st.okSoFar != null || st.warnSoFar != null) {
-        counts += ' · 正常 ' + (st.okSoFar || 0) + ' / 告警 ' + (st.warnSoFar || 0);
+        counts += ' · 正常 ' + (st.okSoFar || 0) + ' / 待处置 ' + (st.warnSoFar || 0);
+        if (st.specialSoFar != null) counts += ' / 特殊 ' + (st.specialSoFar || 0);
       }
       if (st.poolSize != null) counts += ' · 目标池 ' + st.poolSize;
     }
     $('#healthProgressSummary').text(counts || (st.summary || ''));
     $('#btnHealthProgressClose').prop('hidden', !done);
     $('#btnHealthRefresh').prop('disabled', running);
+  }
+
+  function renderHealthSpecial(data) {
+    data = data || {};
+    if (data.specialHint) {
+      $('#healthSpecialHint').text(data.specialHint);
+    }
+    var items = data.specialItems || [];
+    items = items.filter(function (it) { return it && it.severity === 'special'; });
+    var $tb = $('#healthSpecialBody').empty();
+    if (!items.length) {
+      var emptyMsg = (data.specialCount === 0 && (data.okCount > 0 || data.warnCount >= 0))
+        ? '无特殊项'
+        : '刷新覆盖检查后展示特殊项（北交所/退市·PT/停牌）';
+      $tb.html('<tr><td colspan="6" class="empty-state">' + emptyMsg + '</td></tr>');
+      return;
+    }
+    items.sort(function (a, b) {
+      var ka = String(a.emptyDailyKind || '') + String(a.code || '');
+      var kb = String(b.emptyDailyKind || '') + String(b.code || '');
+      return ka < kb ? -1 : (ka > kb ? 1 : 0);
+    });
+    items.forEach(function (it) {
+      $tb.append(
+        '<tr>'
+        + '<td><b>' + escHtml(it.code) + '</b>'
+        + (it.name ? (' <span class="muted">' + escHtml(it.name) + '</span>') : '')
+        + '</td>'
+        + '<td><span class="tag-wait">特殊</span></td>'
+        + '<td class="mono">' + escHtml(String(it.dailyCount == null ? '—' : it.dailyCount)) + '</td>'
+        + '<td class="mono">' + escHtml(it.maxDaily || '—') + '</td>'
+        + '<td class="mono">' + escHtml(String(it.lastDailyVolume == null ? '—' : it.lastDailyVolume)) + '</td>'
+        + '<td>' + escHtml(it.issueText || '—') + '</td>'
+        + '</tr>'
+      );
+    });
+  }
+
+  function renderMdsTdxSample(data) {
+    data = data || {};
+    $('#mdsTdxSampled').text(String(data.sampled == null ? '—' : data.sampled));
+    $('#mdsTdxBoth').text(String(data.bothPresent == null ? '—' : data.bothPresent));
+    $('#mdsTdxCloseWarn').attr('class', 'value ' + (data.closeDiffWarnCount > 0 ? 'pnl-neg' : ''))
+      .text(String(data.closeDiffWarnCount == null ? '—' : data.closeDiffWarnCount));
+    $('#mdsTdxMaxBp').text(String(data.maxCloseDiffBp == null ? '—' : data.maxCloseDiffBp));
+    if (data.hint) {
+      $('#mdsTdxHint').text(data.hint);
+    }
+    var items = data.items || [];
+    var $tb = $('#mdsTdxBody').empty();
+    if (!items.length) {
+      $tb.html('<tr><td colspan="8" class="empty-state">无抽样结果（库中可能尚无 MDS/TDX 分钟）</td></tr>');
+      return;
+    }
+    items.forEach(function (it) {
+      var bad = !it.ok;
+      $tb.append(
+        '<tr>'
+        + '<td><b>' + escHtml(it.code) + '</b></td>'
+        + '<td class="mono">' + escHtml(String(it.tdxCount == null ? '—' : it.tdxCount)) + '</td>'
+        + '<td class="mono">' + escHtml(it.tdxMaxTime ? fmtDateTimeDisplay(it.tdxMaxTime) : '—') + '</td>'
+        + '<td class="mono">' + escHtml(String(it.mdsCount == null ? '—' : it.mdsCount)) + '</td>'
+        + '<td class="mono">' + escHtml(it.mdsMaxTime ? fmtDateTimeDisplay(it.mdsMaxTime) : '—') + '</td>'
+        + '<td class="mono">' + escHtml(String(it.overlapCount == null ? '—' : it.overlapCount)) + '</td>'
+        + '<td class="mono' + (it.closeDiffWarn ? ' pnl-neg' : '') + '">'
+        + escHtml(String(it.maxCloseDiffBp == null ? '—' : it.maxCloseDiffBp)) + '</td>'
+        + '<td>' + (bad ? escHtml(it.issueText || '—') : '<span class="muted">一致</span>') + '</td>'
+        + '</tr>'
+      );
+    });
   }
 
   function renderHealthResult(data) {
@@ -4922,27 +4993,37 @@
     $('#healthOk').text(String(data.okCount == null ? '—' : data.okCount));
     $('#healthWarn').attr('class', 'value ' + (data.warnCount > 0 ? 'pnl-neg' : ''))
       .text(String(data.warnCount == null ? '—' : data.warnCount));
+    $('#healthSpecial').attr('class', 'value ' + (data.specialCount > 0 ? '' : ''))
+      .text(String(data.specialCount == null ? '—' : data.specialCount));
     $('#healthBadge').text(String(data.warnCount == null ? 0 : data.warnCount));
-    $('#healthMeta').text(data.asOf ? ('检查时间：' + fmtDateTimeDisplay(data.asOf) + ' · 明细仅告警') : '');
+    $('#healthMeta').text(data.asOf
+      ? ('检查时间：' + fmtDateTimeDisplay(data.asOf) + ' · 待处置告警 / 特殊项分表')
+      : '');
     var bd = data.breakdown || {};
-    if (bd.emptyDaily != null) {
+    if (bd.emptyDaily != null || bd.specialSuspended != null) {
       var parts = [];
-      if (bd.emptyDailyBj) parts.push('北交所空 ' + bd.emptyDailyBj);
-      if (bd.emptyDailyLikelyDelisted) parts.push('疑似退市空 ' + bd.emptyDailyLikelyDelisted);
+      if (bd.specialBj || bd.emptyDailyBj) parts.push('北交所特殊 ' + (bd.specialBj || bd.emptyDailyBj));
+      if (bd.specialDelisted || bd.emptyDailyLikelyDelisted) {
+        parts.push('疑似退市 ' + (bd.specialDelisted || bd.emptyDailyLikelyDelisted));
+      }
+      if (bd.specialSuspended) parts.push('停牌特殊 ' + bd.specialSuspended);
       if (bd.emptyDailyOther) parts.push('其它空 ' + bd.emptyDailyOther);
       if (bd.minuteWarn) parts.push('分钟告警 ' + bd.minuteWarn);
       if (parts.length) {
         $('#healthMeta').text(($('#healthMeta').text() || '') + ' · ' + parts.join(' / '));
       }
     }
+    renderHealthSpecial(data);
     var items = data.items || [];
-    // 后端已 warn_only；前端再滤一层，避免旧结果夹带正常行
-    items = items.filter(function (it) { return !it.ok; });
+    // 后端已 warn_only；前端再滤一层，避免旧结果夹带正常/特殊行
+    items = items.filter(function (it) {
+      return it && !it.ok && it.severity !== 'special' && it.actionNeeded !== false;
+    });
     var $tb = $('#healthBody').empty();
     if (!items.length) {
       var emptyMsg = (data.warnCount === 0 && data.okCount > 0)
-        ? '全部正常，无告警明细'
-        : '无告警标的或尚未执行覆盖检查';
+        ? '无待处置告警'
+        : '无待处置告警或尚未执行覆盖检查';
       $tb.html('<tr><td colspan="7" class="empty-state">' + emptyMsg + '</td></tr>');
       return;
     }
@@ -4957,7 +5038,7 @@
         + '<td><b>' + escHtml(it.code) + '</b>'
         + (it.name ? (' <span class="muted">' + escHtml(it.name) + '</span>') : '')
         + '</td>'
-        + '<td><span class="tag-wait">告警</span></td>'
+        + '<td><span class="tag-wait">待处置</span></td>'
         + '<td class="mono">' + escHtml(String(it.dailyCount == null ? '—' : it.dailyCount)) + '</td>'
         + '<td class="mono">' + escHtml(it.maxDaily || '—') + '</td>'
         + '<td class="mono">' + escHtml(String(it.minuteCount == null ? '—' : it.minuteCount)) + '</td>'
@@ -5386,6 +5467,24 @@
   $('#btnHealthRefresh').on('click', startHealthCoverageCheck);
   $('#btnHealthProgressClose').on('click', function () {
     showHealthProgressModal(false);
+  });
+  $('#btnMdsTdxSample').on('click', function () {
+    var $btn = $(this);
+    if ($btn.prop('disabled')) return;
+    $('#mdsTdxBody').html('<tr><td colspan="8" class="empty-state">抽样对账进行中…</td></tr>');
+    withLoading($btn, $.ajax({
+      url: '/api/ops/data-health/mds-tdx-sample',
+      method: 'POST',
+      data: { limit: 20 }
+    }).done(function (data) {
+      renderMdsTdxSample(data || {});
+      var n = (data && data.sampled != null) ? data.sampled : 0;
+      var w = (data && data.closeDiffWarnCount != null) ? data.closeDiffWarnCount : 0;
+      toast('MDS/TDX 抽样完成：' + n + ' 只，收盘偏差告警 ' + w, w > 0 ? 'err' : 'ok');
+    }).fail(function (xhr) {
+      toast(extractAjaxError(xhr, 'MDS/TDX 抽样对账失败'), 'err');
+      $('#mdsTdxBody').html('<tr><td colspan="8" class="empty-state">抽样对账失败</td></tr>');
+    }));
   });
   $('#btnReconcileRun').on('click', function () {
     var $btn = $(this);

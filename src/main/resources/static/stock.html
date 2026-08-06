@@ -637,7 +637,21 @@
             <ul class="ops-action-points">
               <li>聚焦分钟 K 质量，不是覆盖扫表</li>
               <li>异常数 →「异常标的」</li>
-              <li>外部多源对账尚未接入</li>
+              <li>MDS/TDX 抽样对账另见下方按钮</li>
+            </ul>
+          </div>
+          <div class="ops-action-card">
+            <div class="ops-action-card-head">
+              <button type="button" id="btnMdsTdxSample" class="secondary">MDS/TDX 抽样对账</button>
+              <span class="ops-action-tag muted">可选</span>
+            </div>
+            <p class="ops-action-desc">
+              抽样比较 <code>market_1min</code> 中 TDX 与 MDS 的条数、最新时间与重叠收盘偏差（阈 50 bp）。
+              优先目标池，再补库中有两源标记的标的；只读不改库。
+            </p>
+            <ul class="ops-action-points">
+              <li>需库中已有 <code>data_source=MDS</code> 与 <code>TDX</code> 数据才有重叠可比</li>
+              <li>结果见下方「MDS/TDX 抽样」汇总与明细</li>
             </ul>
           </div>
         </div>
@@ -649,7 +663,8 @@
               <div class="result-kv"><span class="label" title="stock_basic 全市场标的数，覆盖检查扫这些股票的日线">全市场</span><span class="value" id="healthUniverse">—</span></div>
               <div class="result-kv"><span class="label" title="目标池活跃标的数；这些股票额外检查分钟线">目标池</span><span class="value" id="healthPool">—</span></div>
               <div class="result-kv"><span class="label">正常</span><span class="value" id="healthOk">—</span></div>
-              <div class="result-kv"><span class="label">告警</span><span class="value" id="healthWarn">—</span></div>
+              <div class="result-kv"><span class="label" title="可行动：缺数/真滞后/池内分钟">待处置告警</span><span class="value" id="healthWarn">—</span></div>
+              <div class="result-kv"><span class="label" title="北交所空/疑似退市·PT/停牌，不计入待处置">特殊项</span><span class="value" id="healthSpecial">—</span></div>
             </div>
             <div class="result-group">
               <div class="result-group-title">分钟自洽结果</div>
@@ -657,10 +672,19 @@
               <div class="result-kv"><span class="label">异常标的</span><span class="value" id="reconcileDiverge">—</span></div>
               <div class="result-kv"><span class="label">上次检查</span><span class="value mono" id="reconcileAt">—</span></div>
             </div>
+            <div class="result-group">
+              <div class="result-group-title">MDS/TDX 抽样</div>
+              <div class="result-kv"><span class="label">抽样数</span><span class="value" id="mdsTdxSampled">—</span></div>
+              <div class="result-kv"><span class="label">两源齐全</span><span class="value" id="mdsTdxBoth">—</span></div>
+              <div class="result-kv"><span class="label">收盘偏差告警</span><span class="value" id="mdsTdxCloseWarn">—</span></div>
+              <div class="result-kv"><span class="label">最大偏差 bp</span><span class="value mono" id="mdsTdxMaxBp">—</span></div>
+            </div>
           </div>
-          <p class="hint" id="reconcileHint" style="margin-top:8px;">检查分钟K是否为空、过旧、当日根数过少或 OHLC 不合法；外部多源对账仍未接入。默认只告警，不禁止开仓。</p>
+          <p class="hint" id="reconcileHint" style="margin-top:8px;">检查分钟K是否为空、过旧、当日根数过少或 OHLC 不合法；默认只告警，不禁止开仓。MDS/TDX 抽样对账见上方按钮。</p>
+          <p class="hint" id="mdsTdxHint" style="margin-top:4px;"></p>
         </div>
-        <div class="table-wrap" style="margin-top:12px;max-height:none;">
+        <h4 style="margin:16px 0 8px;">待处置告警 <span class="field-hint">缺数 / 真滞后 / 池内分钟</span></h4>
+        <div class="table-wrap" style="margin-top:0;max-height:none;">
           <table class="tp-table">
             <thead>
             <tr>
@@ -669,6 +693,33 @@
             </thead>
             <tbody id="healthBody">
             <tr><td colspan="7" class="empty-state">点击「刷新覆盖检查」</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h4 style="margin:16px 0 8px;">特殊项 <span class="field-hint">北交所空 / 疑似退市·PT / 停牌 · 不计入待处置</span></h4>
+        <p class="hint" id="healthSpecialHint" style="margin:0 0 8px;"></p>
+        <div class="table-wrap" style="margin-top:0;max-height:none;">
+          <table class="tp-table">
+            <thead>
+            <tr>
+              <th>代码</th><th>状态</th><th>日线条数</th><th>日线最新</th><th>最新量</th><th>问题</th>
+            </tr>
+            </thead>
+            <tbody id="healthSpecialBody">
+            <tr><td colspan="6" class="empty-state">刷新覆盖检查后展示</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h4 style="margin:16px 0 8px;">MDS/TDX 抽样明细</h4>
+        <div class="table-wrap" style="margin-top:0;max-height:none;">
+          <table class="tp-table">
+            <thead>
+            <tr>
+              <th>代码</th><th>TDX条数</th><th>TDX最新</th><th>MDS条数</th><th>MDS最新</th><th>重叠</th><th>最大偏差bp</th><th>问题</th>
+            </tr>
+            </thead>
+            <tbody id="mdsTdxBody">
+            <tr><td colspan="8" class="empty-state">点击「MDS/TDX 抽样对账」</td></tr>
             </tbody>
           </table>
         </div>

@@ -5,6 +5,7 @@ import com.quant.stock.admin.DataHealthService;
 import com.quant.stock.admin.DataReconcileGateService;
 import com.quant.stock.admin.EffectiveParamsService;
 import com.quant.stock.admin.IndustryReclassService;
+import com.quant.stock.admin.MarketSourceSampleReconcileService;
 import com.quant.stock.admin.SystemParamsService;
 import com.quant.stock.backtest.BacktestStrategyIdBackfillService;
 import com.quant.stock.kuangrui.KuangruiMdsOpsFacade;
@@ -39,6 +40,7 @@ import java.util.Map;
 public class OpsController {
 
     private final ObjectProvider<DataHealthService> dataHealthProvider;
+    private final ObjectProvider<MarketSourceSampleReconcileService> mdsTdxSampleProvider;
     private final SystemParamsService systemParamsService;
     private final EffectiveParamsService effectiveParamsService;
     private final DataReconcileGateService dataReconcileGateService;
@@ -60,7 +62,9 @@ public class OpsController {
             m.put("universeSize", 0);
             m.put("okCount", 0);
             m.put("warnCount", 0);
+            m.put("specialCount", 0);
             m.put("items", Collections.emptyList());
+            m.put("specialItems", Collections.emptyList());
             m.put("hint", "需要 quant.db-enabled=true");
             return m;
         }
@@ -96,6 +100,23 @@ public class OpsController {
             return m;
         }
         return svc.status();
+    }
+
+    /**
+     * 抽样对账 market_1min 中 TDX 与 MDS：条数、最新时间、重叠收盘偏差（bp）。
+     * query: {@code limit} 默认 20。
+     */
+    @PostMapping("/data-health/mds-tdx-sample")
+    public Map<String, Object> mdsTdxSample(
+            @RequestParam(value = "limit", required = false) Integer limit) {
+        MarketSourceSampleReconcileService svc = mdsTdxSampleProvider.getIfAvailable();
+        if (svc == null) {
+            Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("ok", false);
+            m.put("message", "需要 quant.db-enabled=true");
+            return m;
+        }
+        return svc.sample(limit);
     }
 
     /**

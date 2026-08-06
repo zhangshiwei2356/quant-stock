@@ -65,9 +65,15 @@ public class QuantProperties {
      */
     private String daySource = "auto";
     /**
-     * pool-rebuild 前是否先按日线重算 {@code factor_daily}（默认 true，粗筛更准；全市场较慢时可关）。
+     * pool-rebuild 前是否先按日线重算 {@code factor_daily}（默认 false 加速入池；
+     * 需要更准粗筛时可开，或单独跑 {@code factor-daily-rebuild}）。
      */
-    private boolean poolRebuildRefreshFactors = true;
+    private boolean poolRebuildRefreshFactors = false;
+    /**
+     * pool-rebuild 扫池是否跑完整日线回测（默认 false：只算指标/信号/动量，入池打分足够；
+     * true 时每只全量 {@code BackTestEngine}，全市场很慢）。
+     */
+    private boolean poolRebuildFullBacktest = false;
     /**
      * pool-rebuild 成功后是否异步调用 TDX 分钟回填脚本（需 {@link TdxScript#enabled}=true）。
      * 默认 false，避免未装 Python/pytdx 时拖垮扫池。

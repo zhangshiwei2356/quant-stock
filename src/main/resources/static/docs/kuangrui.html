@@ -94,7 +94,7 @@
   <table>
     <thead><tr><th>本应用模块</th><th>现状</th><th>宽睿可补</th><th>仍缺</th></tr></thead>
     <tbody>
-      <tr><td><code>market-collect</code> / MDS 摄入</td><td><b>M1 可选已落地</b>（默认关）</td><td>L1 订阅/查询→分钟桶→<code>market_1min(MDS)</code></td><td>断线重连强化、L2、与 TDX 抽样对账</td></tr>
+      <tr><td><code>market-collect</code> / MDS 摄入</td><td><b>M1 可选已落地</b>（默认关）</td><td>L1 订阅/查询→分钟桶→<code>market_1min(MDS)</code>；运维 MDS/TDX 抽样对账已落地</td><td>断线重连强化、L2</td></tr>
       <tr><td><code>TradeGatewayService</code></td><td>sim 即时；sdk 本地桩</td><td>OES 下单/撤单/回报</td><td>本地风控↔柜台拒单映射</td></tr>
       <tr><td><code>sync-orders</code></td><td>本地桩（假推进 FILLED）</td><td><code>queryOrder</code>/<code>queryTrade</code>+回报</td><td>M2/M3</td></tr>
       <tr><td><code>position-pnl-sync</code></td><td>本地成本+最新价</td><td><code>queryCashAsset</code>/<code>queryStkHolding</code></td><td>M2</td></tr>
@@ -122,8 +122,8 @@
       <tr>
         <td><b>M1 MDS L1</b></td>
         <td><b>可选已落地</b>（默认关 · 2026-08-04）</td>
-        <td>价÷10000；分钟桶；写 <code>market_1min.data_source=MDS</code>；<code>market-collect</code> live 时优先 pull/flush；实现仅 <code>-Pkuangrui</code> 编译（<code>src/main-kuangrui</code>）</td>
-        <td>运维 <code>/api/ops/kuangrui/mds/{status,pull,subscribe,flush,stop}</code>；详见 <code>config/kuangrui/README.md</code></td>
+        <td>价÷10000；分钟桶；写 <code>market_1min.data_source=MDS</code>；<code>market-collect</code> live 时优先 pull/flush；实现仅 <code>-Pkuangrui</code> 编译（<code>src/main-kuangrui</code>）；与 TDX 抽样对账已落地</td>
+        <td>运维 <code>/api/ops/kuangrui/mds/{status,pull,subscribe,flush,stop}</code>；抽样 <code>POST /api/ops/data-health/mds-tdx-sample</code>；详见 <code>config/kuangrui/README.md</code></td>
       </tr>
     </tbody>
   </table>

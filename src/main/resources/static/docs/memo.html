@@ -9,7 +9,7 @@
   <h4 style="margin-top:0">一、待办 · 依赖外部 API / 数据源</h4>
   <p class="hint" style="margin:0 0 8px;">当前真正待推进的能力缺口（本地模拟无法替代）。</p>
   <ol>
-    <li><b>真实行情 API（优先对接宽睿 MDS）</b> — <b>M1 可选已落地</b>（默认关）· <code>quant.kuangrui.enabled</code>+<code>mds.enabled</code>；<code>mvn -Pkuangrui</code> 编译真实客户端；L1 订阅/查询 → 价÷10000 → <code>market_1min(MDS)</code>；运维 <code>/api/ops/kuangrui/mds/*</code>；<code>market-collect</code> live 时优先 MDS。待增强：断线重连、L2、与 TDX 抽样对账</li>
+    <li><b>真实行情 API（优先对接宽睿 MDS）</b> — <b>M1 可选已落地</b>（默认关）· <code>quant.kuangrui.enabled</code>+<code>mds.enabled</code>；<code>mvn -Pkuangrui</code> 编译真实客户端；L1 订阅/查询 → 价÷10000 → <code>market_1min(MDS)</code>；运维 <code>/api/ops/kuangrui/mds/*</code>；<code>market-collect</code> live 时优先 MDS；与 TDX 抽样对账已落地（运维「MDS/TDX 抽样对账」 / <code>POST /api/ops/data-health/mds-tdx-sample</code>）。待增强：断线重连、L2</li>
     <li><b>券商交易 API（优先对接宽睿 OES）</b> — 未接入 · <code>quant.trade-mode=sdk</code> 仅为状态桩。待接：<code>sendOrdReq</code> / <code>sendBatchOrdsReq</code> / <code>sendOrdCancelReq</code> + <code>OesCallBack</code> 委托/成交回报与 <code>initRptSync</code></li>
     <li><b>券商委托/持仓对账（OES 查询）</b> — 未接入 · <code>sync-orders</code> ← <code>queryOrder</code>/<code>queryTrade</code>；<code>position-pnl-sync</code> ← <code>queryCashAsset</code>/<code>queryStkHolding</code>（及可选 <code>queryClientOverview</code>）</li>
     <li><b>证券状态 / 静态信息（MDS+OES）</b> — 部分本地粗滤 · 待接 MDS <code>qrySecurityStatus</code>、<code>qryStockStaticInfo(List)</code>（涨跌停价、停牌标识）；OES <code>queryStock</code></li>
@@ -59,13 +59,13 @@
     <li><b>行情分层（日线选股 + 分钟交易）</b> — 已落地 · <code>market_daily</code> 供全市场扫池；<code>market_1min</code> 供池内分钟交易；<code>quant.day-source=auto</code> 日线优先，空则分钟聚日</li>
     <li><b>TDX 日线回填</b> — 已落地 · <code>scripts/fetch_daily_tdx.py</code>（<code>--from-basic --years 1</code> / <code>--codes</code>）写 <code>market_daily</code>（adj=NONE）；升级 <code>scripts/sql/20260805_market_daily.sql</code></li>
     <li><b>TDX 脚本桥接</b> — 已落地 · 默认开 · <code>quant.tdx-script.enabled</code>；任务 <code>day-collect</code>（同步列表；已齐日线跳过、否则增量；默认4线程）、<code>pool-minute-backfill</code>（池内分钟尽量~90日）；运维 <code>/api/ops/tdx-script/*</code>；亦可单独跑 <code>scripts/sync_stock_basic.py</code>；推荐手动三步：日线→扫池→池内分钟；无本机 Python/pytdx 时可关</li>
-    <li><b>日频因子批算</b> — 已落地 · <code>FactorDailyComputeService</code>；运维 <code>POST /api/ops/factor-daily/rebuild</code>；定时 <code>factor-daily-rebuild</code>；<code>pool-rebuild</code> 默认预刷（<code>quant.pool-rebuild-refresh-factors</code>）</li>
+    <li><b>日频因子批算</b> — 已落地 · <code>FactorDailyComputeService</code>；运维 <code>POST /api/ops/factor-daily/rebuild</code>；定时 <code>factor-daily-rebuild</code>；<code>pool-rebuild</code> 默认不预刷（<code>quant.pool-rebuild-refresh-factors=false</code>，可开）</li>
     <li><b>1 分钟交易真相源</b> — 已落地 · 读写 <code>market_1min</code>（价额为元）；<code>data_source</code> 区分 MOCK/TDX/MDS；分钟周期内存聚合；灌数 <code>scripts/fetch_min1_tdx.py</code></li>
     <li><b>TDX 1 分钟历史回填</b> — 已落地 · <code>scripts/fetch_min1_tdx.py</code>（含 <code>--from-pool</code>）只写 <code>market_1min</code>；公开节点通常约 90 个交易日，非全市场多年历史源</li>
     <li><b>交易日历（静态）</b> — 已落地 · 周末 + 内置法定节假日（含 2026 中秋 9/25–27、国庆 10/1–7；10/8 开市）；风控拒非交易日</li>
     <li><b>账户概览</b> — 已落地 · 资金权益 / 当前持仓（批次 T+1）/ 委托记录 / 权益日结 / 风控事件 / 风控日报</li>
     <li><b>唯一目标池</b> — 已落地 · 「当前池 / 扫描历史」的「扫描更新」提交 <code>pool-rebuild</code>（与运维「执行一次」同一异步进度弹框）；亦可定时 <code>pool-rebuild</code> / <code>after-market-batch-scan</code>；移出≠卖出；漏斗 + Markdown 报告</li>
-    <li><b>运维中心</b> — 已落地 · 任务管理（执行一次弹进度框+页内横幅，可收起到页内）/ 数据健康（覆盖检查异步进度；明细仅告警并区分北交所/疑似退市空日线；分钟自洽）/ 运行参数（白名单可写 + 中文说明对照配置键；改参/纸面激活在此，与策略总览页职责分离）</li>
+    <li><b>运维中心</b> — 已落地 · 任务管理（执行一次弹进度框+页内横幅，可收起到页内）/ 数据健康（覆盖检查异步进度；待处置告警 vs 特殊项分表：北交所空/退市·PT/停牌不计入待处置；分钟自洽；MDS/TDX 抽样对账）/ 运行参数（白名单可写 + 中文说明对照配置键；改参/纸面激活在此，与策略总览页职责分离）</li>
     <li><b>策略管理</b> — 已落地 · 一级菜单（运维与数据表之间）；二级「策略总览」：介绍（默认收起）+ 满分 100 评分 + 历史表；无回测自动/手动目标池补种（单股×池 + 组合×1，进度条）；按 <code>strategy_id</code> 关联；运维 <code>POST /api/ops/backtest/backfill-strategy-id</code></li>
     <li><b>数据表</b> — 已落地 · MySQL 白名单分页只读浏览；列表/详情展示 information_schema 磁盘占用（数据/索引）</li>
     <li><b>回测工作台</b> — 已落地 · 行情全市场选股；个股/组合回测<strong>仅从目标池</strong>选股；个股二级：回测工作台 / 批量扫描（yml 列表）/ 回测历史；组合二级：回测工作台 / 回测历史；结果含 <code>configFingerprint</code> / <code>atrRisk</code>；历史落库带注册策略 <code>strategy_id</code></li>
@@ -83,7 +83,8 @@
     <li><b>回测部成对齐</b> — 已落地 · <code>backtest-fill-ratio</code> 默认 1；残量挂单；<code>GET /api/account/partial-fill</code></li>
     <li><b>压力情景库</b> — 已落地 · 预注册 ADV 断崖/一字板/相关尖峰等；<code>GET /api/account/stress</code>；不改金叉</li>
     <li><b>信号漂移监控</b> — 已落地（可落部分）· 滚动胜率+MA价差代理 IC；默认不自动退役；<code>GET /api/account/signal-drift</code></li>
-    <li><b>分钟行情自洽</b> — 已落地 · 运维「数据健康 → 检查分钟自洽」；查 <code>market_1min</code> 空/滞后/稀疏/OHLC；默认不阻断开仓；外部多源仍待 API（覆盖汇总另见 <code>/api/ops/data-health</code>）</li>
+    <li><b>分钟行情自洽</b> — 已落地 · 运维「数据健康 → 检查分钟自洽」；查 <code>market_1min</code> 空/滞后/稀疏/OHLC；默认不阻断开仓；覆盖汇总另见 <code>/api/ops/data-health</code></li>
+    <li><b>MDS/TDX 抽样对账</b> — 已落地 · 运维「数据健康 → MDS/TDX 抽样对账」；<code>POST /api/ops/data-health/mds-tdx-sample?limit=</code>；比条数/最新时间/重叠收盘 bp（阈 50）；优先目标池</li>
     <li><b>扩容降频 + POV</b> — 已落地 · <code>capacity-aum-base</code> 收紧 ADV；<code>pov-max-bar-volume-pct</code> 当根量切片</li>
     <li><b>结构突变监控</b> — 已落地 · 双窗突变分→降仓+挂漂移；<code>GET /api/account/structural-break</code></li>
     <li><b>ST as-of 日切</b> — 已落地（局部）· 表 <code>st_status_hist</code> + 禁开；无历史行时回退现状态；财报时钟仍缺</li>
@@ -119,7 +120,7 @@
       <tr><td><code>scan-and-trade</code></td><td>已实现</td><td>目标池内分钟扫描 + 本地模拟账本</td><td>行情改 MDS 后仍走本任务；下单改 OES</td></tr>
       <tr><td><code>pool-rebuild</code> / <code>after-market-batch-scan</code></td><td>已实现</td><td>全市场扫描覆盖唯一目标池（启用互斥）</td><td>静态信息/状态用 MDS 增强过滤</td></tr>
       <tr><td><code>settle-after-close</code></td><td>已实现</td><td>权益日记最近交易日；落库/刷新 <code>market_1min</code></td><td>MDS 收盘快照（可选）</td></tr>
-      <tr><td><code>data-validate</code></td><td>已实现</td><td>分层：universe→market_daily；池内→market_1min</td><td>与 MDS 快照抽样对账（可选）</td></tr>
+      <tr><td><code>data-validate</code></td><td>已实现</td><td>分层：universe→market_daily；池内→market_1min；特殊项分表</td><td>MDS/TDX 抽样对账已落地（运维按钮）</td></tr>
       <tr><td><code>factor-daily-rebuild</code></td><td>已实现</td><td>日线→factor_daily；亦可 POST /api/ops/factor-daily/rebuild</td><td>—</td></tr>
       <tr><td><code>day-collect</code></td><td>已实现</td><td>全市场日线：已齐跳过 / 否则增量；默认4线程（需 tdx-script.enabled）</td><td>—</td></tr>
       <tr><td><code>pool-minute-backfill</code></td><td>已实现</td><td>目标池分钟尽量~90日并补到最近（需 tdx-script.enabled）</td><td>—</td></tr>

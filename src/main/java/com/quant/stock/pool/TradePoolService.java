@@ -549,7 +549,9 @@ public class TradePoolService {
         int afterCoarse = codes.size();
         // 重置进度：因子预刷可能已到 100%，否则页面会一直显示「5200/5200 · 开始扫描」像卡住
         jobProgressHub.tick(0, Math.max(1, afterCoarse), null,
-                "粗筛后 " + afterCoarse + " 只，开始扫描…");
+                "粗筛后 " + afterCoarse + " 只，开始扫描…"
+                        + (quantProperties.isPoolRebuildFullBacktest() ? "（完整回测）" : "（轻量·无全量回测）"));
+        final boolean light = !quantProperties.isPoolRebuildFullBacktest();
         List<BatchScanResultDTO> scanned = codes.isEmpty()
                 ? new ArrayList<BatchScanResultDTO>()
                 : new ArrayList<BatchScanResultDTO>(batchStockBackTestService.scan(codes,
@@ -558,9 +560,10 @@ public class TradePoolService {
                     public void onProgress(int done, int total, String symbol) {
                         jobProgressHub.tick(done, total, symbol,
                                 "入池扫描 " + done + "/" + total
+                                        + (light ? " ·轻量" : "")
                                         + (symbol != null ? (" · " + symbol) : ""));
                     }
-                }));
+                }, light));
         int afterScan = scanned.size();
         filterByAvgAmount(scanned);
         int afterLiquidity = scanned.size();
@@ -584,6 +587,9 @@ public class TradePoolService {
         out.put("batchId", batchId);
         out.put("scoreMin", quantProperties.getPoolScoreMin());
         out.put("tradePoolMax", max);
+        out.put("poolRebuildRefreshFactors", quantProperties.isPoolRebuildRefreshFactors());
+        out.put("poolRebuildFullBacktest", quantProperties.isPoolRebuildFullBacktest());
+        out.put("scanMode", light ? "light" : "fullBacktest");
         if (factorRefresh != null) {
             out.put("factorRefresh", factorRefresh);
         }

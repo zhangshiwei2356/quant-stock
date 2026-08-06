@@ -30,7 +30,7 @@
   <li><b>组合回测</b>：目标池多选；默认日 K 共享资金池；<code>branchScaffold</code> 时 session 为 MIN_1 共享资金池（账户风控/熔断挂卖/AUM+POV，无金叉五步；结果含会话事件与相关摘要）；可临时改参 / 回测历史（落库带策略 id）</li>
   <li><b>目标池</b>：当前池 / 扫描历史；「扫描更新」提交运维任务 <code>pool-rebuild</code>（异步进度弹框，与定时入池同一套）；移出≠卖出；也是回测选股来源</li>
   <li><b>账户概览</b>：资金 · 持仓（T+1 批次）· 委托 · 日结 · 风控事件</li>
-  <li><b>运维中心</b>：任务管理 / 数据健康（操作卡说明覆盖检查与分钟自洽） / 运行参数（全局白名单 + 按策略稀疏参数包；已注册策略列表与纸面激活切换；任务种子默认全关）</li>
+  <li><b>运维中心</b>：任务管理 / 数据健康（覆盖检查：待处置告警 vs 特殊项分表；分钟自洽；MDS/TDX 抽样对账） / 运行参数（全局白名单 + 按策略稀疏参数包；已注册策略列表与纸面激活切换；任务种子默认全关）</li>
   <li><b>策略管理</b>：二级「策略总览」——注册策略介绍（默认收起）、满分 100 综合评分与回测历史；无回测时自动用目标池补种（逐只单股+全池组合）；空白/指纹旧名启动自动补全；<strong>不改参/不激活</strong>（仍在运维运行参数）</li>
   <li><b>数据表</b>：白名单表分页只读；侧栏/摘要展示磁盘占用（数据+索引）</li>
   <li><b>量化知识</b> / <b>应用说明</b>：指标与规则文档；应用说明含系统概述、项目 README、交易规则、能力与待办、宽睿梳理；可导出 PDF</li>
@@ -40,8 +40,8 @@
 <ul>
   <li>演示股：classpath 十只近一年模拟种子（空库灌 <code>market_1min</code>，区间随 <code>MockKlineDataGenerator</code> 重刷）；目标池可用 <code>fetch_min1_tdx.py --from-pool</code> 回填约 90 交易日 1 分钟</li>
   <li>行情分层：<code>market_1min</code>=池内交易分钟真相源；<code>market_daily</code>=全市场选股日线真相源（首期不复权 NONE）。日线灌数：<code>python scripts/fetch_daily_tdx.py --from-basic --years 1</code>；分钟灌数：<code>python scripts/fetch_min1_tdx.py --from-pool</code></li>
-  <li>入池流水线：日线入库 → <code>factor-daily-rebuild</code>（或 pool-rebuild 预刷）→ <code>pool-rebuild</code> → 池内补分钟。数据健康分层：全市场看日线、池内看分钟；覆盖明细<strong>只列告警</strong></li>
-  <li>推荐手动三步（定时任务默认关，运维「执行一次」）：① <code>day-collect</code> 全市场日线（同步列表；已齐跳过、否则增量；默认4线程）→ ② <code>pool-rebuild</code> 入池 → ③ <code>pool-minute-backfill</code> 池内分钟（尽量~90日并补到最近）。依赖本机 Python + pytdx/pymysql（<code>quant.tdx-script.enabled</code> 默认 true）。全部任务「执行一次」均后台跑：弹框 + 任务管理页内横幅同步进度，可「收起到页内」；长任务（TDX 日线/分钟、因子重算、入池、数据校验、行情采集）上报行级 <code>i/n</code>；入池分「因子预刷 → 粗筛扫描」两段进度（扫描段会重置计数）</li>
+  <li>入池流水线：日线入库 → <code>factor-daily-rebuild</code>（可选；<code>pool-rebuild</code> 默认不预刷）→ <code>pool-rebuild</code>（默认轻量扫池，<code>pool-rebuild-full-backtest=false</code>）→ 池内补分钟。数据健康：全市场看日线、池内看分钟；待处置告警与特殊项（北交所/退市·PT/停牌）分表</li>
+  <li>推荐手动三步（定时任务默认关，运维「执行一次」）：① <code>day-collect</code> 全市场日线（同步列表；已齐跳过、否则增量；默认4线程）→ ② <code>pool-rebuild</code> 入池 → ③ <code>pool-minute-backfill</code> 池内分钟（尽量~90日并补到最近）。依赖本机 Python + pytdx/pymysql（<code>quant.tdx-script.enabled</code> 默认 true）。全部任务「执行一次」均后台跑：弹框 + 任务管理页内横幅同步进度，可「收起到页内」；长任务（TDX 日线/分钟、因子重算、入池、数据校验、行情采集）上报行级 <code>i/n</code>；入池若开预刷则分「因子预刷 → 粗筛扫描」两段进度</li>
   <li>回测区间默认留空 = 全量 K 线；初始资金默认 <b>100000</b></li>
   <li>页头主题默认<strong>极光</strong>（浅色日间：流动极光帘 + 淡粒子）；另有夜盘 / 银河，可切换并记住</li>
 </ul>
@@ -60,7 +60,7 @@
   <li>IC 衰减监控（代理 IC→只降仓）；改价=撤补队尾；配置指纹含实验种子</li>
   <li>回测 <code>atrRisk</code> 验收字段；信号漂移标明代理 IC；禁空头边界可查</li>
   <li>限价/执行/对账/行业边界可查；组合回测对齐部成/压力降仓/成交缩量/停牌拒卖/ST as-of 强平/`atrRisk`；退役强制恢复双人复核</li>
-  <li>账户「风控日报」含相关监控；委托支持撤/部成/改价；运维数据健康可「检查分钟自洽」；scan/sync/settle 锁忙手动执行 failLoud</li>
+  <li>账户「风控日报」含相关监控；委托支持撤/部成/改价；运维数据健康可「检查分钟自洽」与「MDS/TDX 抽样对账」；scan/sync/settle 锁忙手动执行 failLoud</li>
   <li>单股 / 组合 / 扫描交易对齐核心规则；实盘为<strong>本地模拟账本</strong>（含风控/挂单持久化与路径对齐）</li>
   <li>宽睿 OES/MDS：资料包 <code>v0.19.4.0</code>；见「宽睿文档梳理」。M0 登录探针已 COMPLETE；<b>M1 MDS L1</b> 已落地为可选旁路（默认关）：价÷10000 → <code>market_1min(data_source=MDS)</code>；运维 <code>/api/ops/kuangrui/mds/*</code>；默认仍 <code>sim</code>+<code>db</code></li>
   <li>细则：「应用说明 → 交易规则」</li>
