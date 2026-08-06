@@ -15,7 +15,7 @@
 
 <h4>二、买入何时触发</h4>
 <ul>
-  <li><b>单活策略</b>：同一时刻只跑 <code>quant.active-strategy</code>（默认 <code>maCross</code>，读全局 quant 过滤）。另有对照画像 <code>maCrossBalanced</code>（趋势+放量/RSI55），买卖公式同金叉、过滤包固定，供回测下拉对比；不改原版 <code>MaCrossStrategy</code>。已下线不成功的 <code>maCrossTrend</code>/<code>maCrossVolume</code>/<code>maCrossStrict</code>（启动幂等删除其 <code>bt_backtest_record</code>/<code>bt_backtest_analysis</code>/<code>strategy_param</code>）。纸面扫描仍用配置激活。列表见 <code>GET /api/config/strategies</code></li>
+  <li><b>单活策略</b>：同一时刻只跑 <code>quant.active-strategy</code>（默认 <code>maCross</code>，读全局 quant 过滤）。另有对照画像 <code>maCrossBalanced</code>（趋势+放量/RSI55），买卖公式同金叉、过滤包固定，供回测下拉对比；不改原版 <code>MaCrossStrategy</code>。已下线不成功的 <code>maCrossTrend</code>/<code>maCrossVolume</code>/<code>maCrossStrict</code>（启动幂等删除其回测/分析/参数包与指纹类名残留，并重置误写的激活策略）。纸面扫描仍用配置激活。列表见 <code>GET /api/config/strategies</code></li>
   <li><b>金叉首开</b>：上一根 MA5≤MA20，本根 MA5&gt;MA20（收盘确认；单股引擎有效回测通常需 K 线约≥65 根）</li>
   <li><b>必过过滤</b>：RSI14 &lt; 60；ATR14 &gt; 0.001；
     <b>硬过滤</b>（可关 <code>market-cap-filter-enabled</code>）：模拟市值 &lt; 50 亿 → <strong>直接跳过、不开仓</strong></li>

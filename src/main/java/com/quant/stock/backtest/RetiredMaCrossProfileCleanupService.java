@@ -1,8 +1,12 @@
 package com.quant.stock.backtest;
 
+import com.quant.stock.admin.ActiveStrategyService;
+import com.quant.stock.config.QuantProperties;
 import com.quant.stock.mapper.BacktestAnalysisMapper;
 import com.quant.stock.mapper.BacktestRecordMapper;
 import com.quant.stock.mapper.StrategyParamMapper;
+import com.quant.stock.strategy.StrategyRegistry;
+import com.quant.stock.trade.LiveLedgerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -24,10 +28,11 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 下线不成功的金叉对照画像后，清理其回测历史、分析事件与策略参数包。
+ * 下线不成功的金叉对照画像后，清理其回测历史、分析事件、策略参数包，
+ * 以及误写的激活策略配置。
  * <p>
- * 目标 id：{@code maCrossTrend} / {@code maCrossVolume} / {@code maCrossStrict}（大小写不敏感）。
- * 启动幂等执行一次；也可运维手动再跑。
+ * 匹配：注册 id（{@code maCrossTrend} 等）与历史指纹类名（{@code MaCrossTrendStrategy} 等），
+ * 大小写不敏感。启动幂等执行一次。
  */
 @Slf4j
 @Service
@@ -35,18 +40,25 @@ import java.util.Set;
 @ConditionalOnProperty(name = "quant.db-enabled", havingValue = "true")
 public class RetiredMaCrossProfileCleanupService {
 
-    /** 已下线对照画像的规范 id（小写键）。 */
+    /** 已下线对照画像：注册 id + 指纹类名（小写键）。 */
     public static final Set<String> RETIRED_IDS = Collections.unmodifiableSet(
             new LinkedHashSet<String>(Arrays.asList(
-                    "macrosstrend", "macrossvolume", "macrossstrict")));
+                    "macrosstrend", "macrossvolume", "macrossstrict",
+                    "macrosstrendstrategy", "macrossvolumestrategy", "macrossstrictstrategy")));
+
+    private static final List<String> CANONICAL_DELETE_IDS = Collections.unmodifiableList(Arrays.asList(
+            "maCrossTrend", "maCrossVolume", "maCrossStrict",
+            "MaCrossTrendStrategy", "MaCrossVolumeStrategy", "MaCrossStrictStrategy"));
 
     private final BacktestRecordMapper backtestRecordMapper;
     private final BacktestAnalysisMapper backtestAnalysisMapper;
     private final ObjectProvider<StrategyParamMapper> strategyParamMapperProvider;
+    private final ObjectProvider<LiveLedgerService> ledgerProvider;
+    private final QuantProperties props;
 
-    /** 启动后清理（在 strategy_id 补全之后；{@link Order} 略大）。 */
+    /** 启动后清理；Order 略高于默认，便于在激活策略加载后纠正死配置。 */
     @EventListener(ApplicationReadyEvent.class)
-    @Order(100)
+    @Order(200)
     public void onReady() {
         try {
             Map<String, Object> r = cleanup();
@@ -57,49 +69,46 @@ public class RetiredMaCrossProfileCleanupService {
     }
 
     /**
-     * 删除已下线策略的回测记录、对应分析、稀疏参数包。
+     * 删除已下线策略的回测记录、对应分析、稀疏参数包；必要时重置激活策略。
      *
-     * @return matchedStrategyIds / analysisDeleted / recordsDeleted / paramsDeleted
+     * @return matchedStrategyIds / analysisDeleted / recordsDeleted / paramsDeleted / activeStrategyReset
      */
     public Map<String, Object> cleanup() {
         Map<String, Object> out = new LinkedHashMap<String, Object>();
         List<String> matched = resolveMatchedIds();
         out.put("matchedStrategyIds", matched);
-        if (matched.isEmpty()) {
-            out.put("analysisDeleted", 0);
-            out.put("recordsDeleted", 0);
-            out.put("paramsDeleted", 0);
-            out.put("ok", true);
-            return out;
-        }
 
-        List<String> recordIds = backtestRecordMapper.selectRecordIdsByStrategyIds(matched);
-        if (recordIds == null) {
-            recordIds = Collections.emptyList();
-        }
         int analysisDeleted = 0;
-        if (!recordIds.isEmpty()) {
-            // 分批避免 IN 列表过大
-            final int batch = 200;
-            for (int i = 0; i < recordIds.size(); i += batch) {
-                int end = Math.min(i + batch, recordIds.size());
-                analysisDeleted += backtestAnalysisMapper.deleteByRecordIds(recordIds.subList(i, end));
-            }
-        }
-        int recordsDeleted = backtestRecordMapper.deleteByStrategyIds(matched);
-
+        int recordsDeleted = 0;
         int paramsDeleted = 0;
-        StrategyParamMapper paramMapper = strategyParamMapperProvider.getIfAvailable();
-        if (paramMapper != null) {
-            Set<String> paramIds = new LinkedHashSet<String>(matched);
-            for (String id : paramIds) {
-                paramsDeleted += paramMapper.deleteByStrategyId(id);
+        if (!matched.isEmpty()) {
+            List<String> recordIds = backtestRecordMapper.selectRecordIdsByStrategyIds(matched);
+            if (recordIds == null) {
+                recordIds = Collections.emptyList();
+            }
+            if (!recordIds.isEmpty()) {
+                final int batch = 200;
+                for (int i = 0; i < recordIds.size(); i += batch) {
+                    int end = Math.min(i + batch, recordIds.size());
+                    analysisDeleted += backtestAnalysisMapper.deleteByRecordIds(recordIds.subList(i, end));
+                }
+            }
+            recordsDeleted = backtestRecordMapper.deleteByStrategyIds(matched);
+
+            StrategyParamMapper paramMapper = strategyParamMapperProvider.getIfAvailable();
+            if (paramMapper != null) {
+                for (String id : new LinkedHashSet<String>(matched)) {
+                    paramsDeleted += paramMapper.deleteByStrategyId(id);
+                }
             }
         }
+
+        boolean activeReset = resetRetiredActiveStrategy();
 
         out.put("analysisDeleted", analysisDeleted);
         out.put("recordsDeleted", recordsDeleted);
         out.put("paramsDeleted", paramsDeleted);
+        out.put("activeStrategyReset", activeReset);
         out.put("ok", true);
         return out;
     }
@@ -107,24 +116,54 @@ public class RetiredMaCrossProfileCleanupService {
     /** 库内 distinct strategy_id 中匹配已下线集合者（保留原文以便 DELETE）。 */
     List<String> resolveMatchedIds() {
         List<String> distinct = backtestRecordMapper.selectDistinctStrategyIds();
-        if (distinct == null || distinct.isEmpty()) {
-            // 仍按规范 id 尝试删除（表空或尚无 distinct）
-            return Arrays.asList("maCrossTrend", "maCrossVolume", "maCrossStrict");
-        }
         Set<String> out = new LinkedHashSet<String>();
-        for (String raw : distinct) {
-            if (!StringUtils.hasText(raw)) {
-                continue;
-            }
-            String key = raw.trim().toLowerCase(Locale.ROOT);
-            if (RETIRED_IDS.contains(key)) {
-                out.add(raw.trim());
+        if (distinct != null) {
+            for (String raw : distinct) {
+                if (!StringUtils.hasText(raw)) {
+                    continue;
+                }
+                if (isRetired(raw)) {
+                    out.add(raw.trim());
+                }
             }
         }
-        // 规范 id 始终带上，覆盖尚无历史行但有 param 的情况由 params 循环处理；记录删除也无害
-        out.add("maCrossTrend");
-        out.add("maCrossVolume");
-        out.add("maCrossStrict");
+        out.addAll(CANONICAL_DELETE_IDS);
         return new ArrayList<String>(out);
+    }
+
+    static boolean isRetired(String raw) {
+        if (!StringUtils.hasText(raw)) {
+            return false;
+        }
+        return RETIRED_IDS.contains(raw.trim().toLowerCase(Locale.ROOT));
+    }
+
+    /**
+     * 若内存或 system_config 仍指向已下线策略，重置为 {@link StrategyRegistry#DEFAULT_ID}。
+     */
+    boolean resetRetiredActiveStrategy() {
+        boolean reset = false;
+        String memory = props != null ? props.getActiveStrategy() : null;
+        if (isRetired(memory)) {
+            props.setActiveStrategy(StrategyRegistry.DEFAULT_ID);
+            reset = true;
+        }
+        LiveLedgerService ledger = ledgerProvider.getIfAvailable();
+        if (ledger != null) {
+            try {
+                String stored = ledger.loadConfigOrNull(ActiveStrategyService.CONFIG_KEY);
+                if (isRetired(stored)) {
+                    ledger.saveConfig(ActiveStrategyService.CONFIG_KEY, StrategyRegistry.DEFAULT_ID,
+                            "纸面激活策略（下线画像后重置为 maCross）");
+                    if (props != null) {
+                        props.setActiveStrategy(StrategyRegistry.DEFAULT_ID);
+                    }
+                    reset = true;
+                }
+            } catch (Exception e) {
+                log.warn("重置激活策略配置失败: {}", e.getMessage());
+            }
+        }
+        return reset;
     }
 }
