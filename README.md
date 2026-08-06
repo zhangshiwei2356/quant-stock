@@ -262,6 +262,7 @@ sequenceDiagram
 | `quant.pool-rebuild-backfill-minute` | `false`（默认）扫池后异步跑 TDX 池内分钟脚本；需同时开 `tdx-script.enabled` |
 | `quant.tdx-script.*` | 通达信 Python 灌数桥接（**默认 enabled=true**）；`python` / `working-dir` / `min1-script` / `daily-script` / `timeout-seconds`；无 Python/pytdx 时可改 `false` |
 | `quant.kuangrui.enabled` / `mds.enabled` | 宽睿旁路总闸 / MDS L1（**默认 false**）；真实客户端需 `mvn -Pkuangrui`；价÷10000 写 `market_1min(MDS)` |
+| `quant.kuangrui.static-enabled` | M4 静态/费率业务覆盖（**默认 false**）；涨跌停/停牌/股本/当日交易日/佣金优先宽睿，失败回退本地 |
 | `quant.kuangrui.oes.enabled` / `oes.order-enabled` | OES 只读 / 报单总闸（**默认 false**）；M3 报撤需二者+`trade-mode=sdk` |
 | `quant.kuangrui.config-dir` | MDS/OES JSON 目录（默认 `config/kuangrui/local`，可用 `QUANT_KUANGRUI_CONFIG_DIR`） |
 
@@ -297,8 +298,9 @@ sequenceDiagram
 | GET/POST `/api/ops/data-reconcile*` | 分钟行情自洽检查（空/滞后/稀疏日/OHLC；UI 文案「检查分钟自洽」） |
 | GET/POST `/api/ops/st-pit` | ST as-of 日切；财报时钟边界说明 |
 | GET/POST `/api/ops/industry-reclass*` | 行业 reclass as-of 日志 |
-| GET/POST `/api/ops/kuangrui/mds/*` | 宽睿 MDS 状态/pull/订阅/flush/stop（默认 noop；`-Pkuangrui`+开关） |
-| GET/POST `/api/ops/kuangrui/oes/*` | 宽睿 OES：只读查询/对账/stop；`order-status`（M3 报撤状态；默认 noop） |
+| GET/POST `/api/ops/kuangrui/mds/*` | 宽睿 MDS：状态/pull/订阅/flush/stop；M4 `stock-static`/`security-status`/`session-status`（默认 noop；`-Pkuangrui`+开关） |
+| GET/POST `/api/ops/kuangrui/oes/*` | 宽睿 OES：只读查询/对账/stop；`order-status`（M3）；M4 `stock`/`trading-day`/`commission-rate` |
+| GET `/api/ops/kuangrui/static/{status,stock}` | M4 静态/费率门面状态与合并证券静态 |
 | GET `/api/account/turnover` | 换手门禁（日成交额/权益） |
 | GET `/api/account/ic-decay` | IC 衰减（半衰期/IR；只降仓） |
 | GET `/api/account/short-policy` | 禁空头边界（多头现货） |
@@ -338,11 +340,12 @@ sequenceDiagram
   - `sync-orders`：`trade-mode=sdk` 时推进成交；默认本地桩；OES `order-enabled` live 时按回报/查询推进（不假推进）；OES 只读 live 时另打对账日志
   - `position-pnl-sync`：本地成本 + 最新价浮盈日志；OES live 时附加柜台资金/持仓对账
 - 页面标「未实现/缺外部默认」：`market-collect`（本地骨架；**可选**宽睿 MDS live 时 pull/flush，见下）
-- 对照：**应用说明 → 能力与待办**；宽睿对接：**应用说明 → 宽睿文档梳理**（M0✓ → M1✓ → M2✓ → M3 报撤可选✓ → 静态/费率）
+- 对照：**应用说明 → 能力与待办**；宽睿对接：**应用说明 → 宽睿文档梳理**（M0✓ → M1✓ → M2✓ → M3✓ → M4 静态/费率可选✓）
 - 宽睿 **M0**：资料包 `OESAPI-JAVA-v0.19.4.0`；探针 **OES+MDS 登录成功** → `M0_STATUS=COMPLETE`
 - 宽睿 **M1**（可选，默认关）：MDS L1 → `market_1min(MDS)`；运维 `/api/ops/kuangrui/mds/*`
 - 宽睿 **M2**（可选，默认关）：OES 只读对账；运维 `/api/ops/kuangrui/oes/{status,cash,holdings,orders,trades,snapshot,reconcile,stop}`
 - 宽睿 **M3**（可选，默认关）：`oes.order-enabled=true` + `trade-mode=sdk`；限价报/撤；`sync-orders` 按柜台状态推进；`GET /api/ops/kuangrui/oes/order-status`
+- 宽睿 **M4**（可选，默认关）：`static-enabled=true`；MDS/OES 静态涨跌停·停牌·股本·交易日·佣金；失败回退本地启发式；运维 `/api/ops/kuangrui/static/*`
 
 ---
 

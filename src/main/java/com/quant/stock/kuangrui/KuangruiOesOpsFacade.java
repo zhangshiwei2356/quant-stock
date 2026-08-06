@@ -30,12 +30,14 @@ public class KuangruiOesOpsFacade {
     private final QuantProperties quantProperties;
     private final StrategyTask strategyTask;
     private final TradeGatewayService tradeGatewayService;
+    private final KuangruiStaticInfoService staticInfoService;
 
     public Map<String, Object> status() {
         Map<String, Object> m = new LinkedHashMap<String, Object>(oesReadonlyService.status());
         QuantProperties.Kuangrui k = quantProperties.getKuangrui();
         m.put("quantKuangruiEnabled", k != null && k.isEnabled());
         m.put("quantOesEnabled", k != null && k.getOes() != null && k.getOes().isEnabled());
+        m.put("staticEnabled", k != null && k.isStaticEnabled());
         m.put("orderEnabled", k != null && k.getOes() != null && k.getOes().isOrderEnabled());
         m.put("orderLive", oesOrderService != null && oesOrderService.isOrderLive());
         if (oesOrderService != null) {
@@ -66,6 +68,60 @@ public class KuangruiOesOpsFacade {
         m.put("tradeMode", quantProperties.getTradeMode());
         m.put("orderEnabled", k != null && k.getOes() != null && k.getOes().isOrderEnabled());
         return m;
+    }
+
+    /** M4：证券产品信息。 */
+    public Map<String, Object> stock(String code) {
+        return queryBlock("stock", new QueryCall() {
+            @Override
+            public Object call() {
+                return oesReadonlyService.queryStock(code);
+            }
+        });
+    }
+
+    /** M4：柜台交易日。 */
+    public Map<String, Object> tradingDay() {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        m.put("live", oesReadonlyService.isLive());
+        if (!oesReadonlyService.isLive()) {
+            m.put("ok", false);
+            m.put("message", "OES 未启用或未编译进 classpath（见 status.hint）");
+            return m;
+        }
+        try {
+            if (!oesReadonlyService.ensureReady()) {
+                m.put("ok", false);
+                m.put("message", "OES 登录/回报同步失败");
+                m.putAll(oesReadonlyService.status());
+                return m;
+            }
+            m.putAll(oesReadonlyService.queryTradingDay());
+            if (!m.containsKey("ok")) {
+                m.put("ok", true);
+            }
+            return m;
+        } catch (Exception e) {
+            log.warn("[oes-ops] tradingDay 失败: {}", e.getMessage());
+            m.put("ok", false);
+            m.put("message", e.getMessage());
+            return m;
+        }
+    }
+
+    /** M4：佣金费率。 */
+    public Map<String, Object> commissionRate() {
+        return queryBlock("commissionRate", new QueryCall() {
+            @Override
+            public Object call() {
+                return oesReadonlyService.queryCommissionRate();
+            }
+        });
+    }
+
+    /** M4：静态/费率门面状态。 */
+    public Map<String, Object> staticStatus() {
+        return staticInfoService.status();
     }
 
     public Map<String, Object> cash() {

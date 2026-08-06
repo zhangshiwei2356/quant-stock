@@ -2,6 +2,7 @@ package com.quant.stock.kuangrui;
 
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,5 +48,20 @@ public class NoopMdsMinuteIngestService implements MdsMinuteIngestService {
     @Override
     public int flushBuckets() {
         return 0;
+    }
+
+    @Override
+    public List<Map<String, Object>> queryStockStatic(String code) {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<Map<String, Object>> querySecurityStatus(String code) {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<Map<String, Object>> queryTrdSessionStatus() {
+        return Collections.emptyList();
     }
 }

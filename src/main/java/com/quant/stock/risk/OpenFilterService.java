@@ -3,6 +3,7 @@ package com.quant.stock.risk;
 import com.quant.stock.admin.ParamsScope;
 import com.quant.stock.backtest.FillTimingHelper;
 import com.quant.stock.config.QuantProperties;
+import com.quant.stock.kuangrui.KuangruiStaticInfoService;
 import com.quant.stock.mapper.StockBasicMapper;
 import com.quant.stock.market.dto.BarDTO;
 import com.quant.stock.market.dto.StockBasicDO;
@@ -25,6 +26,7 @@ import java.util.Set;
 /**
  * 开仓前置过滤：停牌/涨跌停/流动性/市值/静默时段。
  * 涨跌停相对<strong>上一交易日收盘</strong>判定（分钟序列不取相邻 bar）。
+ * M4：{@code static-enabled} 时停牌/涨跌停/股本可取宽睿静态，失败回退本地启发式。
  */
 @Service
 public class OpenFilterService {
@@ -39,22 +41,30 @@ public class OpenFilterService {
     private StockBasicMapper stockBasicMapper;
 
     private final ObjectProvider<StPitService> stPitProvider;
+    private final ObjectProvider<KuangruiStaticInfoService> staticInfoProvider;
 
     private volatile Set<String> stCodesCache;
     private volatile long stCodesCacheAtMs;
 
     /** 单测便捷构造：无 ST PIT 时等价于仅用 stock_basic */
     public OpenFilterService(QuantProperties props) {
-        this(props, emptyStPitProvider());
+        this(props, emptyStPitProvider(), emptyStaticProvider());
+    }
+
+    public OpenFilterService(QuantProperties props, ObjectProvider<StPitService> stPitProvider) {
+        this(props, stPitProvider, emptyStaticProvider());
     }
 
     /**
      * Spring 注入入口。须唯一标注 {@link Autowired}：多构造器时否则会回退无参构造并启动失败。
      */
     @Autowired
-    public OpenFilterService(QuantProperties props, ObjectProvider<StPitService> stPitProvider) {
+    public OpenFilterService(QuantProperties props,
+                             ObjectProvider<StPitService> stPitProvider,
+                             ObjectProvider<KuangruiStaticInfoService> staticInfoProvider) {
         this.props = props;
         this.stPitProvider = stPitProvider == null ? emptyStPitProvider() : stPitProvider;
+        this.staticInfoProvider = staticInfoProvider == null ? emptyStaticProvider() : staticInfoProvider;
     }
 
     private static ObjectProvider<StPitService> emptyStPitProvider() {
@@ -76,6 +86,30 @@ public class OpenFilterService {
 
             @Override
             public StPitService getIfUnique() {
+                return null;
+            }
+        };
+    }
+
+    private static ObjectProvider<KuangruiStaticInfoService> emptyStaticProvider() {
+        return new ObjectProvider<KuangruiStaticInfoService>() {
+            @Override
+            public KuangruiStaticInfoService getObject() {
+                return null;
+            }
+
+            @Override
+            public KuangruiStaticInfoService getObject(Object... args) {
+                return null;
+            }
+
+            @Override
+            public KuangruiStaticInfoService getIfAvailable() {
+                return null;
+            }
+
+            @Override
+            public KuangruiStaticInfoService getIfUnique() {
                 return null;
             }
         };
@@ -182,8 +216,17 @@ public class OpenFilterService {
         return LimitBoardHelper.isLimitDown(cur, prev.getClose(), cur.getCode(), isSt(cur.getCode()));
     }
 
-    /** 无量视为停牌 */
+    /** 无量视为停牌；M4 有柜台停牌标志时优先 */
     public boolean isSuspended(BarDTO cur) {
+        if (cur != null && StringUtils.hasText(cur.getCode())) {
+            KuangruiStaticInfoService s = staticInfoProvider.getIfAvailable();
+            if (s != null && s.isApplyEnabled()) {
+                Boolean flagged = s.isSuspended(cur.getCode());
+                if (flagged != null) {
+                    return flagged.booleanValue();
+                }
+            }
+        }
         return cur == null || cur.getVolume() == null || cur.getVolume().compareTo(BigDecimal.ZERO) <= 0;
     }
 
@@ -198,12 +241,19 @@ public class OpenFilterService {
             return false;
         }
         BarDTO cur = bars.get(index);
+        String code = cur != null && StringUtils.hasText(cur.getCode())
+                ? cur.getCode() : null;
+        KuangruiStaticInfoService s = staticInfoProvider.getIfAvailable();
+        if (s != null && s.isApplyEnabled() && code != null) {
+            Boolean board = s.isLimitBoard(code, cur, up);
+            if (board != null) {
+                return board.booleanValue();
+            }
+        }
         BigDecimal ref = prevTradingDayClose(bars, index);
         if (ref == null && index > 0 && bars.get(index - 1) != null) {
             ref = bars.get(index - 1).getClose();
         }
-        String code = cur != null && StringUtils.hasText(cur.getCode())
-                ? cur.getCode() : null;
         LocalDate asOf = cur != null && cur.getBarBegin() != null
                 ? cur.getBarBegin().toLocalDate() : null;
         boolean st = isSt(code, asOf);
@@ -265,6 +315,13 @@ public class OpenFilterService {
     }
 
     private BigDecimal resolveSharesYi(String code) {
+        KuangruiStaticInfoService s = staticInfoProvider.getIfAvailable();
+        if (s != null && s.isApplyEnabled()) {
+            BigDecimal yi = s.floatSharesYi(code);
+            if (yi != null && yi.compareTo(BigDecimal.ZERO) > 0) {
+                return yi;
+            }
+        }
         Map<String, BigDecimal> map = p().getFloatSharesYi();
         if (map != null && code != null && map.containsKey(code)) {
             BigDecimal v = map.get(code);

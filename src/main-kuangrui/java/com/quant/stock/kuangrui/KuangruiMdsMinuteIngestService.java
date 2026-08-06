@@ -147,6 +147,286 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
         return aggregator.flush(true);
     }
 
+    @Override
+    public List<Map<String, Object>> queryStockStatic(String code) {
+        List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
+        String norm = OesViewMapper.normalizeCode(code);
+        if (norm == null || norm.isEmpty()) {
+            return out;
+        }
+        try {
+            ensureClient();
+            Object item = invokeMdsQueryOne("qryStockStaticInfo", norm);
+            if (item == null) {
+                item = invokeMdsQueryOne("qryStockStaticInfoList", norm);
+            }
+            if (item instanceof List) {
+                for (Object o : (List<?>) item) {
+                    out.add(mapMdsStatic(o, norm));
+                }
+            } else if (item != null) {
+                out.add(mapMdsStatic(item, norm));
+            }
+        } catch (Exception e) {
+            lastError.set(e.getMessage());
+            log.debug("[mds] qryStockStaticInfo {}: {}", norm, e.getMessage());
+        }
+        return out;
+    }
+
+    @Override
+    public List<Map<String, Object>> querySecurityStatus(String code) {
+        List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
+        String norm = OesViewMapper.normalizeCode(code);
+        if (norm == null || norm.isEmpty()) {
+            return out;
+        }
+        try {
+            ensureClient();
+            Object item = invokeMdsQueryOne("qrySecurityStatus", norm);
+            if (item instanceof List) {
+                for (Object o : (List<?>) item) {
+                    out.add(mapMdsStatus(o, norm));
+                }
+            } else if (item != null) {
+                out.add(mapMdsStatus(item, norm));
+            }
+        } catch (Exception e) {
+            lastError.set(e.getMessage());
+            log.debug("[mds] qrySecurityStatus {}: {}", norm, e.getMessage());
+        }
+        return out;
+    }
+
+    @Override
+    public List<Map<String, Object>> queryTrdSessionStatus() {
+        List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
+        try {
+            ensureClient();
+            Object item = invokeReturning(client, "qryTrdSessionStatus");
+            if (item == null) {
+                item = invokeReturning(client, "qryTrdSessionStatus", new Object[]{null});
+            }
+            if (item instanceof List) {
+                for (Object o : (List<?>) item) {
+                    out.add(mapMdsSession(o));
+                }
+            } else if (item != null) {
+                out.add(mapMdsSession(item));
+            }
+        } catch (Exception e) {
+            lastError.set(e.getMessage());
+            log.debug("[mds] qryTrdSessionStatus: {}", e.getMessage());
+        }
+        return out;
+    }
+
+    private Object invokeMdsQueryOne(String method, String code) {
+        int exch = KuangruiExchangeIds.fromStockCode(code);
+        int instr = KuangruiExchangeIds.toInstrId(code);
+        // 尝试多种请求类型
+        String[] reqClasses = new String[]{
+                "com.quant360.api.model.mds.MdsQryStockStaticInfoReq",
+                "com.quant360.api.model.mds.MdsQrySecurityStatusReq",
+                "com.quant360.api.model.mds.MdsQryMktDataSnapshotReq"
+        };
+        for (String cn : reqClasses) {
+            Object req = newInstance(cn);
+            if (req == null) {
+                continue;
+            }
+            setBean(req, "setExchId", toExch(exch));
+            setBean(req, "setExchId", Integer.valueOf(exch));
+            setBean(req, "setInstrId", Integer.valueOf(instr));
+            setBean(req, "setSecurityId", code);
+            setBean(req, "setSecurityType", MdsSecurityType.MDS_SECURITY_TYPE_STOCK);
+            Object ret = invokeReturning(client, method, req);
+            if (ret != null) {
+                return ret;
+            }
+        }
+        return invokeReturning(client, method);
+    }
+
+    private Map<String, Object> mapMdsStatic(Object item, String fallbackCode) {
+        String code = str(firstGetter(item, "getSecurityId", "getSecurityID"));
+        if (code == null || code.isEmpty()) {
+            Object head = firstGetter(item, "getHead", "getSnapshotHead");
+            if (head != null) {
+                code = str(firstGetter(head, "getSecurityId", "getSecurityID"));
+                if (code == null || code.isEmpty()) {
+                    long instr = lng(firstGetter(head, "getInstrId", "getInstrumentId"));
+                    if (instr > 0) {
+                        code = String.format("%06d", instr);
+                    }
+                }
+            }
+        }
+        if (code == null || code.isEmpty()) {
+            code = fallbackCode;
+        }
+        Object body = firstGetter(item, "getStock", "getStockStaticInfo", "getStaticInfo");
+        Object src = body != null ? body : item;
+        return MdsViewMapper.stockStatic(
+                code,
+                str(firstGetter(src, "getSecurityName", "getSecurityNameUTF8", "getName")),
+                lng(firstGetter(src, "getUpperLimitPrice", "getPriceLimitUpper", "getCeilPrice")),
+                lng(firstGetter(src, "getLowerLimitPrice", "getPriceLimitLower", "getFloorPrice")),
+                lng(firstGetter(src, "getPrevClose", "getPreClosePrice", "getPrevClosePrice")),
+                lng(firstGetter(src, "getOutstandingShare", "getTotalShare", "getEquity")),
+                lng(firstGetter(src, "getPublicFloatShare", "getFloatShare", "getCirculationShare")),
+                (int) lng(firstGetter(src, "getSuspFlag", "getSuspendFlag", "getIsSuspend")),
+                (int) lng(firstGetter(src, "getSecurityStatus", "getSecurityStatusFlag", "getProductStatus"))
+        );
+    }
+
+    private Map<String, Object> mapMdsStatus(Object item, String fallbackCode) {
+        String code = str(firstGetter(item, "getSecurityId", "getSecurityID"));
+        if (code == null || code.isEmpty()) {
+            long instr = lng(firstGetter(item, "getInstrId", "getInstrumentId"));
+            if (instr > 0) {
+                code = String.format("%06d", instr);
+            } else {
+                code = fallbackCode;
+            }
+        }
+        return MdsViewMapper.securityStatus(
+                code,
+                (int) lng(firstGetter(item, "getSuspFlag", "getSuspendFlag", "getIsSuspend")),
+                (int) lng(firstGetter(item, "getSecurityStatus", "getSecurityStatusFlag")),
+                (int) lng(firstGetter(item, "getTradingPhase", "getTrdPhase", "getPhase"))
+        );
+    }
+
+    private Map<String, Object> mapMdsSession(Object item) {
+        return MdsViewMapper.trdSession(
+                (int) lng(firstGetter(item, "getExchId", "getMktId", "getMarketId")),
+                (int) lng(firstGetter(item, "getSessionType", "getTrdSessionType")),
+                (int) lng(firstGetter(item, "getSessionStatus", "getTrdSessionStatus", "getStatus"))
+        );
+    }
+
+    private void setBean(Object target, String setter, Object value) {
+        if (target == null || value == null) {
+            return;
+        }
+        for (java.lang.reflect.Method m : target.getClass().getMethods()) {
+            if (!m.getName().equals(setter) || m.getParameterTypes().length != 1) {
+                continue;
+            }
+            try {
+                Class<?> pt = m.getParameterTypes()[0];
+                Object arg = value;
+                if (pt.isEnum() && value instanceof Number) {
+                    // try valueOf(int)
+                    try {
+                        java.lang.reflect.Method valueOf = pt.getMethod("valueOf", int.class);
+                        arg = valueOf.invoke(null, Integer.valueOf(((Number) value).intValue()));
+                    } catch (Exception ignore) {
+                        arg = value;
+                    }
+                } else if (!pt.isInstance(value) && value instanceof Number) {
+                    if (pt == Integer.TYPE || pt == Integer.class) {
+                        arg = Integer.valueOf(((Number) value).intValue());
+                    } else if (pt == Byte.TYPE || pt == Byte.class) {
+                        arg = Byte.valueOf(((Number) value).byteValue());
+                    }
+                }
+                if (pt.isInstance(arg) || pt.isPrimitive()) {
+                    m.invoke(target, arg);
+                    return;
+                }
+            } catch (Exception e) {
+                log.debug("[mds] setBean {} 失败: {}", setter, e.getMessage());
+            }
+        }
+    }
+
+    private Object invokeReturning(Object target, String name, Object... args) {
+        if (target == null) {
+            return null;
+        }
+        for (java.lang.reflect.Method m : target.getClass().getMethods()) {
+            if (!m.getName().equals(name) || m.getParameterTypes().length != args.length) {
+                continue;
+            }
+            try {
+                return m.invoke(target, args);
+            } catch (Exception e) {
+                log.debug("[mds] invoke {} 失败: {}", name, e.getMessage());
+            }
+        }
+        if (args.length > 0) {
+            try {
+                return target.getClass().getMethod(name).invoke(target);
+            } catch (Exception ignore) {
+                // ignore
+            }
+        }
+        return null;
+    }
+
+    private static Object newInstance(String className) {
+        try {
+            return Class.forName(className).getDeclaredConstructor().newInstance();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static Object firstGetter(Object target, String... getters) {
+        if (target == null || getters == null) {
+            return null;
+        }
+        for (String g : getters) {
+            Object v = invokeGetter(target, g);
+            if (v != null) {
+                return v;
+            }
+        }
+        return null;
+    }
+
+    private static Object invokeGetter(Object target, String getter) {
+        if (target == null) {
+            return null;
+        }
+        try {
+            return target.getClass().getMethod(getter).invoke(target);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String str(Object o) {
+        return o == null ? null : String.valueOf(o);
+    }
+
+    private static long lng(Object o) {
+        if (o == null) {
+            return 0L;
+        }
+        if (o instanceof Number) {
+            return ((Number) o).longValue();
+        }
+        if (o instanceof Enum) {
+            try {
+                Object v = o.getClass().getMethod("value").invoke(o);
+                if (v instanceof Number) {
+                    return ((Number) v).longValue();
+                }
+            } catch (Exception ignore) {
+                // fallthrough
+            }
+            return ((Enum<?>) o).ordinal();
+        }
+        try {
+            return Long.parseLong(o.toString());
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
+    }
+
     @PreDestroy
     public void destroy() {
         stopSubscribe();

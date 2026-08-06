@@ -70,6 +70,21 @@ public class NoopOesReadonlyService implements OesReadonlyService {
     }
 
     @Override
+    public List<Map<String, Object>> queryStock(String code) {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public Map<String, Object> queryTradingDay() {
+        return Collections.emptyMap();
+    }
+
+    @Override
+    public List<Map<String, Object>> queryCommissionRate() {
+        return Collections.emptyList();
+    }
+
+    @Override
     public void stop() {
         // no-op
     }

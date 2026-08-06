@@ -321,6 +321,11 @@ public class QuantProperties {
     public static class Kuangrui {
         /** 总闸；false 时不装配真实 MDS/OES 客户端 */
         private boolean enabled = false;
+        /**
+         * M4 静态/费率业务覆盖总闸（默认 false）。
+         * 为 true 且 {@link #enabled} 时，开仓过滤/佣金/当日交易日优先宽睿查询，失败回退本地。
+         */
+        private boolean staticEnabled = false;
         /** 外部配置目录（含 mds/oes json；默认可指向 gitignore 的 local） */
         private String configDir = "config/kuangrui/local";
         private Mds mds = new Mds();

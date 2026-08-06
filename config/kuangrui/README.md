@@ -203,3 +203,29 @@ quant:
    - `sync-orders` 按回报/查询推进 FILLED（**不再假推进**）
 
 实现与 M2 共用 `KuangruiOesReadonlyService`（实现 `OesOrderService`）；网关 `TradeGatewayService` 在 orderLive 时切换路径。
+
+## M4 静态 / 费率（可选）
+
+默认不覆盖本地启发式。启用步骤（仿真）：
+
+1. 同 M1/M2：`-Pkuangrui`、MDS 和/或 OES 配置与账号
+2. 配置：
+
+```yaml
+quant:
+  kuangrui:
+    enabled: true
+    static-enabled: true   # 业务覆盖总闸；失败回退本地
+    mds:
+      enabled: true        # 涨跌停/停牌/时段
+    oes:
+      enabled: true        # 产品/交易日/佣金
+```
+
+3. 验收：
+   - `GET /api/ops/kuangrui/static/status` → `applyEnabled=true`
+   - `GET /api/ops/kuangrui/oes/stock?code=600036` / `trading-day` / `commission-rate`
+   - `GET /api/ops/kuangrui/mds/stock-static?code=` / `security-status` / `session-status`
+   - `GET /api/ops/kuangrui/static/stock?code=` → MDS+OES 合并视图
+
+业务挂钩（仅 `static-enabled`）：开仓停牌/涨跌停/股本、当日交易日、`TradeCostModel` 默认佣金。

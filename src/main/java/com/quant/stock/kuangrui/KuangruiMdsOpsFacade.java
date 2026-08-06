@@ -24,12 +24,14 @@ public class KuangruiMdsOpsFacade {
     private final MdsMinuteIngestService mdsMinuteIngestService;
     private final QuantProperties quantProperties;
     private final TradePoolService tradePoolService;
+    private final KuangruiStaticInfoService staticInfoService;
 
     public Map<String, Object> status() {
         Map<String, Object> m = new LinkedHashMap<String, Object>(mdsMinuteIngestService.status());
         QuantProperties.Kuangrui k = quantProperties.getKuangrui();
         m.put("quantKuangruiEnabled", k != null && k.isEnabled());
         m.put("quantMdsEnabled", k != null && k.getMds() != null && k.getMds().isEnabled());
+        m.put("staticEnabled", k != null && k.isStaticEnabled());
         m.put("configDir", k == null ? null : k.getConfigDir());
         return m;
     }
@@ -74,6 +76,90 @@ public class KuangruiMdsOpsFacade {
         int n = mdsMinuteIngestService.flushBuckets();
         m.put("ok", true);
         m.put("upserted", n);
+        return m;
+    }
+
+    /** M4：证券静态信息。 */
+    public Map<String, Object> stockStatic(String code) {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        m.put("live", mdsMinuteIngestService.isLive());
+        if (!mdsMinuteIngestService.isLive()) {
+            m.put("ok", false);
+            m.put("message", "MDS 未启用或未编译进 classpath（见 status.hint）");
+            m.put("stockStatic", java.util.Collections.emptyList());
+            return m;
+        }
+        try {
+            java.util.List<Map<String, Object>> list = mdsMinuteIngestService.queryStockStatic(code);
+            m.put("ok", true);
+            m.put("stockStatic", list);
+            m.put("count", list.size());
+            return m;
+        } catch (Exception e) {
+            log.warn("[mds-ops] stockStatic 失败: {}", e.getMessage());
+            m.put("ok", false);
+            m.put("message", e.getMessage());
+            m.put("stockStatic", java.util.Collections.emptyList());
+            return m;
+        }
+    }
+
+    /** M4：证券状态。 */
+    public Map<String, Object> securityStatus(String code) {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        m.put("live", mdsMinuteIngestService.isLive());
+        if (!mdsMinuteIngestService.isLive()) {
+            m.put("ok", false);
+            m.put("message", "MDS 未启用或未编译进 classpath（见 status.hint）");
+            m.put("securityStatus", java.util.Collections.emptyList());
+            return m;
+        }
+        try {
+            java.util.List<Map<String, Object>> list = mdsMinuteIngestService.querySecurityStatus(code);
+            m.put("ok", true);
+            m.put("securityStatus", list);
+            m.put("count", list.size());
+            return m;
+        } catch (Exception e) {
+            log.warn("[mds-ops] securityStatus 失败: {}", e.getMessage());
+            m.put("ok", false);
+            m.put("message", e.getMessage());
+            m.put("securityStatus", java.util.Collections.emptyList());
+            return m;
+        }
+    }
+
+    /** M4：交易时段。 */
+    public Map<String, Object> sessionStatus() {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        m.put("live", mdsMinuteIngestService.isLive());
+        if (!mdsMinuteIngestService.isLive()) {
+            m.put("ok", false);
+            m.put("message", "MDS 未启用或未编译进 classpath（见 status.hint）");
+            m.put("sessionStatus", java.util.Collections.emptyList());
+            return m;
+        }
+        try {
+            java.util.List<Map<String, Object>> list = mdsMinuteIngestService.queryTrdSessionStatus();
+            m.put("ok", true);
+            m.put("sessionStatus", list);
+            m.put("count", list.size());
+            return m;
+        } catch (Exception e) {
+            log.warn("[mds-ops] sessionStatus 失败: {}", e.getMessage());
+            m.put("ok", false);
+            m.put("message", e.getMessage());
+            m.put("sessionStatus", java.util.Collections.emptyList());
+            return m;
+        }
+    }
+
+    /** M4：合并静态视图（MDS+OES）。 */
+    public Map<String, Object> mergedStock(String code) {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        m.putAll(staticInfoService.status());
+        m.put("stock", staticInfoService.stockStatic(code));
+        m.put("ok", true);
         return m;
     }
 

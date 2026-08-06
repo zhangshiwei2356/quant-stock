@@ -534,6 +534,105 @@ public class OpsController {
         });
     }
 
+    /** M4：OES 证券产品（涨跌停/停牌/股本）。 */
+    @GetMapping("/kuangrui/oes/stock")
+    public Map<String, Object> kuangruiOesStock(@RequestParam(value = "code", required = false) String code) {
+        return oesOrDbOff(new OesCall() {
+            @Override
+            public Map<String, Object> call(KuangruiOesOpsFacade f) {
+                return f.stock(code);
+            }
+        });
+    }
+
+    /** M4：OES 交易日。 */
+    @GetMapping("/kuangrui/oes/trading-day")
+    public Map<String, Object> kuangruiOesTradingDay() {
+        return oesOrDbOff(new OesCall() {
+            @Override
+            public Map<String, Object> call(KuangruiOesOpsFacade f) {
+                return f.tradingDay();
+            }
+        });
+    }
+
+    /** M4：OES 佣金费率。 */
+    @GetMapping("/kuangrui/oes/commission-rate")
+    public Map<String, Object> kuangruiOesCommissionRate() {
+        return oesOrDbOff(new OesCall() {
+            @Override
+            public Map<String, Object> call(KuangruiOesOpsFacade f) {
+                return f.commissionRate();
+            }
+        });
+    }
+
+    /** M4：静态/费率门面状态。 */
+    @GetMapping("/kuangrui/static/status")
+    public Map<String, Object> kuangruiStaticStatus() {
+        return oesOrDbOff(new OesCall() {
+            @Override
+            public Map<String, Object> call(KuangruiOesOpsFacade f) {
+                return f.staticStatus();
+            }
+        });
+    }
+
+    /** M4：MDS 证券静态。 */
+    @GetMapping("/kuangrui/mds/stock-static")
+    public Map<String, Object> kuangruiMdsStockStatic(
+            @RequestParam(value = "code", required = false) String code) {
+        KuangruiMdsOpsFacade f = kuangruiMdsOpsProvider.getIfAvailable();
+        if (f == null) {
+            Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("ok", false);
+            m.put("message", "需要 quant.db-enabled=true");
+            return m;
+        }
+        return f.stockStatic(code);
+    }
+
+    /** M4：MDS 证券状态。 */
+    @GetMapping("/kuangrui/mds/security-status")
+    public Map<String, Object> kuangruiMdsSecurityStatus(
+            @RequestParam(value = "code", required = false) String code) {
+        KuangruiMdsOpsFacade f = kuangruiMdsOpsProvider.getIfAvailable();
+        if (f == null) {
+            Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("ok", false);
+            m.put("message", "需要 quant.db-enabled=true");
+            return m;
+        }
+        return f.securityStatus(code);
+    }
+
+    /** M4：MDS 交易时段。 */
+    @GetMapping("/kuangrui/mds/session-status")
+    public Map<String, Object> kuangruiMdsSessionStatus() {
+        KuangruiMdsOpsFacade f = kuangruiMdsOpsProvider.getIfAvailable();
+        if (f == null) {
+            Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("ok", false);
+            m.put("message", "需要 quant.db-enabled=true");
+            return m;
+        }
+        return f.sessionStatus();
+    }
+
+    /** M4：合并静态（MDS+OES）。 */
+    @GetMapping("/kuangrui/static/stock")
+    public Map<String, Object> kuangruiStaticStock(
+            @RequestParam(value = "code", required = false) String code) {
+        KuangruiMdsOpsFacade f = kuangruiMdsOpsProvider.getIfAvailable();
+        if (f == null) {
+            Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("ok", false);
+            m.put("message", "需要 quant.db-enabled=true");
+            return m;
+        }
+        return f.mergedStock(code);
+    }
+
     private Map<String, Object> oesOrDbOff(OesCall call) {
         KuangruiOesOpsFacade f = kuangruiOesOpsProvider.getIfAvailable();
         if (f == null) {

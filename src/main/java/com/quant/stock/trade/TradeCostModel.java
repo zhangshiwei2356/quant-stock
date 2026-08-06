@@ -2,8 +2,10 @@ package com.quant.stock.trade;
 
 import com.quant.stock.admin.ParamsScope;
 import com.quant.stock.config.QuantProperties;
+import com.quant.stock.kuangrui.KuangruiStaticInfoService;
 import com.quant.stock.market.dto.BarDTO;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -12,16 +14,45 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * 真实交易成本：佣金 + 印花税(卖) + 分级滑点 + 冲击成本
+ * 真实交易成本：佣金 + 印花税(卖) + 分级滑点 + 冲击成本。
+ * M4：{@code static-enabled} 时默认费率可取 OES {@code queryCommissionRate}，失败回退 {@code quant.feeRate}。
  */
 @Component
-@RequiredArgsConstructor
 public class TradeCostModel {
 
     private final QuantProperties props;
+    private final ObjectProvider<KuangruiStaticInfoService> staticInfoProvider;
+
+    public TradeCostModel(QuantProperties props) {
+        this(props, null);
+    }
+
+    @Autowired
+    public TradeCostModel(QuantProperties props,
+                          ObjectProvider<KuangruiStaticInfoService> staticInfoProvider) {
+        this.props = props;
+        this.staticInfoProvider = staticInfoProvider;
+    }
 
     private QuantProperties p() {
         return ParamsScope.current(props);
+    }
+
+    /** 默认佣金费率：宽睿 M4 优先，否则配置。 */
+    private BigDecimal effectiveFeeRate(BigDecimal override) {
+        if (override != null) {
+            return override;
+        }
+        if (staticInfoProvider != null) {
+            KuangruiStaticInfoService s = staticInfoProvider.getIfAvailable();
+            if (s != null && s.isApplyEnabled()) {
+                BigDecimal r = s.commissionRate();
+                if (r != null && r.compareTo(BigDecimal.ZERO) > 0) {
+                    return r;
+                }
+            }
+        }
+        return p().getFeeRate();
     }
 
     /**
@@ -59,20 +90,20 @@ public class TradeCostModel {
 
     /** 买入佣金（默认费率，含最低 5 元）。 */
     public BigDecimal buyFee(BigDecimal amount) {
-        return buyFee(amount, p().getFeeRate());
+        return buyFee(amount, effectiveFeeRate(null));
     }
 
     /**
      * 买入佣金（指定费率，含最低 5 元）。
      */
     public BigDecimal buyFee(BigDecimal amount, BigDecimal feeRate) {
-        BigDecimal rate = feeRate == null ? p().getFeeRate() : feeRate;
+        BigDecimal rate = effectiveFeeRate(feeRate);
         return commissionWithFloor(amount, rate).setScale(2, RoundingMode.HALF_UP);
     }
 
     /** 卖出：佣金（含最低 5 元）+ 印花税（无成交日则用配置税率） */
     public BigDecimal sellFee(BigDecimal amount) {
-        return sellFee(amount, p().getFeeRate(), null);
+        return sellFee(amount, effectiveFeeRate(null), null);
     }
 
     /**
@@ -84,7 +115,7 @@ public class TradeCostModel {
 
     /** 卖出费用；印花税按成交日 as-of（P0-104） */
     public BigDecimal sellFee(BigDecimal amount, BigDecimal feeRate, LocalDate tradeDay) {
-        BigDecimal rate = feeRate == null ? p().getFeeRate() : feeRate;
+        BigDecimal rate = effectiveFeeRate(feeRate);
         BigDecimal commission = commissionWithFloor(amount, rate);
         BigDecimal stampRate = tradeDay != null
                 ? StampTaxAsOf.rateOn(tradeDay, null)

@@ -53,4 +53,13 @@ class KuangruiMdsHelpersTest {
         assertNotNull(bucket.snapshot());
         assertEquals(m2, bucket.snapshot().getBarBegin());
     }
+
+    @Test
+    void noopMds_m4QueriesEmpty() {
+        NoopMdsMinuteIngestService noop = new NoopMdsMinuteIngestService();
+        assertFalse(noop.isLive());
+        assertTrue(noop.queryStockStatic("600036").isEmpty());
+        assertTrue(noop.querySecurityStatus("600036").isEmpty());
+        assertTrue(noop.queryTrdSessionStatus().isEmpty());
+    }
 }

@@ -202,6 +202,8 @@ quant:
   # ---- 宽睿 Quant360（默认全关；真实 MDS 需 mvn -Pkuangrui 且本机 jar/账号）----
   kuangrui:
     enabled: false
+    # M4：静态涨跌停/停牌/股本/交易日/佣金覆盖业务（默认关；失败回退本地）
+    static-enabled: false
     config-dir: ${QUANT_KUANGRUI_CONFIG_DIR:config/kuangrui/local}
     mds:
       enabled: false

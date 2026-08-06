@@ -42,6 +42,18 @@ public interface OesReadonlyService {
      */
     Map<String, Object> snapshot();
 
+    /**
+     * M4：证券产品信息（涨跌停价/停牌/股本等，价÷10000 为元）。
+     * {@code code} 为空则尽量拉全量（视柜台过滤支持）。
+     */
+    List<Map<String, Object>> queryStock(String code);
+
+    /** M4：柜台当前交易日（YYYY-MM-DD 字符串；失败空）。 */
+    Map<String, Object> queryTradingDay();
+
+    /** M4：佣金费率列表（费率已换算为小数，如 0.0003）。 */
+    List<Map<String, Object>> queryCommissionRate();
+
     /** 关闭客户端连接。 */
     void stop();
 }

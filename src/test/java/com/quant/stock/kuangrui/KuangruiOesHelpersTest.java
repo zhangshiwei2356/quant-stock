@@ -79,7 +79,41 @@ class KuangruiOesHelpersTest {
         assertFalse(noop.isLive());
         assertFalse(noop.ensureReady());
         assertTrue(noop.queryCash().isEmpty());
+        assertTrue(noop.queryStock("600036").isEmpty());
+        assertTrue(noop.queryTradingDay().isEmpty());
+        assertTrue(noop.queryCommissionRate().isEmpty());
         assertEquals("noop", noop.status().get("impl"));
         assertEquals(Boolean.FALSE, noop.snapshot().get("ok"));
+    }
+
+    @Test
+    void viewMapper_stockTradingDayCommission() {
+        Map<String, Object> s = OesViewMapper.stock("600036", "招商银行",
+                110000L, 90000L, 100000L, 25_0000_0000L, 20_0000_0000L, 0, 0);
+        assertEquals("600036", s.get("code"));
+        assertEquals(new BigDecimal("11.0000"), s.get("upperLimit"));
+        assertEquals(new BigDecimal("9.0000"), s.get("lowerLimit"));
+        assertEquals(Boolean.FALSE, s.get("suspended"));
+        assertEquals(new BigDecimal("20.0000"), s.get("floatSharesYi"));
+
+        Map<String, Object> sus = OesViewMapper.stock("000001", "x", 0, 0, 0, 0, 0, 1, 0);
+        assertEquals(Boolean.TRUE, sus.get("suspended"));
+
+        Map<String, Object> td = OesViewMapper.tradingDay(20260806);
+        assertEquals("2026-08-06", td.get("tradingDay"));
+        assertEquals("", OesViewMapper.formatYyyymmdd(0));
+
+        Map<String, Object> c = OesViewMapper.commission(1, 1, 30000L, 50000L, null);
+        assertEquals(0, new BigDecimal("0.00030000").compareTo((BigDecimal) c.get("feeRate")));
+        assertEquals(new BigDecimal("5.0000"), c.get("minFee"));
+        assertEquals(0, new BigDecimal("0.0003").compareTo(OesViewMapper.decodeFeeRate(30000L)));
+    }
+
+    @Test
+    void mdsViewMapper_sessionAndStatus() {
+        Map<String, Object> st = MdsViewMapper.securityStatus("600036", 0, 0, 1);
+        assertEquals(Boolean.FALSE, st.get("suspended"));
+        Map<String, Object> sess = MdsViewMapper.trdSession(1, 1, 1);
+        assertEquals(Boolean.TRUE, sess.get("open"));
     }
 }

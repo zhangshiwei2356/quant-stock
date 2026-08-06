@@ -11,7 +11,8 @@
   <b>M1</b> MDS L1→<code>market_1min(MDS)</code> 可选已落地 ·
   <b>M2</b> OES 只读对账可选已落地 ·
   <b>M3</b> OES 报撤回报可选已落地 ·
-  下一步 <b>M4</b> 静态/费率。
+  <b>M4</b> 静态/费率可选已落地 ·
+  后置 L2/批量/银证。
 </p>
 
 <div class="memo-todo">
@@ -48,9 +49,9 @@
       <tr><td>行情订阅</td><td><code>subscribeMarketData</code> → L1 股票/指数/期权</td><td><b>M1 已用</b>：目标池 L1 → 分钟桶</td></tr>
       <tr><td>快照查询</td><td><code>qryMktDataSnapshot</code> / <code>qrySnapshotList</code></td><td><b>M1 已用</b>：pull 补当前分钟</td></tr>
       <tr><td>Level2</td><td>L2 快照/增量/逐笔等</td><td>后置</td></tr>
-      <tr><td>证券实时状态</td><td><code>qrySecurityStatus</code> / <code>onSecurityStatus</code></td><td>停复牌硬过滤（待接）</td></tr>
-      <tr><td>交易时段</td><td><code>qryTrdSessionStatus</code> / <code>onTrdSessionStatus</code></td><td>开市/休市（待接）</td></tr>
-      <tr><td>证券静态信息</td><td><code>qryStockStaticInfo</code> / <code>List</code></td><td>涨跌停/停牌/股本（待接）</td></tr>
+      <tr><td>证券实时状态</td><td><code>qrySecurityStatus</code> / <code>onSecurityStatus</code></td><td><b>M4 已用</b>：停复牌（可开关回退量≤0）</td></tr>
+      <tr><td>交易时段</td><td><code>qryTrdSessionStatus</code> / <code>onTrdSessionStatus</code></td><td><b>M4 已用</b>：开市/休市查询</td></tr>
+      <tr><td>证券静态信息</td><td><code>qryStockStaticInfo</code> / <code>List</code></td><td><b>M4 已用</b>：涨跌停/停牌/股本</td></tr>
       <tr><td>UDP 组播</td><td><code>MdsUdpClient</code></td><td>低延迟；公网模拟通常不可用，后置</td></tr>
     </tbody>
   </table>
@@ -65,7 +66,7 @@
       <tr><td>查委托 / 成交</td><td><code>queryOrder</code> / <code>queryTrade</code></td><td><b>M2/M3</b>：对账 + sync 推进补强</td></tr>
       <tr><td>查资金 / 持仓</td><td><code>queryCashAsset</code> / <code>queryStkHolding</code></td><td><b>M2 已用</b>：运维查询 + <code>position-pnl-sync</code> 对账</td></tr>
       <tr><td>总览 / 柜台资金</td><td><code>queryClientOverview</code> / <code>queryCounterCash</code></td><td>纸面对账</td></tr>
-      <tr><td>佣金 / 产品 / 交易日</td><td><code>queryCommissionRate</code> / <code>queryStock</code> / <code>queryTradingDay</code></td><td>M4 增强</td></tr>
+      <tr><td>佣金 / 产品 / 交易日</td><td><code>queryCommissionRate</code> / <code>queryStock</code> / <code>queryTradingDay</code></td><td><b>M4 已用</b>：可开关覆盖本地费率/日历/涨跌停</td></tr>
       <tr><td>两融 / 期权 / ETF / 银证</td><td>扩展接口族</td><td>超出现货范围，暂缓</td></tr>
     </tbody>
   </table>
@@ -99,8 +100,9 @@
       <tr><td><code>market-collect</code> / MDS 摄入</td><td><b>M1 可选已落地</b>（默认关）</td><td>L1 订阅/查询→分钟桶→<code>market_1min(MDS)</code>；运维 MDS/TDX 抽样对账已落地</td><td>断线重连强化、L2</td></tr>
       <tr><td><code>TradeGatewayService</code></td><td>sim 即时；sdk 本地桩或 <b>M3 可选</b> OES</td><td>OES 限价报/撤 + 回报/查询推进</td><td>批量、本地风控↔拒单细映射</td></tr>
       <tr><td><code>sync-orders</code></td><td>本地桩或 <b>M3</b> OES 推进 + M2 对账日志</td><td><code>queryOrder</code>/<code>queryTrade</code>+回报</td><td>—</td></tr>
-      <tr><td><code>position-pnl-sync</code></td><td>本地成本+最新价 + <b>M2 可选</b> OES 对账</td><td><code>queryCashAsset</code>/<code>queryStkHolding</code></td><td>—</td></tr>      <tr><td>停复牌 / 涨跌停 / 股本</td><td>量≤0、规则估算、启发式</td><td>MDS 静态+状态；OES <code>queryStock</code></td><td>M4；ST 日切可并存本地表</td></tr>
-      <tr><td>交易日历 / 佣金</td><td>静态节假日 / 配置近似</td><td><code>queryTradingDay</code> / <code>queryCommissionRate</code></td><td>M4</td></tr>
+      <tr><td><code>position-pnl-sync</code></td><td>本地成本+最新价 + <b>M2 可选</b> OES 对账</td><td><code>queryCashAsset</code>/<code>queryStkHolding</code></td><td>—</td></tr>
+      <tr><td>停复牌 / 涨跌停 / 股本</td><td>量≤0、规则估算、启发式；<b>M4 可选</b>宽睿价</td><td>MDS 静态+状态；OES <code>queryStock</code></td><td>断线缓存强化；ST 日切可并存本地表</td></tr>
+      <tr><td>交易日历 / 佣金</td><td>静态节假日 / 配置近似；<b>M4 可选</b> OES</td><td><code>queryTradingDay</code> / <code>queryCommissionRate</code></td><td>—</td></tr>
       <tr><td>复权 / 财报 / 舆情</td><td>未落地</td><td>资料包基本不覆盖</td><td>其他数据源</td></tr>
     </tbody>
   </table>
@@ -138,6 +140,12 @@
         <td>限价 <code>sendOrdReq</code>/<code>sendOrdCancelReq</code>；<code>sync-orders</code> 按回报/查询推进 FILLED；总闸 <code>oes.order-enabled</code>（默认 false）；需 <code>trade-mode=sdk</code></td>
         <td>运维 <code>/api/ops/kuangrui/oes/order-status</code>；仿真买/卖/撤 + sync 闭环</td>
       </tr>
+      <tr>
+        <td><b>M4 静态/费率</b></td>
+        <td><b>可选已落地</b>（默认关 · 2026-08-06）</td>
+        <td>MDS 静态/状态/时段 + OES 产品/交易日/佣金；业务总闸 <code>static-enabled</code>（失败回退本地启发式）</td>
+        <td>运维 <code>/api/ops/kuangrui/static/*</code>、<code>oes/{stock,trading-day,commission-rate}</code>、<code>mds/{stock-static,security-status,session-status}</code></td>
+      </tr>
     </tbody>
   </table>
 
@@ -158,15 +166,9 @@
     <thead><tr><th>阶段</th><th>目标</th><th>要点</th><th>Done 标准</th></tr></thead>
     <tbody>
       <tr>
-        <td><b>M4 增强</b></td>
-        <td>少启发式</td>
-        <td>静态涨跌停/停牌/股本；交易日；佣金费率</td>
-        <td>可开关回退</td>
-      </tr>
-      <tr>
         <td><b>后置</b></td>
         <td>可选</td>
-        <td>L2/UDP、批量、银证；两融/期权/ETF 不进主路径</td>
+        <td>L2/UDP、批量、银证；两融/期权/ETF 不进主路径；MDS 断线重连强化</td>
         <td>—</td>
       </tr>
     </tbody>
@@ -174,11 +176,18 @@
 
   <h5 style="margin:12px 0 4px;">开关（默认全关）</h5>
   <pre style="margin:0;white-space:pre-wrap;font-size:12px;">quant.kuangrui.enabled=false
+quant.kuangrui.static-enabled=false
 quant.kuangrui.mds.enabled=false
 quant.kuangrui.oes.enabled=false
 quant.kuangrui.oes.order-enabled=false
 quant.kuangrui.config-dir=${QUANT_KUANGRUI_CONFIG_DIR:config/kuangrui/local}
 quant.trade-mode=sim
+
+# 启用 M4 静态/费率（仿真，需 MDS 或 OES 就绪）：
+# mvn -Pkuangrui spring-boot:run
+# quant.kuangrui.enabled=true
+# quant.kuangrui.static-enabled=true
+# quant.kuangrui.mds.enabled=true   # 和/或 oes.enabled=true
 
 # 启用 M3 报撤（仿真）：
 # mvn -Pkuangrui spring-boot:run

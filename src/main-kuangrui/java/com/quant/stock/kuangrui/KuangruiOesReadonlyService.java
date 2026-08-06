@@ -95,8 +95,8 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
                 && quantProperties.getKuangrui().getOes() != null
                 && quantProperties.getKuangrui().getOes().isOrderEnabled());
         m.put("hint", isOrderLive()
-                ? "M3 报撤已开：限价 sendOrdReq/撤单 + 回报/查询推进"
-                : "M2 只读；报撤需 oes.order-enabled=true（M3，默认关）");
+                ? "M3 报撤已开：限价 sendOrdReq/撤单 + 回报/查询推进；M4 产品/交易日/佣金可查"
+                : "M2 只读 + M4 查询（stock/tradingDay/commission）；报撤需 oes.order-enabled=true（M3）");
         return m;
     }
 
@@ -196,6 +196,134 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
             ));
         }
         return out;
+    }
+
+    @Override
+    public List<Map<String, Object>> queryStock(String code) {
+        ensureReadyOrThrow();
+        Object filter = newInstance("com.quant360.api.model.oes.OesQryStockFilter");
+        String norm = OesViewMapper.normalizeCode(code);
+        if (filter != null && norm != null && !norm.isEmpty()) {
+            setBean(filter, "setSecurityId", norm);
+            setBean(filter, "setSecurityID", norm);
+            int mkt = KuangruiExchangeIds.fromStockCode(norm);
+            if (mkt > 0) {
+                setBean(filter, "setMktId", Integer.valueOf(mkt));
+            }
+        }
+        List<?> raw = invokeQueryListWithFilter("queryStock", filter);
+        if (raw.isEmpty()) {
+            raw = invokeQueryListWithFilter("queryStockItem", filter);
+        }
+        List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
+        for (Object item : raw) {
+            out.add(mapStockItem(item));
+        }
+        return out;
+    }
+
+    @Override
+    public Map<String, Object> queryTradingDay() {
+        ensureReadyOrThrow();
+        Object ret = invokeReturning(client, "queryTradingDay");
+        if (ret == null) {
+            ret = invokeReturning(client, "queryTradingDay", new Object[]{null});
+        }
+        int day = 0;
+        if (ret instanceof Number) {
+            day = ((Number) ret).intValue();
+        } else if (ret instanceof List && !((List<?>) ret).isEmpty()) {
+            day = (int) lng(firstGetter(((List<?>) ret).get(0),
+                    "getTradingDay", "getTrdDay", "getTradeDate"));
+        } else if (ret != null) {
+            day = (int) lng(firstGetter(ret, "getTradingDay", "getTrdDay", "getTradeDate"));
+            if (day == 0) {
+                day = (int) lng(ret);
+            }
+        }
+        if (day <= 0) {
+            Map<String, Object> empty = new LinkedHashMap<String, Object>();
+            empty.put("tradingDayRaw", 0);
+            empty.put("tradingDay", "");
+            empty.put("ok", false);
+            return empty;
+        }
+        Map<String, Object> m = OesViewMapper.tradingDay(day);
+        m.put("ok", true);
+        return m;
+    }
+
+    @Override
+    public List<Map<String, Object>> queryCommissionRate() {
+        ensureReadyOrThrow();
+        Object filter = newInstance("com.quant360.api.model.oes.OesQryCommissionRateFilter");
+        List<?> raw = invokeQueryListWithFilter("queryCommissionRate", filter);
+        List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
+        for (Object item : raw) {
+            Object fr = firstGetter(item, "getFeeRate", "getCommissionRate", "getRate");
+            long feeRaw = lng(fr);
+            BigDecimal asDecimal = null;
+            if (fr instanceof BigDecimal) {
+                asDecimal = (BigDecimal) fr;
+            } else if (fr instanceof Double || fr instanceof Float) {
+                asDecimal = BigDecimal.valueOf(((Number) fr).doubleValue());
+            }
+            out.add(OesViewMapper.commission(
+                    (int) lng(firstGetter(item, "getFeeType", "getFeeTypeId")),
+                    (int) lng(firstGetter(item, "getBsType", "getBsTypeId")),
+                    feeRaw,
+                    lng(firstGetter(item, "getMinFee", "getMinCommission")),
+                    asDecimal != null && asDecimal.compareTo(BigDecimal.ONE) < 0 ? asDecimal : null
+            ));
+        }
+        return out;
+    }
+
+    private Map<String, Object> mapStockItem(Object item) {
+        String code = str(firstGetter(item, "getSecurityId", "getSecurityID"));
+        return OesViewMapper.stock(
+                code,
+                str(firstGetter(item, "getSecurityName", "getSecurityNameUTF8", "getName")),
+                lng(firstGetter(item, "getUpperLimitPrice", "getPriceLimitUpper", "getCeilPrice")),
+                lng(firstGetter(item, "getLowerLimitPrice", "getPriceLimitLower", "getFloorPrice")),
+                lng(firstGetter(item, "getPrevClose", "getPreClosePrice", "getPrevClosePrice")),
+                lng(firstGetter(item, "getOutstandingShare", "getTotalShare", "getEquity")),
+                lng(firstGetter(item, "getPublicFloatShare", "getFloatShare", "getCirculationShare")),
+                (int) lng(firstGetter(item, "getSuspFlag", "getSuspendFlag", "getIsSuspend")),
+                (int) lng(firstGetter(item, "getSecurityStatus", "getSecurityStatusFlag", "getProductStatus"))
+        );
+    }
+
+    private List<?> invokeQueryListWithFilter(String methodName, Object filter) {
+        OesClientImpl c = client;
+        if (c == null) {
+            return Collections.emptyList();
+        }
+        Object list = invokeReturning(c, methodName, filter);
+        if (list instanceof List) {
+            return (List<?>) list;
+        }
+        if (list instanceof Collection) {
+            return new ArrayList<Object>((Collection<?>) list);
+        }
+        Object list2 = invokeReturning(c, methodName);
+        if (list2 instanceof List) {
+            return (List<?>) list2;
+        }
+        return Collections.emptyList();
+    }
+
+    private static Object firstGetter(Object target, String... getters) {
+        if (target == null || getters == null) {
+            return null;
+        }
+        for (String g : getters) {
+            Object v = invokeGetter(target, g);
+            if (v != null) {
+                return v;
+            }
+        }
+        return null;
     }
 
     @Override

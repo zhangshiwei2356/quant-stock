@@ -36,4 +36,16 @@ public interface MdsMinuteIngestService {
 
     /** 将已闭合/当前分钟桶刷入 {@code market_1min}。 */
     int flushBuckets();
+
+    /**
+     * M4：证券静态信息（涨跌停/昨收/停牌/股本；价÷10000 为元）。
+     * {@code code} 为空则空列表。
+     */
+    List<Map<String, Object>> queryStockStatic(String code);
+
+    /** M4：证券实时状态（停复牌等）。 */
+    List<Map<String, Object>> querySecurityStatus(String code);
+
+    /** M4：交易时段状态（开市/休市）。 */
+    List<Map<String, Object>> queryTrdSessionStatus();
 }

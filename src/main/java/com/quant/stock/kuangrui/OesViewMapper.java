@@ -132,6 +132,110 @@ public final class OesViewMapper {
         }
     }
 
+    /**
+     * M4 证券产品：涨跌停/昨收为元；股本为股；{@code suspended} 由柜台标志推导。
+     */
+    public static Map<String, Object> stock(String securityId,
+                                            String securityName,
+                                            long upperLimitMilli,
+                                            long lowerLimitMilli,
+                                            long prevCloseMilli,
+                                            long outstandingShare,
+                                            long publicFloatShare,
+                                            int suspendFlag,
+                                            int securityStatus) {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        m.put("code", normalizeCode(securityId));
+        m.put("name", nullToEmpty(securityName));
+        BigDecimal up = KuangruiPriceScale.toYuan(upperLimitMilli);
+        BigDecimal down = KuangruiPriceScale.toYuan(lowerLimitMilli);
+        BigDecimal prev = KuangruiPriceScale.toYuan(prevCloseMilli);
+        m.put("upperLimit", up);
+        m.put("lowerLimit", down);
+        m.put("prevClose", prev);
+        m.put("outstandingShare", outstandingShare);
+        m.put("publicFloatShare", publicFloatShare);
+        m.put("suspendFlag", suspendFlag);
+        m.put("securityStatus", securityStatus);
+        m.put("suspended", isSuspendedFlag(suspendFlag, securityStatus));
+        // 流通股本 → 亿股（市值过滤用）
+        if (publicFloatShare > 0L) {
+            m.put("floatSharesYi", BigDecimal.valueOf(publicFloatShare)
+                    .divide(new BigDecimal("100000000"), 4, java.math.RoundingMode.HALF_UP));
+        } else if (outstandingShare > 0L) {
+            m.put("floatSharesYi", BigDecimal.valueOf(outstandingShare)
+                    .divide(new BigDecimal("100000000"), 4, java.math.RoundingMode.HALF_UP));
+        } else {
+            m.put("floatSharesYi", null);
+        }
+        return m;
+    }
+
+    /** M4 交易日：YYYYMMDD int → ISO 日期字符串。 */
+    public static Map<String, Object> tradingDay(int yyyymmdd) {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        m.put("tradingDayRaw", yyyymmdd);
+        m.put("tradingDay", formatYyyymmdd(yyyymmdd));
+        return m;
+    }
+
+    /**
+     * M4 佣金：柜台 feeRate 常见为 ×1e8 整数（如 30000 → 0.0003）；已是小数则原样。
+     */
+    public static Map<String, Object> commission(int feeType,
+                                                 int bsType,
+                                                 long feeRateRaw,
+                                                 long minFeeMilli,
+                                                 BigDecimal feeRateDecimal) {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        m.put("feeType", feeType);
+        m.put("bsType", bsType);
+        m.put("feeRateRaw", feeRateRaw);
+        BigDecimal rate = feeRateDecimal;
+        if (rate == null && feeRateRaw > 0L) {
+            rate = decodeFeeRate(feeRateRaw);
+        }
+        m.put("feeRate", rate);
+        BigDecimal minFee = KuangruiPriceScale.toYuan(minFeeMilli);
+        m.put("minFee", minFee == null ? BigDecimal.ZERO : minFee);
+        return m;
+    }
+
+    /** 柜台费率整数 → 小数；优先按 1e8 解（OES 常见）。 */
+    public static BigDecimal decodeFeeRate(long raw) {
+        if (raw <= 0L) {
+            return null;
+        }
+        // 已是「万分之」量级误传（如 3 → 0.0003）极少见；主路径 1e8
+        if (raw < 1000L) {
+            return BigDecimal.valueOf(raw).divide(new BigDecimal("10000"), 8, java.math.RoundingMode.HALF_UP);
+        }
+        return BigDecimal.valueOf(raw).divide(new BigDecimal("100000000"), 8, java.math.RoundingMode.HALF_UP);
+    }
+
+    /** 停牌：suspendFlag≠0，或 securityStatus 落入常见停牌枚举值（依资料包粗判）。 */
+    public static boolean isSuspendedFlag(int suspendFlag, int securityStatus) {
+        if (suspendFlag != 0) {
+            return true;
+        }
+        // 常见：0=正常；部分版本非 0 表示异常/停牌
+        return securityStatus < 0;
+    }
+
+    /** YYYYMMDD → yyyy-MM-dd；非法返回空串。 */
+    public static String formatYyyymmdd(int yyyymmdd) {
+        if (yyyymmdd < 19700101 || yyyymmdd > 21001231) {
+            return "";
+        }
+        int y = yyyymmdd / 10000;
+        int mo = (yyyymmdd / 100) % 100;
+        int d = yyyymmdd % 100;
+        if (mo < 1 || mo > 12 || d < 1 || d > 31) {
+            return "";
+        }
+        return String.format("%04d-%02d-%02d", y, mo, d);
+    }
+
     /** 柜台状态 → 本地 {@code OrderDTO.Status} 名（未知保持 SUBMITTED）。 */
     public static String toLocalStatusName(int oesStatus) {
         switch (oesStatus) {
