@@ -5,11 +5,12 @@
   厂商：上海宽睿；产品 <b>OES</b>（交易）/ <b>MDS</b>（行情）。
   默认业务仍为本地 <code>sim</code> + <code>db</code>；宽睿能力经独立开关接入，默认关闭。
 </p>
-<p class="hint" style="margin-top:0">
-  更新：2026-08-04 ·
+<p>
+  更新：2026-08-06 ·
   <b>M0</b> 仿真登录 COMPLETE ·
   <b>M1</b> MDS L1→<code>market_1min(MDS)</code> 可选已落地 ·
-  下一步 <b>M2</b> OES 只读对账。
+  <b>M2</b> OES 只读对账可选已落地 ·
+  下一步 <b>M3</b> OES 报撤回报。
 </p>
 
 <div class="memo-todo">
@@ -60,8 +61,8 @@
     <tbody>
       <tr><td>下单 / 批量 / 撤单</td><td><code>sendOrdReq</code> / <code>sendBatchOrdsReq</code> / <code>sendOrdCancelReq</code></td><td>M3：替换 <code>trade-mode=sdk</code> 桩</td></tr>
       <tr><td>回报同步</td><td><code>sendRptSync</code></td><td><b>登录后必做</b>；超时易断连</td></tr>
-      <tr><td>查委托 / 成交</td><td><code>queryOrder</code> / <code>queryTrade</code></td><td>M2：真 <code>sync-orders</code></td></tr>
-      <tr><td>查资金 / 持仓</td><td><code>queryCashAsset</code> / <code>queryStkHolding</code></td><td>M2：真 <code>position-pnl-sync</code></td></tr>
+      <tr><td>查委托 / 成交</td><td><code>queryOrder</code> / <code>queryTrade</code></td><td><b>M2 已用</b>：运维查询 + <code>sync-orders</code> 对账日志</td></tr>
+      <tr><td>查资金 / 持仓</td><td><code>queryCashAsset</code> / <code>queryStkHolding</code></td><td><b>M2 已用</b>：运维查询 + <code>position-pnl-sync</code> 对账</td></tr>
       <tr><td>总览 / 柜台资金</td><td><code>queryClientOverview</code> / <code>queryCounterCash</code></td><td>纸面对账</td></tr>
       <tr><td>佣金 / 产品 / 交易日</td><td><code>queryCommissionRate</code> / <code>queryStock</code> / <code>queryTradingDay</code></td><td>M4 增强</td></tr>
       <tr><td>两融 / 期权 / ETF / 银证</td><td>扩展接口族</td><td>超出现货范围，暂缓</td></tr>
@@ -96,8 +97,8 @@
     <tbody>
       <tr><td><code>market-collect</code> / MDS 摄入</td><td><b>M1 可选已落地</b>（默认关）</td><td>L1 订阅/查询→分钟桶→<code>market_1min(MDS)</code></td><td>断线重连强化、L2、与 TDX 抽样对账</td></tr>
       <tr><td><code>TradeGatewayService</code></td><td>sim 即时；sdk 本地桩</td><td>OES 下单/撤单/回报</td><td>本地风控↔柜台拒单映射</td></tr>
-      <tr><td><code>sync-orders</code></td><td>本地桩（假推进 FILLED）</td><td><code>queryOrder</code>/<code>queryTrade</code>+回报</td><td>M2/M3</td></tr>
-      <tr><td><code>position-pnl-sync</code></td><td>本地成本+最新价</td><td><code>queryCashAsset</code>/<code>queryStkHolding</code></td><td>M2</td></tr>
+      <tr><td><code>sync-orders</code></td><td>本地桩 + <b>M2 可选</b> OES 对账日志</td><td><code>queryOrder</code>/<code>queryTrade</code></td><td>M3 回报推进 FILLED</td></tr>
+      <tr><td><code>position-pnl-sync</code></td><td>本地成本+最新价 + <b>M2 可选</b> OES 对账</td><td><code>queryCashAsset</code>/<code>queryStkHolding</code></td><td>—</td></tr>
       <tr><td>停复牌 / 涨跌停 / 股本</td><td>量≤0、规则估算、启发式</td><td>MDS 静态+状态；OES <code>queryStock</code></td><td>M4；ST 日切可并存本地表</td></tr>
       <tr><td>交易日历 / 佣金</td><td>静态节假日 / 配置近似</td><td><code>queryTradingDay</code> / <code>queryCommissionRate</code></td><td>M4</td></tr>
       <tr><td>复权 / 财报 / 舆情</td><td>未落地</td><td>资料包基本不覆盖</td><td>其他数据源</td></tr>
@@ -125,6 +126,12 @@
         <td>价÷10000；分钟桶；写 <code>market_1min.data_source=MDS</code>；<code>market-collect</code> live 时优先 pull/flush；实现仅 <code>-Pkuangrui</code> 编译（<code>src/main-kuangrui</code>）</td>
         <td>运维 <code>/api/ops/kuangrui/mds/{status,pull,subscribe,flush,stop}</code>；详见 <code>config/kuangrui/README.md</code></td>
       </tr>
+      <tr>
+        <td><b>M2 OES 只读</b></td>
+        <td><b>可选已落地</b>（默认关 · 2026-08-06）</td>
+        <td>登录 + <code>sendRptSync</code> + 查资金/持仓/委托/成交（价÷10000）；纸面 vs 柜台对账；<b>不下单</b>；实现仅 <code>-Pkuangrui</code></td>
+        <td>运维 <code>/api/ops/kuangrui/oes/{status,cash,holdings,orders,trades,snapshot,reconcile,stop}</code>；任务 <code>sync-orders</code>/<code>position-pnl-sync</code> live 时打对账日志</td>
+      </tr>
     </tbody>
   </table>
 
@@ -144,12 +151,6 @@
   <table>
     <thead><tr><th>阶段</th><th>目标</th><th>要点</th><th>Done 标准</th></tr></thead>
     <tbody>
-      <tr>
-        <td><b>M2 OES 只读</b></td>
-        <td>先对账</td>
-        <td>登录 + <code>sendRptSync</code> + 查资金/持仓/委托/成交</td>
-        <td>账户/纸面对账可见柜台数据</td>
-      </tr>
       <tr>
         <td><b>M3 OES 报撤</b></td>
         <td>替换 sdk 桩</td>
@@ -181,7 +182,12 @@ quant.kuangrui.config-dir=${QUANT_KUANGRUI_CONFIG_DIR:config/kuangrui/local}
 # 启用 M1：
 # mvn -Pkuangrui spring-boot:run
 # quant.kuangrui.enabled=true
-# quant.kuangrui.mds.enabled=true</pre>
+# quant.kuangrui.mds.enabled=true
+
+# 启用 M2（只读，不下单）：
+# quant.kuangrui.enabled=true
+# quant.kuangrui.oes.enabled=true
+# 准备 local/oes_api_config.json + QUANT_KUANGRUI_USER/PASSWORD</pre>
 
   <h5 style="margin:12px 0 4px;">明确不做</h5>
   <ul>

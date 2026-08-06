@@ -153,3 +153,29 @@ quant:
    - 或 `POST .../subscribe` 后由 `market-collect` / `flush` 落库
 
 实现位置：`src/main-kuangrui/java/.../KuangruiMdsMinuteIngestService.java`（仅 `-Pkuangrui` 编译）；主工程门面与换算在 `src/main/java/.../kuangrui/`。
+
+## M2 OES 只读对账（可选）
+
+默认业务路径不变；**不下单**（`oes.order-enabled` 保持 false）。启用步骤：
+
+1. 同 M1：安装 `quant360-all-api`、准备账号
+2. 准备 `local/oes_api_config.json`（可从 `examples/oes_api_config.example.json` 复制）
+3. `mvn -Pkuangrui spring-boot:run`
+4. 配置：
+
+```yaml
+quant:
+  kuangrui:
+    enabled: true
+    oes:
+      enabled: true
+      # order-enabled: false   # M3 才开
+```
+
+5. 运维验收：
+   - `GET /api/ops/kuangrui/oes/status` → `live=true`
+   - `GET /api/ops/kuangrui/oes/cash|holdings|orders|trades`
+   - `GET /api/ops/kuangrui/oes/reconcile` → 本地纸面 vs 柜台差异
+   - 定时任务 `sync-orders` / `position-pnl-sync` 在 OES live 时打对账日志（不改本地账本）
+
+实现：`src/main-kuangrui/.../KuangruiOesReadonlyService.java`；门面 `KuangruiOesOpsFacade`。

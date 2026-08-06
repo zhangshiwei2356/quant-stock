@@ -340,11 +340,17 @@ public class QuantProperties {
 
         @Data
         public static class Oes {
-            /** OES 对接（M2/M3，尚未实现业务） */
+            /**
+             * OES 只读对账（M2）；需同时 {@code kuangrui.enabled=true}。
+             * 真实客户端仅 {@code -Pkuangrui} 编译；默认 false。
+             */
             private boolean enabled = false;
-            /** 报单总闸；默认 false */
+            /** 报单总闸（M3）；默认 false，M2 不打开 */
             private boolean orderEnabled = false;
+            /** 相对 {@link Kuangrui#configDir} 的 OES JSON 文件名 */
             private String configFile = "oes_api_config.json";
+            /** 可选登录加密类型（对齐 {@code OesLogonEncryptType#value()}）；null=跟配置文件 */
+            private Integer encryptType;
         }
     }
 

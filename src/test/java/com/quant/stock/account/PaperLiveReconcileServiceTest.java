@@ -46,11 +46,14 @@ class PaperLiveReconcileServiceTest {
         @SuppressWarnings("unchecked")
         ObjectProvider<com.quant.stock.pool.TradePoolService> poolProvider = mock(ObjectProvider.class);
         when(poolProvider.getIfAvailable()).thenReturn(null);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<com.quant.stock.kuangrui.OesReadonlyService> oesProvider = mock(ObjectProvider.class);
+        when(oesProvider.getIfAvailable()).thenReturn(null);
 
         TradeCostModel costModel = new TradeCostModel(props);
         SlippageResidualService slip = new SlippageResidualService(overview, costModel, props);
         PaperLiveReconcileService svc = new PaperLiveReconcileService(
-                props, costModel, overview, slip, poolProvider);
+                props, costModel, overview, slip, poolProvider, oesProvider);
         Map<String, Object> report = svc.report();
         assertNotNull(report.get("configFingerprint"));
         assertFalse(Boolean.TRUE.equals(report.get("gatePass")));

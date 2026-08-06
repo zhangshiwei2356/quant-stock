@@ -29,4 +29,19 @@ public final class KuangruiPriceScale {
         }
         return toYuan(milli.longValue());
     }
+
+    /**
+     * 毫级金额 → 元（允许 0，用于资金余额；负值按原样换算）。
+     */
+    public static BigDecimal toYuanAllowZero(long milli) {
+        return BigDecimal.valueOf(milli).divide(SCALE, 4, RoundingMode.HALF_UP);
+    }
+
+    /** null → {@code BigDecimal.ZERO}。 */
+    public static BigDecimal toYuanAllowZero(Long milli) {
+        if (milli == null) {
+            return BigDecimal.ZERO;
+        }
+        return toYuanAllowZero(milli.longValue());
+    }
 }
