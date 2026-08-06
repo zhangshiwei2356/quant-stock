@@ -10,7 +10,7 @@ import com.quant.stock.market.BarPeriod;
 import com.quant.stock.market.MarketDataService;
 import com.quant.stock.market.dto.BarDTO;
 import com.quant.stock.risk.OpenFilterService;
-import com.quant.stock.session.BranchScaffoldStrategy;
+import com.quant.stock.session.OvernightGapStrategy;
 import com.quant.stock.session.SessionContext;
 import com.quant.stock.session.SessionDepProbe;
 import com.quant.stock.session.SessionEvent;
@@ -99,7 +99,7 @@ class PortfolioBackTestEngineSmokeTest {
         BackTestQueryDTO q = BackTestQueryDTO.builder()
                 .stockCodeList(Arrays.asList("600036", "600519"))
                 .initCapital(new BigDecimal("100000"))
-                .strategyId(BranchScaffoldStrategy.ID)
+                .strategyId(OvernightGapStrategy.ID)
                 .engine("session")
                 .build();
         PortfolioResultDTO result = engine.run(q);
@@ -252,14 +252,14 @@ class PortfolioBackTestEngineSmokeTest {
     }
 
     @Test
-    void resolveEngineDefaultsBranchScaffoldToSession() {
+    void resolveEngineDefaultsOvernightGapToSession() {
         QuantProperties props = new QuantProperties();
         assertEquals("session", PortfolioBackTestEngine.resolveEngine(
-                BackTestQueryDTO.builder().build(), new BranchScaffoldStrategy()));
+                BackTestQueryDTO.builder().build(), new OvernightGapStrategy(props)));
         assertEquals("classic", PortfolioBackTestEngine.resolveEngine(
                 BackTestQueryDTO.builder().build(), new MaCrossStrategy(props)));
         assertEquals("classic", PortfolioBackTestEngine.resolveEngine(
-                BackTestQueryDTO.builder().engine("classic").build(), new BranchScaffoldStrategy()));
+                BackTestQueryDTO.builder().engine("classic").build(), new OvernightGapStrategy(props)));
     }
 
     private static PortfolioBackTestEngine engine(QuantProperties props, MarketDataService mds) {
@@ -278,7 +278,7 @@ class PortfolioBackTestEngineSmokeTest {
                 new OpenFilterService(props),
                 new StrategyRegistry(Arrays.asList(
                         new MaCrossStrategy(props),
-                        new BranchScaffoldStrategy()), props),
+                        new OvernightGapStrategy(props)), props),
                 new TradingCalendar(),
                 sessionPortfolio);
     }

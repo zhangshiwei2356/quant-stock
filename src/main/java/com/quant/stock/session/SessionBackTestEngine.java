@@ -170,7 +170,7 @@ public class SessionBackTestEngine {
                 if (currentDay != null && lastBarOfDay != null) {
                     BigDecimal eqClose = markEquity(cash, pos, lastBarOfDay);
                     SessionContext closeCtx = baseCtx(stockCode, currentDay, SessionBranch.CLOSE, lastBarOfDay,
-                            lastBarIndexOfDay, hold, eqClose, cash, pos, degraded, matchingEnabled);
+                            lastBarIndexOfDay, hold, eqClose, cash, pos, degraded, matchingEnabled, bars);
                     strategy.onSessionClose(closeCtx, events);
                     hold = closeCtx.getHoldState() == null ? hold : closeCtx.getHoldState();
                     cash = acceptIntents(strategy, closeCtx, bars, lastBarIndexOfDay, cash, pos, events, trades,
@@ -184,7 +184,7 @@ public class SessionBackTestEngine {
                 sessionDays++;
                 BigDecimal eqOpen = markEquity(cash, pos, bar);
                 SessionContext openCtx = baseCtx(stockCode, day, branch, bar, i, hold, eqOpen, cash, pos,
-                        degraded, matchingEnabled);
+                        degraded, matchingEnabled, bars);
                 strategy.onSessionOpen(openCtx, events);
                 hold = openCtx.getHoldState() == null ? hold : openCtx.getHoldState();
                 cash = acceptIntents(strategy, openCtx, bars, i, cash, pos, events, trades,
@@ -202,7 +202,7 @@ public class SessionBackTestEngine {
 
             BigDecimal equity = markEquity(cash, pos, bar);
             SessionContext ctx = baseCtx(stockCode, day, branch, bar, i, hold, equity, cash, pos,
-                    degraded, matchingEnabled);
+                    degraded, matchingEnabled, bars);
             if (ctx.isBranchDegraded()) {
                 if (firstOfBranch) {
                     events.add(SessionEvent.builder()
@@ -242,7 +242,7 @@ public class SessionBackTestEngine {
         if (currentDay != null && lastBarOfDay != null) {
             BigDecimal eqClose = markEquity(cash, pos, lastBarOfDay);
             SessionContext closeCtx = baseCtx(stockCode, currentDay, SessionBranch.CLOSE, lastBarOfDay,
-                    lastBarIndexOfDay, hold, eqClose, cash, pos, degraded, matchingEnabled);
+                    lastBarIndexOfDay, hold, eqClose, cash, pos, degraded, matchingEnabled, bars);
             strategy.onSessionClose(closeCtx, events);
             cash = acceptIntents(strategy, closeCtx, bars, lastBarIndexOfDay, cash, pos, events, trades,
                     buyMarks, sellMarks, stats, matchingEnabled, fillMode, nextEffective,
@@ -427,7 +427,7 @@ public class SessionBackTestEngine {
         }
         SessionContext fillCtx = baseCtx(stockCode, tradeDay, branch, bars.get(index), index,
                 HoldDayState.FLAT, markEquity(cash, pos, bars.get(index)), cash, pos,
-                java.util.Collections.<SessionBranch>emptySet(), true);
+                java.util.Collections.<SessionBranch>emptySet(), true, bars);
         // 先卖后买；仅成交成功才清挂单（拒单保留待下一可撮合分钟或过期）
         if (!pendingSells.isEmpty()) {
             PendingOrder ps = pendingSells.get(0);
@@ -614,8 +614,8 @@ public class SessionBackTestEngine {
 
     private SessionContext baseCtx(String code, LocalDate day, SessionBranch branch, BarDTO bar, int i,
                                    HoldDayState hold, BigDecimal equity, BigDecimal cash, PositionState pos,
-                                   Set<SessionBranch> degraded, boolean matchingEnabled) {
-        return SessionContext.builder()
+                                   Set<SessionBranch> degraded, boolean matchingEnabled, List<BarDTO> bars) {
+        SessionContext.SessionContextBuilder b = SessionContext.builder()
                 .stockCode(code)
                 .sessionDay(day)
                 .branch(branch)
@@ -627,8 +627,9 @@ public class SessionBackTestEngine {
                 .positionShares(pos == null ? 0 : pos.getShares())
                 .sellableShares(pos == null ? 0 : pos.sellableShares(day))
                 .matchingEnabled(matchingEnabled)
-                .degradedBranches(new LinkedHashSet<SessionBranch>(degraded))
-                .build();
+                .degradedBranches(new LinkedHashSet<SessionBranch>(degraded));
+        SessionBarAnchors.applyTo(b, bars, i);
+        return b.build();
     }
 
     private static SessionEvent ev(SessionContext ctx, String type, String detail) {
@@ -660,20 +661,15 @@ public class SessionBackTestEngine {
     }
 
     private static BigDecimal prevClose(List<BarDTO> bars, int index) {
-        if (bars == null || index <= 0) {
+        BigDecimal pc = SessionBarAnchors.prevClose(bars, index);
+        if (pc != null) {
+            return pc;
+        }
+        if (bars == null || index <= 0 || index >= bars.size()) {
             return null;
         }
-        LocalDate day = bars.get(index).getBarBegin() == null ? null : bars.get(index).getBarBegin().toLocalDate();
-        for (int i = index - 1; i >= 0; i--) {
-            BarDTO b = bars.get(i);
-            if (b == null || b.getBarBegin() == null || b.getClose() == null) {
-                continue;
-            }
-            if (day != null && b.getBarBegin().toLocalDate().isBefore(day)) {
-                return b.getClose();
-            }
-        }
-        return bars.get(Math.max(0, index - 1)).getClose();
+        BarDTO prev = bars.get(index - 1);
+        return prev == null ? null : prev.getClose();
     }
 
     private List<AnalysisEvent> toAnalysis(String code, List<SessionEvent> events) {
@@ -702,7 +698,7 @@ public class SessionBackTestEngine {
     private String sessionFingerprint(QuantProperties cfg, String strategyId, boolean failOnMissingDep,
                                       SessionWindows windows, boolean matchingEnabled, String fillMode) {
         QuantProperties use = cfg == null ? p() : cfg;
-        String classic = ConfigFingerprint.of(use, strategyId == null ? "branchScaffold" : strategyId,
+        String classic = ConfigFingerprint.of(use, strategyId == null ? "overnightGap" : strategyId,
                 use.getFeeRate());
         String extra = "engine=session|failOnMissingDep=" + failOnMissingDep
                 + "|" + windows.fingerprintPart()

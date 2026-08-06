@@ -62,7 +62,7 @@ quant:
     min1-script: scripts/fetch_min1_tdx.py
     daily-script: scripts/fetch_daily_tdx.py
     timeout-seconds: 3600
-  # 单活策略 id（maCross=金叉默认；可切换对照画像或 branchScaffold）
+  # 单活策略 id（maCross=金叉默认；可切换对照画像或 overnightGap）
   active-strategy: maCross
   mock-bar-days: 15
   db-enabled: true
@@ -164,8 +164,16 @@ quant:
     matching-enabled: true
     # AUTO=跟随 next-bar-open-fill；NEXT_EFFECTIVE=次日≥09:45开盘；BAR_CLOSE=当根收盘
     fill-mode: AUTO
-    # 激活策略为 SessionStrategy 时，纸面分钟扫描走会话钩子（脚手架默认不下单）
+    # 激活策略为 SessionStrategy 时，纸面分钟扫描走会话钩子
     paper-enabled: true
+    # 隔日高开三分支（overnightGap）阈值
+    overnight-gap:
+      gap-take-profit: 0.015
+      gap-stop: -0.010
+      mid-stop-from-open: 0.020
+      close-buy-min-day-ret: -0.020
+      close-buy-max-day-ret: 0.030
+      close-buy-max-gap: 0.070
 
   # ---- 开仓过滤 ----
   quiet-open-enabled: true

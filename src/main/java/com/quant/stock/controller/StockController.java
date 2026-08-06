@@ -15,7 +15,6 @@ import com.quant.stock.pool.TradePoolService;
 import com.quant.stock.admin.EffectiveParamsService;
 import com.quant.stock.admin.ParamsScope;
 import com.quant.stock.admin.RunParamOverrides;
-import com.quant.stock.session.BranchScaffoldStrategy;
 import com.quant.stock.session.SessionBackTestEngine;
 import com.quant.stock.session.SessionStrategy;
 import com.quant.stock.strategy.BaseStrategy;
@@ -144,8 +143,8 @@ public class StockController {
     /**
      * 对单只股票执行当前（或指定）策略回测并持久化历史与分析。
      * <p>
-     * {@code engine=classic|session}，默认 classic；{@code strategyId=branchScaffold} 且未显式指定时走 session。
-     * session 强制 MIN_1；{@code failOnMissingDep=true} 时缺依赖整单失败。
+     * {@code engine=classic|session}，默认 classic；策略实现 {@code SessionStrategy}（如 {@code overnightGap}）
+     * 且未显式指定时走 session。session 强制 MIN_1；{@code failOnMissingDep=true} 时缺依赖整单失败。
      */
     @GetMapping("/backtest/run")
     public BackTestResult runBacktest(@RequestParam("code") String code,
@@ -224,8 +223,8 @@ public class StockController {
         return result;
     }
 
-    /** classic 默认；branchScaffold 未显式指定时强制 session。 */
-    private static String resolveEngine(String engine, String strategyId) {
+    /** classic 默认；SessionStrategy（如 overnightGap）未显式指定时强制 session。 */
+    private String resolveEngine(String engine, String strategyId) {
         if (engine != null && !engine.trim().isEmpty()) {
             String e = engine.trim().toLowerCase();
             if ("session".equals(e) || "classic".equals(e)) {
@@ -233,7 +232,8 @@ public class StockController {
             }
             throw new IllegalArgumentException("engine 仅支持 classic|session，当前=" + engine);
         }
-        if (strategyId != null && BranchScaffoldStrategy.ID.equalsIgnoreCase(strategyId.trim())) {
+        BaseStrategy resolved = strategyRegistry.resolve(strategyId);
+        if (resolved instanceof SessionStrategy) {
             return "session";
         }
         return "classic";

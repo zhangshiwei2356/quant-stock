@@ -37,12 +37,12 @@ import static org.mockito.Mockito.when;
 class SessionBackTestEngineTest {
 
     @Test
-    void scaffoldCountsThreeBranchesAndStats() {
-        List<BarDTO> bars = syntheticSessionDays("600036", 3);
-        SessionBackTestEngine engine = engineWith(bars);
+    void overnightGapCountsThreeBranchesAndCanTrade() {
+        List<BarDTO> bars = syntheticSessionDays("600036", 4);
+        SessionBackTestEngine engine = engineWith(bars, "BAR_CLOSE");
 
         BackTestResult r = engine.run("600036", null, null, new BigDecimal("100000"),
-                new BranchScaffoldStrategy(), false);
+                new OvernightGapStrategy(new QuantProperties()), false);
 
         assertEquals("session", r.getEngine());
         assertTrue(r.getSessionEvents() != null && !r.getSessionEvents().isEmpty());
@@ -50,7 +50,8 @@ class SessionBackTestEngineTest {
         assertTrue(hasBranch(r, "OPEN"));
         assertTrue(hasBranch(r, "MID"));
         assertTrue(hasBranch(r, "CLOSE"));
-        assertEquals(0, r.getTotalTradeNum().intValue());
+        assertTrue(r.getTotalTradeNum() != null && r.getTotalTradeNum() >= 2,
+                "尾盘布局 + 次日退出应有买卖");
         assertTrue(r.getDegradedBranches() == null || r.getDegradedBranches().isEmpty());
         assertTrue(r.getConfigFingerprint() != null && r.getConfigFingerprint().contains("sess:"));
         assertNotNull(r.getSessionBranchStats());

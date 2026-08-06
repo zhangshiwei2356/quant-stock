@@ -52,6 +52,7 @@ public class ConfigController {
             row.put("id", s.name());
             row.put("fingerprintId", s.fingerprintId());
             row.put("label", s.uiLabel());
+            row.put("session", s instanceof com.quant.stock.session.SessionStrategy);
             if (s.profileSummary() != null && !s.profileSummary().isEmpty()) {
                 row.put("summary", s.profileSummary());
             }

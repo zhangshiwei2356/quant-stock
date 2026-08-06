@@ -83,7 +83,7 @@ public class QuantProperties {
     private TdxScript tdxScript = new TdxScript();
     /**
      * 当前激活策略 id（单活可切换），对应 {@link com.quant.stock.strategy.BaseStrategy#name()}。
-     * 默认 {@code maCross}；可选已注册策略如对照画像或 {@code branchScaffold}。
+     * 默认 {@code maCross}；可选已注册策略如对照画像或 {@code overnightGap}。
      */
     private String activeStrategy = "maCross";
     /** mock/JSON 模式下生成的 K 线天数 */
@@ -383,6 +383,27 @@ public class QuantProperties {
          * 默认 true；金叉等非会话策略不受影响。
          */
         private boolean paperEnabled = true;
+        /** 隔日高开三分支策略阈值（{@code overnightGap}）。 */
+        private OvernightGap overnightGap = new OvernightGap();
+    }
+
+    /**
+     * 隔日高开复合策略参数（前缀 {@code quant.session.overnight-gap}）。
+     */
+    @Data
+    public static class OvernightGap {
+        /** 早盘高开兑现阈值（相对昨收）。 */
+        private BigDecimal gapTakeProfit = new BigDecimal("0.015");
+        /** 早盘低开止损阈值（相对昨收，负值）。 */
+        private BigDecimal gapStop = new BigDecimal("-0.010");
+        /** 盘中相对当日开盘回撤止损。 */
+        private BigDecimal midStopFromOpen = new BigDecimal("0.020");
+        /** 尾盘布局：当日收益下限（相对昨收）。 */
+        private BigDecimal closeBuyMinDayRet = new BigDecimal("-0.020");
+        /** 尾盘布局：当日收益上限（相对昨收）。 */
+        private BigDecimal closeBuyMaxDayRet = new BigDecimal("0.030");
+        /** 尾盘布局：开盘高开上限（过高不追）。 */
+        private BigDecimal closeBuyMaxGap = new BigDecimal("0.070");
     }
 
     /**

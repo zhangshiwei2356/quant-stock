@@ -32,7 +32,7 @@
   <h4 style="margin-top:0">一（附）、待办 · 应用能力 · 多策略体系</h4>
   <p class="hint" style="margin:0 0 8px;">
     不依赖外部券商 API；在现有「单活可切换」之上补齐产品能力。
-    <b>本期不加新策略实现</b>（如隔日高开复合策略仅作路线图参考，代码侧暂不落地）。
+    会话策略可独立注册；金叉主路径不静默改写。
   </p>
   <ol>
     <li><b>多策略注册与发现面板</b> — 已落地 · 运维「运行参数」展示已注册策略表；约定：独立 <code>BaseStrategy</code>、稳定 id、不改金叉类</li>
@@ -40,8 +40,8 @@
     <li><b>按策略隔离的参数包</b> — 已落地 · 表 <code>strategy_param</code> 稀疏 JSON；叠层 yml → <code>quant.prop.*</code> → 策略包；运维可选策略编辑；纸面/回测 <code>ParamsScope</code> 生效快照；画像有包则过滤改读快照</li>
     <li><b>回测本次表单临时改参</b> — 已落地 · 个股 <code>paramOverrides</code> JSON / 组合 body 字段；白名单同运维可写键；叠在策略包之上、不落库；费用/仓位工具读 <code>ParamsScope</code></li>
     <li><b>全局激活策略的安全切换</b> — 已落地 · 运维确认后 <code>POST /api/ops/active-strategy</code>；写 <code>system_config</code> 并热更新；影响纸面扫描，不影响回测下拉</li>
-    <li><b>分钟级/多分支策略引擎适配</b> — 回测/纸面/组合旁路已落地 · <code>SessionBackTestEngine</code> / <code>SessionPaperAdaptor</code> / <code>SessionPortfolioBackTestEngine</code>；成交默认 <code>fill-mode=AUTO</code>；组合 <code>engine=session</code> 为 MIN_1 <b>共享资金池</b>+账户风控/熔断挂卖/压力降仓/AUM+POV（无金叉五步）；组合页展示会话事件与相关摘要；脚手架不下单；金叉经典路径不变；<strong>隔日高开公式不实现</strong></li>
-    <li><b>候选策略入库（仅规划，不实现）</b> — 待办 · 「全时段隔日高开套利复合策略」（早盘/盘中/尾盘三分支、隔日持有最长 2 日等）文档已备；待多策略能力与数据条件就绪后再单独立项接入，<strong>禁止</strong>塞进 <code>MaCrossStrategy</code></li>
+    <li><b>分钟级/多分支策略引擎适配</b> — 已落地 · <code>SessionBackTestEngine</code> / <code>SessionPaperAdaptor</code> / <code>SessionPortfolioBackTestEngine</code>；成交默认 <code>fill-mode=AUTO</code>；组合 <code>engine=session</code> 为 MIN_1 <b>共享资金池</b>+账户风控/熔断挂卖/压力降仓/AUM+POV（无金叉五步）；组合页展示会话事件与相关摘要；金叉经典路径不变</li>
+    <li><b>隔日高开三分支（overnightGap）</b> — 已落地 · 正式 <code>SessionStrategy</code>：CLOSE 尾盘布局、OPEN 兑现/止损/隔日退出、MID 回撤止损；最长持有 2 日；阈值 <code>quant.session.overnight-gap.*</code>；已下线验收脚手架 <code>branchScaffold</code>；<strong>禁止</strong>塞进 <code>MaCrossStrategy</code></li>
     <li><b>明确不做（本阶段）</b> — 多策略并行分账本、信号合成冲突裁决、按策略拆目标池、运维「CRUD 编辑买卖公式」菜单</li>
   </ol>
 </div>
@@ -55,7 +55,7 @@
     <li><b>账本/退出/运维补强</b> — 已落地 · 信号日≠成交日落库；熔断/时间止损可抢占死叉挂单；持仓以批次为准；委托撤/部成/改价与分钟自洽检查挂 UI；schema 任务 implemented 与运行时对齐；Redis 锁 token</li>
     <li><b>收盘权益日表</b> — 已落地 · <code>settle-after-close</code> 写 <code>trade_cashflows</code>；账户概览 →「权益日结」可查看</li>
     <li><b>风控日志</b> — 已落地 · 峰值回撤熔断写入 <code>risk_control_log</code>；账户概览 →「风控事件」</li>
-    <li><b>单活策略可切换</b> — 已落地 · <code>StrategyRegistry</code> + <code>quant.active-strategy</code>（默认 <code>maCross</code>）；对照画像仅 <code>maCrossBalanced</code>（固定过滤，不改原版类）；已下线 <code>maCrossTrend/Volume/Strict</code> 并启动清理其回测报告；已删除占位 <code>holdNothing</code>；回测下拉对比；扫池/纸面仍用配置激活；多策略并行分账本仍不做</li>
+    <li><b>单活策略可切换</b> — 已落地 · <code>StrategyRegistry</code> + <code>quant.active-strategy</code>（默认 <code>maCross</code>）；对照画像仅 <code>maCrossBalanced</code>（固定过滤，不改原版类）；会话策略 <code>overnightGap</code>；已下线 <code>maCrossTrend/Volume/Strict</code>、<code>holdNothing</code>、<code>branchScaffold</code>；回测下拉对比；扫池/纸面仍用配置激活；多策略并行分账本仍不做</li>
     <li><b>行情分层（日线选股 + 分钟交易）</b> — 已落地 · <code>market_daily</code> 供全市场扫池；<code>market_1min</code> 供池内分钟交易；<code>quant.day-source=auto</code> 日线优先，空则分钟聚日</li>
     <li><b>TDX 日线回填</b> — 已落地 · <code>scripts/fetch_daily_tdx.py</code>（<code>--from-basic --years 1</code> / <code>--codes</code>）写 <code>market_daily</code>（adj=NONE）；升级 <code>scripts/sql/20260805_market_daily.sql</code></li>
     <li><b>TDX 脚本桥接</b> — 已落地 · 默认开 · <code>quant.tdx-script.enabled</code>；任务 <code>day-collect</code>（同步列表；已齐日线跳过、否则增量；默认4线程）、<code>pool-minute-backfill</code>（池内分钟尽量~90日）；运维 <code>/api/ops/tdx-script/*</code>；亦可单独跑 <code>scripts/sync_stock_basic.py</code>；推荐手动三步：日线→扫池→池内分钟；无本机 Python/pytdx 时可关</li>

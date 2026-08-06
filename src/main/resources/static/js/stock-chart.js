@@ -1793,7 +1793,7 @@
     var backStart = ($('#singleBackStart').val() || '').trim();
     var backEnd = ($('#singleBackEnd').val() || '').trim();
     var strategyId = ($('#singleStrategyId').val() || '').trim();
-    var sessionEngine = strategyId && strategyId.toLowerCase() === 'branchscaffold';
+    var sessionEngine = isSessionStrategyId(strategyId);
     if (sessionEngine) {
       period = 'MIN_1';
     }
@@ -1945,7 +1945,7 @@
     };
     var pfStrategyId = ($('#pfStrategyId').val() || '').trim();
     if (pfStrategyId) body.strategyId = pfStrategyId;
-    var pfSession = pfStrategyId && pfStrategyId.toLowerCase() === 'branchscaffold';
+    var pfSession = isSessionStrategyId(pfStrategyId);
     if (pfSession) body.engine = 'session';
     var pfOv = collectRunOverrides({
       feeRate: '#pfOvFeeRate',
@@ -6251,6 +6251,13 @@
     }
   });
 
+  var sessionStrategyIds = {};
+
+  function isSessionStrategyId(id) {
+    if (!id) return false;
+    return !!sessionStrategyIds[String(id).toLowerCase()];
+  }
+
   function fillStrategySelect($sel, data) {
     if (!$sel || !$sel.length) return;
     var list = (data && data.strategies) || [];
@@ -6270,6 +6277,9 @@
       if (s.summary) {
         $opt.attr('title', s.summary);
       }
+      if (s.session) {
+        $opt.attr('data-session', '1');
+      }
       $sel.append($opt);
     });
     if (active) {
@@ -6280,10 +6290,18 @@
   function loadStrategyOptions() {
     return $.getJSON('/api/config/strategies')
       .done(function (data) {
+        sessionStrategyIds = {};
+        var list = (data && data.strategies) || [];
+        list.forEach(function (s) {
+          if (s && s.session && s.id) {
+            sessionStrategyIds[String(s.id).toLowerCase()] = true;
+          }
+        });
         fillStrategySelect($('#singleStrategyId'), data);
         fillStrategySelect($('#pfStrategyId'), data);
       })
       .fail(function () {
+        sessionStrategyIds = {};
         $('#singleStrategyId, #pfStrategyId').empty()
           .append($('<option/>').val('maCross').text('均线金叉（maCross）'));
       });

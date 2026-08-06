@@ -755,7 +755,7 @@ public class SessionPortfolioBackTestEngine {
 
     private SessionContext baseCtx(Leg leg, LocalDate day, SessionBranch branch, BarDTO bar, int i,
                                    BigDecimal equity, BigDecimal cash, boolean matchingEnabled) {
-        return SessionContext.builder()
+        SessionContext.SessionContextBuilder b = SessionContext.builder()
                 .stockCode(leg.code)
                 .sessionDay(day)
                 .branch(branch)
@@ -767,8 +767,9 @@ public class SessionPortfolioBackTestEngine {
                 .positionShares(leg.pos.getShares())
                 .sellableShares(leg.pos.sellableShares(day))
                 .matchingEnabled(matchingEnabled)
-                .degradedBranches(new LinkedHashSet<SessionBranch>(leg.degraded))
-                .build();
+                .degradedBranches(new LinkedHashSet<SessionBranch>(leg.degraded));
+        SessionBarAnchors.applyTo(b, leg.bars, i);
+        return b.build();
     }
 
     /** 与经典组合对齐：账户仓位系数 × ADV断崖 × 结构突变 */

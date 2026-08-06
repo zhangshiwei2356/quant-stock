@@ -17,7 +17,6 @@ import com.quant.stock.market.BarPeriod;
 import com.quant.stock.market.MarketDataService;
 import com.quant.stock.market.dto.BarDTO;
 import com.quant.stock.pool.TradePoolService;
-import com.quant.stock.session.BranchScaffoldStrategy;
 import com.quant.stock.session.SessionBackTestEngine;
 import com.quant.stock.session.SessionStrategy;
 import lombok.extern.slf4j.Slf4j;
@@ -210,8 +209,7 @@ public class StrategyPoolSeedService {
         try {
             state.phase = "single";
             state.phaseLabel = "单股回测";
-            boolean useSession = strategy instanceof SessionStrategy
-                    || BranchScaffoldStrategy.ID.equalsIgnoreCase(sid);
+            boolean useSession = strategy instanceof SessionStrategy;
 
             for (int i = 0; i < codes.size(); i++) {
                 String code = codes.get(i);

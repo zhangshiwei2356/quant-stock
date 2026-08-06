@@ -24,7 +24,6 @@ import com.quant.stock.risk.LimitPriceProtect;
 import com.quant.stock.risk.StopFillPrice;
 import com.quant.stock.risk.StressScenarioService;
 import com.quant.stock.risk.StructuralBreakMonitor;
-import com.quant.stock.session.BranchScaffoldStrategy;
 import com.quant.stock.session.SessionPortfolioBackTestEngine;
 import com.quant.stock.session.SessionStrategy;
 import com.quant.stock.strategy.BaseStrategy;
@@ -80,8 +79,8 @@ public class PortfolioBackTestEngine {
     }
 
     /**
-     * 组合回测：默认日 K 共享资金池；{@code engine=session} 或策略 {@code branchScaffold}
-     * 时为 MIN_1 会话共享资金池（统一现金 + 账户风控，非等权分账）。
+     * 组合回测：默认日 K 共享资金池；{@code engine=session} 或 {@link SessionStrategy}
+     * （如 {@code overnightGap}）时为 MIN_1 会话共享资金池（统一现金 + 账户风控）。
      */
     public PortfolioResultDTO run(BackTestQueryDTO query) {
         BaseStrategy strategy = strategyRegistry.resolve(
@@ -114,8 +113,7 @@ public class PortfolioBackTestEngine {
             }
             throw new IllegalArgumentException("engine 仅支持 classic|session，当前=" + raw);
         }
-        if (strategy instanceof SessionStrategy
-                || (strategy != null && BranchScaffoldStrategy.ID.equalsIgnoreCase(strategy.name()))) {
+        if (strategy instanceof SessionStrategy) {
             return "session";
         }
         return "classic";
