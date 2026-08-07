@@ -11,7 +11,7 @@
   <b>M1</b>～<b>M4</b> 可选已落地（默认关）·
   下一步 <b>M5</b> 连接韧性（先 MDS，再 OES）·
   后置 L2/批量/银证。
-  工作台「<b>宽睿联调</b>」可点测运维 API（入参/出参）；报撤试单须 yml <code>order-enabled</code>。
+  工作台「<b>宽睿联调</b>」可点测运维 API（入参/出参）；含<strong>账号登录</strong>（验柜后密文入库）；报撤试单须 yml <code>order-enabled</code>。
 </p>
 
 <div class="memo-todo">
@@ -38,7 +38,8 @@
     <li>TCP Socket + 二进制报文（MDS 另有 UDP 组播）</li>
     <li><b>价格/金额</b>：整型，精确到元后四位，<code>1 元 = 10000</code>（本应用落库前÷10000，库内一律「元」）</li>
     <li>登录：<code>ClientLogonReq/Rsp</code>；<code>clEnvId</code>∈[0~99]；密码加密类型须与柜台一致</li>
-    <li>配置走外部 JSON；账号/密钥勿入库（<code>config/kuangrui/local/</code> + 环境变量）</li>
+    <li>配置走外部 JSON；通道配置在 <code>config/kuangrui/local/</code>（gitignore）</li>
+    <li>账号：优先「宽睿联调 → 账号登录」验柜后入库（用户名明文、密码 AES-GCM；主密钥在 <code>kuangrui_crypto_key</code>，同库仅防误读）；否则 <code>QUANT_KUANGRUI_USER</code>/<code>PASSWORD</code>。勿把密码写进 yml/Git；数据表白名单不含密钥/账号表</li>
   </ul>
   <h5 style="margin:8px 0 4px;">2.2 MDS 行情</h5>
   <p>入口：<code>MdsClient</code>（TCP）/ <code>MdsUdpClient</code>（组播）；回调 <code>MdsCallBack</code> / <code>MdsUdpCallBack</code>。定位是<strong>实时行情</strong>，不是多年历史 K 线库。</p>
@@ -157,7 +158,7 @@
     <li><b>MDS <code>[mds_client]</code></b>：
       tcp <code>tcp://139.196.228.232:5103</code> /
       qry <code>tcp://139.196.228.232:5203</code></li>
-    <li>对照与 JSON：<code>config/kuangrui/examples/aliyun-sim.md</code>；密钥仅 <code>local/</code>（gitignore）+ 环境变量</li>
+    <li>对照与 JSON：<code>config/kuangrui/examples/aliyun-sim.md</code>；通道配置仅 <code>local/</code>（gitignore）；账号优先页面验柜入库，或环境变量</li>
   </ul>
 
   <h5 style="margin:12px 0 4px;">待做（2026-08-07 对照 Demo/Javadoc 复核）</h5>
@@ -248,7 +249,7 @@ quant.trade-mode=sim
   <ol>
     <li>宽睿侧开通 OES、MDS 账号与通道（仿真可用上文阿里云地址）</li>
     <li>本机 <code>mvn install:install-file</code> 安装 <code>quant360-all-api-0.19.4.0.jar</code>；以 <code>-Pkuangrui</code> 运行/打包</li>
-    <li>准备 <code>config/kuangrui/local/mds_api_config.json</code>（及 OES 配置）；设置 <code>QUANT_KUANGRUI_USER</code> / <code>PASSWORD</code></li>
+    <li>准备 <code>config/kuangrui/local/mds_api_config.json</code>（及 OES 配置）；在「宽睿联调 → 账号登录」验柜入库，或设 <code>QUANT_KUANGRUI_USER</code> / <code>PASSWORD</code></li>
     <li>长连接：登录、心跳、断线重连（见 M5）、回报续订；回调勿做重活（参考 Demo）；明确仿真 vs 生产、<code>clEnvId</code> 与加密</li>
   </ol>
 </div>

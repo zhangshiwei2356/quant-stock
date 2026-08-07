@@ -8,6 +8,7 @@ import com.quant.stock.admin.IndustryReclassService;
 import com.quant.stock.admin.MarketSourceSampleReconcileService;
 import com.quant.stock.admin.SystemParamsService;
 import com.quant.stock.backtest.BacktestStrategyIdBackfillService;
+import com.quant.stock.kuangrui.KuangruiAccountLoginService;
 import com.quant.stock.kuangrui.KuangruiMdsOpsFacade;
 import com.quant.stock.kuangrui.KuangruiOesOpsFacade;
 import com.quant.stock.market.FactorDailyComputeService;
@@ -51,6 +52,7 @@ public class OpsController {
     private final ObjectProvider<IndustryReclassService> industryReclassProvider;
     private final ObjectProvider<KuangruiMdsOpsFacade> kuangruiMdsOpsProvider;
     private final ObjectProvider<KuangruiOesOpsFacade> kuangruiOesOpsProvider;
+    private final ObjectProvider<KuangruiAccountLoginService> kuangruiAccountLoginProvider;
     private final ObjectProvider<FactorDailyComputeService> factorDailyComputeProvider;
     private final ObjectProvider<TradePoolService> tradePoolProvider;
     private final ObjectProvider<TdxScriptBackfillService> tdxScriptBackfillProvider;
@@ -432,6 +434,48 @@ public class OpsController {
             return m;
         }
         return f.flush();
+    }
+
+    /** 宽睿账号登录状态（库内 active / env 回退；无密文）。 */
+    @GetMapping("/kuangrui/account/status")
+    public Map<String, Object> kuangruiAccountStatus() {
+        KuangruiAccountLoginService s = kuangruiAccountLoginProvider.getIfAvailable();
+        if (s == null) {
+            Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("ok", false);
+            m.put("hasCred", false);
+            m.put("credSource", "none");
+            m.put("message", "需要 quant.db-enabled=true");
+            return m;
+        }
+        return s.status();
+    }
+
+    /** 验柜成功后加密落库并设为 active。 */
+    @PostMapping("/kuangrui/account/login")
+    public Map<String, Object> kuangruiAccountLogin(@RequestBody Map<String, Object> body) {
+        KuangruiAccountLoginService s = kuangruiAccountLoginProvider.getIfAvailable();
+        if (s == null) {
+            Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("ok", false);
+            m.put("message", "需要 quant.db-enabled=true");
+            return m;
+        }
+        Map<String, Object> b = body == null ? new LinkedHashMap<String, Object>() : body;
+        return s.login(asStr(b.get("username")), asStr(b.get("password")));
+    }
+
+    /** 清除库内 active（不删历史）。 */
+    @PostMapping("/kuangrui/account/logout")
+    public Map<String, Object> kuangruiAccountLogout() {
+        KuangruiAccountLoginService s = kuangruiAccountLoginProvider.getIfAvailable();
+        if (s == null) {
+            Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("ok", false);
+            m.put("message", "需要 quant.db-enabled=true");
+            return m;
+        }
+        return s.logout();
     }
 
     /** 宽睿 OES 只读状态（默认 noop；-Pkuangrui + 开关开启后为真实客户端）。 */

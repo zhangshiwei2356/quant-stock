@@ -56,4 +56,10 @@ public interface OesReadonlyService {
 
     /** 关闭客户端连接。 */
     void stop();
+
+    /**
+     * 用指定账号短登录验柜后关闭（不写库、不占用长期会话）。
+     * 默认 noop；真实实现仅 {@code -Pkuangrui}。
+     */
+    Map<String, Object> probeLogon(String username, String password);
 }

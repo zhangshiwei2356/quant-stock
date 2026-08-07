@@ -5,7 +5,7 @@
 <ul>
   <li>项目根目录：执行 <code>mapper/schema.sql</code> 后 <code>mvn spring-boot:run</code>（或 IDEA 运行主类）</li>
   <li>默认 profile=<b>local</b>：叠加 <code>application-local.yml</code>（本机可开宽睿开关）；基线 <code>application.yml</code> 宽睿仍默认关</li>
-  <li>宽睿真客户端另需 Maven profile <code>kuangrui</code> + <code>config/kuangrui/local</code> 账号；浏览器：<code>http://localhost:8080/stock.html</code></li>
+  <li>宽睿真客户端另需 Maven profile <code>kuangrui</code> + <code>config/kuangrui/local</code>；账号优先「宽睿联调 → 账号登录」验柜入库，否则环境变量；浏览器：<code>http://localhost:8080/stock.html</code></li>
   <li>空库自动导入 1 分钟种子（有 <code>MIN_1.json</code> 则用之，否则由 <code>MIN_5.json</code> 拆成 1 分钟）</li>
 </ul>
 
@@ -34,7 +34,7 @@
   <li><b>运维中心</b>：任务管理 / 数据健康（覆盖检查：待处置告警 vs 特殊项分表；分钟自洽；MDS/TDX 抽样对账） / 运行参数（全局白名单 + 按策略稀疏参数包；已注册策略列表与纸面激活切换；任务种子默认全关）</li>
   <li><b>策略管理</b>：二级「策略总览」——注册策略介绍（默认收起）、满分 100 综合评分与回测历史；无回测时自动用目标池补种（逐只单股+全池组合）；空白/指纹旧名启动自动补全；<strong>不改参/不激活</strong>（仍在运维运行参数）</li>
   <li><b>数据表</b>：白名单表分页只读；侧栏/摘要展示磁盘占用（数据+索引）</li>
-  <li><b>宽睿联调</b>：接入总览（LIVE/OFF）+ OES 只读 / MDS 行情 / 报撤<strong>左右分栏</strong>；报撤须 <code>order-enabled</code>+二次确认；开关见 <code>application-local.yml</code>（基线 yml 仍默认关）</li>
+  <li><b>宽睿联调</b>：接入总览 + <b>账号登录</b>（验柜后密文入库，DB 优先于 env）+ OES 只读 / MDS 行情 / 报撤<strong>左右分栏</strong>；报撤须 <code>order-enabled</code>+二次确认；开关见 <code>application-local.yml</code>（基线 yml 仍默认关）</li>
   <li><b>量化知识</b> / <b>应用说明</b>：指标与规则文档；应用说明含系统概述、项目 README、交易规则、能力与待办、宽睿梳理；可导出 PDF</li>
 </ul>
 

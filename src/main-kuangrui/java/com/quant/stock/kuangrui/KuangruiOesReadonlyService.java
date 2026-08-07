@@ -51,6 +51,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
     private static final int OES_BS_SELL = 2;
 
     private final QuantProperties quantProperties;
+    private final org.springframework.beans.factory.ObjectProvider<KuangruiCredentialStore> credentialStoreProvider;
 
     private final Object clientLock = new Object();
     private final AtomicBoolean rptSynced = new AtomicBoolean(false);
@@ -60,8 +61,10 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
     private volatile OesClientImpl client;
     private volatile long lastInMsgSeq;
 
-    public KuangruiOesReadonlyService(QuantProperties quantProperties) {
+    public KuangruiOesReadonlyService(QuantProperties quantProperties,
+                                      org.springframework.beans.factory.ObjectProvider<KuangruiCredentialStore> credentialStoreProvider) {
         this.quantProperties = quantProperties;
+        this.credentialStoreProvider = credentialStoreProvider;
     }
 
     @Override
@@ -90,7 +93,12 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
         m.put("pendingEvents", eventQueue.size());
         m.put("configPath", resolveOesConfig().toString());
         m.put("configExists", Files.isRegularFile(resolveOesConfig()));
-        m.put("hasCred", env("QUANT_KUANGRUI_USER") != null && env("QUANT_KUANGRUI_PASSWORD") != null);
+        KuangruiCredentials cr = resolveCred();
+        m.put("hasCred", cr.isPresent());
+        m.put("credSource", cr.getSource());
+        if (cr.isPresent()) {
+            m.put("activeUsername", cr.getUsername());
+        }
         m.put("orderEnabled", quantProperties.getKuangrui() != null
                 && quantProperties.getKuangrui().getOes() != null
                 && quantProperties.getKuangrui().getOes().isOrderEnabled());
@@ -530,11 +538,13 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
             if (!Files.isRegularFile(cfg)) {
                 throw new IllegalStateException("缺少 OES 配置: " + cfg.toAbsolutePath());
             }
-            String user = env("QUANT_KUANGRUI_USER");
-            String pass = env("QUANT_KUANGRUI_PASSWORD");
-            if (user == null || pass == null) {
-                throw new IllegalStateException("请设置环境变量 QUANT_KUANGRUI_USER / QUANT_KUANGRUI_PASSWORD");
+            KuangruiCredentials cred = resolveCred();
+            if (!cred.isPresent()) {
+                throw new IllegalStateException(
+                        "无宽睿账号：请在「宽睿联调 → 账号登录」验柜入库，或设置 QUANT_KUANGRUI_USER / PASSWORD");
             }
+            String user = cred.getUsername();
+            String pass = cred.getPassword();
             String driver = envOr("QUANT_KUANGRUI_DRIVER_ID", "DAEB7F56");
             OesClientImpl c = new OesClientImpl(1, cfg.toAbsolutePath().toString());
             c.initCallBack(buildCallback());
@@ -569,9 +579,85 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
             lastInMsgSeq = rsp.getLastInMsgSeq();
             applVerId.set(rsp.getApplVerId());
             lastError.set(null);
-            log.info("[oes] 登录成功 applVerId={} lastInMsgSeq={}", rsp.getApplVerId(), lastInMsgSeq);
+            log.info("[oes] 登录成功 applVerId={} lastInMsgSeq={} credSource={}",
+                    rsp.getApplVerId(), lastInMsgSeq, cred.getSource());
             doRptSync(lastInMsgSeq);
         }
+    }
+
+    @Override
+    public Map<String, Object> probeLogon(String username, String password) {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        if (username == null || username.trim().isEmpty() || password == null || password.isEmpty()) {
+            m.put("ok", false);
+            m.put("message", "用户名或密码为空");
+            return m;
+        }
+        Path cfg = resolveOesConfig();
+        if (!Files.isRegularFile(cfg)) {
+            m.put("ok", false);
+            m.put("message", "缺少 OES 配置: " + cfg.toAbsolutePath());
+            return m;
+        }
+        OesClientImpl c = null;
+        try {
+            String driver = envOr("QUANT_KUANGRUI_DRIVER_ID", "DAEB7F56");
+            c = new OesClientImpl(1, cfg.toAbsolutePath().toString());
+            c.initCallBack(buildCallback());
+            ClientLogonReq logon = new ClientLogonReq();
+            logon.setHeartBtInt(30);
+            logon.setUsername(username.trim());
+            logon.setPassword(password);
+            logon.setClientDriverId(driver);
+            logon.setBusinessType(OesBusinessType.OES_BUSINESS_TYPE_STOCK);
+            Integer enc = resolveEncryptType();
+            if (enc != null) {
+                logon.setLogonEncryptType(OesLogonEncryptType.valueOf(enc.intValue()));
+            }
+            String ip = env("QUANT_KUANGRUI_CLIENT_IP");
+            String mac = env("QUANT_KUANGRUI_CLIENT_MAC");
+            if (ip != null) {
+                logon.setClientIp(ip);
+            }
+            if (mac != null) {
+                logon.setClientMac(mac.replace('-', ':').toUpperCase());
+            }
+            ClientLogonRsp rsp = c.start(logon);
+            if (rsp == null || !rsp.isSuccess()) {
+                m.put("ok", false);
+                m.put("message", "柜台登录失败 rsp=" + rsp);
+                return m;
+            }
+            m.put("ok", true);
+            m.put("applVerId", rsp.getApplVerId());
+            m.put("message", "柜台验柜成功");
+            return m;
+        } catch (Exception e) {
+            m.put("ok", false);
+            m.put("message", "柜台验柜异常: " + e.getMessage());
+            return m;
+        } finally {
+            if (c != null) {
+                try {
+                    c.close();
+                } catch (Exception ignore) {
+                    // ignore
+                }
+            }
+        }
+    }
+
+    private KuangruiCredentials resolveCred() {
+        KuangruiCredentialStore store = credentialStoreProvider.getIfAvailable();
+        if (store != null) {
+            return store.resolve();
+        }
+        String user = env("QUANT_KUANGRUI_USER");
+        String pass = env("QUANT_KUANGRUI_PASSWORD");
+        if (user != null && pass != null) {
+            return new KuangruiCredentials(user, pass, "env");
+        }
+        return new KuangruiCredentials(null, null, "none");
     }
 
     private OesCallBack buildCallback() {

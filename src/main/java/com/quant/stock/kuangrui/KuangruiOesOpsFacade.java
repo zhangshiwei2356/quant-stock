@@ -31,6 +31,7 @@ public class KuangruiOesOpsFacade {
     private final StrategyTask strategyTask;
     private final TradeGatewayService tradeGatewayService;
     private final KuangruiStaticInfoService staticInfoService;
+    private final KuangruiCredentialStore credentialStore;
     private final java.util.concurrent.atomic.AtomicInteger testClSeq =
             new java.util.concurrent.atomic.AtomicInteger((int) (System.currentTimeMillis() % 800_000) + 1000);
 
@@ -53,6 +54,7 @@ public class KuangruiOesOpsFacade {
             m.put("orderHint", os.get("hint"));
         }
         m.put("configDir", k == null ? null : k.getConfigDir());
+        m.putAll(credentialStore.statusView());
         return m;
     }
 

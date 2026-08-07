@@ -114,5 +114,13 @@ class KuangruiStaticInfoServiceTest {
         public void stop() {
             // no-op
         }
+
+        @Override
+        public Map<String, Object> probeLogon(String username, String password) {
+            Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("ok", true);
+            m.put("message", "stub");
+            return m;
+        }
     }
 }

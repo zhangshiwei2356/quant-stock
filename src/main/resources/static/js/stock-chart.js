@@ -2327,7 +2327,7 @@
   }
 
   function hideAllWorkspaceViews() {
-    $('#viewHome, #viewNavIntro, #viewPool, #viewSingle, #viewPortfolio, #viewTradePool, #viewTpHistory, #viewDbTable, #viewSchedule, #viewStrategy, #viewDataHealth, #viewSysParams, #viewAcctFunds, #viewAcctPositions, #viewAcctOrders, #viewAcctCashflows, #viewAcctRiskLogs, #viewAcctRiskDash, #viewAcctPaperGap, #viewKuangruiOverview, #viewKuangruiOes, #viewKuangruiMds, #viewKuangruiOrder').prop('hidden', true);
+    $('#viewHome, #viewNavIntro, #viewPool, #viewSingle, #viewPortfolio, #viewTradePool, #viewTpHistory, #viewDbTable, #viewSchedule, #viewStrategy, #viewDataHealth, #viewSysParams, #viewAcctFunds, #viewAcctPositions, #viewAcctOrders, #viewAcctCashflows, #viewAcctRiskLogs, #viewAcctRiskDash, #viewAcctPaperGap, #viewKuangruiOverview, #viewKuangruiAccount, #viewKuangruiOes, #viewKuangruiMds, #viewKuangruiOrder').prop('hidden', true);
     $('body').removeClass('home-theme-peek');
     $('#btnExpandHome').prop('hidden', true);
   }
@@ -2444,7 +2444,9 @@
 
   function showKuangruiPanel(panel) {
     panel = panel || lastKuangruiPanel || 'overview';
-    if (panel !== 'overview' && panel !== 'oes' && panel !== 'mds' && panel !== 'order') panel = 'overview';
+    if (panel !== 'overview' && panel !== 'account' && panel !== 'oes' && panel !== 'mds' && panel !== 'order') {
+      panel = 'overview';
+    }
     lastKuangruiPanel = panel;
     lastWorkspaceMode = 'kuangrui';
     $('body').removeClass('mode-doc');
@@ -2453,7 +2455,10 @@
     hideAllWorkspaceViews();
     setSideNavOpen('kuangruiBody');
     setKuangruiMenuActive(panel);
-    if (panel === 'oes') {
+    if (panel === 'account') {
+      $('#viewKuangruiAccount').prop('hidden', false);
+      loadKrAccountStatus();
+    } else if (panel === 'oes') {
       $('#viewKuangruiOes').prop('hidden', false);
       ensureKrOesCards();
     } else if (panel === 'mds') {
@@ -2551,6 +2556,14 @@
     $('#btnKrOverviewRefresh').prop('disabled', true).addClass('is-loading');
     var slots = [
       {
+        key: 'Account',
+        title: '账号凭据',
+        sub: '库内 active / env 回退',
+        url: '/api/ops/kuangrui/account/status',
+        panel: 'account',
+        liveKey: 'hasCred'
+      },
+      {
         key: 'MDS',
         title: 'MDS 行情',
         sub: 'L1 落库 / 静态查询',
@@ -2609,6 +2622,13 @@
         impl: '实现',
         orderImpl: '报撤实现',
         configDir: '配置目录',
+        hasCred: '有凭据',
+        hasDbAccount: '库内账号',
+        hasEnvFallback: 'env 回退',
+        activeUsername: '当前用户',
+        credSource: '凭据来源',
+        oesLive: 'OES live',
+        probeAvailable: '可验柜',
         hint: '说明',
         orderHint: '报撤说明',
         message: '消息'
@@ -2664,7 +2684,9 @@
         $c.append($('<p class="kr-status-err"/>').text('加载失败 HTTP ' + (errHttp || '—')));
       } else {
         var prefer = [
-          'live', 'orderLive', 'applyEnabled', 'orderEnabled', 'subscribed', 'loggedIn',
+          'live', 'orderLive', 'applyEnabled', 'orderEnabled', 'hasCred', 'hasDbAccount',
+          'activeUsername', 'credSource', 'hasEnvFallback', 'oesLive', 'probeAvailable',
+          'subscribed', 'loggedIn',
           'quantKuangruiEnabled', 'quantOesEnabled', 'staticEnabled', 'tradeMode',
           'impl', 'orderImpl', 'configDir'
         ];
@@ -2758,6 +2780,16 @@
       });
     });
     paintSummary();
+  }
+
+  function loadKrAccountStatus() {
+    krInvoke({
+      method: 'GET',
+      url: '/api/ops/kuangrui/account/status',
+      $btn: $('#btnKrAccRefresh'),
+      resultPrefix: 'krAcc',
+      label: '账号状态'
+    });
   }
 
   function ensureKrOesCards() {
@@ -5131,6 +5163,55 @@
   $('#btnKrOverviewRefresh').on('click', function () { loadKrOverview(); });
   $('#viewKuangruiOverview').on('click', '[data-kr-jump]', function () {
     showKuangruiPanel($(this).attr('data-kr-jump') || 'overview');
+  });
+  $('#btnKrAccRefresh').on('click', function () { loadKrAccountStatus(); });
+  $('#btnKrAccLogin').on('click', function () {
+    var user = ($('#krAccUser').val() || '').trim();
+    var pass = $('#krAccPass').val() || '';
+    if (!user || !pass) {
+      toast('请填写用户名和密码', 'err');
+      return;
+    }
+    var body = { username: user, password: pass };
+    var reqView = { method: 'POST', url: '/api/ops/kuangrui/account/login', body: { username: user, password: '***' } };
+    var $btn = $('#btnKrAccLogin');
+    var t0 = Date.now();
+    $btn.prop('disabled', true).addClass('is-loading');
+    $('#krAccResultMeta').text('登录并保存 · 请求中…');
+    $.ajax({
+      url: '/api/ops/kuangrui/account/login',
+      method: 'POST',
+      contentType: 'application/json',
+      dataType: 'json',
+      data: JSON.stringify(body)
+    }).done(function (rsp, _t, xhr) {
+      var ms = Date.now() - t0;
+      krFillResult('krAcc', '登录并保存 · HTTP ' + (xhr && xhr.status) + ' · ' + ms + 'ms', reqView, rsp);
+      if (rsp && rsp.ok) {
+        $('#krAccPass').val('');
+        toast('登录成功，账号已保存', 'ok');
+      } else {
+        toast((rsp && rsp.message) || '登录失败', 'err');
+      }
+    }).fail(function (xhr) {
+      var ms = Date.now() - t0;
+      var bodyRsp = (xhr && xhr.responseJSON) || { message: (xhr && xhr.responseText) || '请求失败' };
+      krFillResult('krAcc', '登录并保存 · HTTP ' + (xhr && xhr.status) + ' · ' + ms + 'ms', reqView, bodyRsp);
+      toast('登录失败', 'err');
+    }).always(function () {
+      $btn.prop('disabled', false).removeClass('is-loading');
+    });
+  });
+  $('#btnKrAccLogout').on('click', function () {
+    if (!window.confirm('确认清除库内当前 active 账号？历史行保留；将回退环境变量（若有）。')) return;
+    krInvoke({
+      method: 'POST',
+      url: '/api/ops/kuangrui/account/logout',
+      data: {},
+      $btn: $('#btnKrAccLogout'),
+      resultPrefix: 'krAcc',
+      label: '清除当前账号'
+    });
   });
   $('#btnKrPlace').on('click', function () {
     var body = {

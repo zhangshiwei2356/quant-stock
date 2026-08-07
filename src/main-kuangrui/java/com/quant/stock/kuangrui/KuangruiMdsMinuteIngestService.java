@@ -55,6 +55,7 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
 
     private final QuantProperties quantProperties;
     private final MdsMinuteAggregator aggregator;
+    private final org.springframework.beans.factory.ObjectProvider<KuangruiCredentialStore> credentialStoreProvider;
 
     private final Object clientLock = new Object();
     private final AtomicBoolean subscribed = new AtomicBoolean(false);
@@ -62,9 +63,11 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
     private volatile MdsClientImpl client;
 
     public KuangruiMdsMinuteIngestService(QuantProperties quantProperties,
-                                          CoreMarketBarService coreMarketBarService) {
+                                          CoreMarketBarService coreMarketBarService,
+                                          org.springframework.beans.factory.ObjectProvider<KuangruiCredentialStore> credentialStoreProvider) {
         this.quantProperties = quantProperties;
         this.aggregator = new MdsMinuteAggregator(coreMarketBarService);
+        this.credentialStoreProvider = credentialStoreProvider;
     }
 
     @Override
@@ -82,7 +85,12 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
         m.put("lastError", lastError.get());
         m.put("configPath", resolveMdsConfig().toString());
         m.put("configExists", Files.isRegularFile(resolveMdsConfig()));
-        m.put("hasCred", env("QUANT_KUANGRUI_USER") != null && env("QUANT_KUANGRUI_PASSWORD") != null);
+        KuangruiCredentials cr = resolveCred();
+        m.put("hasCred", cr.isPresent());
+        m.put("credSource", cr.getSource());
+        if (cr.isPresent()) {
+            m.put("activeUsername", cr.getUsername());
+        }
         m.putAll(aggregator.stats());
         return m;
     }
@@ -493,11 +501,13 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
             if (!Files.isRegularFile(cfg)) {
                 throw new IllegalStateException("缺少 MDS 配置: " + cfg.toAbsolutePath());
             }
-            String user = env("QUANT_KUANGRUI_USER");
-            String pass = env("QUANT_KUANGRUI_PASSWORD");
-            if (user == null || pass == null) {
-                throw new IllegalStateException("请设置环境变量 QUANT_KUANGRUI_USER / QUANT_KUANGRUI_PASSWORD");
+            KuangruiCredentials cred = resolveCred();
+            if (!cred.isPresent()) {
+                throw new IllegalStateException(
+                        "无宽睿账号：请在「宽睿联调 → 账号登录」验柜入库，或设置 QUANT_KUANGRUI_USER / PASSWORD");
             }
+            String user = cred.getUsername();
+            String pass = cred.getPassword();
             String driver = envOr("QUANT_KUANGRUI_DRIVER_ID", "DAEB7F56");
             MdsClientImpl c = new MdsClientImpl(cfg.toAbsolutePath().toString());
             c.initCallBack(new MdsCallBack() {
@@ -606,6 +616,19 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
             return MdsExchangeId.MDS_EXCH_BSE;
         }
         return MdsExchangeId.MDS_EXCH_SSE;
+    }
+
+    private KuangruiCredentials resolveCred() {
+        KuangruiCredentialStore store = credentialStoreProvider.getIfAvailable();
+        if (store != null) {
+            return store.resolve();
+        }
+        String user = env("QUANT_KUANGRUI_USER");
+        String pass = env("QUANT_KUANGRUI_PASSWORD");
+        if (user != null && pass != null) {
+            return new KuangruiCredentials(user, pass, "env");
+        }
+        return new KuangruiCredentials(null, null, "none");
     }
 
     private static String env(String key) {

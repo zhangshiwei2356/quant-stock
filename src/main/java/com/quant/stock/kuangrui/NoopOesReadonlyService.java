@@ -88,4 +88,13 @@ public class NoopOesReadonlyService implements OesReadonlyService {
     public void stop() {
         // no-op
     }
+
+    @Override
+    public Map<String, Object> probeLogon(String username, String password) {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        m.put("ok", false);
+        m.put("message", "OES 未启用或未编译进 classpath，无法验柜");
+        m.put("hint", "请以 Maven profile kuangrui 启动，并打开 quant.kuangrui.enabled + oes.enabled");
+        return m;
+    }
 }

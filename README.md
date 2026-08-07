@@ -24,7 +24,7 @@ mvn spring-boot:run
 
 空库启动时会自动从 classpath JSON 导入 **1 分钟**模拟数据到 `market_1min`（优先 `MIN_1.json`，否则由 `MIN_5.json` 拆分）。默认不连 Redis（配置存在但自动配置已排除）。
 
-**配置分层**：`application.yml` 为仓库基线（宽睿开关默认关）；默认激活 profile **`local`**，加载 `application-local.yml`（本仓库已开宽睿旁路开关，**不含账号**）。真客户端仍需 `mvn -Pkuangrui`（或 IDEA 勾选同名 profile）+ `config/kuangrui/local` 与账号环境变量。关闭本机覆盖：`--spring.profiles.active=default` 或设 `SPRING_PROFILES_ACTIVE`。
+**配置分层**：`application.yml` 为仓库基线（宽睿开关默认关）；默认激活 profile **`local`**，加载 `application-local.yml`（本仓库已开宽睿旁路开关，**不含账号**）。真客户端仍需 `mvn -Pkuangrui`（或 IDEA 勾选同名 profile）+ `config/kuangrui/local`；账号优先「宽睿联调 → 账号登录」验柜入库，否则环境变量。关闭本机覆盖：`--spring.profiles.active=default` 或设 `SPRING_PROFILES_ACTIVE`。
 
 页面内也可查看本文件：**应用说明 → 项目 README**（服务端实时渲染 `README.md`）。
 
@@ -206,7 +206,8 @@ sequenceDiagram
 
 | 二级 | 功能 |
 |------|------|
-| 接入总览 | MDS/OES/报撤/静态状态卡（LIVE 徽章、中文键值、hint、原始 JSON 可展开）+ 快捷入口 |
+| 接入总览 | 账号凭据 / MDS / OES / 报撤 / 静态状态卡（LIVE 徽章、中文键值、hint、原始 JSON）+ 快捷入口 |
+| 账号登录 | 先 OES 验柜，成功后用户名明文 + 密码 AES-GCM 密文入库；取密 **DB active 优先**，否则 `QUANT_KUANGRUI_USER`/`PASSWORD`；主密钥在独立表 `kuangrui_crypto_key`（同库仅防误读；两表不进数据表白名单） |
 | OES 只读 | 左列表点测；右侧固定入参/出参（资金/持仓/委托/成交/快照/对账/证券/交易日/佣金/stop） |
 | MDS 行情 | 同上布局；状态/静态/证券状态/时段/合并静态；pull·subscribe·flush·stop（写操作二次确认） |
 | 报撤试单 | 左表单 + 右侧结果；`place-test`/`cancel-test`；须 `orderLive`；页面二次确认 |
@@ -314,6 +315,7 @@ sequenceDiagram
 | GET/POST `/api/ops/data-reconcile*` | 分钟行情自洽检查（空/滞后/稀疏日/OHLC；UI 文案「检查分钟自洽」） |
 | GET/POST `/api/ops/st-pit` | ST as-of 日切；财报时钟边界说明 |
 | GET/POST `/api/ops/industry-reclass*` | 行业 reclass as-of 日志 |
+| GET/POST `/api/ops/kuangrui/account/{status,login,logout}` | 宽睿账号：验柜后 AES 密文入库；status 无密码/密钥；logout 清 active |
 | GET/POST `/api/ops/kuangrui/mds/*` | 宽睿 MDS：状态/pull/订阅/flush/stop；M4 `stock-static`/`security-status`/`session-status`（默认 noop；`-Pkuangrui`+开关） |
 | GET/POST `/api/ops/kuangrui/oes/*` | 宽睿 OES：只读查询/对账/stop；`order-status`（M3）；M4 `stock`/`trading-day`/`commission-rate`；联调页 `place-test`/`cancel-test`（须 orderLive） |
 | GET `/api/ops/kuangrui/static/{status,stock}` | M4 静态/费率门面状态与合并证券静态 |
