@@ -6,12 +6,10 @@
   默认业务仍为本地 <code>sim</code> + <code>db</code>；宽睿能力经独立开关接入，默认关闭。
 </p>
 <p>
-  更新：2026-08-06 ·
+  更新：2026-08-07 ·
   <b>M0</b> 仿真登录 COMPLETE ·
-  <b>M1</b> MDS L1→<code>market_1min(MDS)</code> 可选已落地 ·
-  <b>M2</b> OES 只读对账可选已落地 ·
-  <b>M3</b> OES 报撤回报可选已落地 ·
-  <b>M4</b> 静态/费率可选已落地 ·
+  <b>M1</b>～<b>M4</b> 可选已落地（默认关）·
+  下一步 <b>M5</b> 连接韧性（先 MDS，再 OES）·
   后置 L2/批量/银证。
 </p>
 
@@ -97,11 +95,11 @@
   <table>
     <thead><tr><th>本应用模块</th><th>现状</th><th>宽睿可补</th><th>仍缺</th></tr></thead>
     <tbody>
-      <tr><td><code>market-collect</code> / MDS 摄入</td><td><b>M1 可选已落地</b>（默认关）</td><td>L1 订阅/查询→分钟桶→<code>market_1min(MDS)</code>；运维 MDS/TDX 抽样对账已落地</td><td>断线重连强化、L2</td></tr>
-      <tr><td><code>TradeGatewayService</code></td><td>sim 即时；sdk 本地桩或 <b>M3 可选</b> OES</td><td>OES 限价报/撤 + 回报/查询推进</td><td>批量、本地风控↔拒单细映射</td></tr>
-      <tr><td><code>sync-orders</code></td><td>本地桩或 <b>M3</b> OES 推进 + M2 对账日志</td><td><code>queryOrder</code>/<code>queryTrade</code>+回报</td><td>—</td></tr>
-      <tr><td><code>position-pnl-sync</code></td><td>本地成本+最新价 + <b>M2 可选</b> OES 对账</td><td><code>queryCashAsset</code>/<code>queryStkHolding</code></td><td>—</td></tr>
-      <tr><td>停复牌 / 涨跌停 / 股本</td><td>量≤0、规则估算、启发式；<b>M4 可选</b>宽睿价</td><td>MDS 静态+状态；OES <code>queryStock</code></td><td>断线缓存强化；ST 日切可并存本地表</td></tr>
+      <tr><td><code>market-collect</code> / MDS 摄入</td><td><b>M1 可选已落地</b>（默认关）</td><td>L1 订阅/查询→分钟桶→<code>market_1min(MDS)</code>；运维 MDS/TDX 抽样对账已落地</td><td><b>M5a</b> 断线清客户端/重连；死连接勿挡本地回退；L2 后置</td></tr>
+      <tr><td><code>TradeGatewayService</code></td><td>sim 即时；sdk 本地桩或 <b>M3 可选</b> OES</td><td>限价报/撤 + 回报/查询推进（粗状态映射已有）</td><td>撤单确认闭环；<code>PARTIALLY_CANCELED(6)</code>→本地 CANCELLED；批量后置</td></tr>
+      <tr><td><code>sync-orders</code></td><td>本地桩或 <b>M3</b> OES 推进 + M2 对账日志</td><td><code>queryOrder</code>/<code>queryTrade</code>+回报</td><td>同上细态；ErrorCode 可读原因可选</td></tr>
+      <tr><td><code>position-pnl-sync</code></td><td>本地成本+最新价 + <b>M2 可选</b> OES 对账</td><td><code>queryCashAsset</code>/<code>queryStkHolding</code></td><td>可选增强 overview/invAcct/可买量</td></tr>
+      <tr><td>停复牌 / 涨跌停 / 股本</td><td>量≤0、规则估算、启发式；<b>M4 可选</b>宽睿价</td><td>MDS 静态+状态；OES <code>queryStock</code></td><td>随 M5 连接韧性；ST 日切可并存本地表</td></tr>
       <tr><td>交易日历 / 佣金</td><td>静态节假日 / 配置近似；<b>M4 可选</b> OES</td><td><code>queryTradingDay</code> / <code>queryCommissionRate</code></td><td>—</td></tr>
       <tr><td>复权 / 财报 / 舆情</td><td>未落地</td><td>资料包基本不覆盖</td><td>其他数据源</td></tr>
     </tbody>
@@ -161,14 +159,63 @@
     <li>对照与 JSON：<code>config/kuangrui/examples/aliyun-sim.md</code>；密钥仅 <code>local/</code>（gitignore）+ 环境变量</li>
   </ul>
 
-  <h5 style="margin:12px 0 4px;">待做</h5>
+  <h5 style="margin:12px 0 4px;">待做（2026-08-07 对照 Demo/Javadoc 复核）</h5>
+  <p class="hint" style="margin:0 0 8px;">
+    现货主路径 M0～M4 <b>代码可选已落地</b>（默认关）；联机浸泡需再跑证据。
+    Demo 能力远大于接入面：两融/期权/L2 不进主路径。SDK 无公开 reconnect，须应用层实现（回调内勿重活）。
+  </p>
   <table>
     <thead><tr><th>阶段</th><th>目标</th><th>要点</th><th>Done 标准</th></tr></thead>
     <tbody>
       <tr>
+        <td><b>M5a MDS</b></td>
+        <td>连接韧性（优先）</td>
+        <td>
+          现状：<code>onDisConn</code> 只清 <code>subscribed</code>，不清 <code>client</code>；
+          <code>ensureClient</code> 见非空直接返回 → 易顶死连接；
+          <code>market-collect</code> pull 空窗时仍可能 <code>return true</code> 挡住本地回退。
+          改：异步 <code>closeClient</code> → 退避重登 → 需则重订阅；全失败勿冒充成功。
+        </td>
+        <td>断线后采集可自愈或明确回退本地；status 可见断线/重连</td>
+      </tr>
+      <tr>
+        <td><b>M5b OES</b></td>
+        <td>连接韧性</td>
+        <td>
+          现状：断线置 <code>client=null</code> 可懒重连，但未先 <code>close</code>（泄漏/重复登录风险）。
+          改：先 close 再重建 + <code>sendRptSync</code>；退避；status 暴露断线计数。
+        </td>
+        <td>断线后只读/报撤可恢复；仿真无长期假死</td>
+      </tr>
+      <tr>
+        <td><b>M3/M5 小修</b></td>
+        <td>状态与撤单</td>
+        <td>
+          粗映射已有（含 REJECTED≥10）。缺口：
+          <code>PARTIALLY_CANCELED(6)</code> 现映 <code>PARTIAL</code>，应映 <code>CANCELLED</code>（保留已成量）；
+          撤单现乐观本地 CANCELLED，应等回报/查询确认。
+        </td>
+        <td>单测覆盖状态 6；撤拒不永久假撤</td>
+      </tr>
+      <tr>
+        <td><b>验收</b></td>
+        <td>仿真浸泡</td>
+        <td>开关开一轮：登录 → MDS pull/订 → OES reconcile → 买/卖/撤 → sync → static 抽检</td>
+        <td>有日志/运维结果可复现</td>
+      </tr>
+      <tr>
+        <td><b>增强（可选）</b></td>
+        <td>查询/效率</td>
+        <td>
+          M2：<code>queryInvAcct</code> / <code>queryClientOverview</code> / <code>queryMaxTradableQty</code> 等；
+          M1：<code>qrySnapshotList</code> 批量 pull；需要时再 <code>sendBatchOrdsReq</code>
+        </td>
+        <td>按需验收</td>
+      </tr>
+      <tr>
         <td><b>后置</b></td>
         <td>可选</td>
-        <td>L2/UDP、批量、银证；两融/期权/ETF 不进主路径；MDS 断线重连强化</td>
+        <td>L2/UDP/LOB、银证（<code>sendCashTrsfReq</code>）、两融/期权/ETF 申赎不进主路径</td>
         <td>—</td>
       </tr>
     </tbody>
@@ -209,7 +256,7 @@ quant.trade-mode=sim
     <li>宽睿侧开通 OES、MDS 账号与通道（仿真可用上文阿里云地址）</li>
     <li>本机 <code>mvn install:install-file</code> 安装 <code>quant360-all-api-0.19.4.0.jar</code>；以 <code>-Pkuangrui</code> 运行/打包</li>
     <li>准备 <code>config/kuangrui/local/mds_api_config.json</code>（及 OES 配置）；设置 <code>QUANT_KUANGRUI_USER</code> / <code>PASSWORD</code></li>
-    <li>长连接：登录、心跳、断线重连、回报续订（参考 Demo）；明确仿真 vs 生产、<code>clEnvId</code> 与加密</li>
+    <li>长连接：登录、心跳、断线重连（见 M5）、回报续订；回调勿做重活（参考 Demo）；明确仿真 vs 生产、<code>clEnvId</code> 与加密</li>
   </ol>
 </div>
 

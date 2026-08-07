@@ -8,6 +8,7 @@ import com.quant.stock.trade.dto.OrderDTO;
 import com.quant.stock.util.RedisLockUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -43,6 +44,10 @@ public class TradeGatewayService {
     private final Map<Integer, String> clSeqToOrderId = new ConcurrentHashMap<Integer, String>();
     private final AtomicInteger clSeqGen = new AtomicInteger(1);
 
+    /**
+     * Spring 注入主构造（多构造时必须 {@code @Autowired}，否则会退回无参并启动失败）。
+     */
+    @Autowired
     public TradeGatewayService(RedisLockUtil redisLockUtil,
                                QuantProperties props,
                                ObjectProvider<LiveLedgerService> liveLedgerProvider,

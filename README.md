@@ -340,12 +340,13 @@ sequenceDiagram
   - `sync-orders`：`trade-mode=sdk` 时推进成交；默认本地桩；OES `order-enabled` live 时按回报/查询推进（不假推进）；OES 只读 live 时另打对账日志
   - `position-pnl-sync`：本地成本 + 最新价浮盈日志；OES live 时附加柜台资金/持仓对账
 - 页面标「未实现/缺外部默认」：`market-collect`（本地骨架；**可选**宽睿 MDS live 时 pull/flush，见下）
-- 对照：**应用说明 → 能力与待办**；宽睿对接：**应用说明 → 宽睿文档梳理**（M0✓ → M1✓ → M2✓ → M3✓ → M4 静态/费率可选✓）
+- 对照：**应用说明 → 能力与待办**；宽睿对接：**应用说明 → 宽睿文档梳理**（M0✓ → M1～M4 可选✓；下一步 **M5 连接韧性**）
 - 宽睿 **M0**：资料包 `OESAPI-JAVA-v0.19.4.0`；探针 **OES+MDS 登录成功** → `M0_STATUS=COMPLETE`
 - 宽睿 **M1**（可选，默认关）：MDS L1 → `market_1min(MDS)`；运维 `/api/ops/kuangrui/mds/*`
 - 宽睿 **M2**（可选，默认关）：OES 只读对账；运维 `/api/ops/kuangrui/oes/{status,cash,holdings,orders,trades,snapshot,reconcile,stop}`
 - 宽睿 **M3**（可选，默认关）：`oes.order-enabled=true` + `trade-mode=sdk`；限价报/撤；`sync-orders` 按柜台状态推进；`GET /api/ops/kuangrui/oes/order-status`
 - 宽睿 **M4**（可选，默认关）：`static-enabled=true`；MDS/OES 静态涨跌停·停牌·股本·交易日·佣金；失败回退本地启发式；运维 `/api/ops/kuangrui/static/*`
+- 宽睿 **下一步 M5**（未落地）：MDS/OES 断线清连接与重连（先 MDS，避免死连接挡 `market-collect` 回退）；OES 宜先 `close` 再重建 + `sendRptSync`；小修撤单确认与 `PARTIALLY_CANCELED(6)`→CANCELLED；后置 L2/批量/银证。详见「宽睿文档梳理」待做表
 
 ---
 
