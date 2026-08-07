@@ -202,6 +202,24 @@
             <ul id="dbtablesMenu" class="side-nav-menu"></ul>
           </div>
         </div>
+
+        <div class="side-nav" data-nav="kuangrui">
+          <button type="button" class="side-nav-toggle" data-body="kuangruiBody" data-mode="kuangrui"
+                  data-intro="/docs/nav-kuangrui.html" data-intro-title="宽睿联调" aria-expanded="false">
+            <span class="nav-idx">09</span>
+            <span class="nav-label">宽睿联调</span>
+            <span class="chevron">▸</span>
+          </button>
+          <div id="kuangruiBody" class="side-nav-body">
+            <p class="hint">接入状态 / 接口点测入参出参 / 报撤试单</p>
+            <ul id="kuangruiMenu" class="side-nav-menu">
+              <li data-kuangrui-panel="overview" role="button" tabindex="0">接入总览</li>
+              <li data-kuangrui-panel="oes" role="button" tabindex="0">OES 只读</li>
+              <li data-kuangrui-panel="mds" role="button" tabindex="0">MDS</li>
+              <li data-kuangrui-panel="order" role="button" tabindex="0">报撤试单</li>
+            </ul>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -211,7 +229,7 @@
         <div class="side-nav" data-nav="stock-knowledge">
           <button type="button" class="side-nav-toggle" data-body="stockKnowledgeMenu" data-mode="doc"
                   data-intro="/docs/nav-stock-knowledge.html" data-intro-title="量化知识" aria-expanded="false">
-            <span class="nav-idx">09</span>
+            <span class="nav-idx">10</span>
             <span class="nav-label">量化知识</span>
             <span class="chevron">▸</span>
           </button>
@@ -221,7 +239,7 @@
         <div class="side-nav" data-nav="app-related">
           <button type="button" class="side-nav-toggle" data-body="appRelatedMenu" data-mode="doc"
                   data-intro="/docs/nav-app-related.html" data-intro-title="应用说明" aria-expanded="false">
-            <span class="nav-idx">10</span>
+            <span class="nav-idx">11</span>
             <span class="nav-label">应用说明</span>
             <span class="chevron">▸</span>
           </button>
@@ -858,6 +876,91 @@
       </section>
     </div>
 
+    <!-- 宽睿联调 -->
+    <div id="viewKuangruiOverview" class="workspace-view" hidden>
+      <section class="panel">
+        <h3>宽睿 · 接入总览</h3>
+        <p class="hint">并行读取 MDS / OES / order / static 状态。报撤开关 <code>quant.kuangrui.oes.order-enabled</code> 仅 yml（默认 false），运行参数页不可热改。</p>
+        <div class="toolbar" style="margin-top:8px;">
+          <button type="button" id="btnKrOverviewRefresh">刷新状态</button>
+          <span class="field-hint" id="krOverviewMeta"></span>
+        </div>
+        <div id="krOverviewCards" class="kr-status-grid" style="margin-top:12px;"></div>
+      </section>
+    </div>
+
+    <div id="viewKuangruiOes" class="workspace-view" hidden>
+      <section class="panel">
+        <h3>宽睿 · OES 只读点测</h3>
+        <p class="hint">点击「调用」请求运维 API，下方展示入参 / 出参 JSON（对应 SDK 如 <code>queryCashAsset</code>）。</p>
+        <div id="krOesCards" class="kr-api-list"></div>
+        <div class="kr-result" id="krOesResult">
+          <h4>最近一次调用</h4>
+          <p class="hint" id="krOesResultMeta">尚未调用</p>
+          <div class="kr-result-cols">
+            <div><span class="kr-result-label">入参</span><pre class="kr-json" id="krOesReq">—</pre></div>
+            <div><span class="kr-result-label">出参</span><pre class="kr-json" id="krOesRsp">—</pre></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div id="viewKuangruiMds" class="workspace-view" hidden>
+      <section class="panel">
+        <h3>宽睿 · MDS 点测</h3>
+        <p class="hint">查询与 pull/subscribe/flush/stop；写操作会二次确认。</p>
+        <div id="krMdsCards" class="kr-api-list"></div>
+        <div class="kr-result" id="krMdsResult">
+          <h4>最近一次调用</h4>
+          <p class="hint" id="krMdsResultMeta">尚未调用</p>
+          <div class="kr-result-cols">
+            <div><span class="kr-result-label">入参</span><pre class="kr-json" id="krMdsReq">—</pre></div>
+            <div><span class="kr-result-label">出参</span><pre class="kr-json" id="krMdsRsp">—</pre></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div id="viewKuangruiOrder" class="workspace-view" hidden>
+      <section class="panel">
+        <h3>宽睿 · 报撤试单</h3>
+        <p class="hint" id="krOrderGateHint">须 <code>orderLive=true</code>（yml 打开 order-enabled + -Pkuangrui）。提交前弹框确认。</p>
+        <div class="kr-order-forms">
+          <div class="kr-api-card">
+            <h4>限价报单 <code>sendOrdReq</code></h4>
+            <p class="hint mono">POST /api/ops/kuangrui/oes/place-test</p>
+            <div class="toolbar">
+              <label class="field-inline">代码 <input type="text" id="krPlaceCode" value="600036" style="width:88px;"/></label>
+              <label class="field-inline">方向
+                <select id="krPlaceSide"><option value="BUY">BUY</option><option value="SELL">SELL</option></select>
+              </label>
+              <label class="field-inline">价 <input type="number" id="krPlacePrice" step="0.01" value="30" style="width:88px;"/></label>
+              <label class="field-inline">量 <input type="number" id="krPlaceQty" step="100" value="100" style="width:88px;"/></label>
+              <label class="field-inline">clientId <input type="text" id="krPlaceCid" placeholder="可选" style="width:120px;"/></label>
+              <button type="button" id="btnKrPlace">报单试单</button>
+            </div>
+          </div>
+          <div class="kr-api-card">
+            <h4>撤单 <code>sendOrdCancelReq</code></h4>
+            <p class="hint mono">POST /api/ops/kuangrui/oes/cancel-test</p>
+            <div class="toolbar">
+              <label class="field-inline">origClSeqNo <input type="number" id="krCancelSeq" style="width:120px;"/></label>
+              <label class="field-inline">代码 <input type="text" id="krCancelCode" value="600036" style="width:88px;"/></label>
+              <button type="button" id="btnKrCancel" class="secondary">撤单试单</button>
+            </div>
+          </div>
+        </div>
+        <div class="kr-result" id="krOrderResult">
+          <h4>最近一次调用</h4>
+          <p class="hint" id="krOrderResultMeta">尚未调用</p>
+          <div class="kr-result-cols">
+            <div><span class="kr-result-label">入参</span><pre class="kr-json" id="krOrderReq">—</pre></div>
+            <div><span class="kr-result-label">出参</span><pre class="kr-json" id="krOrderRsp">—</pre></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
     <!-- 数据表 -->
     <div id="viewDbTable" class="workspace-view" hidden>
       <section class="panel">
@@ -1433,6 +1536,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260803-data-source"></script>
+<script src="/js/stock-chart.js?v=20260808-kuangrui-ops"></script>
 </body>
 </html>

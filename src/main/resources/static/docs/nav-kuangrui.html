@@ -1,0 +1,28 @@
+<!-- 一级菜单介绍：宽睿联调 -->
+<p class="nav-intro-lead">点测宽睿 OES/MDS 运维接口，查看<strong>入参 / 出参</strong>与接入开关状态。默认旁路关闭；报撤须 yml 打开 <code>order-enabled</code> 并二次确认。</p>
+<div class="nav-intro-grid">
+  <section class="nav-intro-card">
+    <h4><span class="nav-intro-card-tag">二级</span>菜单说明</h4>
+    <ul class="nav-intro-list">
+      <li><strong>接入总览</strong>：MDS / OES / order / static 状态一览</li>
+      <li><strong>OES 只读</strong>：资金、持仓、委托、成交等；展示 HTTP 入参出参</li>
+      <li><strong>MDS</strong>：状态与静态查询；pull / subscribe / flush / stop</li>
+      <li><strong>报撤试单</strong>：限价买/卖/撤；仅 <code>orderLive</code>；弹框确认</li>
+    </ul>
+  </section>
+  <section class="nav-intro-card nav-intro-card--steps">
+    <h4><span class="nav-intro-card-tag">步骤</span>建议流程</h4>
+    <ol class="nav-intro-steps">
+      <li>确认 <code>-Pkuangrui</code> 与 <code>config/kuangrui/local</code> 账号</li>
+      <li>先开 <code>kuangrui.enabled</code> + <code>oes.enabled</code> / <code>mds.enabled</code> 做只读点测</li>
+      <li>报撤另开 <code>oes.order-enabled=true</code>（仅 yml，非运行参数页）</li>
+    </ol>
+  </section>
+</div>
+<div class="nav-intro-cta">
+  <button type="button" class="nav-intro-btn" data-enter-mode="kuangrui" data-kuangrui-panel="overview">进入接入总览</button>
+  <button type="button" class="nav-intro-btn secondary" data-enter-mode="kuangrui" data-kuangrui-panel="oes">OES 只读</button>
+  <button type="button" class="nav-intro-btn secondary" data-enter-mode="kuangrui" data-kuangrui-panel="mds">MDS</button>
+  <button type="button" class="nav-intro-btn secondary" data-enter-mode="kuangrui" data-kuangrui-panel="order">报撤试单</button>
+</div>
+<p class="nav-intro-hint">再点一次「宽睿联调」可收起并回初始化页。手册见「应用说明 → 宽睿文档梳理」。</p>

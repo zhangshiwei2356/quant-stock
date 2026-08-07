@@ -31,6 +31,8 @@ public class KuangruiOesOpsFacade {
     private final StrategyTask strategyTask;
     private final TradeGatewayService tradeGatewayService;
     private final KuangruiStaticInfoService staticInfoService;
+    private final java.util.concurrent.atomic.AtomicInteger testClSeq =
+            new java.util.concurrent.atomic.AtomicInteger((int) (System.currentTimeMillis() % 800_000) + 1000);
 
     public Map<String, Object> status() {
         Map<String, Object> m = new LinkedHashMap<String, Object>(oesReadonlyService.status());
@@ -117,6 +119,91 @@ public class KuangruiOesOpsFacade {
                 return oesReadonlyService.queryCommissionRate();
             }
         });
+    }
+
+    /** 联调页限价试单（须 orderLive；不改金叉主路径）。 */
+    public Map<String, Object> placeTest(String code, String side, BigDecimal priceYuan, Integer qty,
+                                         String clientOrderId) {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        m.putAll(orderStatus());
+        if (oesOrderService == null || !oesOrderService.isOrderLive()) {
+            m.put("ok", false);
+            m.put("hint", "报撤未 live。请配置 quant.kuangrui.enabled + oes.enabled + oes.order-enabled=true，"
+                    + "并以 mvn -Pkuangrui 启动；order-enabled 仅 application.yml（运行参数页不可热改）");
+            return m;
+        }
+        String norm = OesViewMapper.normalizeCode(code);
+        if (norm == null || norm.isEmpty()) {
+            m.put("ok", false);
+            m.put("message", "code 不能为空");
+            return m;
+        }
+        OrderDTO.Side s = "SELL".equalsIgnoreCase(side) ? OrderDTO.Side.SELL : OrderDTO.Side.BUY;
+        if (priceYuan == null || priceYuan.compareTo(BigDecimal.ZERO) <= 0) {
+            m.put("ok", false);
+            m.put("message", "price 须为正");
+            return m;
+        }
+        int q = qty == null ? 0 : qty.intValue();
+        if (q < 100) {
+            m.put("ok", false);
+            m.put("message", "qty 至少 100（一手）");
+            return m;
+        }
+        int clSeq = testClSeq.incrementAndGet();
+        String cid = clientOrderId == null || clientOrderId.trim().isEmpty()
+                ? "KR-TEST-" + clSeq : clientOrderId.trim();
+        try {
+            OesOrderService.OesPlaceResult r = oesOrderService.placeLimit(norm, s, priceYuan, q, clSeq, cid);
+            m.put("ok", r != null && r.isAccepted());
+            m.put("accepted", r != null && r.isAccepted());
+            m.put("clSeqNo", r == null ? clSeq : r.getClSeqNo());
+            m.put("clOrdId", r == null ? 0L : r.getClOrdId());
+            m.put("message", r == null ? "null result" : r.getMessage());
+            m.put("code", norm);
+            m.put("side", s.name());
+            m.put("price", priceYuan);
+            m.put("qty", Integer.valueOf(q));
+            m.put("clientOrderId", cid);
+            return m;
+        } catch (Exception e) {
+            log.warn("[oes-ops] placeTest 失败: {}", e.getMessage());
+            m.put("ok", false);
+            m.put("message", e.getMessage());
+            return m;
+        }
+    }
+
+    /** 联调页撤单试单（须 orderLive）。 */
+    public Map<String, Object> cancelTest(Integer origClSeqNo, String code) {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        m.putAll(orderStatus());
+        if (oesOrderService == null || !oesOrderService.isOrderLive()) {
+            m.put("ok", false);
+            m.put("hint", "报撤未 live。请配置 quant.kuangrui.enabled + oes.enabled + oes.order-enabled=true，"
+                    + "并以 mvn -Pkuangrui 启动");
+            return m;
+        }
+        if (origClSeqNo == null || origClSeqNo.intValue() <= 0) {
+            m.put("ok", false);
+            m.put("message", "origClSeqNo 无效");
+            return m;
+        }
+        String norm = OesViewMapper.normalizeCode(code);
+        try {
+            boolean sent = oesOrderService.cancelByClSeqNo(origClSeqNo.intValue(), norm);
+            m.put("ok", sent);
+            m.put("sent", Boolean.valueOf(sent));
+            m.put("origClSeqNo", origClSeqNo);
+            m.put("code", norm);
+            m.put("message", sent ? "撤单请求已发出（非柜台最终确认）" : "撤单请求失败");
+            return m;
+        } catch (Exception e) {
+            log.warn("[oes-ops] cancelTest 失败: {}", e.getMessage());
+            m.put("ok", false);
+            m.put("message", e.getMessage());
+            return m;
+        }
     }
 
     /** M4：静态/费率门面状态。 */

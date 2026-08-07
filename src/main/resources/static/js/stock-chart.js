@@ -2007,7 +2007,7 @@
     { id: 'readme', group: 'app', title: '项目 README', src: '/api/docs/readme' },
     { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260803-data-source' },
     { id: 'memo', group: 'app', title: '能力与待办', src: '/docs/memo.html?v=20260803-data-source' },
-    { id: 'kuangrui', group: 'app', title: '宽睿文档梳理', src: '/docs/kuangrui.html?v=20260804-m1' },
+    { id: 'kuangrui', group: 'app', title: '宽睿文档梳理', src: '/docs/kuangrui.html?v=20260808-ops' },
     { id: 'ashare', group: 'stock', title: 'A股基础', src: '/docs/ashare.html?v=20260720-nav-rename' },
     { id: 'session', group: 'stock', title: '交易时间', src: '/docs/session.html?v=20260720-nav-rename' },
     { id: 'kline', group: 'stock', title: 'K线', src: '/docs/kline.html?v=20260720-nav-rename' },
@@ -2327,7 +2327,7 @@
   }
 
   function hideAllWorkspaceViews() {
-    $('#viewHome, #viewNavIntro, #viewPool, #viewSingle, #viewPortfolio, #viewTradePool, #viewTpHistory, #viewDbTable, #viewSchedule, #viewStrategy, #viewDataHealth, #viewSysParams, #viewAcctFunds, #viewAcctPositions, #viewAcctOrders, #viewAcctCashflows, #viewAcctRiskLogs, #viewAcctRiskDash, #viewAcctPaperGap').prop('hidden', true);
+    $('#viewHome, #viewNavIntro, #viewPool, #viewSingle, #viewPortfolio, #viewTradePool, #viewTpHistory, #viewDbTable, #viewSchedule, #viewStrategy, #viewDataHealth, #viewSysParams, #viewAcctFunds, #viewAcctPositions, #viewAcctOrders, #viewAcctCashflows, #viewAcctRiskLogs, #viewAcctRiskDash, #viewAcctPaperGap, #viewKuangruiOverview, #viewKuangruiOes, #viewKuangruiMds, #viewKuangruiOrder').prop('hidden', true);
     $('body').removeClass('home-theme-peek');
     $('#btnExpandHome').prop('hidden', true);
   }
@@ -2343,8 +2343,10 @@
 
   var lastTpPanel = 'pool';
   var lastSchedulePanel = 'jobs';
+  var lastKuangruiPanel = 'overview';
   var lastSinglePanel = 'workspace';
   var lastPortfolioPanel = 'workspace';
+  var krOrderLive = false;
 
   function setSingleMenuActive(panel) {
     $('#singleMenu li').removeClass('active');
@@ -2430,6 +2432,242 @@
       loadTradePoolManage();
     }
     resizeCharts();
+  }
+
+  function setKuangruiMenuActive(panel) {
+    $('#kuangruiMenu li').removeClass('active');
+    if (panel) {
+      $('#kuangruiMenu li[data-kuangrui-panel="' + panel + '"]').addClass('active');
+    }
+  }
+
+  function showKuangruiPanel(panel) {
+    panel = panel || lastKuangruiPanel || 'overview';
+    if (panel !== 'overview' && panel !== 'oes' && panel !== 'mds' && panel !== 'order') panel = 'overview';
+    lastKuangruiPanel = panel;
+    lastWorkspaceMode = 'kuangrui';
+    $('body').removeClass('mode-doc');
+    $('#knowledgePanel').prop('hidden', true);
+    $('.side-nav-menu li').removeClass('active');
+    hideAllWorkspaceViews();
+    setSideNavOpen('kuangruiBody');
+    setKuangruiMenuActive(panel);
+    if (panel === 'oes') {
+      $('#viewKuangruiOes').prop('hidden', false);
+      ensureKrOesCards();
+    } else if (panel === 'mds') {
+      $('#viewKuangruiMds').prop('hidden', false);
+      ensureKrMdsCards();
+    } else if (panel === 'order') {
+      $('#viewKuangruiOrder').prop('hidden', false);
+      refreshKrOrderGate();
+    } else {
+      $('#viewKuangruiOverview').prop('hidden', false);
+      loadKrOverview();
+    }
+    resizeCharts();
+  }
+
+  function krPretty(obj) {
+    try { return JSON.stringify(obj == null ? null : obj, null, 2); } catch (e) { return String(obj); }
+  }
+
+  function krFillResult(prefix, meta, req, rsp) {
+    $('#' + prefix + 'ResultMeta').text(meta || '');
+    $('#' + prefix + 'Req').text(krPretty(req));
+    $('#' + prefix + 'Rsp').text(krPretty(rsp));
+  }
+
+  function krInvoke(opts) {
+    var method = (opts.method || 'GET').toUpperCase();
+    var url = opts.url;
+    var data = opts.data;
+    var confirmMsg = opts.confirm;
+    var $btn = opts.$btn;
+    var resultPrefix = opts.resultPrefix;
+    var label = opts.label || url;
+    if (confirmMsg && !window.confirm(confirmMsg)) {
+      return;
+    }
+    var reqView = { method: method, url: url };
+    if (data != null) {
+      if (method === 'GET') reqView.query = data;
+      else reqView.body = data;
+    }
+    var t0 = Date.now();
+    if ($btn && $btn.length) $btn.prop('disabled', true).addClass('is-loading');
+    var ajax = {
+      url: url,
+      method: method,
+      dataType: 'json'
+    };
+    if (method === 'GET') {
+      ajax.data = data || {};
+    } else {
+      ajax.contentType = 'application/json';
+      ajax.data = JSON.stringify(data == null ? {} : data);
+    }
+    $.ajax(ajax).done(function (rsp, _text, xhr) {
+      var ms = Date.now() - t0;
+      var st = xhr && xhr.status != null ? xhr.status : 200;
+      krFillResult(resultPrefix, label + ' · HTTP ' + st + ' · ' + ms + 'ms', reqView, rsp);
+      var ok = rsp && (rsp.ok === true || rsp.live === true || rsp.orderLive === true);
+      toast(ok ? (label + ' 完成') : (label + ' 已返回'), ok ? 'ok' : 'info');
+    }).fail(function (xhr) {
+      var ms = Date.now() - t0;
+      var body = (xhr && xhr.responseJSON) || { message: (xhr && xhr.responseText) || '请求失败' };
+      krFillResult(resultPrefix, label + ' · HTTP ' + (xhr && xhr.status) + ' · ' + ms + 'ms', reqView, body);
+      toast(label + ' 失败', 'err');
+    }).always(function () {
+      if ($btn && $btn.length) {
+        $btn.removeClass('is-loading');
+        if (resultPrefix === 'krOrder') {
+          $btn.prop('disabled', !krOrderLive);
+        } else {
+          $btn.prop('disabled', false);
+        }
+      }
+      if (resultPrefix === 'krOrder') refreshKrOrderGate();
+    });
+  }
+
+  function loadKrOverview() {
+    $('#krOverviewMeta').text('加载中…');
+    var urls = [
+      { key: 'MDS', url: '/api/ops/kuangrui/mds/status' },
+      { key: 'OES', url: '/api/ops/kuangrui/oes/status' },
+      { key: 'Order', url: '/api/ops/kuangrui/oes/order-status' },
+      { key: 'Static', url: '/api/ops/kuangrui/static/status' }
+    ];
+    var pending = urls.length;
+    var $grid = $('#krOverviewCards').empty();
+    urls.forEach(function (u) {
+      $.getJSON(u.url).done(function (d) {
+        if (u.key === 'Order') krOrderLive = !!(d && d.orderLive);
+        var lines = [];
+        ['live', 'orderLive', 'orderEnabled', 'applyEnabled', 'enabled', 'subscribed', 'loggedIn', 'quantKuangruiEnabled', 'quantOesEnabled', 'staticEnabled', 'impl', 'hint', 'orderHint', 'message'].forEach(function (k) {
+          if (d && d[k] != null && d[k] !== '') lines.push(k + ': ' + d[k]);
+        });
+        var $c = $('<div class="kr-status-card"/>');
+        $c.append($('<h4/>').text(u.key));
+        $c.append($('<div class="kr-kv mono"/>').text(lines.length ? lines.join('\n') : krPretty(d)));
+        $grid.append($c);
+      }).fail(function (xhr) {
+        var $c = $('<div class="kr-status-card"/>');
+        $c.append($('<h4/>').text(u.key));
+        $c.append($('<div class="kr-kv"/>').text('加载失败 HTTP ' + (xhr && xhr.status)));
+        $grid.append($c);
+      }).always(function () {
+        pending--;
+        if (pending <= 0) $('#krOverviewMeta').text('已刷新 ' + new Date().toLocaleTimeString());
+      });
+    });
+  }
+
+  function ensureKrOesCards() {
+    var $box = $('#krOesCards');
+    if ($box.data('ready')) return;
+    $box.data('ready', true);
+    var apis = [
+      { title: '查资金', sdk: 'queryCashAsset', method: 'GET', path: '/api/ops/kuangrui/oes/cash' },
+      { title: '查持仓', sdk: 'queryStkHolding', method: 'GET', path: '/api/ops/kuangrui/oes/holdings' },
+      { title: '查委托', sdk: 'queryOrder', method: 'GET', path: '/api/ops/kuangrui/oes/orders' },
+      { title: '查成交', sdk: 'queryTrade', method: 'GET', path: '/api/ops/kuangrui/oes/trades' },
+      { title: '快照', sdk: 'snapshot', method: 'GET', path: '/api/ops/kuangrui/oes/snapshot' },
+      { title: '纸面对账', sdk: 'reconcile', method: 'GET', path: '/api/ops/kuangrui/oes/reconcile' },
+      { title: '报撤状态', sdk: 'order-status', method: 'GET', path: '/api/ops/kuangrui/oes/order-status' },
+      { title: '证券产品', sdk: 'queryStock', method: 'GET', path: '/api/ops/kuangrui/oes/stock', code: true },
+      { title: '交易日', sdk: 'queryTradingDay', method: 'GET', path: '/api/ops/kuangrui/oes/trading-day' },
+      { title: '佣金', sdk: 'queryCommissionRate', method: 'GET', path: '/api/ops/kuangrui/oes/commission-rate' },
+      { title: '关闭连接', sdk: 'stop', method: 'POST', path: '/api/ops/kuangrui/oes/stop', confirm: '确认关闭 OES 客户端连接？' }
+    ];
+    apis.forEach(function (a) {
+      var $card = $('<div class="kr-api-card"/>');
+      $card.append($('<h4/>').html(a.title + ' <code>' + a.sdk + '</code>'));
+      $card.append($('<p class="hint mono"/>').text(a.method + ' ' + a.path));
+      var $tb = $('<div class="toolbar"/>');
+      if (a.code) {
+        $tb.append($('<label class="field-inline"/>').html('代码 <input type="text" class="kr-code" value="600036" style="width:88px;"/>'));
+      }
+      var $btn = $('<button type="button"/>').text('调用');
+      $tb.append($btn);
+      $card.append($tb);
+      $btn.on('click', function () {
+        var data = undefined;
+        if (a.code) data = { code: $card.find('.kr-code').val() };
+        krInvoke({
+          method: a.method,
+          url: a.path,
+          data: data,
+          confirm: a.confirm,
+          $btn: $btn,
+          resultPrefix: 'krOes',
+          label: a.title
+        });
+      });
+      $box.append($card);
+    });
+  }
+
+  function ensureKrMdsCards() {
+    var $box = $('#krMdsCards');
+    if ($box.data('ready')) return;
+    $box.data('ready', true);
+    var apis = [
+      { title: 'MDS 状态', sdk: 'status', method: 'GET', path: '/api/ops/kuangrui/mds/status' },
+      { title: '证券静态', sdk: 'qryStockStaticInfo', method: 'GET', path: '/api/ops/kuangrui/mds/stock-static', code: true },
+      { title: '证券状态', sdk: 'qrySecurityStatus', method: 'GET', path: '/api/ops/kuangrui/mds/security-status', code: true },
+      { title: '交易时段', sdk: 'qryTrdSessionStatus', method: 'GET', path: '/api/ops/kuangrui/mds/session-status' },
+      { title: '合并静态', sdk: 'static/stock', method: 'GET', path: '/api/ops/kuangrui/static/stock', code: true },
+      { title: 'Pull 落库', sdk: 'pull', method: 'POST', path: '/api/ops/kuangrui/mds/pull', confirm: '确认执行 MDS pull 并落库？' },
+      { title: '订阅 L1', sdk: 'subscribe', method: 'POST', path: '/api/ops/kuangrui/mds/subscribe', confirm: '确认订阅 MDS L1？' },
+      { title: 'Flush 分钟桶', sdk: 'flush', method: 'POST', path: '/api/ops/kuangrui/mds/flush', confirm: '确认 flush 分钟桶？' },
+      { title: '停止订阅', sdk: 'stop', method: 'POST', path: '/api/ops/kuangrui/mds/stop', confirm: '确认停止 MDS 订阅并关闭连接？' }
+    ];
+    apis.forEach(function (a) {
+      var $card = $('<div class="kr-api-card"/>');
+      $card.append($('<h4/>').html(a.title + ' <code>' + a.sdk + '</code>'));
+      $card.append($('<p class="hint mono"/>').text(a.method + ' ' + a.path));
+      var $tb = $('<div class="toolbar"/>');
+      if (a.code) {
+        $tb.append($('<label class="field-inline"/>').html('代码 <input type="text" class="kr-code" value="600036" style="width:88px;"/>'));
+      }
+      var $btn = $('<button type="button"/>').text('调用');
+      $tb.append($btn);
+      $card.append($tb);
+      $btn.on('click', function () {
+        var data = undefined;
+        if (a.code) data = { code: $card.find('.kr-code').val() };
+        krInvoke({
+          method: a.method,
+          url: a.path,
+          data: data,
+          confirm: a.confirm,
+          $btn: $btn,
+          resultPrefix: 'krMds',
+          label: a.title
+        });
+      });
+      $box.append($card);
+    });
+  }
+
+  function refreshKrOrderGate() {
+    $.getJSON('/api/ops/kuangrui/oes/order-status').done(function (d) {
+      krOrderLive = !!(d && d.orderLive);
+      var hint = (d && (d.hint || d.orderHint || d.message)) || '';
+      $('#krOrderGateHint').html(
+        krOrderLive
+          ? 'orderLive=<b>true</b>，可试单（仍会弹框确认）。'
+          : 'orderLive=<b>false</b>，试单按钮禁用。' + (hint ? ' ' + hint : '')
+          + ' 开关：<code>quant.kuangrui.oes.order-enabled</code>（yml，默认 false）。'
+      );
+      $('#btnKrPlace, #btnKrCancel').prop('disabled', !krOrderLive);
+    }).fail(function () {
+      krOrderLive = false;
+      $('#btnKrPlace, #btnKrCancel').prop('disabled', true);
+      $('#krOrderGateHint').text('无法读取 order-status');
+    });
   }
 
   function showSchedulePanel(panel) {
@@ -3618,6 +3856,9 @@
     } else if (lastWorkspaceMode === 'schedule') {
       showSchedulePanel(options.panel || lastSchedulePanel || 'jobs');
       return;
+    } else if (lastWorkspaceMode === 'kuangrui') {
+      showKuangruiPanel(options.panel || lastKuangruiPanel || 'overview');
+      return;
     } else if (lastWorkspaceMode === 'strategy') {
       showStrategyEval();
       return;
@@ -4639,6 +4880,10 @@
       showSchedulePanel($(this).attr('data-schedule-panel') || 'jobs');
       return;
     }
+    if (mode === 'kuangrui') {
+      showKuangruiPanel($(this).attr('data-kuangrui-panel') || 'overview');
+      return;
+    }
     if (mode === 'strategy') {
       showStrategyEval();
       return;
@@ -4674,6 +4919,53 @@
       e.preventDefault();
       $(this).trigger('click');
     }
+  });
+
+  $('#kuangruiMenu').on('click', 'li[data-kuangrui-panel]', function () {
+    showKuangruiPanel($(this).attr('data-kuangrui-panel') || 'overview');
+  });
+  $('#kuangruiMenu').on('keydown', 'li[data-kuangrui-panel]', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      $(this).trigger('click');
+    }
+  });
+  $('#btnKrOverviewRefresh').on('click', function () { loadKrOverview(); });
+  $('#btnKrPlace').on('click', function () {
+    var body = {
+      code: $('#krPlaceCode').val(),
+      side: $('#krPlaceSide').val(),
+      price: Number($('#krPlacePrice').val()),
+      qty: Number($('#krPlaceQty').val()),
+      clientOrderId: $('#krPlaceCid').val() || undefined
+    };
+    var msg = '确认限价试单？\n' + body.side + ' ' + body.code + ' @' + body.price + ' x' + body.qty
+      + '\n（须 order-enabled；将调用柜台）';
+    krInvoke({
+      method: 'POST',
+      url: '/api/ops/kuangrui/oes/place-test',
+      data: body,
+      confirm: msg,
+      $btn: $('#btnKrPlace'),
+      resultPrefix: 'krOrder',
+      label: '报单试单'
+    });
+  });
+  $('#btnKrCancel').on('click', function () {
+    var body = {
+      origClSeqNo: Number($('#krCancelSeq').val()),
+      code: $('#krCancelCode').val()
+    };
+    var msg = '确认撤单试单？\norigClSeqNo=' + body.origClSeqNo + ' code=' + body.code;
+    krInvoke({
+      method: 'POST',
+      url: '/api/ops/kuangrui/oes/cancel-test',
+      data: body,
+      confirm: msg,
+      $btn: $('#btnKrCancel'),
+      resultPrefix: 'krOrder',
+      label: '撤单试单'
+    });
   });
 
   $('#strategyMenu').on('click', 'li[data-strategy-panel]', function () {

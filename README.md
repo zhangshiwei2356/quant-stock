@@ -198,7 +198,20 @@ sequenceDiagram
 
 白名单表分页只读浏览（`DbTableCatalog`）。列表与详情附带 **磁盘占用**（`information_schema` 的 DATA/INDEX；InnoDB 约为已分配空间）：侧栏显示总量徽章，工具栏摘要与表说明展开区显示数据/索引分项。
 
-### 9. 量化知识 / 应用说明
+### 9. 宽睿联调
+
+工作台一级菜单（数据表之后）：点测宽睿 OES/MDS 运维接口，页面展示**入参 / 出参 JSON**。
+
+| 二级 | 功能 |
+|------|------|
+| 接入总览 | 并行读 MDS / OES / order / static 状态 |
+| OES 只读 | 资金/持仓/委托/成交/快照/对账/证券/交易日/佣金/stop |
+| MDS | 状态/静态/证券状态/时段/合并静态；pull·subscribe·flush·stop（写操作二次确认） |
+| 报撤试单 | `POST .../place-test` / `cancel-test`；须 `orderLive`；页面二次确认；`order-enabled` 仅 yml |
+
+默认旁路关闭；不改金叉主路径。对接手册见「应用说明 → 宽睿文档梳理」。
+
+### 10. 量化知识 / 应用说明
 
 - **量化知识**：A 股基础、指标、涨跌停、T+1、成本、仓位、风控、撮合、回测要点等
 - **应用说明**：系统概述 → **项目 README** → 交易规则 → 能力与待办 → 宽睿文档梳理
@@ -211,7 +224,7 @@ sequenceDiagram
 
 - 进入应用先显示**初始化页**（`docs/home.html`）；侧栏一级菜单互斥展开，再点同一菜单收起并回初始化页
 - 展开一级菜单先显示介绍页（`docs/nav-*.html`），再点二级进入工作台/文档
-- 工作台顺序：**行情** → **个股回测** → **组合回测** → **目标池** → **账户** → **运维中心** → **策略管理** → **数据表** → **量化知识** → **应用说明**
+- 工作台顺序：**行情** → **个股回测** → **组合回测** → **目标池** → **账户** → **运维中心** → **策略管理** → **数据表** → **宽睿联调** → **量化知识** → **应用说明**
 - 页头主题（`localStorage`）：浪花（默认日间：左下起浪、右渐高 + 飞沫）/ 夜盘 / 银河
 
 ---
@@ -299,7 +312,7 @@ sequenceDiagram
 | GET/POST `/api/ops/st-pit` | ST as-of 日切；财报时钟边界说明 |
 | GET/POST `/api/ops/industry-reclass*` | 行业 reclass as-of 日志 |
 | GET/POST `/api/ops/kuangrui/mds/*` | 宽睿 MDS：状态/pull/订阅/flush/stop；M4 `stock-static`/`security-status`/`session-status`（默认 noop；`-Pkuangrui`+开关） |
-| GET/POST `/api/ops/kuangrui/oes/*` | 宽睿 OES：只读查询/对账/stop；`order-status`（M3）；M4 `stock`/`trading-day`/`commission-rate` |
+| GET/POST `/api/ops/kuangrui/oes/*` | 宽睿 OES：只读查询/对账/stop；`order-status`（M3）；M4 `stock`/`trading-day`/`commission-rate`；联调页 `place-test`/`cancel-test`（须 orderLive） |
 | GET `/api/ops/kuangrui/static/{status,stock}` | M4 静态/费率门面状态与合并证券静态 |
 | GET `/api/account/turnover` | 换手门禁（日成交额/权益） |
 | GET `/api/account/ic-decay` | IC 衰减（半衰期/IR；只降仓） |

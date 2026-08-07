@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -534,6 +535,31 @@ public class OpsController {
         });
     }
 
+    /** 联调页限价试单（须 orderLive；页面二次确认）。 */
+    @PostMapping("/kuangrui/oes/place-test")
+    public Map<String, Object> kuangruiOesPlaceTest(@RequestBody Map<String, Object> body) {
+        final Map<String, Object> b = body == null ? new LinkedHashMap<String, Object>() : body;
+        return oesOrDbOff(new OesCall() {
+            @Override
+            public Map<String, Object> call(KuangruiOesOpsFacade f) {
+                return f.placeTest(asStr(b.get("code")), asStr(b.get("side")),
+                        asBd(b.get("price")), asInt(b.get("qty")), asStr(b.get("clientOrderId")));
+            }
+        });
+    }
+
+    /** 联调页撤单试单（须 orderLive；页面二次确认）。 */
+    @PostMapping("/kuangrui/oes/cancel-test")
+    public Map<String, Object> kuangruiOesCancelTest(@RequestBody Map<String, Object> body) {
+        final Map<String, Object> b = body == null ? new LinkedHashMap<String, Object>() : body;
+        return oesOrDbOff(new OesCall() {
+            @Override
+            public Map<String, Object> call(KuangruiOesOpsFacade f) {
+                return f.cancelTest(asInt(b.get("origClSeqNo")), asStr(b.get("code")));
+            }
+        });
+    }
+
     /** M4：OES 证券产品（涨跌停/停牌/股本）。 */
     @GetMapping("/kuangrui/oes/stock")
     public Map<String, Object> kuangruiOesStock(@RequestParam(value = "code", required = false) String code) {
@@ -643,6 +669,41 @@ public class OpsController {
             return m;
         }
         return call.call(f);
+    }
+
+    private static String asStr(Object o) {
+        return o == null ? null : String.valueOf(o).trim();
+    }
+
+    private static Integer asInt(Object o) {
+        if (o == null) {
+            return null;
+        }
+        if (o instanceof Number) {
+            return Integer.valueOf(((Number) o).intValue());
+        }
+        try {
+            return Integer.valueOf(String.valueOf(o).trim());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static BigDecimal asBd(Object o) {
+        if (o == null) {
+            return null;
+        }
+        if (o instanceof BigDecimal) {
+            return (BigDecimal) o;
+        }
+        if (o instanceof Number) {
+            return BigDecimal.valueOf(((Number) o).doubleValue());
+        }
+        try {
+            return new BigDecimal(String.valueOf(o).trim());
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private interface OesCall {
