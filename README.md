@@ -204,10 +204,10 @@ sequenceDiagram
 
 | 二级 | 功能 |
 |------|------|
-| 接入总览 | 并行读 MDS / OES / order / static 状态 |
-| OES 只读 | 资金/持仓/委托/成交/快照/对账/证券/交易日/佣金/stop |
-| MDS | 状态/静态/证券状态/时段/合并静态；pull·subscribe·flush·stop（写操作二次确认） |
-| 报撤试单 | `POST .../place-test` / `cancel-test`；须 `orderLive`；页面二次确认；`order-enabled` 仅 yml |
+| 接入总览 | MDS/OES/报撤/静态状态卡（LIVE 徽章、中文键值、hint、原始 JSON 可展开）+ 快捷入口 |
+| OES 只读 | 左列表点测；右侧固定入参/出参（资金/持仓/委托/成交/快照/对账/证券/交易日/佣金/stop） |
+| MDS 行情 | 同上布局；状态/静态/证券状态/时段/合并静态；pull·subscribe·flush·stop（写操作二次确认） |
+| 报撤试单 | 左表单 + 右侧结果；`place-test`/`cancel-test`；须 `orderLive`；页面二次确认 |
 
 默认旁路关闭；不改金叉主路径。对接手册见「应用说明 → 宽睿文档梳理」。
 

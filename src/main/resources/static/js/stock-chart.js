@@ -370,7 +370,7 @@
         var range = (s.start || '') + ' ~ ' + (s.end || '');
         var phStart = (s.start || 'yyyy-MM-dd') + ' 09:30:00';
         var phEnd = (s.end || 'yyyy-MM-dd') + ' 15:00:00';
-        $('#dataHint').text(range + ' · MySQL行情');
+        $('#dataHint').prop('hidden', false).text(range + ' · MySQL行情');
         $('#singleHint').text(
           '回测时间：默认留空=全部可用K线（当前 ' + range +
           '）。格式 yyyy-MM-dd HH:mm:ss；初始资金默认 100000。'
@@ -382,7 +382,7 @@
         $('#singleBackStart, #backStart').attr('placeholder', phStart);
         $('#singleBackEnd, #backEnd').attr('placeholder', phEnd);
       } else {
-        $('#dataHint').text('运行时合成行情');
+        $('#dataHint').prop('hidden', false).text('运行时合成行情');
         $('#singleHint').text('回测时间默认留空=全部可用K线。格式 yyyy-MM-dd HH:mm:ss。');
         $('#backTimeHint').text('回测时间：默认留空=全部可用K线。格式 yyyy-MM-dd HH:mm:ss。');
       }
@@ -2347,6 +2347,7 @@
   var lastSinglePanel = 'workspace';
   var lastPortfolioPanel = 'workspace';
   var krOrderLive = false;
+  var krOverviewGen = 0;
 
   function setSingleMenuActive(panel) {
     $('#singleMenu li').removeClass('active');
@@ -2476,6 +2477,16 @@
     $('#' + prefix + 'ResultMeta').text(meta || '');
     $('#' + prefix + 'Req').text(krPretty(req));
     $('#' + prefix + 'Rsp').text(krPretty(rsp));
+    var $panel = $('#' + prefix + 'Result');
+    $panel.removeClass('is-empty kr-result-flash');
+    void $panel[0].offsetWidth;
+    $panel.addClass('kr-result-flash is-filled');
+  }
+
+  function krMarkActiveCard($card) {
+    if (!$card || !$card.length) return;
+    $card.closest('.kr-bench-apis').find('.kr-api-card').removeClass('is-active');
+    $card.addClass('is-active');
   }
 
   function krInvoke(opts) {
@@ -2489,6 +2500,7 @@
     if (confirmMsg && !window.confirm(confirmMsg)) {
       return;
     }
+    if ($btn && $btn.length) krMarkActiveCard($btn.closest('.kr-api-card'));
     var reqView = { method: method, url: url };
     if (data != null) {
       if (method === 'GET') reqView.query = data;
@@ -2496,6 +2508,8 @@
     }
     var t0 = Date.now();
     if ($btn && $btn.length) $btn.prop('disabled', true).addClass('is-loading');
+    var $meta = $('#' + resultPrefix + 'ResultMeta');
+    if ($meta.length) $meta.text(label + ' · 请求中…');
     var ajax = {
       url: url,
       method: method,
@@ -2532,36 +2546,218 @@
   }
 
   function loadKrOverview() {
+    var gen = ++krOverviewGen;
     $('#krOverviewMeta').text('加载中…');
-    var urls = [
-      { key: 'MDS', url: '/api/ops/kuangrui/mds/status' },
-      { key: 'OES', url: '/api/ops/kuangrui/oes/status' },
-      { key: 'Order', url: '/api/ops/kuangrui/oes/order-status' },
-      { key: 'Static', url: '/api/ops/kuangrui/static/status' }
+    $('#btnKrOverviewRefresh').prop('disabled', true).addClass('is-loading');
+    var slots = [
+      {
+        key: 'MDS',
+        title: 'MDS 行情',
+        sub: 'L1 落库 / 静态查询',
+        url: '/api/ops/kuangrui/mds/status',
+        panel: 'mds',
+        liveKey: 'live'
+      },
+      {
+        key: 'OES',
+        title: 'OES 交易',
+        sub: '只读查询 / 对账',
+        url: '/api/ops/kuangrui/oes/status',
+        panel: 'oes',
+        liveKey: 'live'
+      },
+      {
+        key: 'Order',
+        title: '报撤能力',
+        sub: '限价报 / 撤试单',
+        url: '/api/ops/kuangrui/oes/order-status',
+        panel: 'order',
+        liveKey: 'orderLive'
+      },
+      {
+        key: 'Static',
+        title: '静态 / 费率',
+        sub: '涨跌停 · 停牌 · 佣金',
+        url: '/api/ops/kuangrui/static/status',
+        panel: 'overview',
+        liveKey: 'applyEnabled'
+      }
     ];
-    var pending = urls.length;
     var $grid = $('#krOverviewCards').empty();
-    urls.forEach(function (u) {
-      $.getJSON(u.url).done(function (d) {
-        if (u.key === 'Order') krOrderLive = !!(d && d.orderLive);
-        var lines = [];
-        ['live', 'orderLive', 'orderEnabled', 'applyEnabled', 'enabled', 'subscribed', 'loggedIn', 'quantKuangruiEnabled', 'quantOesEnabled', 'staticEnabled', 'impl', 'hint', 'orderHint', 'message'].forEach(function (k) {
-          if (d && d[k] != null && d[k] !== '') lines.push(k + ': ' + d[k]);
+    var $sum = $('#krOverviewSummary').empty().append($('<div class="kr-overview-chips"/>'));
+    var $chips = $sum.find('.kr-overview-chips');
+    var pending = slots.length;
+    var results = {};
+
+    function boolish(v) {
+      return v === true || v === 'true' || v === 1 || v === '1';
+    }
+
+    function labelOf(k) {
+      var map = {
+        live: '连接',
+        orderLive: '报撤 live',
+        orderEnabled: 'order-enabled',
+        applyEnabled: '业务覆盖',
+        enabled: '开关',
+        subscribed: '已订阅',
+        loggedIn: '已登录',
+        quantKuangruiEnabled: 'kuangrui.enabled',
+        quantOesEnabled: 'oes.enabled',
+        staticEnabled: 'static-enabled',
+        tradeMode: 'trade-mode',
+        impl: '实现',
+        orderImpl: '报撤实现',
+        configDir: '配置目录',
+        hint: '说明',
+        orderHint: '报撤说明',
+        message: '消息'
+      };
+      return map[k] || k;
+    }
+
+    function fmtVal(v) {
+      if (v === true || v === 'true') return { text: '开', kind: 'on' };
+      if (v === false || v === 'false') return { text: '关', kind: 'off' };
+      if (v == null || v === '') return { text: '—', kind: 'mute' };
+      return { text: String(v), kind: 'text' };
+    }
+
+    function pickLive(slot, d) {
+      if (!d) return null;
+      if (slot.liveKey && d[slot.liveKey] != null) return boolish(d[slot.liveKey]);
+      if (d.live != null) return boolish(d.live);
+      return null;
+    }
+
+    function renderCard(slot, state, d, errHttp) {
+      var live = state === 'ok' ? pickLive(slot, d) : null;
+      var badgeClass = 'kr-badge kr-badge--load';
+      var badgeText = '加载中';
+      if (state === 'err') {
+        badgeClass = 'kr-badge kr-badge--err';
+        badgeText = '失败';
+      } else if (state === 'ok') {
+        if (live === true) {
+          badgeClass = 'kr-badge kr-badge--on';
+          badgeText = 'LIVE';
+        } else {
+          badgeClass = 'kr-badge kr-badge--off';
+          badgeText = 'OFF';
+        }
+      }
+      var $c = $('<div class="kr-status-card"/>').attr('data-kr-slot', slot.key);
+      if (live === true) $c.addClass('is-live');
+      else if (state === 'ok') $c.addClass('is-off');
+      else if (state === 'err') $c.addClass('is-err');
+
+      var $hd = $('<div class="kr-status-head"/>');
+      $hd.append($('<div class="kr-status-titles"/>')
+        .append($('<h4/>').text(slot.title))
+        .append($('<p class="kr-status-sub"/>').text(slot.sub)));
+      $hd.append($('<span/>').attr('class', badgeClass).text(badgeText));
+      $c.append($hd);
+
+      if (state === 'load') {
+        $c.append($('<p class="kr-status-loading"/>').text('拉取 status…'));
+      } else if (state === 'err') {
+        $c.append($('<p class="kr-status-err"/>').text('加载失败 HTTP ' + (errHttp || '—')));
+      } else {
+        var prefer = [
+          'live', 'orderLive', 'applyEnabled', 'orderEnabled', 'subscribed', 'loggedIn',
+          'quantKuangruiEnabled', 'quantOesEnabled', 'staticEnabled', 'tradeMode',
+          'impl', 'orderImpl', 'configDir'
+        ];
+        var $rows = $('<div class="kr-kv-rows"/>');
+        prefer.forEach(function (k) {
+          if (!d || d[k] == null || d[k] === '') return;
+          var fv = fmtVal(d[k]);
+          var $row = $('<div class="kr-kv-row"/>');
+          $row.append($('<span class="kr-kv-k"/>').text(labelOf(k)));
+          if (fv.kind === 'on' || fv.kind === 'off') {
+            $row.append($('<span class="kr-pill"/>').addClass('kr-pill--' + fv.kind).text(fv.text));
+          } else {
+            $row.append($('<span class="kr-kv-v mono"/>').text(fv.text));
+          }
+          $rows.append($row);
         });
-        var $c = $('<div class="kr-status-card"/>');
-        $c.append($('<h4/>').text(u.key));
-        $c.append($('<div class="kr-kv mono"/>').text(lines.length ? lines.join('\n') : krPretty(d)));
-        $grid.append($c);
+        $c.append($rows);
+
+        var hint = (d && (d.hint || d.orderHint || d.message)) || '';
+        if (hint) {
+          $c.append($('<div class="kr-status-hint"/>').text(hint));
+        }
+
+        var $det = $('<details class="kr-status-raw"/>');
+        $det.append($('<summary/>').text('原始 JSON'));
+        $det.append($('<pre class="kr-json"/>').text(krPretty(d)));
+        $c.append($det);
+      }
+
+      if (slot.panel && slot.panel !== 'overview') {
+        var $go = $('<button type="button" class="secondary kr-status-go"/>')
+          .text('进入点测')
+          .attr('data-kr-jump', slot.panel);
+        $c.append($go);
+      }
+      return $c;
+    }
+
+    function paintSummary() {
+      $chips.empty();
+      var on = 0;
+      slots.forEach(function (s) {
+        var r = results[s.key];
+        var live = r && r.state === 'ok' ? pickLive(s, r.data) : null;
+        if (live) on++;
+        var cls = 'kr-chip';
+        var t = s.key + ' · —';
+        if (!r || r.state === 'load') {
+          cls += ' kr-chip--load';
+          t = s.key + ' · …';
+        } else if (r.state === 'err') {
+          cls += ' kr-chip--err';
+          t = s.key + ' · 失败';
+        } else if (live) {
+          cls += ' kr-chip--on';
+          t = s.key + ' · LIVE';
+        } else {
+          cls += ' kr-chip--off';
+          t = s.key + ' · OFF';
+        }
+        $chips.append($('<span/>').attr('class', cls).text(t));
+      });
+      var tip = on === 0
+        ? '当前均为旁路关闭（noop）。要真连柜台请用 -Pkuangrui 并打开对应开关。'
+        : ('已 live ' + on + '/' + slots.length + ' 项；可点下方卡片或右上快捷入口进入点测。');
+      $sum.find('.kr-overview-tip').remove();
+      $sum.append($('<p class="kr-overview-tip"/>').text(tip));
+    }
+
+    slots.forEach(function (slot) {
+      var $ph = renderCard(slot, 'load', null, null);
+      $grid.append($ph);
+      results[slot.key] = { state: 'load' };
+      $.getJSON(slot.url).done(function (d) {
+        if (gen !== krOverviewGen) return;
+        if (slot.key === 'Order') krOrderLive = !!(d && d.orderLive);
+        results[slot.key] = { state: 'ok', data: d };
+        $ph.replaceWith(renderCard(slot, 'ok', d, null));
       }).fail(function (xhr) {
-        var $c = $('<div class="kr-status-card"/>');
-        $c.append($('<h4/>').text(u.key));
-        $c.append($('<div class="kr-kv"/>').text('加载失败 HTTP ' + (xhr && xhr.status)));
-        $grid.append($c);
+        if (gen !== krOverviewGen) return;
+        results[slot.key] = { state: 'err' };
+        $ph.replaceWith(renderCard(slot, 'err', null, xhr && xhr.status));
       }).always(function () {
+        if (gen !== krOverviewGen) return;
         pending--;
-        if (pending <= 0) $('#krOverviewMeta').text('已刷新 ' + new Date().toLocaleTimeString());
+        paintSummary();
+        if (pending <= 0) {
+          $('#krOverviewMeta').text('已刷新 ' + new Date().toLocaleTimeString());
+          $('#btnKrOverviewRefresh').prop('disabled', false).removeClass('is-loading');
+        }
       });
     });
+    paintSummary();
   }
 
   function ensureKrOesCards() {
@@ -2583,15 +2779,16 @@
     ];
     apis.forEach(function (a) {
       var $card = $('<div class="kr-api-card"/>');
-      $card.append($('<h4/>').html(a.title + ' <code>' + a.sdk + '</code>'));
-      $card.append($('<p class="hint mono"/>').text(a.method + ' ' + a.path));
-      var $tb = $('<div class="toolbar"/>');
+      var $hd = $('<div class="kr-api-card-head"/>');
+      $hd.append($('<h4/>').html(a.title + ' <code>' + a.sdk + '</code>'));
+      var $btn = $('<button type="button" class="kr-api-call"/>').text('调用');
+      $hd.append($btn);
+      $card.append($hd);
+      $card.append($('<p class="hint mono kr-api-path"/>').text(a.method + ' ' + a.path));
       if (a.code) {
-        $tb.append($('<label class="field-inline"/>').html('代码 <input type="text" class="kr-code" value="600036" style="width:88px;"/>'));
+        $card.append($('<div class="toolbar kr-api-params"/>')
+          .append($('<label class="field-inline"/>').html('代码 <input type="text" class="kr-code" value="600036" style="width:88px;"/>')));
       }
-      var $btn = $('<button type="button"/>').text('调用');
-      $tb.append($btn);
-      $card.append($tb);
       $btn.on('click', function () {
         var data = undefined;
         if (a.code) data = { code: $card.find('.kr-code').val() };
@@ -2626,15 +2823,16 @@
     ];
     apis.forEach(function (a) {
       var $card = $('<div class="kr-api-card"/>');
-      $card.append($('<h4/>').html(a.title + ' <code>' + a.sdk + '</code>'));
-      $card.append($('<p class="hint mono"/>').text(a.method + ' ' + a.path));
-      var $tb = $('<div class="toolbar"/>');
+      var $hd = $('<div class="kr-api-card-head"/>');
+      $hd.append($('<h4/>').html(a.title + ' <code>' + a.sdk + '</code>'));
+      var $btn = $('<button type="button" class="kr-api-call"/>').text('调用');
+      $hd.append($btn);
+      $card.append($hd);
+      $card.append($('<p class="hint mono kr-api-path"/>').text(a.method + ' ' + a.path));
       if (a.code) {
-        $tb.append($('<label class="field-inline"/>').html('代码 <input type="text" class="kr-code" value="600036" style="width:88px;"/>'));
+        $card.append($('<div class="toolbar kr-api-params"/>')
+          .append($('<label class="field-inline"/>').html('代码 <input type="text" class="kr-code" value="600036" style="width:88px;"/>')));
       }
-      var $btn = $('<button type="button"/>').text('调用');
-      $tb.append($btn);
-      $card.append($tb);
       $btn.on('click', function () {
         var data = undefined;
         if (a.code) data = { code: $card.find('.kr-code').val() };
@@ -4931,6 +5129,9 @@
     }
   });
   $('#btnKrOverviewRefresh').on('click', function () { loadKrOverview(); });
+  $('#viewKuangruiOverview').on('click', '[data-kr-jump]', function () {
+    showKuangruiPanel($(this).attr('data-kr-jump') || 'overview');
+  });
   $('#btnKrPlace').on('click', function () {
     var body = {
       code: $('#krPlaceCode').val(),

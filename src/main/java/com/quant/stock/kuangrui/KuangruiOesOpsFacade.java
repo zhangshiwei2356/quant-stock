@@ -87,8 +87,7 @@ public class KuangruiOesOpsFacade {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.put("live", oesReadonlyService.isLive());
         if (!oesReadonlyService.isLive()) {
-            m.put("ok", false);
-            m.put("message", "OES 未启用或未编译进 classpath（见 status.hint）");
+            putOesNotLive(m);
             return m;
         }
         try {
@@ -251,8 +250,7 @@ public class KuangruiOesOpsFacade {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.put("live", oesReadonlyService.isLive());
         if (!oesReadonlyService.isLive()) {
-            m.put("ok", false);
-            m.put("message", "OES 未启用或未编译进 classpath（见 status.hint）");
+            putOesNotLive(m);
             m.putAll(oesReadonlyService.snapshot());
             return m;
         }
@@ -486,12 +484,27 @@ public class KuangruiOesOpsFacade {
         return 0;
     }
 
+    /** 未 live 时附带 status.hint，联调页可直接看到启用步骤。 */
+    private void putOesNotLive(Map<String, Object> m) {
+        m.put("ok", false);
+        m.put("live", false);
+        m.put("message", "OES 未启用或未编译进 classpath");
+        Map<String, Object> st = oesReadonlyService.status();
+        if (st != null) {
+            if (st.get("hint") != null) {
+                m.put("hint", st.get("hint"));
+            }
+            if (st.get("impl") != null) {
+                m.put("impl", st.get("impl"));
+            }
+        }
+    }
+
     private Map<String, Object> queryBlock(String key, QueryCall call) {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.put("live", oesReadonlyService.isLive());
         if (!oesReadonlyService.isLive()) {
-            m.put("ok", false);
-            m.put("message", "OES 未启用或未编译进 classpath（见 status.hint）");
+            putOesNotLive(m);
             m.put(key, new ArrayList<Object>());
             return m;
         }
