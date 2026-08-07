@@ -43,7 +43,7 @@
   <li>入池流水线：日线入库 → <code>factor-daily-rebuild</code>（可选；<code>pool-rebuild</code> 默认不预刷）→ <code>pool-rebuild</code>（默认轻量扫池，<code>pool-rebuild-full-backtest=false</code>）→ 池内补分钟。数据健康：全市场看日线、池内看分钟；待处置告警与特殊项（北交所/退市·PT/停牌）分表</li>
   <li>推荐手动三步（定时任务默认关，运维「执行一次」）：① <code>day-collect</code> 全市场日线（同步列表；已齐跳过、否则增量；默认4线程）→ ② <code>pool-rebuild</code> 入池 → ③ <code>pool-minute-backfill</code> 池内分钟（尽量~90日并补到最近）。依赖本机 Python + pytdx/pymysql（<code>quant.tdx-script.enabled</code> 默认 true）。全部任务「执行一次」均后台跑：弹框 + 任务管理页内横幅同步进度，可「收起到页内」；长任务（TDX 日线/分钟、因子重算、入池、数据校验、行情采集）上报行级 <code>i/n</code>；入池若开预刷则分「因子预刷 → 粗筛扫描」两段进度</li>
   <li>回测区间默认留空 = 全量 K 线；初始资金默认 <b>100000</b></li>
-  <li>页头主题默认<strong>极光</strong>（浅色日间：流动极光帘 + 淡粒子）；另有夜盘 / 银河，可切换并记住</li>
+  <li>页头主题默认<strong>浪花</strong>（浅色日间：左下起浪、向右渐高 + 飞沫 + 淡粒子）；另有夜盘 / 银河，可切换并记住</li>
 </ul>
 
 <h4>策略与风控摘要</h4>

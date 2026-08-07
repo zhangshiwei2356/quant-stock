@@ -312,7 +312,7 @@
   };
 
   function applyTheme(theme) {
-    // 已下线主题并入极光日间；波浪→银河；代码雨/Vanta→夜盘；旧 aurora→极光
+    // 已下线主题并入浪花日间；波浪→银河；代码雨/Vanta→夜盘；旧 aurora→浪花
     if (theme === 'interact' || theme === 'finance' || theme === 'day' || theme === 'circuit' ||
         theme === 'rings' || theme === 'worldclock' || theme === 'heatspots' || theme === 'isocandles' ||
         theme === 'orbits') {

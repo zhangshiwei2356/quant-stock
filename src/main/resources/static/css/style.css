@@ -83,39 +83,39 @@ html[data-theme="forest"] {
   --table-border: rgba(42, 74, 61, 0.55);
 }
 
-/* 极光：浅色日间 UI + 流动极光帘背景（默认主题） */
+/* 浪花：浅色日间 UI + 密浪飞沫背景（默认主题，data-theme=cosmos） */
 html[data-theme="cosmos"] {
-  --bg-0: #f0f5fc;
-  --bg-1: #e8eef8;
-  --bg-2: #dde6f2;
+  --bg-0: #eef4fb;
+  --bg-1: #e6eef8;
+  --bg-2: #d8e4f2;
   --panel: rgba(255, 255, 255, 0.94);
   --panel-solid: #ffffff;
   --header-bg: rgba(255, 255, 255, 0.93);
-  --border: #c9d6e8;
-  --border-focus: #5a9fd4;
+  --border: #c4d4e8;
+  --border-focus: #3db8e8;
   --text: #1a2432;
   --muted: #64748b;
-  --accent: #4a8fc8;
-  --accent-deep: #3876a8;
+  --accent: #3a9fd4;
+  --accent-deep: #2d86b8;
   --buy: #0f766e;
   --sell: #dc2626;
   --warn: #c2410c;
-  --row-alt: rgba(90, 159, 212, 0.04);
-  --row-hover: rgba(120, 145, 230, 0.08);
+  --row-alt: rgba(61, 184, 232, 0.045);
+  --row-hover: rgba(120, 145, 230, 0.09);
   --shadow: 0 6px 20px rgba(40, 70, 110, 0.07);
   --chart-bg: rgba(248, 250, 253, 0.97);
-  --table-head: #e8eef8;
-  --glow-a: rgba(90, 170, 230, 0.12);
-  --glow-b: rgba(150, 135, 220, 0.1);
-  --accent-soft: rgba(74, 143, 200, 0.12);
+  --table-head: #e6eef8;
+  --glow-a: rgba(61, 184, 232, 0.14);
+  --glow-b: rgba(150, 120, 240, 0.11);
+  --accent-soft: rgba(58, 159, 212, 0.13);
   --input-bg: #ffffff;
-  --input-bg-focus: #f5f8fc;
-  --input-border-hover: #b0c0d0;
-  --focus-ring: rgba(90, 159, 212, 0.22);
+  --input-bg-focus: #f3f8fc;
+  --input-border-hover: #a8bdd4;
+  --focus-ring: rgba(61, 184, 232, 0.24);
   --btn-secondary: #5b6b7c;
   --btn-secondary-hover: #4a5868;
-  --panel-border-hover: #b0c0d0;
-  --table-border: rgba(201, 214, 232, 0.95);
+  --panel-border-hover: #a8bdd4;
+  --table-border: rgba(196, 212, 232, 0.95);
 }
 
 /* 旧 interact 主题并入日间浅色 */
@@ -1047,7 +1047,8 @@ body.home-theme-peek .app-header {
 }
 
 .nav-intro-panel {
-  max-width: 880px;
+  max-width: none;
+  width: 100%;
   padding: 28px 32px 30px;
   position: relative;
   overflow: hidden;

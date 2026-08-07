@@ -1,6 +1,6 @@
 /**
  * 多主题动态背景（无第三方依赖）
- * - cosmos：日间极光 —— 浅色天幕 + 柔和极光帘 + 淡粒子连线，界面名「极光」（默认）
+ * - cosmos：日间浪花 —— 浅色天幕 + 左→右递增高浪花 + 淡粒子，界面名「浪花」（默认）
  * - forest / wave：背景由 starfield-bg.js（Three.js 银河）负责，界面名「银河」
  * - night / matrix：夜盘深色 + 慢速代码雨
  * pointer-events:none，交互监听挂在 window，不挡点击。
@@ -68,32 +68,27 @@
       bg: '10, 20, 17'
     },
 
-    /* 极光(cosmos) · 默认日间：浅色天幕 + 流动极光帘 + 淡粒子 */
+    /* 浪花(cosmos) · 默认日间：浅色天幕 + 左→右密浪 + 飞沫 + 淡粒子 */
     cosmos: {
       mode: 'net',
-      count: 72,
-      connect: 130,
-      speed: 0.42,
+      count: 64,
+      connect: 120,
+      speed: 0.38,
       bg: '240, 245, 252',
       trail: 1,
-      particle: [110, 155, 210],
-      line: '130, 170, 215',
-      lineAlpha: 0.18,
-      glow: [170, 205, 240, 0.1],
+      particle: [95, 160, 220],
+      line: '110, 175, 230',
+      lineAlpha: 0.16,
+      glow: [140, 200, 245, 0.1],
       stars: false,
       meteors: false,
-      aurora: true,
+      aurora: false,
       auroraDay: true,
-      auroraSpeed: 0.00038,
+      surfWaves: true,
+      surfLayers: 8,
+      surfSpeed: 0.00062,
       noInput: true,
-      softDots: true,
-      auroraColors: [
-        [90, 170, 230, 0.16],
-        [120, 145, 230, 0.13],
-        [70, 195, 175, 0.12],
-        [150, 135, 220, 0.1],
-        [100, 200, 210, 0.09]
-      ]
+      softDots: true
     }
   };
 
@@ -791,7 +786,7 @@
 
   /** 日间极光：竖直流动光帘（多层正弦偏移 + 纵向渐隐） */
   function drawDayAuroraRibbons(c, time) {
-    var sp = c.auroraSpeed || 0.00038;
+    var sp = c.auroraSpeed || 0.00058;
     var colors = c.auroraColors;
     var i, col, baseX, amp, amp2, freq, freq2, phase, bandW, y, x, t, aTop, aMid, grad;
     var step = height < 700 ? 5 : 4;
@@ -802,12 +797,12 @@
     for (i = 0; i < colors.length; i++) {
       col = colors[i];
       baseX = width * (0.12 + (i / Math.max(1, colors.length - 1)) * 0.76);
-      amp = width * (0.04 + (i % 3) * 0.012);
-      amp2 = width * (0.018 + (i % 2) * 0.01);
+      amp = width * (0.055 + (i % 3) * 0.016);
+      amp2 = width * (0.024 + (i % 2) * 0.012);
       freq = 0.008 + i * 0.0011;
       freq2 = 0.015 + i * 0.0007;
-      phase = time * sp * (1.1 + i * 0.35) + i * 1.7;
-      bandW = 18 + i * 5 + Math.sin(time * sp * 2 + i) * 4;
+      phase = time * sp * (1.25 + i * 0.4) + i * 1.7;
+      bandW = 20 + i * 5.5 + Math.sin(time * sp * 2.4 + i) * 5;
 
       // 主体光帘：自上而下渐隐，中段略亮
       for (y = -20; y <= height + 20; y += step) {
@@ -815,9 +810,9 @@
         x = baseX
           + Math.sin(y * freq + phase) * amp
           + Math.sin(y * freq2 + phase * 1.35) * amp2
-          + Math.cos(time * sp * 1.2 + i + y * 0.002) * (width * 0.012);
+          + Math.cos(time * sp * 1.35 + i + y * 0.002) * (width * 0.016);
         aTop = col[3] * (0.35 + 0.65 * Math.sin(Math.PI * Math.min(1, Math.max(0, t * 1.15))));
-        aMid = aTop * (0.55 + 0.45 * Math.sin(time * sp * 3.2 + i + t * 4));
+        aMid = aTop * (0.55 + 0.45 * Math.sin(time * sp * 3.6 + i + t * 4));
         if (aMid < 0.01) continue;
 
         grad = ctx.createLinearGradient(x - bandW, y, x + bandW, y);
@@ -831,17 +826,202 @@
       }
 
       // 顶部柔光团：增强「极光从天幕洒下」感
-      var hx = baseX + Math.sin(phase * 0.7) * width * 0.06;
+      var hx = baseX + Math.sin(phase * 0.7) * width * 0.08;
       var hy = height * (0.08 + (i % 3) * 0.05);
-      var hr = Math.max(width, height) * (0.14 + (i % 2) * 0.04);
+      var hr = Math.max(width, height) * (0.15 + (i % 2) * 0.045);
       var hg = ctx.createRadialGradient(hx, hy, 0, hx, hy, hr);
-      hg.addColorStop(0, rgba(col, col[3] * 0.55));
-      hg.addColorStop(0.45, rgba(col, col[3] * 0.18));
+      hg.addColorStop(0, rgba(col, col[3] * 0.62));
+      hg.addColorStop(0.45, rgba(col, col[3] * 0.2));
       hg.addColorStop(1, rgba(col, 0));
       ctx.fillStyle = hg;
       ctx.beginPath();
       ctx.arc(hx, hy, hr, 0, Math.PI * 2);
       ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  /** 克制科技 HUD：淡网格 + 偶发水平扫描线（不挡可读） */
+  function drawTechHud(c, time) {
+    if (!c.techGrid && !c.techScan) return;
+
+    ctx.save();
+    var ga = c.techGridAlpha != null ? c.techGridAlpha : 0.055;
+    var reduce = prefersReducedMotion();
+
+    if (c.techGrid) {
+      var gap = Math.max(36, Math.min(56, Math.floor(Math.min(width, height) / 18)));
+      var vanishY = height * 0.12;
+      var vanishX = width * 0.5;
+      var y, x, t, alpha, x0, x1;
+      var drift = reduce ? 0 : (time * 0.012) % gap;
+
+      ctx.lineWidth = 1;
+      // 水平线：略带透视收敛感
+      for (y = -gap; y < height + gap; y += gap) {
+        t = Math.max(0, Math.min(1, (y + drift) / height));
+        alpha = ga * (0.35 + 0.65 * (1 - t));
+        if (alpha < 0.008) continue;
+        x0 = vanishX + (0 - vanishX) * (0.55 + 0.45 * t);
+        x1 = vanishX + (width - vanishX) * (0.55 + 0.45 * t);
+        ctx.strokeStyle = 'rgba(90, 160, 220,' + alpha + ')';
+        ctx.beginPath();
+        ctx.moveTo(x0, y + drift);
+        ctx.lineTo(x1, y + drift);
+        ctx.stroke();
+      }
+      // 竖线：上部略向中心收束
+      for (x = 0; x <= width; x += gap) {
+        t = Math.abs(x - vanishX) / (width * 0.5);
+        alpha = ga * (0.45 + 0.4 * (1 - Math.min(1, t)));
+        ctx.strokeStyle = 'rgba(120, 150, 230,' + alpha + ')';
+        ctx.beginPath();
+        ctx.moveTo(lerp(vanishX, x, 0.22), vanishY);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+      }
+    }
+
+    if (c.techScan && !reduce) {
+      // 两道慢速扫描：主带 + 弱残影，周期约 9s / 14s
+      var scans = [
+        { period: 9000, thick: 2.2, a: 0.11, hue: '80,200,235' },
+        { period: 14000, thick: 1.4, a: 0.06, hue: '150,130,240', phase: 0.45 }
+      ];
+      var s, prog, sy, band, g;
+      for (s = 0; s < scans.length; s++) {
+        prog = ((time / scans[s].period) + (scans[s].phase || 0)) % 1;
+        // 仅前 28% 行程可见，形成「偶发」感
+        if (prog > 0.28) continue;
+        sy = -40 + (height + 80) * (prog / 0.28);
+        band = scans[s].thick + height * 0.012;
+        g = ctx.createLinearGradient(0, sy - band, 0, sy + band);
+        g.addColorStop(0, 'rgba(' + scans[s].hue + ',0)');
+        g.addColorStop(0.45, 'rgba(' + scans[s].hue + ',' + (scans[s].a * 0.55) + ')');
+        g.addColorStop(0.5, 'rgba(' + scans[s].hue + ',' + scans[s].a + ')');
+        g.addColorStop(0.55, 'rgba(' + scans[s].hue + ',' + (scans[s].a * 0.55) + ')');
+        g.addColorStop(1, 'rgba(' + scans[s].hue + ',0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, sy - band, width, band * 2);
+      }
+    }
+
+    ctx.restore();
+  }
+
+  /**
+   * 日间浪花：自左下方起浪，向右逐渐升高；近层更高更碎。
+   */
+  function drawDaySurfWaves(c, time) {
+    if (!c.surfWaves) return;
+
+    var layers = c.surfLayers || 8;
+    var sp = c.surfSpeed || 0.00062;
+    var reduce = prefersReducedMotion();
+    var step = width < 900 ? 5 : 3;
+    var i, x, y, nx, rise, baseAtX, ampAtX, freq, phase, t, crest, foamA, j, fx, fy, fr;
+    var fillColors = [
+      [160, 205, 235, 0.08],
+      [140, 195, 232, 0.09],
+      [120, 185, 228, 0.1],
+      [100, 175, 225, 0.12],
+      [85, 168, 222, 0.13],
+      [70, 160, 218, 0.15],
+      [58, 152, 214, 0.16],
+      [48, 145, 210, 0.18]
+    ];
+    var strokeColors = [
+      [200, 230, 250, 0.28],
+      [195, 228, 248, 0.32],
+      [190, 225, 246, 0.36],
+      [185, 222, 245, 0.4],
+      [210, 235, 250, 0.48],
+      [230, 245, 255, 0.55],
+      [245, 250, 255, 0.62],
+      [255, 255, 255, 0.72]
+    ];
+
+    function surfY(px, layerT, frq, ph, base0, amp0, riseH, ampGain) {
+      var n = Math.max(0, Math.min(1, px / width));
+      // smoothstep：左低右高更自然
+      var r = n * n * (3 - 2 * n);
+      var b = base0 - r * riseH;
+      var a = amp0 + r * ampGain;
+      return b
+        + Math.sin(px * frq - ph) * a
+        + Math.sin(px * frq * 2.15 - ph * 1.4) * a * 0.32
+        + Math.sin(px * frq * 0.55 - ph * 0.7) * a * 0.12;
+    }
+
+    ctx.save();
+
+    for (i = 0; i < layers; i++) {
+      t = i / Math.max(1, layers - 1);
+      // 左端贴底，右端逐渐抬升（一浪高过一浪沿 x）
+      var baseLeft = height * (0.94 - t * 0.018);
+      var riseH = height * (0.26 + t * 0.1);
+      var amp0 = height * (0.01 + t * 0.012);
+      var ampGain = height * (0.04 + t * 0.055);
+      freq = 0.014 + t * 0.0045;
+      phase = (reduce ? 0 : time * sp * (1.05 + t * 1.1)) + i * 0.95;
+
+      ctx.beginPath();
+      ctx.moveTo(0, height);
+      for (x = 0; x <= width + step; x += step) {
+        y = surfY(x, t, freq, phase, baseLeft, amp0, riseH, ampGain);
+        if (x === 0) ctx.lineTo(0, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.lineTo(width, height);
+      ctx.closePath();
+
+      var fc = fillColors[Math.min(i, fillColors.length - 1)];
+      var topY = baseLeft - riseH - amp0 - ampGain;
+      var grad = ctx.createLinearGradient(0, Math.max(0, topY), 0, height);
+      grad.addColorStop(0, rgba(fc, fc[3]));
+      grad.addColorStop(0.55, rgba(fc, fc[3] * 0.4));
+      grad.addColorStop(1, rgba(fc, 0.015));
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      var sc = strokeColors[Math.min(i, strokeColors.length - 1)];
+      ctx.beginPath();
+      for (x = 0; x <= width + step; x += step) {
+        y = surfY(x, t, freq, phase, baseLeft, amp0, riseH, ampGain);
+        if (x === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = rgba(sc, sc[3] * (0.5 + t * 0.4));
+      ctx.lineWidth = 1 + t * 1.1;
+      ctx.stroke();
+
+      if (reduce) continue;
+      for (x = 0; x <= width; x += 5 + ((i % 3) | 0)) {
+        nx = x / width;
+        rise = nx * nx * (3 - 2 * nx);
+        // 左侧几乎不起沫，越往右飞沫越多
+        if (rise < 0.08) continue;
+        crest = Math.sin(x * freq - phase);
+        if (crest < 0.55) continue;
+        y = surfY(x, t, freq, phase, baseLeft, amp0, riseH, ampGain);
+        foamA = (crest - 0.55) / 0.45 * (0.18 + t * 0.45) * (0.35 + rise * 0.9);
+        ctx.fillStyle = 'rgba(255,255,255,' + foamA + ')';
+        ctx.beginPath();
+        ctx.arc(x, y - 1 - t * 2, 0.9 + t * 1.2 + crest * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+        if (crest > 0.78 && rise > 0.25) {
+          for (j = 0; j < 3; j++) {
+            fx = x + (j - 1) * (2.5 + t);
+            fy = y - 4 - t * 6 - j * 2.2;
+            fr = 0.6 + t * 0.7 + (crest - 0.78) * 1.5;
+            ctx.fillStyle = 'rgba(255,255,255,' + (foamA * (0.7 - j * 0.18)) + ')';
+            ctx.beginPath();
+            ctx.arc(fx, fy, fr, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
     }
 
     ctx.restore();
@@ -871,7 +1051,7 @@
       ctx.fillRect(0, 0, width, height);
     }
 
-    drawAurora(c, time);
+    drawDaySurfWaves(c, time);
 
     var i;
     for (i = 0; i < particles.length; i++) {
@@ -884,11 +1064,11 @@
 
     // 中心留白，保证工作台可读
     var veil = ctx.createRadialGradient(
-      width * 0.5, height * 0.38, Math.min(width, height) * 0.1,
-      width * 0.5, height * 0.42, Math.max(width, height) * 0.58
+      width * 0.5, height * 0.36, Math.min(width, height) * 0.12,
+      width * 0.5, height * 0.4, Math.max(width, height) * 0.55
     );
-    veil.addColorStop(0, 'rgba(' + bg + ', 0.42)');
-    veil.addColorStop(0.45, 'rgba(' + bg + ', 0.14)');
+    veil.addColorStop(0, 'rgba(' + bg + ', 0.52)');
+    veil.addColorStop(0.5, 'rgba(' + bg + ', 0.14)');
     veil.addColorStop(1, 'rgba(' + bg + ', 0)');
     ctx.fillStyle = veil;
     ctx.fillRect(0, 0, width, height);
