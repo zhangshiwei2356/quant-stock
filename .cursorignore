@@ -1,0 +1,44 @@
+# 排除 AI 不需索引的大目录/产物；保留编码与文档同步所需路径。
+
+# 构建与编译产物
+target/
+build/
+out/
+*.class
+*.jar
+*.war
+
+# 依赖与缓存
+.m2/
+.gradle/
+lib/
+node_modules/
+
+# IDE与系统文件
+.idea/
+.vscode/
+.git/
+.DS_Store
+
+# 日志与临时文件
+logs/
+*.log
+*.tmp
+
+# 大体积 SQL dump（保留 mapper schema 与 scripts）
+*.sql
+!src/main/resources/mapper/**/*.sql
+!scripts/
+!scripts/**
+
+# 模拟 K 线种子 JSON（体积大；保留说明与 meta）
+src/main/resources/data/kline/**
+!src/main/resources/data/kline/README.md
+!src/main/resources/data/kline/meta.json
+
+# 知识库万轮正文（占索引大头；保留 INDEX/topics 等入口）
+docs/quant-knowledge/rounds/
+
+# 本地 agent 过程产物
+.superpowers/
+agent-transcripts/
