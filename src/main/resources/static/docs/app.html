@@ -3,16 +3,17 @@
 
 <h4>如何启动</h4>
 <ul>
-  <li>项目根目录：执行 <code>mapper/schema.sql</code> 后 <code>mvn spring-boot:run</code></li>
-  <li>浏览器：<code>http://localhost:8080/stock.html</code></li>
+  <li>项目根目录：执行 <code>mapper/schema.sql</code> 后 <code>mvn spring-boot:run</code>（或 IDEA 运行主类）</li>
+  <li>默认 profile=<b>local</b>：叠加 <code>application-local.yml</code>（本机可开宽睿开关）；基线 <code>application.yml</code> 宽睿仍默认关</li>
+  <li>宽睿真客户端另需 Maven profile <code>kuangrui</code> + <code>config/kuangrui/local</code> 账号；浏览器：<code>http://localhost:8080/stock.html</code></li>
   <li>空库自动导入 1 分钟种子（有 <code>MIN_1.json</code> 则用之，否则由 <code>MIN_5.json</code> 拆成 1 分钟）</li>
 </ul>
 
 <h4>默认行情 / 交易模式</h4>
 <ul>
-  <li><b><code>quant.market-mode=db</code>（行情从哪来）</b>：分钟读 MySQL <code>market_1min</code>（5/15/30/60 内存聚合）；日线默认优先 <code>market_daily</code>（<code>quant.day-source=auto</code>，空则分钟聚日）。空库启动自动灌演示 1 分钟种子。可选 <code>json</code>（classpath JSON，偏开发）、<code>sdk</code>（外部行情客户端，当前多为桩）。宽睿 MDS L1 落库为<strong>旁路开关</strong>（默认关）：<code>quant.kuangrui.*</code>，需 <code>mvn -Pkuangrui</code> 打包</li>
+  <li><b><code>quant.market-mode=db</code>（行情从哪来）</b>：分钟读 MySQL <code>market_1min</code>（5/15/30/60 内存聚合）；日线默认优先 <code>market_daily</code>（<code>quant.day-source=auto</code>，空则分钟聚日）。空库启动自动灌演示 1 分钟种子。可选 <code>json</code>（classpath JSON，偏开发）、<code>sdk</code>（外部行情客户端，当前多为桩）。宽睿 MDS L1 为旁路：基线 yml 默认关；本机 <code>application-local.yml</code> 可开，真客户端需 <code>mvn -Pkuangrui</code></li>
   <li><b><code>quant.trade-mode=sim</code>（单怎么成交）</b>：本地模拟账本——下单即时 <code>FILLED</code> 并改现金/持仓，可持久化；<strong>不连券商柜台</strong>。可选 <code>sdk</code>：先 <code>SUBMITTED</code> 占资/占仓，由 <code>sync-orders</code> 再推进成交（默认本地桩；宽睿 OES 报撤为可选旁路，需 <code>oes.order-enabled</code>）</li>
-  <li>二者组合含义：默认开箱即用「库内行情 + 本地模拟成交」，可回测/扫池/纸面账户，无需宽睿或券商账号</li>
+  <li>二者组合含义：默认开箱即用「库内行情 + 本地模拟成交」；本机 local 开宽睿开关后仍须 <code>-Pkuangrui</code> 才 live</li>
 </ul>
 
 <h4>架构一览</h4>
@@ -33,7 +34,7 @@
   <li><b>运维中心</b>：任务管理 / 数据健康（覆盖检查：待处置告警 vs 特殊项分表；分钟自洽；MDS/TDX 抽样对账） / 运行参数（全局白名单 + 按策略稀疏参数包；已注册策略列表与纸面激活切换；任务种子默认全关）</li>
   <li><b>策略管理</b>：二级「策略总览」——注册策略介绍（默认收起）、满分 100 综合评分与回测历史；无回测时自动用目标池补种（逐只单股+全池组合）；空白/指纹旧名启动自动补全；<strong>不改参/不激活</strong>（仍在运维运行参数）</li>
   <li><b>数据表</b>：白名单表分页只读；侧栏/摘要展示磁盘占用（数据+索引）</li>
-  <li><b>宽睿联调</b>：接入总览（LIVE/OFF）+ OES 只读 / MDS 行情 / 报撤<strong>左右分栏</strong>（左点测、右固定入参出参）；报撤须 yml <code>order-enabled</code>+二次确认；默认旁路关</li>
+  <li><b>宽睿联调</b>：接入总览（LIVE/OFF）+ OES 只读 / MDS 行情 / 报撤<strong>左右分栏</strong>；报撤须 <code>order-enabled</code>+二次确认；开关见 <code>application-local.yml</code>（基线 yml 仍默认关）</li>
   <li><b>量化知识</b> / <b>应用说明</b>：指标与规则文档；应用说明含系统概述、项目 README、交易规则、能力与待办、宽睿梳理；可导出 PDF</li>
 </ul>
 

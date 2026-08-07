@@ -24,6 +24,8 @@ mvn spring-boot:run
 
 空库启动时会自动从 classpath JSON 导入 **1 分钟**模拟数据到 `market_1min`（优先 `MIN_1.json`，否则由 `MIN_5.json` 拆分）。默认不连 Redis（配置存在但自动配置已排除）。
 
+**配置分层**：`application.yml` 为仓库基线（宽睿开关默认关）；默认激活 profile **`local`**，加载 `application-local.yml`（本仓库已开宽睿旁路开关，**不含账号**）。真客户端仍需 `mvn -Pkuangrui`（或 IDEA 勾选同名 profile）+ `config/kuangrui/local` 与账号环境变量。关闭本机覆盖：`--spring.profiles.active=default` 或设 `SPRING_PROFILES_ACTIVE`。
+
 页面内也可查看本文件：**应用说明 → 项目 README**（服务端实时渲染 `README.md`）。
 
 ---
@@ -274,10 +276,11 @@ sequenceDiagram
 | `quant.pool-rebuild-full-backtest` | `false`（默认）轻量扫池只算指标/信号/动量；`true` 时每只跑完整 `BackTestEngine`（很慢） |
 | `quant.pool-rebuild-backfill-minute` | `false`（默认）扫池后异步跑 TDX 池内分钟脚本；需同时开 `tdx-script.enabled` |
 | `quant.tdx-script.*` | 通达信 Python 灌数桥接（**默认 enabled=true**）；`python` / `working-dir` / `min1-script` / `daily-script` / `timeout-seconds`；无 Python/pytdx 时可改 `false` |
-| `quant.kuangrui.enabled` / `mds.enabled` | 宽睿旁路总闸 / MDS L1（**默认 false**）；真实客户端需 `mvn -Pkuangrui`；价÷10000 写 `market_1min(MDS)` |
-| `quant.kuangrui.static-enabled` | M4 静态/费率业务覆盖（**默认 false**）；涨跌停/停牌/股本/当日交易日/佣金优先宽睿，失败回退本地 |
-| `quant.kuangrui.oes.enabled` / `oes.order-enabled` | OES 只读 / 报单总闸（**默认 false**）；M3 报撤需二者+`trade-mode=sdk` |
+| `quant.kuangrui.enabled` / `mds.enabled` | 宽睿旁路总闸 / MDS L1（**application.yml 默认 false**；本机 `application-local.yml` 可开）；真实客户端需 `mvn -Pkuangrui`；价÷10000 写 `market_1min(MDS)` |
+| `quant.kuangrui.static-enabled` | M4 静态/费率业务覆盖（基线 **false**；local 可开）；涨跌停/停牌/股本/当日交易日/佣金优先宽睿，失败回退本地 |
+| `quant.kuangrui.oes.enabled` / `oes.order-enabled` | OES 只读 / 报单总闸（基线 **false**；local 可开）；M3 报撤需二者+`trade-mode=sdk` |
 | `quant.kuangrui.config-dir` | MDS/OES JSON 目录（默认 `config/kuangrui/local`，可用 `QUANT_KUANGRUI_CONFIG_DIR`） |
+| `spring.profiles.active` | 默认 **`local`**（可用 `SPRING_PROFILES_ACTIVE` 覆盖）；加载 `application-local.yml` |
 
 ---
 

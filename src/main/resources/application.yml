@@ -2,6 +2,9 @@ server:
   port: 8080
 
 spring:
+  # 本机默认走 application-local.yml（宽睿等本机覆盖）；可用 SPRING_PROFILES_ACTIVE 覆盖
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
   redis:
     host: 127.0.0.1
     port: 6379
@@ -199,7 +202,8 @@ quant:
   schedule:
     enabled: true
 
-  # ---- 宽睿 Quant360（默认全关；真实 MDS 需 mvn -Pkuangrui 且本机 jar/账号）----
+  # ---- 宽睿 Quant360（默认全关；真实客户端需 mvn -Pkuangrui 且本机 jar/账号）----
+  # 本机联调请改 application-local.yml（默认已激活 profile=local），勿把密钥写入本文件
   kuangrui:
     enabled: false
     # M4：静态涨跌停/停牌/股本/交易日/佣金覆盖业务（默认关；失败回退本地）

@@ -139,13 +139,19 @@ mvn -Pkuangrui spring-boot:run
 
 4. 配置（勿入库密钥）：
 
+默认 profile=`local` 时看 `src/main/resources/application-local.yml`（已可开开关）。  
+或临时写在启动参数 / 环境变量。仓库基线 `application.yml` 保持默认关。
+
 ```yaml
+# application-local.yml 示例（本仓库已类似开启）
 quant:
   kuangrui:
     enabled: true
     mds:
       enabled: true
 ```
+
+真客户端：`mvn -Pkuangrui spring-boot:run` 或 IDEA 勾选 Maven profile `kuangrui`。
 
 5. 运维验收：
    - `GET /api/ops/kuangrui/mds/status` → `live=true`

@@ -222,8 +222,9 @@
     </tbody>
   </table>
 
-  <h5 style="margin:12px 0 4px;">开关（默认全关）</h5>
-  <pre style="margin:0;white-space:pre-wrap;font-size:12px;">quant.kuangrui.enabled=false
+  <h5 style="margin:12px 0 4px;">开关（application.yml 基线默认全关）</h5>
+  <pre style="margin:0;white-space:pre-wrap;font-size:12px;"># application.yml（仓库基线）
+quant.kuangrui.enabled=false
 quant.kuangrui.static-enabled=false
 quant.kuangrui.mds.enabled=false
 quant.kuangrui.oes.enabled=false
@@ -231,18 +232,9 @@ quant.kuangrui.oes.order-enabled=false
 quant.kuangrui.config-dir=${QUANT_KUANGRUI_CONFIG_DIR:config/kuangrui/local}
 quant.trade-mode=sim
 
-# 启用 M4 静态/费率（仿真，需 MDS 或 OES 就绪）：
-# mvn -Pkuangrui spring-boot:run
-# quant.kuangrui.enabled=true
-# quant.kuangrui.static-enabled=true
-# quant.kuangrui.mds.enabled=true   # 和/或 oes.enabled=true
-
-# 启用 M3 报撤（仿真）：
-# mvn -Pkuangrui spring-boot:run
-# quant.trade-mode=sdk
-# quant.kuangrui.enabled=true
-# quant.kuangrui.oes.enabled=true
-# quant.kuangrui.oes.order-enabled=true</pre>
+# 默认 profile=local → application-local.yml 可开旁路开关（不含账号）
+# 真客户端：mvn -Pkuangrui（或 IDEA 勾选 kuangrui）+ local 配置与账号
+# 关闭本机覆盖：--spring.profiles.active=default</pre>
 
   <h5 style="margin:12px 0 4px;">明确不做</h5>
   <ul>
