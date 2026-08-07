@@ -1,45 +1,32 @@
-# 设计：默认主题「浪花」（原极光 / cosmos）
+# 设计：默认主题「浪花」（cosmos / mode=surf）
 
-**日期：** 2026-08-07（初稿）→ 2026-08-08（更名与浪花定稿）  
-**状态：** 已落地（显示名「浪花」；`data-theme="cosmos"` 不变）  
-**范围：** 默认主题背景与 CSS。不新开主题 key，不改夜盘/银河，不加鼠标交互，不改交易逻辑。
+**日期：** 2026-08-07 → 2026-08-08  
+**状态：** 已落地  
+**范围：** 默认主题背景。`data-theme="cosmos"`；Canvas `mode: 'surf'`。不改夜盘/银河交易逻辑。
 
-## 已确认决策（现行）
+## 现行能力
 
-| 项 | 选择 |
+- 显示名：**浪花**
+- 绘制：`drawDaySurfScene` → 天幕 + glow + `drawDaySurfWaves`（左低右高）+ veil
+- **无**粒子网、光帘、网格/扫描
+
+## 已删除的冗余（2026-08-08）
+
+- `drawAurora` / `drawDayAuroraRibbons` / `drawTechHud`
+- `drawWaves` / `drawAmbient`（无现行主题再走）
+- cosmos 上已关却残留的 aurora / particle 配置项
+- `auroraDay` 标志（改由 `mode: 'surf'` 路由）
+
+## 保留
+
+| key | 用途 |
 |---|---|
-| 显示名 | **浪花**（原「极光」；旧 `aurora` / localStorage 仍映射 `cosmos`） |
-| 主视觉 | 底部多层密浪 + 波峰飞沫，左→右推进，近层更高 |
-| 不做 | 光帘、网格/扫描、鼠标交互、新主题 key |
-
-## 浪花绘制要点
-
-1. 浅色天幕 + 可选 glow  
-2. `drawDaySurfWaves`：约 8 层；高频率短波长（避免一浪铺太宽）；压在下半屏  
-3. 波峰密飞沫（主点 + 碎沫簇）  
-4. 淡粒子网 + 中心 veil 保可读  
-
-### cosmos 参数方向
-
-| 参数 | 方向 |
-|---|---|
-| `surfLayers` | ~8 |
-| `surfSpeed` | ~0.00062 |
-| 波长 | `freq ≈ 0.014+`（短浪密浪） |
-| 振幅 | 偏小，贴底 |
-| `aurora` / `techGrid` | 关闭 |
-
-## 文件
-
-| 文件 | 说明 |
-|---|---|
-| `particle-bg.js` | cosmos 配置 + `drawDaySurfWaves` |
-| `style.css` | `html[data-theme="cosmos"]` 日间变量 |
-| `stock.html` | 下拉显示「浪花」；缓存 bump |
-| `README.md` / `docs/app.html` | 与显示名一致 |
+| `cosmos` | 浪花（surf） |
+| `night` / `matrix` | 代码雨 |
+| `forest` / `wave` | Canvas off，银河由 starfield |
 
 ## 验收
 
-1. 主题下拉为「浪花」；浪在底部、波长偏短、飞沫明显  
-2. 工作台可读；夜盘/银河不受影响  
-3. 旧 `aurora` 仍进 cosmos  
+1. 「浪花」仅浪面+飞沫+天幕，无粒子/光帘/网格  
+2. 夜盘、银河切换正常  
+3. 旧 `aurora` localStorage 仍映射 cosmos  

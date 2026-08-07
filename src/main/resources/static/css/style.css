@@ -86,36 +86,36 @@ html[data-theme="forest"] {
 /* 浪花：浅色日间 UI + 密浪飞沫背景（默认主题，data-theme=cosmos） */
 html[data-theme="cosmos"] {
   --bg-0: #eef4fb;
-  --bg-1: #e6eef8;
-  --bg-2: #d8e4f2;
-  --panel: rgba(255, 255, 255, 0.94);
+  --bg-1: #e7eef8;
+  --bg-2: #d9e5f3;
+  --panel: rgba(255, 255, 255, 0.95);
   --panel-solid: #ffffff;
-  --header-bg: rgba(255, 255, 255, 0.93);
-  --border: #c4d4e8;
-  --border-focus: #3db8e8;
+  --header-bg: rgba(255, 255, 255, 0.94);
+  --border: #c5d5e9;
+  --border-focus: #36b4e6;
   --text: #1a2432;
   --muted: #64748b;
-  --accent: #3a9fd4;
-  --accent-deep: #2d86b8;
+  --accent: #3599d0;
+  --accent-deep: #2a7fb3;
   --buy: #0f766e;
   --sell: #dc2626;
   --warn: #c2410c;
-  --row-alt: rgba(61, 184, 232, 0.045);
-  --row-hover: rgba(120, 145, 230, 0.09);
-  --shadow: 0 6px 20px rgba(40, 70, 110, 0.07);
-  --chart-bg: rgba(248, 250, 253, 0.97);
-  --table-head: #e6eef8;
-  --glow-a: rgba(61, 184, 232, 0.14);
-  --glow-b: rgba(150, 120, 240, 0.11);
-  --accent-soft: rgba(58, 159, 212, 0.13);
+  --row-alt: rgba(54, 180, 230, 0.04);
+  --row-hover: rgba(100, 170, 230, 0.09);
+  --shadow: 0 6px 22px rgba(40, 75, 120, 0.065);
+  --chart-bg: rgba(248, 251, 253, 0.97);
+  --table-head: #e7eef8;
+  --glow-a: rgba(54, 180, 230, 0.13);
+  --glow-b: rgba(90, 170, 220, 0.1);
+  --accent-soft: rgba(53, 153, 208, 0.12);
   --input-bg: #ffffff;
   --input-bg-focus: #f3f8fc;
-  --input-border-hover: #a8bdd4;
-  --focus-ring: rgba(61, 184, 232, 0.24);
+  --input-border-hover: #a9bdd4;
+  --focus-ring: rgba(54, 180, 230, 0.22);
   --btn-secondary: #5b6b7c;
   --btn-secondary-hover: #4a5868;
-  --panel-border-hover: #a8bdd4;
-  --table-border: rgba(196, 212, 232, 0.95);
+  --panel-border-hover: #a9bdd4;
+  --table-border: rgba(197, 213, 233, 0.95);
 }
 
 /* 旧 interact 主题并入日间浅色 */
