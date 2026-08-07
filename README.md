@@ -1,6 +1,6 @@
 # Quant Stock · A股量化交易回测系统
 
-基于 **Spring Boot 2.7 + TA4J** 的一体化 A 股量化回测与模拟交易工程（**非前后端分离**）。页面内嵌于 `src/main/resources/static/`，浏览器直接访问工作台即可。
+基于 **Spring Boot 2.7 + TA4J** 的一体化 A 股量化回测与模拟交易工程（**非前后端分离**）。页面内嵌于 `src/main/resources/static/`，浏览器直接访问工作台即可。浏览器标签页图标为 `static/favicon.ico`（ZSW）；工作台顶栏 Logo 为 `static/images/logo.png`（透明底；另存 `logo-black.png` / `logo-navy.png` 备用）。
 
 | 项 | 值 |
 |----|-----|
