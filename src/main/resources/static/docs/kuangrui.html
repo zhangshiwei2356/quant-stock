@@ -86,6 +86,7 @@
     <li><code>all/demo/Main</code>：交互选 OES / MDS(TCP|UDP)；默认现货；测试账号勿入库</li>
     <li><code>OesExample</code>：建 <code>OesClientImpl</code> → <code>initCallBack</code> → <code>start(logon)</code> → 用 <code>lastInMsgSeq</code> 初始化流水 → <b><code>sendRptSync</code></b> → 再查账户/下单。样例价按「元后四位」（如 <code>300000</code> = 30 元）</li>
     <li><b>查资金注意（0.19.4）</b>：Java 签名多为 <code>queryCashAsset(OesQryCashAssetFilter, Client.QueryMode)</code>，<code>QueryMode</code> 不可为 null（否则 <code>ordinal</code> NPE → 页面空列表）。Filter 空/零即可查当前客户全部资金（与 C <code>OesApi_QueryCashAsset</code> 一致）。本机对照：<code>scripts/kuangrui/inspect-oes-cash-query.ps1</code></li>
+    <li><b>日志</b>：签名探测失败旧版只 WARN 拼进 <code>lastError</code>（无 ERROR 堆栈）；现对空枚举/非法入参 NPE 打 ERROR。Filter 空探测仍允许；单参/双参枚举与具体类第二参不再传 null</li>
     <li><code>MdsExample</code>：登录 → <code>subscribeMarketData</code> / 快照查询 → L1/L2 回调 + 静态/状态/时段查询</li>
     <li><code>MdsUdpExample</code>：组播收流；当前主路径用 TCP L1</li>
     <li>回调勿做重活：生产用队列 + 工作线程，勿阻塞 API 线程</li>

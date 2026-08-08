@@ -358,10 +358,47 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
             if (!m.getName().equals(name) || m.getParameterTypes().length != args.length) {
                 continue;
             }
+            Class<?>[] pts = m.getParameterTypes();
+            // 禁止对枚举/基本类型传 null（对齐 OES QueryMode NPE）
+            if (args.length == 1 && args[0] == null && pts[0].isEnum()) {
+                Object[] modes = pts[0].getEnumConstants();
+                if (modes != null) {
+                    for (Object mode : modes) {
+                        try {
+                            Object ret = m.invoke(target, mode);
+                            if (ret != null) {
+                                return ret;
+                            }
+                        } catch (Exception e) {
+                            Throwable cause = e.getCause() != null ? e.getCause() : e;
+                            if (cause instanceof NullPointerException || cause instanceof IllegalArgumentException) {
+                                log.error("[mds] invoke {}#{} 入参异常: {}", name, mode, cause.toString(), cause);
+                            }
+                        }
+                    }
+                }
+                continue;
+            }
+            boolean skip = false;
+            for (int i = 0; i < args.length; i++) {
+                if (args[i] == null && (pts[i].isEnum() || pts[i].isPrimitive())) {
+                    log.warn("[mds] 跳过 {}：禁止对 {} 传 null", name, pts[i].getSimpleName());
+                    skip = true;
+                    break;
+                }
+            }
+            if (skip) {
+                continue;
+            }
             try {
                 return m.invoke(target, args);
             } catch (Exception e) {
-                log.debug("[mds] invoke {} 失败: {}", name, e.getMessage());
+                Throwable cause = e.getCause() != null ? e.getCause() : e;
+                if (cause instanceof NullPointerException || cause instanceof IllegalArgumentException) {
+                    log.error("[mds] invoke {} 入参异常: {}", name, cause.toString(), cause);
+                } else {
+                    log.debug("[mds] invoke {} 失败: {}", name, cause.getMessage());
+                }
             }
         }
         if (args.length > 0) {

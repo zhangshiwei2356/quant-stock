@@ -142,4 +142,31 @@ class OesQueryListInvokerTest {
         assertTrue(r.methodUsed != null && (r.methodUsed.contains("ALL") || r.methodUsed.contains("DEFAULT")),
                 r.methodUsed);
     }
+
+    public static class ClientSingleEnum {
+        public final AtomicInteger nullHits = new AtomicInteger();
+
+        public List<Item> queryTradingDay(QueryMode mode) {
+            if (mode == null) {
+                nullHits.incrementAndGet();
+                throw new NullPointerException("mode is null");
+            }
+            if (mode == QueryMode.ALL) {
+                return Collections.singletonList(new Item("day"));
+            }
+            return Collections.emptyList();
+        }
+    }
+
+    @Test
+    void singleArgQueryMode_neverPassesNull() {
+        ClientSingleEnum c = new ClientSingleEnum();
+        OesQueryListInvoker.Result r = OesQueryListInvoker.invoke(
+                c,
+                new String[]{"queryTradingDay"},
+                new String[]{});
+        assertTrue(r.ok, r.detail);
+        assertEquals(0, c.nullHits.get());
+        assertEquals(1, r.list.size());
+    }
 }

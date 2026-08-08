@@ -196,6 +196,8 @@ $env:QUANT_KUANGRUI_HOME = "D:\OESAPI-JAVA-v0.19.4.0-20260430\OESAPI-JAVA-v0.19.
 .\scripts\kuangrui\inspect-oes-cash-query.ps1
 # 报告：scripts/kuangrui/out/cash-query-inspect.txt
 ```
+
+2d. **为何 IDEA 曾看不到 ERROR 堆栈**：`OesQueryListInvoker` 签名探测会 catch 异常写入 `lastError`/WARN 文案，旧代码**不打 ERROR、不打堆栈**。现已：枚举/具体类禁止 null；探测期 NPE/`IllegalArgumentException` 打 `ERROR`+cause；查询失败文案含 NPE 时 `finishQueryResult` 升为 ERROR。其它仍可能只 WARN/DEBUG 的路径：ops 门面失败、`invokeReturning` 非 NPE、M4 静态回退、`enqueue*`、`setBean`、close。
 3. 核对 `local/oes_api_config.json` 回报通道 `rpt`（模拟常见 `tcp://106.15.58.119:6301`）可达；`subcribeEnvId≤0` 表示订阅全部环境号
 4. 服务端 ApplVerId≈`0.19.1`、客户端 jar `0.19.4.0` 属兼容范围
 
