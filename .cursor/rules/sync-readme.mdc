@@ -38,10 +38,10 @@ alwaysApply: true
 static/docs/app.html      → 系统概述
 static/docs/rules.html    → 交易规则
 static/docs/memo.html     → 能力与待办
-static/docs/kuangrui.html → 宽睿文档梳理
+static/docs/kuangrui.html → 宽睿文档梳理（侧栏「宽睿对接」二级；不在应用说明列表）
 应用说明 → 项目 README → GET /api/docs/readme（实时渲染根目录 README.md）
 static/docs/home.html     → 初始化欢迎页（收起全部一级菜单时）
-stock-chart.js → knowledgeTopics → { id, title, src } 目录索引
+stock-chart.js → knowledgeTopics → { id, title, src } 目录索引（kuangrui 组挂宽睿对接菜单）
 ```
 ## 自检
 

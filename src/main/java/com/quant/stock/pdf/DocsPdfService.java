@@ -48,7 +48,7 @@ public class DocsPdfService {
         list.add(new Topic("app", "app", "系统概述", "app.html"));
         list.add(new Topic("rules", "app", "交易规则", "rules.html"));
         list.add(new Topic("memo", "app", "能力与待办", "memo.html"));
-        list.add(new Topic("kuangrui", "app", "宽睿文档梳理", "kuangrui.html"));
+        // 宽睿文档梳理已迁到侧栏「宽睿对接」，不再打入应用说明 PDF 包
         list.add(new Topic("ashare", "stock", "A股基础", "ashare.html"));
         list.add(new Topic("session", "stock", "交易时间", "session.html"));
         list.add(new Topic("kline", "stock", "K线", "kline.html"));

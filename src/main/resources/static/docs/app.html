@@ -5,7 +5,7 @@
 <ul>
   <li>项目根目录：执行 <code>mapper/schema.sql</code> 后 <code>mvn spring-boot:run</code>（或 IDEA 运行主类）</li>
   <li>默认 profile=<b>local</b>：叠加 <code>application-local.yml</code>（本机可开宽睿开关）；基线 <code>application.yml</code> 宽睿仍默认关</li>
-  <li>宽睿真客户端另需 Maven profile <code>kuangrui</code> + <code>config/kuangrui/local</code>；账号优先「宽睿联调 → 账号登录」验柜入库，否则环境变量；浏览器：<code>http://localhost:8080/stock.html</code></li>
+  <li>宽睿真客户端另需 Maven profile <code>kuangrui</code> + <code>config/kuangrui/local</code>；账号优先「宽睿对接 → 账号登录」验柜入库，否则环境变量；浏览器：<code>http://localhost:8080/stock.html</code></li>
   <li>空库自动导入 1 分钟种子（有 <code>MIN_1.json</code> 则用之，否则由 <code>MIN_5.json</code> 拆成 1 分钟）</li>
 </ul>
 
@@ -18,7 +18,7 @@
 
 <h4>架构一览</h4>
 <ul>
-  <li><b>前端</b>：<code>stock.html</code> + <code>stock-chart.js</code>；文档片段 <code>static/docs/*.html</code>；顶栏与标签页使用 ZSW 品牌图标（<code>/favicon.ico</code>、<code>/images/logo.png</code>）；初始化页 <code>docs/home.html</code> 入口与侧栏一级菜单自动对齐（含宽睿联调）</li>
+  <li><b>前端</b>：<code>stock.html</code> + <code>stock-chart.js</code>；文档片段 <code>static/docs/*.html</code>；顶栏与标签页使用 ZSW 品牌图标（<code>/favicon.ico</code>、<code>/images/logo.png</code>）；初始化页 <code>docs/home.html</code> 入口与侧栏一级菜单自动对齐（含宽睿对接）</li>
   <li><b>后端包</b>：<code>market</code> 行情 · <code>strategy</code> 策略 · <code>backtest</code> 回测 · <code>pool</code> 目标池 · <code>trade</code> 下单账本 · <code>risk</code> 风控 · <code>task</code> 调度 · <code>account</code>/<code>admin</code> 账户与运维 · <code>pdf</code> 文档</li>
   <li><b>数据</b>：行情表 + 目标池 + 模拟账本 + 回测历史 + <code>sys_schedule_job</code></li>
   <li>完整架构图与接口表见侧栏「<b>项目 README</b>」（实时渲染仓库 <code>README.md</code>）</li>
@@ -34,8 +34,8 @@
   <li><b>运维中心</b>：任务管理 / 数据健康（覆盖检查：待处置告警 vs 特殊项分表；分钟自洽；MDS/TDX 抽样对账） / 运行参数（全局白名单 + 按策略稀疏参数包；已注册策略列表与纸面激活切换；任务种子默认全关）</li>
   <li><b>策略管理</b>：二级「策略总览」——注册策略介绍（默认收起）、满分 100 综合评分、平均夏普（权益曲线年化·RF=0·仅展示）与回测历史；无回测时自动用目标池补种（逐只单股+全池组合）；空白/指纹旧名启动自动补全；<strong>不改参/不激活</strong>（仍在运维运行参数）</li>
   <li><b>数据表</b>：白名单表分页只读；侧栏/摘要展示磁盘占用（数据+索引）</li>
-  <li><b>宽睿联调</b>：接入总览 + <b>账号登录</b>（进入自动展示当前账号；验柜后密文入库，DB 优先于 env）+ OES 只读（回报同步多签名；查资金对齐 Demo <code>QueryMode.ALL</code>+<code>getQryItems</code>；失败可查询降级；出参含 <code>rptSyncEngine</code>）/ MDS 行情 / 报撤<strong>左窄右宽</strong>（接口「介绍」轻量弹层对齐宽睿文档摘要，可跳转完整文档；出参旁可复制）；报撤须 <code>order-enabled</code>+二次确认；开关见 <code>application-local.yml</code>（基线 yml 仍默认关）</li>
-  <li><b>量化知识</b> / <b>应用说明</b>：指标与规则文档；应用说明含系统概述、项目 README、交易规则、能力与待办、宽睿梳理；可导出 PDF</li>
+  <li><b>宽睿对接</b>：侧栏「扩展与文档」；接入总览 + <b>账号登录</b>（进入自动展示当前账号；验柜后密文入库，DB 优先于 env）+ OES 只读（回报同步多签名；查资金对齐 Demo <code>QueryMode.ALL</code>+<code>getQryItems</code>；失败可查询降级；出参含 <code>rptSyncEngine</code>）/ MDS 行情 / 报撤<strong>左窄右宽</strong>（接口「介绍」轻量弹层对齐宽睿文档摘要，可跳转完整文档）+ 二级「宽睿文档梳理」；报撤须 <code>order-enabled</code>+二次确认；开关见 <code>application-local.yml</code>（基线 yml 仍默认关）</li>
+  <li><b>量化知识</b> / <b>应用说明</b>：同属「扩展与文档」；指标与规则文档；应用说明含系统概述、项目 README、交易规则、能力与待办（宽睿梳理已迁至「宽睿对接」）；可导出 PDF</li>
 </ul>
 
 <h4>模拟数据与默认参数</h4>
@@ -64,7 +64,7 @@
   <li>限价/执行/对账/行业边界可查；组合回测对齐部成/压力降仓/成交缩量/停牌拒卖/ST as-of 强平/`atrRisk`；退役强制恢复双人复核</li>
   <li>账户「风控日报」含相关监控；委托支持撤/部成/改价；运维数据健康可「检查分钟自洽」与「MDS/TDX 抽样对账」；scan/sync/settle 锁忙手动执行 failLoud</li>
   <li>单股 / 组合 / 扫描交易对齐核心规则；实盘为<strong>本地模拟账本</strong>（含风控/挂单持久化与路径对齐）</li>
-  <li>宽睿 OES/MDS：资料包 <code>v0.19.4.0</code>；见「宽睿文档梳理」。M0 COMPLETE；M1～M4 均为可选旁路（默认关）；下一步 <b>M5 连接韧性</b>（先 MDS）；报撤需 <code>oes.order-enabled</code>+<code>trade-mode=sdk</code>；默认仍 <code>sim</code>+<code>db</code></li>
+  <li>宽睿 OES/MDS：资料包 <code>v0.19.4.0</code>；见「宽睿对接 → 宽睿文档梳理」。M0 COMPLETE；M1～M4 均为可选旁路（默认关）；下一步 <b>M5 连接韧性</b>（先 MDS）；报撤需 <code>oes.order-enabled</code>+<code>trade-mode=sdk</code>；默认仍 <code>sim</code>+<code>db</code></li>
   <li>细则：「应用说明 → 交易规则」</li>
 </ul>
 

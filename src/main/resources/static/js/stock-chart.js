@@ -2003,11 +2003,11 @@
   }
 
   var knowledgeTopics = [
-    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260808-kr-intro' },
+    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260808-kr-dock' },
     { id: 'readme', group: 'app', title: '项目 README', src: '/api/docs/readme' },
     { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260803-data-source' },
-    { id: 'memo', group: 'app', title: '能力与待办', src: '/docs/memo.html?v=20260808-kr-intro' },
-    { id: 'kuangrui', group: 'app', title: '宽睿文档梳理', src: '/docs/kuangrui.html?v=20260808-kr-intro' },
+    { id: 'memo', group: 'app', title: '能力与待办', src: '/docs/memo.html?v=20260808-kr-dock' },
+    { id: 'kuangrui', group: 'kuangrui', title: '宽睿文档梳理', src: '/docs/kuangrui.html?v=20260808-kr-dock' },
     { id: 'ashare', group: 'stock', title: 'A股基础', src: '/docs/ashare.html?v=20260720-nav-rename' },
     { id: 'session', group: 'stock', title: '交易时间', src: '/docs/session.html?v=20260720-nav-rename' },
     { id: 'kline', group: 'stock', title: 'K线', src: '/docs/kline.html?v=20260720-nav-rename' },
@@ -2290,7 +2290,7 @@
           .attr('data-open-nav', bodyId)
           .attr('data-mode', mode)
           .text(label);
-      if (mode === 'doc') {
+      if (mode === 'doc' || $btn.closest('.nav-group--docs').length) {
         $a.addClass('secondary');
       }
       $frag.append($a);
@@ -2335,6 +2335,9 @@
     var $stock = $('#stockKnowledgeMenu').empty();
     var $app = $('#appRelatedMenu').empty();
     knowledgeTopics.forEach(function (t) {
+      if (t.group === 'kuangrui') {
+        return; // 挂在「宽睿对接」二级菜单，不进应用说明列表
+      }
       var $li = $('<li/>').text(t.title).attr('data-id', t.id);
       if (t.group === 'app') {
         $app.append($li);
@@ -2482,6 +2485,12 @@
 
   function showKuangruiPanel(panel) {
     panel = panel || lastKuangruiPanel || 'overview';
+    if (panel === 'docs') {
+      lastKuangruiPanel = 'docs';
+      lastWorkspaceMode = 'kuangrui';
+      openKnowledge('kuangrui');
+      return;
+    }
     if (panel !== 'overview' && panel !== 'account' && panel !== 'oes' && panel !== 'mds' && panel !== 'order') {
       panel = 'overview';
     }
@@ -2638,7 +2647,7 @@
     $card.addClass('is-active');
   }
 
-  /** 宽睿联调接口介绍（对齐 docs/kuangrui.html 手册/接入摘要） */
+  /** 宽睿对接接口介绍（对齐 docs/kuangrui.html 手册/接入摘要） */
   var KR_API_INTROS = {
     'queryCashAsset': {
       title: '查资金',
@@ -2893,8 +2902,9 @@
     var $hd = $('<div class="kr-api-card-head"/>');
     $hd.append($('<h4/>').html(escHtml(a.title) + ' <code>' + escHtml(a.sdk) + '</code>'));
     var $actions = $('<div class="kr-api-card-actions"/>');
-    var $intro = $('<button type="button" class="secondary kr-api-intro"/>')
+    var $intro = $('<button type="button" class="kr-api-intro"/>')
       .attr('data-kr-intro', introKey)
+      .attr('title', '查看接口说明')
       .text('介绍');
     var $btn = $('<button type="button" class="kr-api-call"/>').text('调用');
     $actions.append($intro).append($btn);
@@ -5422,10 +5432,17 @@
       if (knowledgeTopics[i].id === id) { topic = knowledgeTopics[i]; break; }
     }
     if (!topic) return;
-    var menuId = topic.group === 'app' ? 'appRelatedMenu' : 'stockKnowledgeMenu';
+    var menuId = topic.group === 'app' ? 'appRelatedMenu'
+      : (topic.group === 'kuangrui' ? 'kuangruiBody' : 'stockKnowledgeMenu');
     showDocMode(menuId);
     $('.side-nav-menu li').removeClass('active');
-    $('.side-nav-menu li[data-id="' + id + '"]').addClass('active');
+    if (topic.group === 'kuangrui') {
+      setKuangruiMenuActive('docs');
+      lastKuangruiPanel = 'docs';
+      lastWorkspaceMode = 'kuangrui';
+    } else {
+      $('.side-nav-menu li[data-id="' + id + '"]').addClass('active');
+    }
     $('#knowledgeTitle').text(topic.title);
     $('#knowledgeBody').html('<p>加载中…</p>');
     try { $('#knowledgePanel')[0].scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
@@ -5613,7 +5630,7 @@
   });
   $('#btnKrIntroDocs').on('click', function () {
     closeKrApiIntro();
-    openKnowledge('kuangrui');
+    showKuangruiPanel('docs');
   });
   $(document).on('keydown.krkrIntro', function (e) {
     if (e.key === 'Escape' && !$('#krIntroModal').prop('hidden')) {

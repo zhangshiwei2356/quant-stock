@@ -1,5 +1,5 @@
-<!-- 一级菜单介绍：宽睿联调 -->
-<p class="nav-intro-lead">点测宽睿 OES/MDS 运维接口，查看<strong>入参 / 出参</strong>与接入开关状态。默认旁路关闭；报撤须 yml 打开 <code>order-enabled</code> 并二次确认。账号可在「账号登录」验柜后密文入库（优先于环境变量）。</p>
+<!-- 一级菜单介绍：宽睿对接 -->
+<p class="nav-intro-lead">宽睿（Quant360）OES/MDS <strong>对接与联调</strong>：点测运维接口、账号验柜，并阅读接入文档。位于侧栏「扩展与文档」。默认旁路关闭；报撤须 yml 打开 <code>order-enabled</code> 并二次确认。</p>
 <div class="nav-intro-grid">
   <section class="nav-intro-card">
     <h4><span class="nav-intro-card-tag">二级</span>菜单说明</h4>
@@ -9,12 +9,13 @@
       <li><strong>OES 只读</strong>：左窄列表；「介绍」弹层摘要；右侧入参/出参可复制</li>
       <li><strong>MDS 行情</strong>：同上；pull / subscribe / flush / stop</li>
       <li><strong>报撤试单</strong>：限价买/卖/撤（含介绍）；仅 <code>orderLive</code>；弹框确认</li>
+      <li><strong>宽睿文档梳理</strong>：资料包 / 手册要点 / M0～M5 计划（原「应用说明」下文档迁入本菜单）</li>
     </ul>
   </section>
   <section class="nav-intro-card nav-intro-card--steps">
     <h4><span class="nav-intro-card-tag">步骤</span>建议流程</h4>
     <ol class="nav-intro-steps">
-      <li>确认 <code>-Pkuangrui</code> 与 <code>config/kuangrui/local</code> 通道配置</li>
+      <li>先读「宽睿文档梳理」，再确认 <code>-Pkuangrui</code> 与 <code>config/kuangrui/local</code></li>
       <li>「账号登录」验柜入库，或设置 <code>QUANT_KUANGRUI_USER</code> / <code>PASSWORD</code></li>
       <li>先开 <code>kuangrui.enabled</code> + <code>oes.enabled</code> / <code>mds.enabled</code> 做只读点测</li>
       <li>报撤另开 <code>oes.order-enabled=true</code>（仅 yml，非运行参数页）</li>
@@ -27,5 +28,6 @@
   <button type="button" class="nav-intro-btn secondary" data-enter-mode="kuangrui" data-kuangrui-panel="oes">OES 只读</button>
   <button type="button" class="nav-intro-btn secondary" data-enter-mode="kuangrui" data-kuangrui-panel="mds">MDS 行情</button>
   <button type="button" class="nav-intro-btn secondary" data-enter-mode="kuangrui" data-kuangrui-panel="order">报撤试单</button>
+  <button type="button" class="nav-intro-btn secondary" data-enter-mode="kuangrui" data-kuangrui-panel="docs">宽睿文档梳理</button>
 </div>
-<p class="nav-intro-hint">再点一次「宽睿联调」可收起并回初始化页。手册见「应用说明 → 宽睿文档梳理」。</p>
+<p class="nav-intro-hint">再点一次「宽睿对接」可收起并回初始化页。</p>

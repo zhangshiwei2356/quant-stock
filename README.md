@@ -24,7 +24,7 @@ mvn spring-boot:run
 
 空库启动时会自动从 classpath JSON 导入 **1 分钟**模拟数据到 `market_1min`（优先 `MIN_1.json`，否则由 `MIN_5.json` 拆分）。默认不连 Redis（配置存在但自动配置已排除）。
 
-**配置分层**：`application.yml` 为仓库基线（宽睿开关默认关）；默认激活 profile **`local`**，加载 `application-local.yml`（本仓库已开宽睿旁路开关，**不含账号**）。真客户端仍需 `mvn -Pkuangrui`（或 IDEA 勾选同名 profile）+ `config/kuangrui/local`；账号优先「宽睿联调 → 账号登录」验柜入库，否则环境变量。关闭本机覆盖：`--spring.profiles.active=default` 或设 `SPRING_PROFILES_ACTIVE`。
+**配置分层**：`application.yml` 为仓库基线（宽睿开关默认关）；默认激活 profile **`local`**，加载 `application-local.yml`（本仓库已开宽睿旁路开关，**不含账号**）。真客户端仍需 `mvn -Pkuangrui`（或 IDEA 勾选同名 profile）+ `config/kuangrui/local`；账号优先「宽睿对接 → 账号登录」验柜入库，否则环境变量。关闭本机覆盖：`--spring.profiles.active=default` 或设 `SPRING_PROFILES_ACTIVE`。
 
 页面内也可查看本文件：**应用说明 → 项目 README**（服务端实时渲染 `README.md`）。
 
@@ -201,9 +201,9 @@ sequenceDiagram
 
 白名单表分页只读浏览（`DbTableCatalog`）。列表与详情附带 **磁盘占用**（`information_schema` 的 DATA/INDEX；InnoDB 约为已分配空间）：侧栏显示总量徽章，工具栏摘要与表说明展开区显示数据/索引分项。
 
-### 9. 宽睿联调
+### 9. 宽睿对接
 
-工作台一级菜单（数据表之后）：点测宽睿 OES/MDS 运维接口，页面展示**入参 / 出参 JSON**。
+侧栏「扩展与文档」一级菜单（工作台之后、量化知识之前）：点测 OES/MDS 运维接口（入参/出参 JSON）+ 二级「宽睿文档梳理」。
 
 | 二级 | 功能 |
 |------|------|
@@ -213,12 +213,13 @@ sequenceDiagram
 | MDS 行情 | 同上布局；状态/静态/证券状态/时段/合并静态；pull·subscribe·flush·stop（写操作二次确认） |
 | 报撤试单 | 左表单（含介绍）+ 右侧结果（可一键复制出参）；`place-test`/`cancel-test`；须 `orderLive`；页面二次确认 |
 
-默认旁路关闭；不改金叉主路径。对接手册见「应用说明 → 宽睿文档梳理」；联调页「介绍」可跳转该文档。
+默认旁路关闭；不改金叉主路径。对接手册见「宽睿对接 → 宽睿文档梳理」；联调页「介绍」可跳转该文档。
 
 ### 10. 量化知识 / 应用说明
 
 - **量化知识**：A 股基础、指标、涨跌停、T+1、成本、仓位、风控、撮合、回测要点等
-- **应用说明**：系统概述 → **项目 README** → 交易规则 → 能力与待办 → 宽睿文档梳理
+- **应用说明**：系统概述 → **项目 README** → 交易规则 → 能力与待办
+- **宽睿对接**：联调点测 + **宽睿文档梳理**
 - 介绍页可导出 PDF：`GET /api/docs/pdf/{stock|app}`
 - 在线 README：`GET /api/docs/readme`
 
@@ -226,9 +227,10 @@ sequenceDiagram
 
 ## 页面与导航
 
-- 进入应用先显示**初始化页**（`docs/home.html`）；入口按钮与侧栏一级菜单自动对齐（含策略管理/数据表/宽睿联调等）；侧栏一级菜单互斥展开，再点同一菜单收起并回初始化页
+- 进入应用先显示**初始化页**（`docs/home.html`）；入口按钮与侧栏一级菜单自动对齐（含策略管理/数据表/宽睿对接等）；侧栏一级菜单互斥展开，再点同一菜单收起并回初始化页
 - 展开一级菜单先显示介绍页（`docs/nav-*.html`），再点二级进入工作台/文档
-- 工作台顺序：**行情** → **个股回测** → **组合回测** → **目标池** → **账户** → **运维中心** → **策略管理** → **数据表** → **宽睿联调** → **量化知识** → **应用说明**
+- 工作台顺序：**行情** → **个股回测** → **组合回测** → **目标池** → **账户** → **运维中心** → **策略管理** → **数据表**
+- 扩展与文档：**宽睿对接**（联调点测 + 文档梳理） → **量化知识** → **应用说明**
 - 页头主题（`localStorage`）：浪花（默认日间：左下起浪、右渐高 + 飞沫）/ 夜盘 / 银河
 
 ---
@@ -361,7 +363,7 @@ sequenceDiagram
   - `sync-orders`：`trade-mode=sdk` 时推进成交；默认本地桩；OES `order-enabled` live 时按回报/查询推进（不假推进）；OES 只读 live 时另打对账日志
   - `position-pnl-sync`：本地成本 + 最新价浮盈日志；OES live 时附加柜台资金/持仓对账
 - 页面标「未实现/缺外部默认」：`market-collect`（本地骨架；**可选**宽睿 MDS live 时 pull/flush，见下）
-- 对照：**应用说明 → 能力与待办**；宽睿对接：**应用说明 → 宽睿文档梳理**（M0✓ → M1～M4 可选✓；下一步 **M5 连接韧性**）
+- 对照：**应用说明 → 能力与待办**；宽睿对接：**宽睿对接 → 宽睿文档梳理**（M0✓ → M1～M4 可选✓；下一步 **M5 连接韧性**）
 - 宽睿 **M0**：资料包 `OESAPI-JAVA-v0.19.4.0`；探针 **OES+MDS 登录成功** → `M0_STATUS=COMPLETE`
 - 宽睿 **M1**（可选，默认关）：MDS L1 → `market_1min(MDS)`；运维 `/api/ops/kuangrui/mds/*`
 - 宽睿 **M2**（可选，默认关）：OES 只读对账；登录后 `sendRptSync` 多签名适配；同步失败可 **查询降级**；查资金/持仓等经 `OesQueryListInvoker`（对齐 Demo：`Filter + QueryMode.ALL` → `Rsp.getQryItems()`；兼 List/回调/多 Filter）；出参含 `rptSyncEngine`；运维 `/api/ops/kuangrui/oes/{status,cash,...}`
@@ -438,6 +440,6 @@ sequenceDiagram
 2. 「应用说明 → 系统概述」（`static/docs/app.html`）
 3. 规则变更 → 「交易规则」（`rules.html`）
 4. 能力/待办 → 「能力与待办」（`memo.html`；待对接置顶，已落地默认折叠）
-5. 宽睿资料 → 「宽睿文档梳理」（`kuangrui.html`）
+5. 宽睿资料 → 「宽睿对接 → 宽睿文档梳理」（`kuangrui.html`）
 
 规则：`.cursor/rules/sync-readme.mdc`、`.cursor/rules/sync-memo.mdc`。

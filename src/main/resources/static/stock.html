@@ -22,7 +22,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css?v=20260808-kr-intro"/>
+  <link rel="stylesheet" href="/css/style.css?v=20260808-kr-intro-ui"/>
   <script src="/js/jquery.min.js"></script>
   <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/echarts.min.js"></script>
@@ -196,12 +196,17 @@
             <ul id="dbtablesMenu" class="side-nav-menu"></ul>
           </div>
         </div>
+      </div>
+    </section>
 
+    <section class="nav-group nav-group--docs" data-group="docs" aria-label="扩展与文档">
+      <div class="nav-group-rail" aria-hidden="true"><span>扩展与文档</span></div>
+      <div class="nav-group-body">
         <div class="side-nav" data-nav="kuangrui">
           <button type="button" class="side-nav-toggle" data-body="kuangruiBody" data-mode="kuangrui"
-                  data-intro="/docs/nav-kuangrui.html" data-intro-title="宽睿联调" aria-expanded="false">
+                  data-intro="/docs/nav-kuangrui.html" data-intro-title="宽睿对接" aria-expanded="false">
             <span class="nav-idx">09</span>
-            <span class="nav-label">宽睿联调</span>
+            <span class="nav-label">宽睿对接</span>
             <span class="chevron">▸</span>
           </button>
           <div id="kuangruiBody" class="side-nav-body">
@@ -211,15 +216,11 @@
               <li data-kuangrui-panel="oes" role="button" tabindex="0">OES 只读</li>
               <li data-kuangrui-panel="mds" role="button" tabindex="0">MDS 行情</li>
               <li data-kuangrui-panel="order" role="button" tabindex="0">报撤试单</li>
+              <li data-kuangrui-panel="docs" role="button" tabindex="0">宽睿文档梳理</li>
             </ul>
           </div>
         </div>
-      </div>
-    </section>
 
-    <section class="nav-group nav-group--docs" data-group="docs" aria-label="说明文档">
-      <div class="nav-group-rail" aria-hidden="true"><span>说明</span></div>
-      <div class="nav-group-body">
         <div class="side-nav" data-nav="stock-knowledge">
           <button type="button" class="side-nav-toggle" data-body="stockKnowledgeMenu" data-mode="doc"
                   data-intro="/docs/nav-stock-knowledge.html" data-intro-title="量化知识" aria-expanded="false">
@@ -871,7 +872,7 @@
       </section>
     </div>
 
-    <!-- 宽睿联调 -->
+    <!-- 宽睿对接 -->
     <div id="viewKuangruiOverview" class="workspace-view" hidden>
       <section class="panel">
         <h3>宽睿 · 接入总览</h3>
@@ -909,7 +910,7 @@
               <div class="kr-api-card-head">
                 <h4>登录并保存 <code>account/login</code></h4>
                 <div class="kr-api-card-actions">
-                  <button type="button" class="secondary kr-api-intro" data-kr-intro="account.login">介绍</button>
+                  <button type="button" class="kr-api-intro" data-kr-intro="account.login" title="查看接口说明">介绍</button>
                   <span class="kr-api-method">POST</span>
                 </div>
               </div>
@@ -923,7 +924,7 @@
               <div class="kr-api-card-head">
                 <h4>清除当前账号 <code>account/logout</code></h4>
                 <div class="kr-api-card-actions">
-                  <button type="button" class="secondary kr-api-intro" data-kr-intro="account.logout">介绍</button>
+                  <button type="button" class="kr-api-intro" data-kr-intro="account.logout" title="查看接口说明">介绍</button>
                   <span class="kr-api-method">POST</span>
                 </div>
               </div>
@@ -1033,7 +1034,7 @@
               <div class="kr-api-card-head">
                 <h4>限价报单 <code>sendOrdReq</code></h4>
                 <div class="kr-api-card-actions">
-                  <button type="button" class="secondary kr-api-intro" data-kr-intro="sendOrdReq">介绍</button>
+                  <button type="button" class="kr-api-intro" data-kr-intro="sendOrdReq" title="查看接口说明">介绍</button>
                 </div>
               </div>
               <p class="hint mono kr-api-path">POST /api/ops/kuangrui/oes/place-test</p>
@@ -1052,7 +1053,7 @@
               <div class="kr-api-card-head">
                 <h4>撤单 <code>sendOrdCancelReq</code></h4>
                 <div class="kr-api-card-actions">
-                  <button type="button" class="secondary kr-api-intro" data-kr-intro="sendOrdCancelReq">介绍</button>
+                  <button type="button" class="kr-api-intro" data-kr-intro="sendOrdCancelReq" title="查看接口说明">介绍</button>
                 </div>
               </div>
               <p class="hint mono kr-api-path">POST /api/ops/kuangrui/oes/cancel-test</p>
@@ -1216,16 +1217,16 @@
       </section>
     </div>
 
-    <!-- 宽睿联调 · 接口介绍轻量弹层 -->
+    <!-- 宽睿对接 · 接口介绍轻量弹层 -->
     <div id="krIntroModal" class="kr-intro-modal" hidden>
       <div class="kr-intro-dialog" role="dialog" aria-modal="true" aria-labelledby="krIntroTitle">
         <div class="kr-intro-dialog-head">
           <h4 id="krIntroTitle">接口介绍</h4>
-          <button type="button" class="secondary kr-intro-close-x" id="btnKrIntroCloseX" aria-label="关闭">×</button>
+          <button type="button" class="kr-intro-close-x" id="btnKrIntroCloseX" aria-label="关闭">×</button>
         </div>
         <div id="krIntroBody" class="kr-intro-body"></div>
         <div class="kr-intro-foot">
-          <button type="button" class="secondary" id="btnKrIntroDocs">打开完整宽睿文档</button>
+          <button type="button" id="btnKrIntroDocs">打开完整宽睿文档</button>
           <button type="button" id="btnKrIntroClose">关闭</button>
         </div>
       </div>
@@ -1679,6 +1680,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260808-kr-intro"></script>
+<script src="/js/stock-chart.js?v=20260808-kr-intro-ui"></script>
 </body>
 </html>
