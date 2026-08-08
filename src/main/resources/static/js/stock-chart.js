@@ -2003,11 +2003,11 @@
   }
 
   var knowledgeTopics = [
-    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260803-data-source' },
+    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260808-kr-intro' },
     { id: 'readme', group: 'app', title: '项目 README', src: '/api/docs/readme' },
     { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260803-data-source' },
-    { id: 'memo', group: 'app', title: '能力与待办', src: '/docs/memo.html?v=20260803-data-source' },
-    { id: 'kuangrui', group: 'app', title: '宽睿文档梳理', src: '/docs/kuangrui.html?v=20260808-current-user' },
+    { id: 'memo', group: 'app', title: '能力与待办', src: '/docs/memo.html?v=20260808-kr-intro' },
+    { id: 'kuangrui', group: 'app', title: '宽睿文档梳理', src: '/docs/kuangrui.html?v=20260808-kr-intro' },
     { id: 'ashare', group: 'stock', title: 'A股基础', src: '/docs/ashare.html?v=20260720-nav-rename' },
     { id: 'session', group: 'stock', title: '交易时间', src: '/docs/session.html?v=20260720-nav-rename' },
     { id: 'kline', group: 'stock', title: 'K线', src: '/docs/kline.html?v=20260720-nav-rename' },
@@ -2638,6 +2638,289 @@
     $card.addClass('is-active');
   }
 
+  /** 宽睿联调接口介绍（对齐 docs/kuangrui.html 手册/接入摘要） */
+  var KR_API_INTROS = {
+    'queryCashAsset': {
+      title: '查资金',
+      sdk: 'queryCashAsset',
+      stage: 'M2 只读',
+      html:
+        '<p>OES 查询通道：查资金资产（可用/可取等）。Demo 习惯：Filter + <code>QueryMode.ALL</code> → <code>getQryItems</code>。</p>'
+        + '<ul><li>运维：<code>GET /api/ops/kuangrui/oes/cash</code></li>'
+        + '<li>登录后应 <code>sendRptSync</code>；同步失败可<strong>查询降级</strong>仍可查资金</li>'
+        + '<li>本应用：运维点测 + <code>position-pnl-sync</code> 纸面对账</li></ul>'
+    },
+    'queryStkHolding': {
+      title: '查持仓',
+      sdk: 'queryStkHolding',
+      stage: 'M2 只读',
+      html:
+        '<p>OES 查询通道：证券持仓（数量、成本等）。与查资金同属只读对账能力。</p>'
+        + '<ul><li>运维：<code>GET /api/ops/kuangrui/oes/holdings</code></li>'
+        + '<li>查询降级时仍可用；报撤仍要求 <code>rptSynced=true</code></li></ul>'
+    },
+    'queryOrder': {
+      title: '查委托',
+      sdk: 'queryOrder',
+      stage: 'M2 / M3',
+      html:
+        '<p>OES 查委托单状态，用于对账与 <code>sync-orders</code> 推进补强。</p>'
+        + '<ul><li>运维：<code>GET /api/ops/kuangrui/oes/orders</code></li>'
+        + '<li>M3 报撤 live 时，按柜台状态推进本地 FILLED 等</li></ul>'
+    },
+    'queryTrade': {
+      title: '查成交',
+      sdk: 'queryTrade',
+      stage: 'M2 / M3',
+      html:
+        '<p>OES 查成交明细，配合委托回报做纸面/实盘对账。</p>'
+        + '<ul><li>运维：<code>GET /api/ops/kuangrui/oes/trades</code></li></ul>'
+    },
+    'snapshot': {
+      title: '快照',
+      sdk: 'snapshot',
+      stage: 'M2 只读',
+      html:
+        '<p>一次拉齐资金/持仓等只读视图，便于联调对照。</p>'
+        + '<ul><li>运维：<code>GET /api/ops/kuangrui/oes/snapshot</code></li>'
+        + '<li>依赖 OES 已登录；出参含 live / rptSynced 等门禁字段</li></ul>'
+    },
+    'reconcile': {
+      title: '纸面对账',
+      sdk: 'reconcile',
+      stage: 'M2 只读',
+      html:
+        '<p>对比 OES 柜台资金/持仓与本地纸面账户，输出差异摘要。</p>'
+        + '<ul><li>运维：<code>GET /api/ops/kuangrui/oes/reconcile</code></li>'
+        + '<li>不改金叉规则；仅辅助核对</li></ul>'
+    },
+    'order-status': {
+      title: '报撤状态',
+      sdk: 'order-status',
+      stage: 'M3 报撤门禁',
+      html:
+        '<p><strong>报撤能力状态</strong>，不是某笔委托成交状态。回答：现在能否对柜台发限价报/撤。</p>'
+        + '<ul><li>关键字段：<code>orderLive</code>（live ∧ order-enabled）、<code>rptSynced</code>、<code>loggedIn</code></li>'
+        + '<li>总闸：<code>quant.kuangrui.oes.order-enabled</code>（默认 false）</li>'
+        + '<li>查具体委托请用「查委托」</li></ul>'
+    },
+    'queryStock': {
+      title: '证券产品',
+      sdk: 'queryStock',
+      stage: 'M4 静态/费率',
+      html:
+        '<p>OES <code>queryStock</code>：证券产品信息（涨跌停、停牌、股本等产品侧字段）。</p>'
+        + '<ul><li>运维：<code>GET /api/ops/kuangrui/oes/stock?code=</code></li>'
+        + '<li>业务总闸 <code>static-enabled</code>；失败回退本地启发式</li>'
+        + '<li>与 MDS 静态/状态互补，可覆盖本地涨跌停估算</li></ul>'
+    },
+    'queryTradingDay': {
+      title: '交易日',
+      sdk: 'queryTradingDay',
+      stage: 'M4 静态/费率',
+      html:
+        '<p>OES <code>queryTradingDay</code>：柜台交易日，可开关覆盖本地静态节假日日历。</p>'
+        + '<ul><li>运维：<code>GET /api/ops/kuangrui/oes/trading-day</code></li></ul>'
+    },
+    'queryCommissionRate': {
+      title: '佣金',
+      sdk: 'queryCommissionRate',
+      stage: 'M4 静态/费率',
+      html:
+        '<p>OES <code>queryCommissionRate</code>：佣金费率，可开关覆盖配置近似费率。</p>'
+        + '<ul><li>运维：<code>GET /api/ops/kuangrui/oes/commission-rate</code></li></ul>'
+    },
+    'oes.stop': {
+      title: '关闭连接',
+      sdk: 'stop',
+      stage: 'OES 运维',
+      html:
+        '<p>关闭 OES 客户端连接，释放通道；下次查询会按需重登。</p>'
+        + '<ul><li>运维：<code>POST /api/ops/kuangrui/oes/stop</code></li>'
+        + '<li>写操作会二次确认</li></ul>'
+    },
+    'mds.status': {
+      title: 'MDS 状态',
+      sdk: 'status',
+      stage: 'M1 行情',
+      html:
+        '<p>MDS 客户端 live / 订阅 / 配置等门禁状态。</p>'
+        + '<ul><li>运维：<code>GET /api/ops/kuangrui/mds/status</code></li>'
+        + '<li>真客户端须 <code>-Pkuangrui</code> + <code>mds.enabled</code></li></ul>'
+    },
+    'qryStockStaticInfo': {
+      title: '证券静态',
+      sdk: 'qryStockStaticInfo',
+      stage: 'M4 静态',
+      html:
+        '<p>MDS 证券静态信息（涨跌停、股本等）。定位实时辅助，不是历史 K 线库。</p>'
+        + '<ul><li>运维：<code>GET /api/ops/kuangrui/mds/stock-static</code></li></ul>'
+    },
+    'qrySecurityStatus': {
+      title: '证券状态',
+      sdk: 'qrySecurityStatus',
+      stage: 'M4 静态',
+      html:
+        '<p>MDS 证券实时状态（停复牌等）；可开关回退「量≤0」启发式。</p>'
+        + '<ul><li>运维：<code>GET /api/ops/kuangrui/mds/security-status</code></li></ul>'
+    },
+    'qryTrdSessionStatus': {
+      title: '交易时段',
+      sdk: 'qryTrdSessionStatus',
+      stage: 'M4 静态',
+      html:
+        '<p>MDS 交易时段状态（开市/休市查询）。</p>'
+        + '<ul><li>运维：<code>GET /api/ops/kuangrui/mds/session-status</code></li></ul>'
+    },
+    'static/stock': {
+      title: '合并静态',
+      sdk: 'static/stock',
+      stage: 'M4 静态',
+      html:
+        '<p>合并 MDS/OES 静态视图，供业务侧一次取涨跌停/停牌等。</p>'
+        + '<ul><li>运维：<code>GET /api/ops/kuangrui/static/stock</code></li>'
+        + '<li>总闸 <code>quant.kuangrui.static-enabled</code></li></ul>'
+    },
+    'pull': {
+      title: 'Pull 落库',
+      sdk: 'pull',
+      stage: 'M1 MDS L1',
+      html:
+        '<p>主动 pull L1 快照并写入分钟桶 → <code>market_1min(data_source=MDS)</code>。</p>'
+        + '<ul><li>运维：<code>POST /api/ops/kuangrui/mds/pull</code></li>'
+        + '<li>价按元后四位 ÷10000；写操作二次确认</li></ul>'
+    },
+    'subscribe': {
+      title: '订阅 L1',
+      sdk: 'subscribe',
+      stage: 'M1 MDS L1',
+      html:
+        '<p>MDS <code>subscribeMarketData</code>：订阅 L1 股票/指数等到分钟桶。</p>'
+        + '<ul><li>运维：<code>POST /api/ops/kuangrui/mds/subscribe</code></li>'
+        + '<li>回调勿做重活；L2/UDP 后置</li></ul>'
+    },
+    'flush': {
+      title: 'Flush 分钟桶',
+      sdk: 'flush',
+      stage: 'M1 MDS L1',
+      html:
+        '<p>将内存分钟桶刷入库表，便于立刻核对落库结果。</p>'
+        + '<ul><li>运维：<code>POST /api/ops/kuangrui/mds/flush</code></li></ul>'
+    },
+    'mds.stop': {
+      title: '停止订阅',
+      sdk: 'stop',
+      stage: 'MDS 运维',
+      html:
+        '<p>停止 MDS 订阅并关闭连接。</p>'
+        + '<ul><li>运维：<code>POST /api/ops/kuangrui/mds/stop</code></li>'
+        + '<li>M5 将加强断线清客户端与重连（当前断线行为仍有韧性缺口）</li></ul>'
+    },
+    'sendOrdReq': {
+      title: '限价报单',
+      sdk: 'sendOrdReq',
+      stage: 'M3 报撤',
+      html:
+        '<p>OES 限价下单 <code>sendOrdReq</code>（联调试单）。须 <code>orderLive=true</code> 且回报已同步。</p>'
+        + '<ul><li>运维：<code>POST /api/ops/kuangrui/oes/place-test</code></li>'
+        + '<li>总闸 <code>oes.order-enabled</code>；业务主路径另需 <code>trade-mode=sdk</code></li>'
+        + '<li>页面二次确认；价按「元」入参，SDK 侧按元后四位</li></ul>'
+    },
+    'sendOrdCancelReq': {
+      title: '撤单',
+      sdk: 'sendOrdCancelReq',
+      stage: 'M3 报撤',
+      html:
+        '<p>OES 撤单 <code>sendOrdCancelReq</code>。须报撤门禁打开；建议等回报/查询确认（细态闭环仍在 M3/M5 小修）。</p>'
+        + '<ul><li>运维：<code>POST /api/ops/kuangrui/oes/cancel-test</code></li></ul>'
+    },
+    'account.login': {
+      title: '登录并保存',
+      sdk: 'account/login',
+      stage: '账号',
+      html:
+        '<p>先验柜再密文入库（用户名明文、密码 AES-GCM）。库内 active 优先于环境变量。</p>'
+        + '<ul><li>运维：<code>POST /api/ops/kuangrui/account/login</code></li>'
+        + '<li>勿把密码写进 yml/Git；数据表白名单不含密钥表</li></ul>'
+    },
+    'account.logout': {
+      title: '清除当前账号',
+      sdk: 'account/logout',
+      stage: '账号',
+      html:
+        '<p>清除库内 active 凭据；历史可保留；之后回退环境变量（若有）。</p>'
+        + '<ul><li>运维：<code>POST /api/ops/kuangrui/account/logout</code></li></ul>'
+    }
+  };
+
+  function closeKrApiIntro() {
+    $('#krIntroModal').prop('hidden', true);
+  }
+
+  function openKrApiIntro(introKey) {
+    var info = KR_API_INTROS[introKey];
+    if (!info) {
+      toast('暂无该接口介绍', 'info');
+      return;
+    }
+    var titleHtml = escHtml(info.title || '接口介绍');
+    if (info.sdk) {
+      titleHtml += ' <span class="kr-intro-sdk"><code>' + escHtml(info.sdk) + '</code></span>';
+    }
+    $('#krIntroTitle').html(titleHtml);
+    var body = '';
+    if (info.stage) {
+      body += '<span class="kr-intro-stage">' + escHtml(info.stage) + '</span>';
+    }
+    body += info.html || '<p>暂无摘要</p>';
+    $('#krIntroBody').html(body);
+    $('#krIntroModal').prop('hidden', false);
+  }
+
+  function krIntroKeyForApi(a, channel) {
+    if (a.introKey) return a.introKey;
+    if (a.sdk === 'stop') return (channel === 'mds' ? 'mds.stop' : 'oes.stop');
+    if (a.sdk === 'status' && channel === 'mds') return 'mds.status';
+    return a.sdk;
+  }
+
+  function appendKrApiCard($box, a, opts) {
+    opts = opts || {};
+    var channel = opts.channel || 'oes';
+    var resultPrefix = opts.resultPrefix;
+    var introKey = krIntroKeyForApi(a, channel);
+    var $card = $('<div class="kr-api-card"/>').attr('data-kr-intro', introKey);
+    var $hd = $('<div class="kr-api-card-head"/>');
+    $hd.append($('<h4/>').html(escHtml(a.title) + ' <code>' + escHtml(a.sdk) + '</code>'));
+    var $actions = $('<div class="kr-api-card-actions"/>');
+    var $intro = $('<button type="button" class="secondary kr-api-intro"/>')
+      .attr('data-kr-intro', introKey)
+      .text('介绍');
+    var $btn = $('<button type="button" class="kr-api-call"/>').text('调用');
+    $actions.append($intro).append($btn);
+    $hd.append($actions);
+    $card.append($hd);
+    $card.append($('<p class="hint mono kr-api-path"/>').text(a.method + ' ' + a.path));
+    if (a.code) {
+      $card.append($('<div class="toolbar kr-api-params"/>')
+        .append($('<label class="field-inline"/>').html('代码 <input type="text" class="kr-code" value="600036" style="width:88px;"/>')));
+    }
+    $btn.on('click', function () {
+      var data = undefined;
+      if (a.code) data = { code: $card.find('.kr-code').val() };
+      krInvoke({
+        method: a.method,
+        url: a.path,
+        data: data,
+        confirm: a.confirm,
+        $btn: $btn,
+        resultPrefix: resultPrefix,
+        label: a.title
+      });
+    });
+    $box.append($card);
+  }
+
   function krInvoke(opts) {
     var method = (opts.method || 'GET').toUpperCase();
     var url = opts.url;
@@ -3002,31 +3285,7 @@
       { title: '关闭连接', sdk: 'stop', method: 'POST', path: '/api/ops/kuangrui/oes/stop', confirm: '确认关闭 OES 客户端连接？' }
     ];
     apis.forEach(function (a) {
-      var $card = $('<div class="kr-api-card"/>');
-      var $hd = $('<div class="kr-api-card-head"/>');
-      $hd.append($('<h4/>').html(a.title + ' <code>' + a.sdk + '</code>'));
-      var $btn = $('<button type="button" class="kr-api-call"/>').text('调用');
-      $hd.append($btn);
-      $card.append($hd);
-      $card.append($('<p class="hint mono kr-api-path"/>').text(a.method + ' ' + a.path));
-      if (a.code) {
-        $card.append($('<div class="toolbar kr-api-params"/>')
-          .append($('<label class="field-inline"/>').html('代码 <input type="text" class="kr-code" value="600036" style="width:88px;"/>')));
-      }
-      $btn.on('click', function () {
-        var data = undefined;
-        if (a.code) data = { code: $card.find('.kr-code').val() };
-        krInvoke({
-          method: a.method,
-          url: a.path,
-          data: data,
-          confirm: a.confirm,
-          $btn: $btn,
-          resultPrefix: 'krOes',
-          label: a.title
-        });
-      });
-      $box.append($card);
+      appendKrApiCard($box, a, { channel: 'oes', resultPrefix: 'krOes' });
     });
   }
 
@@ -3046,31 +3305,7 @@
       { title: '停止订阅', sdk: 'stop', method: 'POST', path: '/api/ops/kuangrui/mds/stop', confirm: '确认停止 MDS 订阅并关闭连接？' }
     ];
     apis.forEach(function (a) {
-      var $card = $('<div class="kr-api-card"/>');
-      var $hd = $('<div class="kr-api-card-head"/>');
-      $hd.append($('<h4/>').html(a.title + ' <code>' + a.sdk + '</code>'));
-      var $btn = $('<button type="button" class="kr-api-call"/>').text('调用');
-      $hd.append($btn);
-      $card.append($hd);
-      $card.append($('<p class="hint mono kr-api-path"/>').text(a.method + ' ' + a.path));
-      if (a.code) {
-        $card.append($('<div class="toolbar kr-api-params"/>')
-          .append($('<label class="field-inline"/>').html('代码 <input type="text" class="kr-code" value="600036" style="width:88px;"/>')));
-      }
-      $btn.on('click', function () {
-        var data = undefined;
-        if (a.code) data = { code: $card.find('.kr-code').val() };
-        krInvoke({
-          method: a.method,
-          url: a.path,
-          data: data,
-          confirm: a.confirm,
-          $btn: $btn,
-          resultPrefix: 'krMds',
-          label: a.title
-        });
-      });
-      $box.append($card);
+      appendKrApiCard($box, a, { channel: 'mds', resultPrefix: 'krMds' });
     });
   }
 
@@ -5363,6 +5598,27 @@
   $('#btnKrOverviewRefresh').on('click', function () { loadKrOverview(); });
   $('#viewKuangruiOverview').on('click', '[data-kr-jump]', function () {
     showKuangruiPanel($(this).attr('data-kr-jump') || 'overview');
+  });
+
+  $(document).on('click', '.kr-api-intro', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    openKrApiIntro($(this).attr('data-kr-intro'));
+  });
+  $('#btnKrIntroClose, #btnKrIntroCloseX').on('click', function () {
+    closeKrApiIntro();
+  });
+  $('#krIntroModal').on('click', function (e) {
+    if (e.target === this) closeKrApiIntro();
+  });
+  $('#btnKrIntroDocs').on('click', function () {
+    closeKrApiIntro();
+    openKnowledge('kuangrui');
+  });
+  $(document).on('keydown.krkrIntro', function (e) {
+    if (e.key === 'Escape' && !$('#krIntroModal').prop('hidden')) {
+      closeKrApiIntro();
+    }
   });
   // 宽睿结果区复制（委托到 document，避免视图切换/动态补按钮后失效）
   $(document).on('click', '[data-kr-copy]', function (e) {

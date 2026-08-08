@@ -22,7 +22,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css?v=20260808-kr-copy-once"/>
+  <link rel="stylesheet" href="/css/style.css?v=20260808-kr-intro"/>
   <script src="/js/jquery.min.js"></script>
   <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/echarts.min.js"></script>
@@ -905,10 +905,13 @@
         </div>
         <div class="kr-bench">
           <div class="kr-bench-apis" id="krAccCards">
-            <div class="kr-api-card" data-kr-acc-api="login">
+            <div class="kr-api-card" data-kr-acc-api="login" data-kr-intro="account.login">
               <div class="kr-api-card-head">
-                <h4>登录并保存</h4>
-                <span class="kr-api-method">POST</span>
+                <h4>登录并保存 <code>account/login</code></h4>
+                <div class="kr-api-card-actions">
+                  <button type="button" class="secondary kr-api-intro" data-kr-intro="account.login">介绍</button>
+                  <span class="kr-api-method">POST</span>
+                </div>
               </div>
               <div class="toolbar" style="flex-wrap:wrap;gap:8px;">
                 <label class="field-inline">用户名 <input type="text" id="krAccUser" autocomplete="username" style="width:140px;"/></label>
@@ -916,10 +919,13 @@
                 <button type="button" id="btnKrAccLogin">登录并保存</button>
               </div>
             </div>
-            <div class="kr-api-card" data-kr-acc-api="logout">
+            <div class="kr-api-card" data-kr-acc-api="logout" data-kr-intro="account.logout">
               <div class="kr-api-card-head">
-                <h4>清除当前账号</h4>
-                <span class="kr-api-method">POST</span>
+                <h4>清除当前账号 <code>account/logout</code></h4>
+                <div class="kr-api-card-actions">
+                  <button type="button" class="secondary kr-api-intro" data-kr-intro="account.logout">介绍</button>
+                  <span class="kr-api-method">POST</span>
+                </div>
               </div>
               <p class="hint">清除库内 active；历史保留；回退环境变量（若有）</p>
               <div class="toolbar">
@@ -956,7 +962,7 @@
     <div id="viewKuangruiOes" class="workspace-view" hidden>
       <section class="panel">
         <h3>宽睿 · OES 只读点测</h3>
-        <p class="hint">左侧选接口点「调用」；右侧固定展示入参 / 出参（对应 SDK 如 <code>queryCashAsset</code>）。</p>
+        <p class="hint">左侧选接口：「介绍」看文档摘要，「调用」后右侧展示入参 / 出参（对应 SDK 如 <code>queryCashAsset</code>）。</p>
         <div class="kr-bench">
           <div class="kr-bench-apis" id="krOesCards"></div>
           <aside class="kr-result kr-bench-result is-empty" id="krOesResult">
@@ -988,7 +994,7 @@
     <div id="viewKuangruiMds" class="workspace-view" hidden>
       <section class="panel">
         <h3>宽睿 · MDS 行情点测</h3>
-        <p class="hint">左侧选接口；写操作二次确认。右侧固定展示入参 / 出参。</p>
+        <p class="hint">左侧选接口：「介绍」看文档摘要；写操作二次确认。右侧固定展示入参 / 出参。</p>
         <div class="kr-bench">
           <div class="kr-bench-apis" id="krMdsCards"></div>
           <aside class="kr-result kr-bench-result is-empty" id="krMdsResult">
@@ -1023,10 +1029,15 @@
         <p class="hint" id="krOrderGateHint">须 <code>orderLive=true</code>（yml 打开 order-enabled + -Pkuangrui）。提交前弹框确认。</p>
         <div class="kr-bench">
           <div class="kr-bench-apis kr-order-forms">
-            <div class="kr-api-card">
-              <h4>限价报单 <code>sendOrdReq</code></h4>
-              <p class="hint mono">POST /api/ops/kuangrui/oes/place-test</p>
-              <div class="toolbar">
+            <div class="kr-api-card" data-kr-intro="sendOrdReq">
+              <div class="kr-api-card-head">
+                <h4>限价报单 <code>sendOrdReq</code></h4>
+                <div class="kr-api-card-actions">
+                  <button type="button" class="secondary kr-api-intro" data-kr-intro="sendOrdReq">介绍</button>
+                </div>
+              </div>
+              <p class="hint mono kr-api-path">POST /api/ops/kuangrui/oes/place-test</p>
+              <div class="toolbar kr-api-params">
                 <label class="field-inline">代码 <input type="text" id="krPlaceCode" value="600036" style="width:88px;"/></label>
                 <label class="field-inline">方向
                   <select id="krPlaceSide"><option value="BUY">BUY</option><option value="SELL">SELL</option></select>
@@ -1037,10 +1048,15 @@
                 <button type="button" id="btnKrPlace">报单试单</button>
               </div>
             </div>
-            <div class="kr-api-card">
-              <h4>撤单 <code>sendOrdCancelReq</code></h4>
-              <p class="hint mono">POST /api/ops/kuangrui/oes/cancel-test</p>
-              <div class="toolbar">
+            <div class="kr-api-card" data-kr-intro="sendOrdCancelReq">
+              <div class="kr-api-card-head">
+                <h4>撤单 <code>sendOrdCancelReq</code></h4>
+                <div class="kr-api-card-actions">
+                  <button type="button" class="secondary kr-api-intro" data-kr-intro="sendOrdCancelReq">介绍</button>
+                </div>
+              </div>
+              <p class="hint mono kr-api-path">POST /api/ops/kuangrui/oes/cancel-test</p>
+              <div class="toolbar kr-api-params">
                 <label class="field-inline">origClSeqNo <input type="number" id="krCancelSeq" style="width:120px;"/></label>
                 <label class="field-inline">代码 <input type="text" id="krCancelCode" value="600036" style="width:88px;"/></label>
                 <button type="button" id="btnKrCancel" class="secondary">撤单试单</button>
@@ -1198,6 +1214,21 @@
           </table>
         </div>
       </section>
+    </div>
+
+    <!-- 宽睿联调 · 接口介绍轻量弹层 -->
+    <div id="krIntroModal" class="kr-intro-modal" hidden>
+      <div class="kr-intro-dialog" role="dialog" aria-modal="true" aria-labelledby="krIntroTitle">
+        <div class="kr-intro-dialog-head">
+          <h4 id="krIntroTitle">接口介绍</h4>
+          <button type="button" class="secondary kr-intro-close-x" id="btnKrIntroCloseX" aria-label="关闭">×</button>
+        </div>
+        <div id="krIntroBody" class="kr-intro-body"></div>
+        <div class="kr-intro-foot">
+          <button type="button" class="secondary" id="btnKrIntroDocs">打开完整宽睿文档</button>
+          <button type="button" id="btnKrIntroClose">关闭</button>
+        </div>
+      </div>
     </div>
 
     <div id="scheduleProgressModal" class="ops-progress-modal" hidden>
@@ -1648,6 +1679,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260808-kr-copy-once"></script>
+<script src="/js/stock-chart.js?v=20260808-kr-intro"></script>
 </body>
 </html>
