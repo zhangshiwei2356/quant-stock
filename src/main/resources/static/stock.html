@@ -22,7 +22,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css?v=20260809-kr-ux"/>
+  <link rel="stylesheet" href="/css/style.css?v=20260809-kb-ux"/>
   <script src="/js/jquery.min.js"></script>
   <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/echarts.min.js"></script>
@@ -273,7 +273,7 @@
         </div>
 
         <div class="side-nav" data-nav="stock-knowledge">
-          <button type="button" class="side-nav-toggle" data-body="stockKnowledgeMenu" data-mode="doc"
+          <button type="button" class="side-nav-toggle" data-body="stockKnowledgeBody" data-mode="doc"
                   data-intro="/docs/nav-stock-knowledge.html" data-intro-title="量化知识" aria-expanded="false"
                   title="量化知识">
             <span class="nav-ico" aria-hidden="true">
@@ -282,11 +282,13 @@
             <span class="nav-label">量化知识</span>
             <span class="chevron">▸</span>
           </button>
-          <ul id="stockKnowledgeMenu" class="side-nav-menu"></ul>
+          <div id="stockKnowledgeBody" class="side-nav-body">
+            <ul id="stockKnowledgeMenu" class="side-nav-menu"></ul>
+          </div>
         </div>
 
         <div class="side-nav" data-nav="app-related">
-          <button type="button" class="side-nav-toggle" data-body="appRelatedMenu" data-mode="doc"
+          <button type="button" class="side-nav-toggle" data-body="appRelatedBody" data-mode="doc"
                   data-intro="/docs/nav-app-related.html" data-intro-title="应用说明" aria-expanded="false"
                   title="应用说明">
             <span class="nav-ico" aria-hidden="true">
@@ -295,7 +297,9 @@
             <span class="nav-label">应用说明</span>
             <span class="chevron">▸</span>
           </button>
-          <ul id="appRelatedMenu" class="side-nav-menu"></ul>
+          <div id="appRelatedBody" class="side-nav-body">
+            <ul id="appRelatedMenu" class="side-nav-menu"></ul>
+          </div>
         </div>
       </div>
     </section>
@@ -309,10 +313,24 @@
 
     <section class="panel knowledge-panel" id="knowledgePanel" hidden>
       <div class="knowledge-head">
-        <h3 id="knowledgeTitle">说明</h3>
-        <button type="button" id="knowledgeClose" class="secondary">返回工作台</button>
+        <div class="knowledge-head-main">
+          <p class="knowledge-eyebrow" id="knowledgeEyebrow">量化知识</p>
+          <h3 id="knowledgeTitle">说明</h3>
+        </div>
+        <div class="knowledge-head-actions">
+          <button type="button" id="btnKnowledgePrev" class="secondary" title="上一篇（←）">上一篇</button>
+          <button type="button" id="btnKnowledgeNext" class="secondary" title="下一篇（→）">下一篇</button>
+          <button type="button" id="btnKnowledgePdf" class="secondary">下载 PDF</button>
+          <button type="button" id="knowledgeClose" class="secondary">回首页</button>
+        </div>
       </div>
+      <nav class="knowledge-toc" id="knowledgeToc" hidden aria-label="本文目录"></nav>
       <article id="knowledgeBody" class="knowledge-body"></article>
+      <footer class="knowledge-pager" id="knowledgePager" hidden>
+        <button type="button" id="btnKnowledgePrevFoot" class="secondary">上一篇</button>
+        <span class="knowledge-pager-meta" id="knowledgePagerMeta"></span>
+        <button type="button" id="btnKnowledgeNextFoot" class="secondary">下一篇</button>
+      </footer>
     </section>
 
     <!-- 首页仪表盘：正文见 /docs/home.html -->
@@ -1963,6 +1981,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260809-kr-ux"></script>
+<script src="/js/stock-chart.js?v=20260809-kb-ux"></script>
 </body>
 </html>

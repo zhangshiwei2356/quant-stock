@@ -105,7 +105,8 @@
     <li><b>退役强制恢复双人复核</b> — 已落地 · 武装令牌 + <code>confirmCode</code>；冷却满仍可直接 resume</li>
     <li><b>账户风控日报页</b> — 已落地 · 聚合 alerts/换手/IC/漂移/突变/压力/部成/残差/边界 API</li>
     <li><b>组合回测冒烟单测</b> — 已落地 · 合成双标的；断言指纹与 <code>atrRisk</code></li>
-    <li><b>文档 PDF</b> — 已落地 · 量化知识 / 应用说明介绍页一键导出（服务端 iText，<code>GET /api/docs/pdf/{stock|app}</code>；应用说明包不含宽睿梳理，见「宽睿对接」）</li>
+    <li><b>文档 PDF</b> — 已落地 · 量化知识 / 应用说明介绍页与阅读顶栏一键导出（服务端 iText，<code>GET /api/docs/pdf/{stock|app}</code>；应用说明包不含宽睿梳理，见「宽睿对接」）</li>
+    <li><b>量化知识阅读体验</b> — 已落地 · 侧栏分组；上一篇/下一篇（← →）；长文目录；交叉引用可点；「本系统用法」高亮；文末相关功能入口</li>
     <li><b>项目 README 在线查看</b> — 已落地 · 应用说明 →「项目 README」；<code>GET /api/docs/readme</code> 实时渲染仓库根目录 Markdown（含 Mermaid 架构图）</li>
     <li><b>本地可调度任务</b> — 已落地 · <code>scan-and-trade</code>、<code>pool-rebuild</code>、<code>after-market-batch-scan</code>、<code>settle-after-close</code>、<code>data-validate</code>、<code>factor-daily-rebuild</code>、<code>day-collect</code>、<code>pool-minute-backfill</code>、<code>sync-orders</code>、<code>position-pnl-sync</code>；入池粗筛可读 <code>factor_daily</code>；运维「执行一次」全部后台跑：弹框与页内横幅同步进度（可收起）；长任务（TDX / 因子 / 入池 / 校验 / 行情采集）上报 <code>i/n</code>（入池含因子预刷与粗筛扫描两段）；scan/sync/settle 锁忙与业务失败均返回错误而非假成功</li>
     <li><b>宽睿资料梳理</b> — 已落地（文档）· <code>OESAPI-JAVA-v0.19.4.0</code>；「宽睿文档梳理」含接入面盘点（约 22/24）与 <b>M6 银证已落地</b>（2026-08-08）</li>

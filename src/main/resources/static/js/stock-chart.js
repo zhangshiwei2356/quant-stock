@@ -2253,25 +2253,73 @@
     { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260808-shell-dash' },
     { id: 'memo', group: 'app', title: '能力与待办', src: '/docs/memo.html?v=20260808-plan' },
     { id: 'kuangrui', group: 'kuangrui', title: '宽睿文档梳理', src: '/docs/kuangrui.html?v=20260808-plan' },
-    { id: 'ashare', group: 'stock', title: 'A股基础', src: '/docs/ashare.html?v=20260720-nav-rename' },
-    { id: 'session', group: 'stock', title: '交易时间', src: '/docs/session.html?v=20260720-nav-rename' },
-    { id: 'kline', group: 'stock', title: 'K线', src: '/docs/kline.html?v=20260720-nav-rename' },
-    { id: 'ma', group: 'stock', title: '均线与金叉', src: '/docs/ma.html?v=20260720-nav-rename' },
-    { id: 'volume', group: 'stock', title: '成交量与放量', src: '/docs/volume.html?v=20260720-nav-rename' },
-    { id: 'rsi', group: 'stock', title: 'RSI', src: '/docs/rsi.html?v=20260720-nav-rename' },
-    { id: 'atr', group: 'stock', title: 'ATR', src: '/docs/atr.html?v=20260720-nav-rename' },
-    { id: 'adx', group: 'stock', title: 'ADX', src: '/docs/adx.html?v=20260720-nav-rename' },
-    { id: 'boll', group: 'stock', title: '布林带', src: '/docs/boll.html?v=20260720-nav-rename' },
-    { id: 'limit', group: 'stock', title: '涨跌停与停牌', src: '/docs/limit.html?v=20260720-nav-rename' },
-    { id: 'tplus1', group: 'stock', title: 'T+1与整手', src: '/docs/tplus1.html?v=20260720-nav-rename' },
-    { id: 'cost', group: 'stock', title: '交易成本', src: '/docs/cost.html?v=20260720-nav-rename' },
-    { id: 'position', group: 'stock', title: '仓位与金字塔', src: '/docs/position.html?v=20260720-nav-rename' },
-    { id: 'risk', group: 'stock', title: '账户风控', src: '/docs/risk.html?v=20260720-nav-rename' },
-    { id: 'fill', group: 'stock', title: '撮合时机', src: '/docs/fill.html?v=20260720-nav-rename' },
-    { id: 'metrics', group: 'stock', title: '夏普·回撤与胜率', src: '/docs/metrics.html?v=20260808-sharpe-metrics' },
-    { id: 'backtest', group: 'stock', title: '回测要点', src: '/docs/backtest.html?v=20260720-nav-rename' }
+    { id: 'ashare', group: 'stock', section: 'base', title: 'A股基础', src: '/docs/ashare.html?v=20260720-nav-rename',
+      related: [{ key: 'pool', label: '行情浏览' }, { key: 'single', label: '个股回测' }] },
+    { id: 'session', group: 'stock', section: 'base', title: '交易时间', src: '/docs/session.html?v=20260720-nav-rename',
+      related: [{ key: 'pool', label: '行情浏览' }, { key: 'schedule', label: '运维中心' }] },
+    { id: 'kline', group: 'stock', section: 'base', title: 'K线', src: '/docs/kline.html?v=20260720-nav-rename',
+      related: [{ key: 'pool', label: '行情浏览' }, { key: 'single', label: '个股回测' }] },
+    { id: 'ma', group: 'stock', section: 'indicator', title: '均线与金叉', src: '/docs/ma.html?v=20260720-nav-rename',
+      related: [{ key: 'single', label: '个股回测' }, { key: 'strategy', label: '策略总览' }] },
+    { id: 'volume', group: 'stock', section: 'indicator', title: '成交量与放量', src: '/docs/volume.html?v=20260720-nav-rename',
+      related: [{ key: 'single', label: '个股回测' }, { key: 'tradepool', label: '目标池' }] },
+    { id: 'rsi', group: 'stock', section: 'indicator', title: 'RSI', src: '/docs/rsi.html?v=20260720-nav-rename',
+      related: [{ key: 'single', label: '个股回测' }, { key: 'strategy', label: '策略总览' }] },
+    { id: 'atr', group: 'stock', section: 'indicator', title: 'ATR', src: '/docs/atr.html?v=20260720-nav-rename',
+      related: [{ key: 'single', label: '个股回测' }, { key: 'account', label: '账户概览' }] },
+    { id: 'adx', group: 'stock', section: 'indicator', title: 'ADX', src: '/docs/adx.html?v=20260720-nav-rename',
+      related: [{ key: 'single', label: '个股回测' }, { key: 'strategy', label: '策略总览' }] },
+    { id: 'boll', group: 'stock', section: 'indicator', title: '布林带', src: '/docs/boll.html?v=20260720-nav-rename',
+      related: [{ key: 'single', label: '个股回测' }] },
+    { id: 'limit', group: 'stock', section: 'mechanism', title: '涨跌停与停牌', src: '/docs/limit.html?v=20260720-nav-rename',
+      related: [{ key: 'single', label: '个股回测' }, { key: 'tradepool', label: '目标池' }] },
+    { id: 'tplus1', group: 'stock', section: 'mechanism', title: 'T+1与整手', src: '/docs/tplus1.html?v=20260720-nav-rename',
+      related: [{ key: 'account', label: '账户概览' }, { key: 'single', label: '个股回测' }] },
+    { id: 'cost', group: 'stock', section: 'mechanism', title: '交易成本', src: '/docs/cost.html?v=20260720-nav-rename',
+      related: [{ key: 'single', label: '个股回测' }, { key: 'portfolio', label: '组合回测' }] },
+    { id: 'position', group: 'stock', section: 'mechanism', title: '仓位与金字塔', src: '/docs/position.html?v=20260720-nav-rename',
+      related: [{ key: 'single', label: '个股回测' }, { key: 'account', label: '账户概览' }] },
+    { id: 'risk', group: 'stock', section: 'mechanism', title: '账户风控', src: '/docs/risk.html?v=20260720-nav-rename',
+      related: [{ key: 'account', label: '账户概览' }, { key: 'strategy', label: '策略总览' }] },
+    { id: 'fill', group: 'stock', section: 'mechanism', title: '撮合时机', src: '/docs/fill.html?v=20260720-nav-rename',
+      related: [{ key: 'single', label: '个股回测' }, { knowledge: 'rules', label: '交易规则' }] },
+    { id: 'metrics', group: 'stock', section: 'eval', title: '夏普·回撤与胜率', src: '/docs/metrics.html?v=20260808-sharpe-metrics',
+      related: [{ key: 'strategy', label: '策略总览' }, { key: 'single', label: '个股回测' }] },
+    { id: 'backtest', group: 'stock', section: 'eval', title: '回测要点', src: '/docs/backtest.html?v=20260720-nav-rename',
+      related: [{ key: 'single', label: '个股回测' }, { key: 'portfolio', label: '组合回测' }, { key: 'strategy', label: '策略总览' }] }
   ];
+  var STOCK_KNOWLEDGE_SECTIONS = [
+    { key: 'base', label: '基础' },
+    { key: 'indicator', label: '指标' },
+    { key: 'mechanism', label: '机制' },
+    { key: 'eval', label: '评价' }
+  ];
+  var KNOWLEDGE_LINK_ALIASES = {
+    'A股基础': 'ashare', 'A股': 'ashare',
+    '交易时间': 'session',
+    'K线': 'kline',
+    '均线与金叉': 'ma', '金叉死叉': 'ma',
+    '成交量与放量': 'volume', '成交量': 'volume', '放量': 'volume',
+    'RSI': 'rsi',
+    'ATR': 'atr',
+    'ADX': 'adx',
+    '布林带': 'boll',
+    '涨跌停与停牌': 'limit', '涨跌停': 'limit',
+    'T+1与整手': 'tplus1', 'T+1': 'tplus1',
+    '交易成本': 'cost',
+    '仓位与金字塔': 'position', '金字塔': 'position',
+    '账户风控': 'risk',
+    '撮合时机': 'fill', '撮合静默': 'fill',
+    '夏普·回撤与胜率': 'metrics', '夏普': 'metrics',
+    '回测要点': 'backtest',
+    '交易规则': 'rules',
+    '应用说明 → 交易规则': 'rules',
+    '系统概述': 'app',
+    '能力与待办': 'memo',
+    '项目 README': 'readme', 'README': 'readme'
+  };
   var knowledgeHtmlCache = {};
+  var lastKnowledgeId = '';
   var HOME_SRC = '/docs/home.html?v=20260808-home-recent';
   var homePanelReady = false;
   var pendingHomeLead = null;
@@ -2562,23 +2610,70 @@
     }
   }
 
+  function findKnowledgeTopic(id) {
+    for (var i = 0; i < knowledgeTopics.length; i++) {
+      if (knowledgeTopics[i].id === id) return knowledgeTopics[i];
+    }
+    return null;
+  }
+
+  function knowledgeTopicsInGroup(group) {
+    return knowledgeTopics.filter(function (t) { return t.group === group; });
+  }
+
+  function siblingKnowledgeTopic(id, delta) {
+    var cur = findKnowledgeTopic(id);
+    if (!cur || cur.group === 'kuangrui') return null;
+    var list = knowledgeTopicsInGroup(cur.group);
+    var idx = -1;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id === id) { idx = i; break; }
+    }
+    if (idx < 0) return null;
+    return list[idx + delta] || null;
+  }
+
+  function knowledgeSectionLabel(topic) {
+    if (!topic) return '';
+    if (topic.group === 'app') return '应用说明';
+    if (topic.group === 'kuangrui') return '宽睿对接';
+    for (var i = 0; i < STOCK_KNOWLEDGE_SECTIONS.length; i++) {
+      if (STOCK_KNOWLEDGE_SECTIONS[i].key === topic.section) {
+        return '量化知识 · ' + STOCK_KNOWLEDGE_SECTIONS[i].label;
+      }
+    }
+    return '量化知识';
+  }
+
   function initKnowledge() {
     var $stock = $('#stockKnowledgeMenu').empty();
     var $app = $('#appRelatedMenu').empty();
+    STOCK_KNOWLEDGE_SECTIONS.forEach(function (sec) {
+      var items = knowledgeTopics.filter(function (t) {
+        return t.group === 'stock' && t.section === sec.key;
+      });
+      if (!items.length) return;
+      $stock.append(
+        $('<li class="side-nav-section" aria-hidden="true"/>').text(sec.label)
+      );
+      items.forEach(function (t) {
+        $stock.append(
+          $('<li role="button" tabindex="0"/>').text(t.title).attr('data-id', t.id)
+        );
+      });
+    });
     knowledgeTopics.forEach(function (t) {
-      if (t.group === 'kuangrui') {
-        return; // 挂在「宽睿对接」二级菜单，不进应用说明列表
-      }
-      var $li = $('<li/>').text(t.title).attr('data-id', t.id);
-      if (t.group === 'app') {
-        $app.append($li);
-      } else {
-        $stock.append($li);
-      }
+      if (t.group !== 'app') return;
+      $app.append(
+        $('<li role="button" tabindex="0"/>').text(t.title).attr('data-id', t.id)
+      );
     });
   }
 
   function setSideNavOpen(bodyId) {
+    // 兼容旧会话 / 面包屑：知识菜单改为 side-nav-body 包裹
+    if (bodyId === 'stockKnowledgeMenu') bodyId = 'stockKnowledgeBody';
+    if (bodyId === 'appRelatedMenu') bodyId = 'appRelatedBody';
     $('.side-nav-toggle').each(function () {
       var id = $(this).attr('data-body');
       // 必须是严格 boolean：jQuery toggleClass(cls, null/undefined) 会变成“切换”而非“关闭”
@@ -2963,16 +3058,16 @@
         pushRecentVisit({ key: 'kuangrui', label: '宽睿对接', mode: 'kuangrui', panel: 'overview' });
         break;
       case 'knowledge':
-        setSideNavOpen('stockKnowledgeMenu');
+        setSideNavOpen('stockKnowledgeBody');
         ensureSidebarExpanded();
         openKnowledge('ashare');
-        pushRecentVisit({ key: 'knowledge', label: '量化知识', mode: 'doc' });
+        pushRecentVisit({ key: 'knowledge', label: '量化知识', mode: 'doc', panel: 'ashare' });
         break;
       case 'app':
-        setSideNavOpen('appRelatedMenu');
+        setSideNavOpen('appRelatedBody');
         ensureSidebarExpanded();
         openKnowledge('app');
-        pushRecentVisit({ key: 'app', label: '应用说明', mode: 'doc' });
+        pushRecentVisit({ key: 'app', label: '应用说明', mode: 'doc', panel: 'app' });
         break;
       default:
         break;
@@ -6505,32 +6600,188 @@
     setSideNavOpen(menuBodyId || null);
   }
 
-  function openKnowledge(id) {
+  function updateKnowledgeChrome(topic) {
+    lastKnowledgeId = topic ? topic.id : '';
+    var group = topic ? topic.group : 'stock';
+    var pdfGroup = group === 'app' ? 'app' : 'stock';
+    $('#knowledgeEyebrow').text(knowledgeSectionLabel(topic));
+    $('#knowledgeTitle').text(topic ? topic.title : '说明');
+    var $pdf = $('#btnKnowledgePdf');
+    if (group === 'kuangrui') {
+      $pdf.prop('hidden', true);
+    } else {
+      $pdf.prop('hidden', false)
+        .attr('data-download-docs', pdfGroup)
+        .text(pdfGroup === 'app' ? '下载应用说明 PDF' : '下载量化知识 PDF');
+    }
+    var prev = topic ? siblingKnowledgeTopic(topic.id, -1) : null;
+    var next = topic ? siblingKnowledgeTopic(topic.id, 1) : null;
+    var list = topic ? knowledgeTopicsInGroup(topic.group) : [];
+    var idx = -1;
+    if (topic) {
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].id === topic.id) { idx = i; break; }
+      }
+    }
+    $('#btnKnowledgePrev, #btnKnowledgePrevFoot').prop('disabled', !prev);
+    $('#btnKnowledgeNext, #btnKnowledgeNextFoot').prop('disabled', !next);
+    if (list.length && idx >= 0) {
+      $('#knowledgePager').prop('hidden', false);
+      $('#knowledgePagerMeta').text((idx + 1) + ' / ' + list.length
+        + (prev ? ' · 上：' + prev.title : '')
+        + (next ? ' · 下：' + next.title : ''));
+    } else {
+      $('#knowledgePager').prop('hidden', true);
+      $('#knowledgePagerMeta').text('');
+    }
+    $('#knowledgeToc').prop('hidden', true).empty();
+  }
+
+  function wrapKnowledgeSysUsage($root) {
+    $root.find('h4').each(function () {
+      var $h = $(this);
+      if ($h.closest('.kb-sys-block').length) return;
+      if ($.trim($h.text()) !== '本系统用法') return;
+      var $block = $('<div class="kb-sys-block"/>');
+      $h.addClass('kb-sys-title').before($block);
+      $block.append($h);
+      var $n = $block.next();
+      while ($n.length && !$n.is('h4') && !$n.is('.knowledge-related') && !$n.is('.kb-sys-block')) {
+        var $move = $n;
+        $n = $n.next();
+        $block.append($move);
+      }
+    });
+  }
+
+  function linkifyKnowledgeRefs($root) {
+    var keys = Object.keys(KNOWLEDGE_LINK_ALIASES).sort(function (a, b) {
+      return b.length - a.length;
+    });
+    if (!keys.length) return;
+    var re = new RegExp('「(' + keys.map(function (k) {
+      return k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }).join('|') + ')」', 'g');
+    $root.find('p, li').each(function () {
+      var el = this;
+      if ($(el).closest('button, a, code, pre, .kb-link, .knowledge-toc').length) return;
+      var html = el.innerHTML;
+      if (!html || html.indexOf('「') < 0) return;
+      var next = html.replace(re, function (m, name) {
+        var kid = KNOWLEDGE_LINK_ALIASES[name];
+        if (!kid || kid === lastKnowledgeId) return m;
+        return '<button type="button" class="kb-link" data-knowledge="' + kid + '">' + m + '</button>';
+      });
+      if (next !== html) el.innerHTML = next;
+    });
+  }
+
+  function buildKnowledgeToc($root) {
+    var $toc = $('#knowledgeToc').empty().prop('hidden', true);
+    var $heads = $root.find('h4').filter(function () {
+      return !$(this).closest('.knowledge-related').length;
+    });
+    if ($heads.length < 3) return;
+    $toc.append($('<span class="knowledge-toc-label"/>').text('本文目录'));
+    $heads.each(function (i) {
+      var $h = $(this);
+      var tid = 'kb-sec-' + i;
+      $h.attr('id', tid);
+      $toc.append(
+        $('<a href="#' + tid + '"/>')
+          .text($.trim($h.text()) || ('节 ' + (i + 1)))
+          .on('click', function (e) {
+            e.preventDefault();
+            var el = document.getElementById(tid);
+            if (el) {
+              try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (err) {}
+            }
+          })
+      );
+    });
+    $toc.prop('hidden', false);
+  }
+
+  function appendKnowledgeRelated(topic, $root) {
+    $root.find('.knowledge-related').remove();
+    if (!topic || topic.group !== 'stock' || !topic.related || !topic.related.length) return;
+    var $box = $('<div class="knowledge-related"/>');
+    $box.append($('<p class="knowledge-related-title"/>').text('相关功能'));
+    var $chips = $('<div class="knowledge-related-chips"/>');
+    topic.related.forEach(function (r) {
+      if (r.knowledge) {
+        $chips.append(
+          $('<button type="button" class="secondary"/>')
+            .attr('data-knowledge', r.knowledge)
+            .text(r.label || r.knowledge)
+        );
+      } else if (r.key) {
+        $chips.append(
+          $('<button type="button" class="secondary"/>')
+            .attr('data-enter', r.key)
+            .text(r.label || r.key)
+        );
+      }
+    });
+    $box.append($chips);
+    $root.append($box);
+  }
+
+  function enhanceKnowledgeArticle(topic, $root) {
+    wrapKnowledgeSysUsage($root);
+    linkifyKnowledgeRefs($root);
+    buildKnowledgeToc($root);
+    appendKnowledgeRelated(topic, $root);
+    if (topic && topic.id === 'readme') {
+      enhanceReadmeMermaid($root);
+    }
+  }
+
+  function paintKnowledgeEmpty(msg, topic) {
+    var $empty = $('<div class="knowledge-empty"/>');
+    $empty.append($('<p class="hint"/>').text(msg || '文档加载失败'));
+    var $tb = $('<div class="toolbar"/>');
+    if (topic) {
+      $tb.append(
+        $('<button type="button"/>').text('重试').on('click', function () {
+          openKnowledge(topic.id, { force: true });
+        })
+      );
+    }
+    $tb.append(
+      $('<button type="button" class="secondary"/>').text('回首页').on('click', function () {
+        showHome();
+      })
+    );
+    $empty.append($tb);
+    $('#knowledgeBody').empty().append($empty);
+    $('#knowledgeToc').prop('hidden', true).empty();
+  }
+
+  function openKnowledge(id, opts) {
+    opts = opts || {};
     // 宽睿文档梳理改为 workspace 内嵌，避免切 mode-doc 丢联调台
     if (id === 'kuangrui') {
       showKuangruiPanel('docs');
       return;
     }
-    var topic = null;
-    for (var i = 0; i < knowledgeTopics.length; i++) {
-      if (knowledgeTopics[i].id === id) { topic = knowledgeTopics[i]; break; }
-    }
+    var topic = findKnowledgeTopic(id);
     if (!topic) return;
-    var menuId = topic.group === 'app' ? 'appRelatedMenu'
-      : (topic.group === 'kuangrui' ? 'kuangruiBody' : 'stockKnowledgeMenu');
+    var menuId = topic.group === 'app' ? 'appRelatedBody' : 'stockKnowledgeBody';
     showDocMode(menuId);
     $('.side-nav-menu li').removeClass('active');
-    if (topic.group === 'kuangrui') {
-      setKuangruiMenuActive('docs');
-      lastKuangruiPanel = 'docs';
-      lastWorkspaceMode = 'kuangrui';
-    } else {
-      $('.side-nav-menu li[data-id="' + id + '"]').addClass('active');
+    var $active = $('.side-nav-menu li[data-id="' + id + '"]').addClass('active');
+    if ($active.length) {
+      try { $active[0].scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e0) {}
     }
-    $('#knowledgeTitle').text(topic.title);
-    $('#knowledgeBody').html('<p>加载中…</p>');
-    try { $('#knowledgePanel')[0].scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
-    var groupLabel = topic.group === 'app' ? '应用说明' : (topic.group === 'kuangrui' ? '宽睿对接' : '量化知识');
+    updateKnowledgeChrome(topic);
+    $('#knowledgeBody').html('<p class="hint">加载中…</p>');
+    try {
+      var bodyEl = document.getElementById('knowledgeBody');
+      if (bodyEl) bodyEl.scrollTop = 0;
+      $('#knowledgePanel')[0].scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (e) {}
+    var groupLabel = topic.group === 'app' ? '应用说明' : '量化知识';
     updateBreadcrumb([
       { label: '扩展与文档' },
       { label: groupLabel, bodyId: menuId },
@@ -6538,44 +6789,45 @@
     ]);
     saveNavSession({ mode: 'doc', panel: id, menuBodyId: menuId });
     pushRecentVisit({
-      key: topic.group === 'app' ? 'app' : (topic.group === 'kuangrui' ? 'kuangrui' : 'knowledge'),
+      key: topic.group === 'app' ? 'app' : 'knowledge',
       label: topic.title,
       mode: 'doc',
       panel: id
     });
 
     function render(html) {
-      $('#knowledgeBody').html(html || '<p>暂无内容</p>');
-      if (topic.id === 'readme') {
-        enhanceReadmeMermaid($('#knowledgeBody'));
-      }
+      if ($('#knowledgeTitle').text() !== topic.title) return;
+      var $root = $('#knowledgeBody');
+      $root.html(html || '<p class="hint">暂无内容</p>');
+      enhanceKnowledgeArticle(topic, $root);
+      try { $root[0].scrollTop = 0; } catch (e1) {}
     }
+
     // README 实时读盘，不做本地 HTML 缓存
     if (topic.id === 'readme') {
       $.ajax({ url: topic.src, dataType: 'html', cache: false })
-        .done(function (html) {
-          if ($('#knowledgeTitle').text() !== topic.title) return;
-          render(html);
-        })
+        .done(function (html) { render(html); })
         .fail(function () {
           if ($('#knowledgeTitle').text() !== topic.title) return;
-          render('<p>README 加载失败：请确认从项目根目录启动，且 <code>GET /api/docs/readme</code> 可用。</p>');
+          paintKnowledgeEmpty('README 加载失败：请确认从项目根目录启动，且 GET /api/docs/readme 可用。', topic);
         });
       return;
     }
-    if (knowledgeHtmlCache[topic.src]) {
+    if (opts.force) {
+      try { delete knowledgeHtmlCache[topic.src]; } catch (e2) {}
+    }
+    if (!opts.force && knowledgeHtmlCache[topic.src]) {
       render(knowledgeHtmlCache[topic.src]);
       return;
     }
     $.get(topic.src)
       .done(function (html) {
         knowledgeHtmlCache[topic.src] = html;
-        if ($('#knowledgeTitle').text() !== topic.title) return;
         render(html);
       })
       .fail(function () {
         if ($('#knowledgeTitle').text() !== topic.title) return;
-        render('<p>文档加载失败：' + topic.src + '</p>');
+        paintKnowledgeEmpty('文档加载失败，请检查网络或稍后重试。', topic);
       });
   }
 
@@ -6668,6 +6920,14 @@
     }
     if (mode === 'portfolio') {
       showMode('portfolio', { panel: $(this).attr('data-portfolio-panel') || 'workspace' });
+      return;
+    }
+    if (mode === 'knowledge') {
+      openKnowledge($(this).attr('data-knowledge-id') || 'ashare');
+      return;
+    }
+    if (mode === 'app') {
+      openKnowledge($(this).attr('data-knowledge-id') || 'app');
       return;
     }
     showMode(mode);
@@ -8351,7 +8611,7 @@
     showScheduleProgressModal(false);
   });
 
-  $('#viewNavIntro').on('click', '[data-download-docs], [data-docs-pdf]', function () {
+  $('#viewNavIntro, #knowledgePanel').on('click', '[data-download-docs], [data-docs-pdf]', function () {
     var group = $(this).attr('data-download-docs') || $(this).attr('data-docs-pdf');
     if (group === 'stock' || group === 'app') {
       downloadDocsPdf(group, $(this));
@@ -8381,8 +8641,11 @@
     var bodyId = $(this).attr('data-open-nav');
     var mode = $(this).attr('data-mode') || '';
     if (mode === 'doc') {
-      if (bodyId === 'stockKnowledgeMenu') enterWorkspaceByKey('knowledge');
-      else enterWorkspaceByKey('app');
+      if (bodyId === 'stockKnowledgeMenu' || bodyId === 'stockKnowledgeBody') {
+        enterWorkspaceByKey('knowledge');
+      } else {
+        enterWorkspaceByKey('app');
+      }
       return;
     }
     var map = {
@@ -8407,11 +8670,52 @@
   });
 
   $('#stockKnowledgeMenu, #appRelatedMenu').on('click', 'li', function () {
-    openKnowledge($(this).data('id'));
+    if ($(this).hasClass('side-nav-section')) return;
+    var kid = $(this).data('id');
+    if (kid) openKnowledge(kid);
+  });
+  $('#stockKnowledgeMenu, #appRelatedMenu').on('keydown', 'li[data-id]', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      $(this).trigger('click');
+    }
   });
 
+  function goKnowledgeSibling(delta) {
+    if (!lastKnowledgeId) return;
+    var sib = siblingKnowledgeTopic(lastKnowledgeId, delta);
+    if (sib) openKnowledge(sib.id);
+  }
+
+  $('#btnKnowledgePrev, #btnKnowledgePrevFoot').on('click', function () { goKnowledgeSibling(-1); });
+  $('#btnKnowledgeNext, #btnKnowledgeNextFoot').on('click', function () { goKnowledgeSibling(1); });
+
   $('#knowledgeClose').on('click', function () {
-    showMode(lastWorkspaceMode || 'pool');
+    showHome();
+  });
+
+  $(document).on('click', '#knowledgePanel [data-knowledge], #knowledgeBody [data-knowledge]', function (e) {
+    e.preventDefault();
+    var kid = $(this).attr('data-knowledge');
+    if (kid) openKnowledge(kid);
+  });
+
+  $(document).on('click', '#knowledgePanel [data-enter]', function (e) {
+    e.preventDefault();
+    var key = $(this).attr('data-enter');
+    if (key) enterWorkspaceByKey(key);
+  });
+
+  $(document).on('keydown.knowledgePager', function (e) {
+    if ($('#knowledgePanel').prop('hidden')) return;
+    if ($(e.target).closest('input, textarea, select, [contenteditable="true"]').length) return;
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      goKnowledgeSibling(-1);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      goKnowledgeSibling(1);
+    }
   });
 
   $('#poolMenu').on('click', 'li', function () {
