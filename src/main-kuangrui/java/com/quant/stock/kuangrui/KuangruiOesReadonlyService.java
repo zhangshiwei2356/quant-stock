@@ -530,9 +530,11 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
             if (client != null && rptSynced.get()) {
                 return;
             }
+            // 半登录态：回报同步失败后先关掉再整链重登，避免死连接反复 sync
             if (client != null && !rptSynced.get()) {
-                doRptSync(lastInMsgSeq);
-                return;
+                log.warn("[oes] 已登录但未回报同步，关闭后重登 lastInMsgSeq={}", lastInMsgSeq);
+                rptSynced.set(false);
+                closeClient();
             }
             Path cfg = resolveOesConfig();
             if (!Files.isRegularFile(cfg)) {
@@ -581,7 +583,13 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
             lastError.set(null);
             log.info("[oes] 登录成功 applVerId={} lastInMsgSeq={} credSource={}",
                     rsp.getApplVerId(), lastInMsgSeq, cred.getSource());
-            doRptSync(lastInMsgSeq);
+            try {
+                doRptSync(lastInMsgSeq);
+            } catch (Exception syncEx) {
+                rptSynced.set(false);
+                closeClient();
+                throw syncEx;
+            }
         }
     }
 
@@ -828,36 +836,15 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
         if (c == null) {
             throw new IllegalStateException("OES 客户端为空");
         }
-        // Demo：登录后必须 sendRptSync，否则回报通道易断；签名因版本略有差异
-        boolean ok = tryInvokeRptSync(c, seq);
-        if (!ok) {
-            throw new IllegalStateException("sendRptSync 调用失败（请核对 API 版本 0.19.4）");
+        // Demo：登录后必须 sendRptSync；签名/异常明细见 OesRptSyncInvoker
+        OesRptSyncInvoker.Result r = OesRptSyncInvoker.invoke(c, seq);
+        if (!r.ok) {
+            log.warn("[oes] sendRptSync 失败 seq={} detail={}", seq, r.detail);
+            throw new IllegalStateException(r.detail != null ? r.detail
+                    : "sendRptSync 调用失败（请核对 API 版本 0.19.4 与回报通道配置）");
         }
         rptSynced.set(true);
-        log.info("[oes] sendRptSync 完成 lastInMsgSeq={}", seq);
-    }
-
-    private static boolean tryInvokeRptSync(OesClientImpl c, long seq) {
-        // sendRptSync(long)
-        if (invokeQuiet(c, "sendRptSync", new Class[]{long.class}, new Object[]{Long.valueOf(seq)})) {
-            return true;
-        }
-        if (invokeQuiet(c, "sendRptSync", new Class[]{Long.class}, new Object[]{Long.valueOf(seq)})) {
-            return true;
-        }
-        // initRptSync + sendRptSync()
-        if (invokeQuiet(c, "initRptSync", new Class[]{long.class}, new Object[]{Long.valueOf(seq)})
-                || invokeQuiet(c, "initRptSync", new Class[]{Long.class}, new Object[]{Long.valueOf(seq)})) {
-            if (invokeQuiet(c, "sendRptSync", new Class[]{}, new Object[]{})) {
-                return true;
-            }
-        }
-        // sendReportSynchronization(long)
-        if (invokeQuiet(c, "sendReportSynchronization", new Class[]{long.class}, new Object[]{Long.valueOf(seq)})) {
-            return true;
-        }
-        // 无参 sendRptSync（部分 Demo 仅通知开始推送）
-        return invokeQuiet(c, "sendRptSync", new Class[]{}, new Object[]{});
+        log.info("[oes] sendRptSync 完成 lastInMsgSeq={} via {}", seq, r.methodUsed);
     }
 
     private List<?> invokeQueryList(String methodName, String filterClassName) {
@@ -926,19 +913,6 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
             }
         }
         return null;
-    }
-
-    private static boolean invokeQuiet(Object target, String name, Class<?>[] types, Object[] args) {
-        try {
-            Method m = target.getClass().getMethod(name, types);
-            m.invoke(target, args);
-            return true;
-        } catch (NoSuchMethodException e) {
-            return false;
-        } catch (Exception e) {
-            log.debug("[oes] {} 调用异常: {}", name, e.getMessage());
-            return false;
-        }
     }
 
     private static Object newInstance(String className) {

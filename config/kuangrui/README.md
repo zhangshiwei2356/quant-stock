@@ -184,7 +184,14 @@ quant:
    - `GET /api/ops/kuangrui/oes/reconcile` → 本地纸面 vs 柜台差异
    - 定时任务 `sync-orders` / `position-pnl-sync` 在 OES live 时打对账日志（不改本地账本）
 
-实现：`src/main-kuangrui/.../KuangruiOesReadonlyService.java`；门面 `KuangruiOesOpsFacade`。
+排障（查资金报 `rptSynced=false` / `sendRptSync` 失败）：
+
+- 登录成功但回报同步失败时，`lastError` 会带**可用方法签名与真实异常**（不再只写「请核对 API 版本」）
+- 核对 `local/oes_api_config.json` 回报通道 `rpt` URL（模拟默认 `tcp://106.15.58.119:6301`）可达
+- 服务端 ApplVerId≈`0.19.1`、客户端 jar `0.19.4.0` 属兼容范围；须 `-Pkuangrui` 且 jar 已 install
+- 失败后会关闭半登录连接，下次查询会整链重登 + 再 sync
+
+实现：`src/main-kuangrui/.../KuangruiOesReadonlyService.java` + `OesRptSyncInvoker`；门面 `KuangruiOesOpsFacade`。
 
 ## M3 OES 报撤（可选）
 

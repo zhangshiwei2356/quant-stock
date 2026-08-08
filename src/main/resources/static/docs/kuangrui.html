@@ -131,7 +131,7 @@
       <tr>
         <td><b>M2 OES 只读</b></td>
         <td><b>可选已落地</b>（默认关 · 2026-08-06）</td>
-        <td>登录 + <code>sendRptSync</code> + 查资金/持仓/委托/成交（价÷10000）；纸面 vs 柜台对账；实现仅 <code>-Pkuangrui</code></td>
+        <td>登录 + <code>sendRptSync</code>（多签名反射适配；失败会带可用方法/异常明细，并关连接重登）+ 查资金/持仓/委托/成交（价÷10000）；纸面 vs 柜台对账；实现仅 <code>-Pkuangrui</code></td>
         <td>运维 <code>/api/ops/kuangrui/oes/{status,cash,holdings,orders,trades,snapshot,reconcile,stop}</code></td>
       </tr>
       <tr>
