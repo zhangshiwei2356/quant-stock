@@ -49,9 +49,9 @@
       <tr><td>行情订阅</td><td><code>subscribeMarketData</code> → L1 股票/指数/期权</td><td><b>M1 已用</b>：目标池 L1 → 分钟桶</td></tr>
       <tr><td>快照查询</td><td><code>qryMktDataSnapshot</code> / <code>qrySnapshotList</code></td><td><b>M1+M5+ 已用</b>：pull 优先批量 <code>qrySnapshotList</code>，失败回退单只</td></tr>
       <tr><td>Level2</td><td>L2 快照/增量/逐笔等</td><td>后置</td></tr>
-      <tr><td>证券实时状态</td><td><code>qrySecurityStatus</code> / <code>onSecurityStatus</code></td><td><b>M4 已用</b>：停复牌（可开关回退量≤0）</td></tr>
-      <tr><td>交易时段</td><td><code>qryTrdSessionStatus</code> / <code>onTrdSessionStatus</code></td><td><b>M4 已用</b>：开市/休市查询</td></tr>
-      <tr><td>证券静态信息</td><td><code>qryStockStaticInfo</code> / <code>List</code></td><td><b>M4 已用</b>：涨跌停/停牌/股本</td></tr>
+      <tr><td>证券实时状态</td><td><code>qrySecurityStatus</code> / <code>onSecurityStatus</code></td><td><b>M4 已用</b>：强类型 Req；停复牌（可开关回退量≤0）</td></tr>
+      <tr><td>交易时段</td><td><code>qryTrdSessionStatus</code> / <code>onTrdSessionStatus</code></td><td><b>M4 已用</b>：沪/深各查一次；开市/休市</td></tr>
+      <tr><td>证券静态信息</td><td><code>qryStockStaticInfo</code> / <code>List</code></td><td><b>M4 已用</b>：<code>Filter + QueryMode.ALL</code> → <code>getQryItems</code>（涨跌停/停牌/股本）</td></tr>
       <tr><td>UDP 组播</td><td><code>MdsUdpClient</code></td><td>低延迟；公网模拟通常不可用，后置</td></tr>
     </tbody>
   </table>
@@ -145,7 +145,7 @@
       <tr>
         <td><b>M4 静态/费率</b></td>
         <td><b>可选已落地</b>（默认关 · 2026-08-06）</td>
-        <td>MDS 静态/状态/时段 + OES 产品/交易日/佣金；业务总闸 <code>static-enabled</code>（失败回退本地启发式）</td>
+        <td>MDS 静态/状态/时段（静态对齐 Demo：<code>Filter+QueryMode.ALL→getQryItems</code>）+ OES 产品/交易日/佣金；业务总闸 <code>static-enabled</code>（失败回退本地启发式）</td>
         <td>运维 <code>/api/ops/kuangrui/static/*</code>、<code>oes/{stock,trading-day,commission-rate}</code>、<code>mds/{stock-static,security-status,session-status}</code></td>
       </tr>
       <tr>

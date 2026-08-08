@@ -2805,23 +2805,23 @@
       sdk: 'qryStockStaticInfo',
       stage: 'M4 静态',
       html:
-        '<p>MDS 证券静态信息（涨跌停、股本等）。定位实时辅助，不是历史 K 线库。</p>'
-        + '<ul><li>运维：<code>GET /api/ops/kuangrui/mds/stock-static</code></li></ul>'
+        '<p>MDS 证券静态（涨跌停、股本等）。对齐 Demo：<code>Filter + QueryMode.ALL</code> → <code>getQryItems</code>；空则兜底 List。</p>'
+        + '<ul><li>运维：<code>GET /api/ops/kuangrui/mds/stock-static?code=</code></li></ul>'
     },
     'qrySecurityStatus': {
       title: '证券状态',
       sdk: 'qrySecurityStatus',
       stage: 'M4 静态',
       html:
-        '<p>MDS 证券实时状态（停复牌等）；可开关回退「量≤0」启发式。</p>'
-        + '<ul><li>运维：<code>GET /api/ops/kuangrui/mds/security-status</code></li></ul>'
+        '<p>MDS <code>qrySecurityStatus(Req)</code> 证券实时状态（停复牌等）；可开关回退「量≤0」启发式。</p>'
+        + '<ul><li>运维：<code>GET /api/ops/kuangrui/mds/security-status?code=</code></li></ul>'
     },
     'qryTrdSessionStatus': {
       title: '交易时段',
       sdk: 'qryTrdSessionStatus',
       stage: 'M4 静态',
       html:
-        '<p>MDS 交易时段状态（开市/休市查询）。</p>'
+        '<p>MDS <code>qryTrdSessionStatus(Req)</code>：沪/深股票各查一次开市/休市。</p>'
         + '<ul><li>运维：<code>GET /api/ops/kuangrui/mds/session-status</code></li></ul>'
     },
     'static/stock': {

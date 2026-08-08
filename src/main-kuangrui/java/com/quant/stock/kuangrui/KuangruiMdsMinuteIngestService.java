@@ -3,6 +3,7 @@ package com.quant.stock.kuangrui;
 import com.quant.stock.config.QuantProperties;
 import com.quant.stock.market.CoreMarketBarService;
 import com.quant360.api.callback.MdsCallBack;
+import com.quant360.api.client.Client;
 import com.quant360.api.client.MdsClient;
 import com.quant360.api.client.impl.MdsClientImpl;
 import com.quant360.api.model.ClientLogonReq;
@@ -13,7 +14,17 @@ import com.quant360.api.model.mds.MdsMktDataRequestRsp;
 import com.quant360.api.model.mds.MdsMktDataSnapshotBase;
 import com.quant360.api.model.mds.MdsMktDataSnapshotHead;
 import com.quant360.api.model.mds.MdsQryMktDataSnapshotReq;
+import com.quant360.api.model.mds.MdsQrySecurityCodeEntry;
+import com.quant360.api.model.mds.MdsQrySecurityStatusReq;
+import com.quant360.api.model.mds.MdsQryStockStaticInfoFilter;
+import com.quant360.api.model.mds.MdsQryStockStaticInfoListFilter;
+import com.quant360.api.model.mds.MdsQryStockStaticInfoListRsp;
+import com.quant360.api.model.mds.MdsQryStockStaticInfoRsp;
+import com.quant360.api.model.mds.MdsQryTrdSessionStatusReq;
+import com.quant360.api.model.mds.MdsSecurityStatusMsg;
 import com.quant360.api.model.mds.MdsStockSnapshotBody;
+import com.quant360.api.model.mds.MdsStockStaticInfo;
+import com.quant360.api.model.mds.MdsTradingSessionStatusMsg;
 import com.quant360.api.model.mds.enu.MdsExchangeId;
 import com.quant360.api.model.mds.enu.MdsMktSubscribeFlag;
 import com.quant360.api.model.mds.enu.MdsSecurityType;
@@ -21,6 +32,7 @@ import com.quant360.api.model.mds.enu.MdsSubscribeDataType;
 import com.quant360.api.model.mds.enu.MdsSubscribeMode;
 import com.quant360.api.model.mds.enu.MdsSubscribedTickType;
 import com.quant360.api.model.oes.enu.OesLogonEncryptType;
+import com.quant360.api.model.oes.enu.OesSecurityType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -365,22 +377,51 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
         }
         try {
             ensureClient();
-            Object item = invokeMdsQueryOne("qryStockStaticInfo", norm);
-            if (item == null) {
-                item = invokeMdsQueryOne("qryStockStaticInfoList", norm);
+            int exch = KuangruiExchangeIds.fromStockCode(norm);
+            int instr = KuangruiExchangeIds.toInstrId(norm);
+            if (exch == 0 || instr == 0) {
+                return out;
             }
-            if (item instanceof List) {
-                for (Object o : (List<?>) item) {
-                    out.add(mapMdsStatic(o, norm));
+            MdsQryStockStaticInfoFilter filter = new MdsQryStockStaticInfoFilter();
+            filter.setSecurityId(norm);
+            filter.setExchId(toExch(exch));
+            filter.setInstrId(instr);
+            filter.setSecurityType(OesSecurityType.OES_SECURITY_TYPE_STOCK);
+            MdsQryStockStaticInfoRsp rsp = client.qryStockStaticInfo(filter, Client.QueryMode.ALL);
+            List<MdsStockStaticInfo> items = rsp == null ? null : rsp.getQryItems();
+            if (items == null || items.isEmpty()) {
+                items = queryStockStaticByList(exch, instr);
+            }
+            if (items != null) {
+                for (MdsStockStaticInfo item : items) {
+                    if (item != null) {
+                        out.add(mapMdsStatic(item, norm));
+                    }
                 }
-            } else if (item != null) {
-                out.add(mapMdsStatic(item, norm));
             }
         } catch (Exception e) {
             lastError.set(e.getMessage());
             log.error("[mds] qryStockStaticInfo {}: {}", norm, e.getMessage(), e);
         }
         return out;
+    }
+
+    /** List 接口兜底：按交易所 + 证券代码条目查询。 */
+    private List<MdsStockStaticInfo> queryStockStaticByList(int exch, int instr) throws Exception {
+        MdsQryStockStaticInfoListFilter listFilter = new MdsQryStockStaticInfoListFilter();
+        listFilter.setExchId(toExch(exch));
+        listFilter.setSecurityType(OesSecurityType.OES_SECURITY_TYPE_STOCK);
+        MdsQrySecurityCodeEntry entry = new MdsQrySecurityCodeEntry();
+        entry.setExchId(toExch(exch));
+        entry.setMdProductType(MdsSecurityType.MDS_SECURITY_TYPE_STOCK);
+        entry.setInstrId(instr);
+        List<MdsQrySecurityCodeEntry> entries = new ArrayList<MdsQrySecurityCodeEntry>();
+        entries.add(entry);
+        listFilter.setSecurityCodeCnt(1);
+        listFilter.setSecurityCodeList(entries);
+        MdsQryStockStaticInfoListRsp listRsp =
+                client.qryStockStaticInfoList(listFilter, Client.QueryMode.ALL);
+        return listRsp == null ? null : listRsp.getQryItems();
     }
 
     @Override
@@ -392,13 +433,18 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
         }
         try {
             ensureClient();
-            Object item = invokeMdsQueryOne("qrySecurityStatus", norm);
-            if (item instanceof List) {
-                for (Object o : (List<?>) item) {
-                    out.add(mapMdsStatus(o, norm));
-                }
-            } else if (item != null) {
-                out.add(mapMdsStatus(item, norm));
+            int exch = KuangruiExchangeIds.fromStockCode(norm);
+            int instr = KuangruiExchangeIds.toInstrId(norm);
+            if (exch == 0 || instr == 0) {
+                return out;
+            }
+            MdsQrySecurityStatusReq req = new MdsQrySecurityStatusReq();
+            req.setExchId(toExch(exch));
+            req.setSecurityType(MdsSecurityType.MDS_SECURITY_TYPE_STOCK);
+            req.setInstrId(instr);
+            MdsSecurityStatusMsg msg = client.qrySecurityStatus(req);
+            if (msg != null) {
+                out.add(mapMdsStatus(msg, norm));
             }
         } catch (Exception e) {
             lastError.set(e.getMessage());
@@ -412,16 +458,18 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
         List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
         try {
             ensureClient();
-            Object item = invokeReturning(client, "qryTrdSessionStatus");
-            if (item == null) {
-                item = invokeReturning(client, "qryTrdSessionStatus", new Object[]{null});
-            }
-            if (item instanceof List) {
-                for (Object o : (List<?>) item) {
-                    out.add(mapMdsSession(o));
+            MdsExchangeId[] exchanges = new MdsExchangeId[]{
+                    MdsExchangeId.MDS_EXCH_SSE,
+                    MdsExchangeId.MDS_EXCH_SZSE
+            };
+            for (MdsExchangeId exchId : exchanges) {
+                MdsQryTrdSessionStatusReq req = new MdsQryTrdSessionStatusReq();
+                req.setExchId(exchId);
+                req.setSecurityType(MdsSecurityType.MDS_SECURITY_TYPE_STOCK);
+                MdsTradingSessionStatusMsg msg = client.qryTrdSessionStatus(req);
+                if (msg != null) {
+                    out.add(mapMdsSession(msg));
                 }
-            } else if (item != null) {
-                out.add(mapMdsSession(item));
             }
         } catch (Exception e) {
             lastError.set(e.getMessage());
@@ -430,89 +478,78 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
         return out;
     }
 
-    private Object invokeMdsQueryOne(String method, String code) {
-        int exch = KuangruiExchangeIds.fromStockCode(code);
-        int instr = KuangruiExchangeIds.toInstrId(code);
-        // 尝试多种请求类型
-        String[] reqClasses = new String[]{
-                "com.quant360.api.model.mds.MdsQryStockStaticInfoReq",
-                "com.quant360.api.model.mds.MdsQrySecurityStatusReq",
-                "com.quant360.api.model.mds.MdsQryMktDataSnapshotReq"
-        };
-        for (String cn : reqClasses) {
-            Object req = newInstance(cn);
-            if (req == null) {
-                continue;
-            }
-            setBean(req, "setExchId", toExch(exch));
-            setBean(req, "setExchId", Integer.valueOf(exch));
-            setBean(req, "setInstrId", Integer.valueOf(instr));
-            setBean(req, "setSecurityId", code);
-            setBean(req, "setSecurityType", MdsSecurityType.MDS_SECURITY_TYPE_STOCK);
-            Object ret = invokeReturning(client, method, req);
-            if (ret != null) {
-                return ret;
-            }
-        }
-        return invokeReturning(client, method);
-    }
-
-    private Map<String, Object> mapMdsStatic(Object item, String fallbackCode) {
-        String code = str(firstGetter(item, "getSecurityId", "getSecurityID"));
+    private Map<String, Object> mapMdsStatic(MdsStockStaticInfo item, String fallbackCode) {
+        String code = item.getSecurityId();
         if (code == null || code.isEmpty()) {
-            Object head = firstGetter(item, "getHead", "getSnapshotHead");
-            if (head != null) {
-                code = str(firstGetter(head, "getSecurityId", "getSecurityID"));
-                if (code == null || code.isEmpty()) {
-                    long instr = lng(firstGetter(head, "getInstrId", "getInstrumentId"));
-                    if (instr > 0) {
-                        code = String.format("%06d", instr);
-                    }
-                }
-            }
-        }
-        if (code == null || code.isEmpty()) {
-            code = fallbackCode;
-        }
-        Object body = firstGetter(item, "getStock", "getStockStaticInfo", "getStaticInfo");
-        Object src = body != null ? body : item;
-        return MdsViewMapper.stockStatic(
-                code,
-                str(firstGetter(src, "getSecurityName", "getSecurityNameUTF8", "getName")),
-                lng(firstGetter(src, "getUpperLimitPrice", "getPriceLimitUpper", "getCeilPrice")),
-                lng(firstGetter(src, "getLowerLimitPrice", "getPriceLimitLower", "getFloorPrice")),
-                lng(firstGetter(src, "getPrevClose", "getPreClosePrice", "getPrevClosePrice")),
-                lng(firstGetter(src, "getOutstandingShare", "getTotalShare", "getEquity")),
-                lng(firstGetter(src, "getPublicFloatShare", "getFloatShare", "getCirculationShare")),
-                (int) lng(firstGetter(src, "getSuspFlag", "getSuspendFlag", "getIsSuspend")),
-                (int) lng(firstGetter(src, "getSecurityStatus", "getSecurityStatusFlag", "getProductStatus"))
-        );
-    }
-
-    private Map<String, Object> mapMdsStatus(Object item, String fallbackCode) {
-        String code = str(firstGetter(item, "getSecurityId", "getSecurityID"));
-        if (code == null || code.isEmpty()) {
-            long instr = lng(firstGetter(item, "getInstrId", "getInstrumentId"));
-            if (instr > 0) {
-                code = String.format("%06d", instr);
+            if (item.getInstrId() > 0) {
+                code = String.format("%06d", item.getInstrId());
             } else {
                 code = fallbackCode;
             }
         }
-        return MdsViewMapper.securityStatus(
+        long upper = item.getUpperLimitPrice();
+        if (upper == 0L) {
+            upper = item.getLimitUpPrice();
+        }
+        long lower = item.getLowerLimitPrice();
+        if (lower == 0L) {
+            lower = item.getLimitDownPrice();
+        }
+        int susp = item.getSecuritySuspFlag();
+        if (susp == 0 && item.getSuspFlag() != null) {
+            susp = (int) lng(item.getSuspFlag());
+        }
+        return MdsViewMapper.stockStatic(
                 code,
-                (int) lng(firstGetter(item, "getSuspFlag", "getSuspendFlag", "getIsSuspend")),
-                (int) lng(firstGetter(item, "getSecurityStatus", "getSecurityStatusFlag")),
-                (int) lng(firstGetter(item, "getTradingPhase", "getTrdPhase", "getPhase"))
+                item.getSecurityName(),
+                upper,
+                lower,
+                item.getPrevClose(),
+                item.getOutstandingShare(),
+                item.getPublicFloatShare(),
+                susp,
+                item.getSecurityStatus()
         );
     }
 
-    private Map<String, Object> mapMdsSession(Object item) {
-        return MdsViewMapper.trdSession(
-                (int) lng(firstGetter(item, "getExchId", "getMktId", "getMarketId")),
-                (int) lng(firstGetter(item, "getSessionType", "getTrdSessionType")),
-                (int) lng(firstGetter(item, "getSessionStatus", "getTrdSessionStatus", "getStatus"))
-        );
+    private Map<String, Object> mapMdsStatus(MdsSecurityStatusMsg item, String fallbackCode) {
+        String code = item.getSecurityID();
+        if (code == null || code.isEmpty()) {
+            if (item.getInstrId() > 0) {
+                code = String.format("%06d", item.getInstrId());
+            } else {
+                code = fallbackCode;
+            }
+        }
+        String fs = item.getFinancialStatus();
+        // 深交所 FinancialStatus 常见含 P=停牌（运维以原始串为准）
+        boolean susp = fs != null && (fs.indexOf('P') >= 0 || fs.indexOf('p') >= 0);
+        Map<String, Object> m = MdsViewMapper.securityStatus(code, susp ? 1 : 0, 0, 0);
+        if (fs != null && !fs.isEmpty()) {
+            m.put("financialStatus", fs);
+        }
+        return m;
+    }
+
+    private Map<String, Object> mapMdsSession(MdsTradingSessionStatusMsg item) {
+        int mktId = 0;
+        if (item.getExchId() != null) {
+            mktId = (int) lng(item.getExchId());
+        }
+        String sessionId = item.getTradingSessionID();
+        int sessionStatus = 0;
+        if (sessionId != null && !sessionId.isEmpty()) {
+            try {
+                sessionStatus = Integer.parseInt(sessionId.trim());
+            } catch (NumberFormatException ignore) {
+                // 非数字时段码：保留原始串
+            }
+        }
+        Map<String, Object> m = MdsViewMapper.trdSession(mktId, 0, sessionStatus);
+        if (sessionId != null && !sessionId.isEmpty()) {
+            m.put("tradingSessionId", sessionId);
+        }
+        return m;
     }
 
     private void setBean(Object target, String setter, Object value) {
