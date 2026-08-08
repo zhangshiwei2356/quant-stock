@@ -2248,10 +2248,33 @@
   }
 
   var knowledgeTopics = [
-    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260808-shell-dash' },
-    { id: 'readme', group: 'app', title: '项目 README', src: '/api/docs/readme' },
-    { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260808-shell-dash' },
-    { id: 'memo', group: 'app', title: '能力与待办', src: '/docs/memo.html?v=20260808-plan' },
+    { id: 'app', group: 'app', section: 'start', title: '系统概述', src: '/docs/app.html?v=20260809-app-ux',
+      related: [
+        { key: 'pool', label: '行情浏览' },
+        { key: 'single', label: '个股回测' },
+        { knowledge: 'rules', label: '交易规则' },
+        { kuangrui: 'overview', label: '宽睿接入总览' }
+      ] },
+    { id: 'readme', group: 'app', section: 'start', title: '项目 README', src: '/api/docs/readme',
+      related: [
+        { knowledge: 'app', label: '系统概述' },
+        { knowledge: 'memo', label: '能力与待办' },
+        { kuangrui: 'docs', label: '宽睿文档梳理' }
+      ] },
+    { id: 'rules', group: 'app', section: 'rules', title: '交易规则', src: '/docs/rules.html?v=20260809-app-ux',
+      related: [
+        { key: 'single', label: '个股回测' },
+        { key: 'account', label: '账户概览' },
+        { knowledge: 'metrics', label: '夏普·回撤与胜率' },
+        { knowledge: 'memo', label: '能力与待办' }
+      ] },
+    { id: 'memo', group: 'app', section: 'roadmap', title: '能力与待办', src: '/docs/memo.html?v=20260809-app-ux',
+      related: [
+        { kuangrui: 'docs', label: '宽睿文档梳理' },
+        { kuangrui: 'overview', label: '宽睿接入总览' },
+        { key: 'schedule', label: '运维中心' },
+        { knowledge: 'rules', label: '交易规则' }
+      ] },
     { id: 'kuangrui', group: 'kuangrui', title: '宽睿文档梳理', src: '/docs/kuangrui.html?v=20260808-plan' },
     { id: 'ashare', group: 'stock', section: 'base', title: 'A股基础', src: '/docs/ashare.html?v=20260720-nav-rename',
       related: [{ key: 'pool', label: '行情浏览' }, { key: 'single', label: '个股回测' }] },
@@ -2294,6 +2317,11 @@
     { key: 'mechanism', label: '机制' },
     { key: 'eval', label: '评价' }
   ];
+  var APP_KNOWLEDGE_SECTIONS = [
+    { key: 'start', label: '入门' },
+    { key: 'rules', label: '规则' },
+    { key: 'roadmap', label: '路线' }
+  ];
   var KNOWLEDGE_LINK_ALIASES = {
     'A股基础': 'ashare', 'A股': 'ashare',
     '交易时间': 'session',
@@ -2316,7 +2344,10 @@
     '应用说明 → 交易规则': 'rules',
     '系统概述': 'app',
     '能力与待办': 'memo',
-    '项目 README': 'readme', 'README': 'readme'
+    '项目 README': 'readme', 'README': 'readme',
+    '宽睿文档梳理': 'kuangrui',
+    '宽睿对接 → 宽睿文档梳理': 'kuangrui',
+    '宽睿对接': 'kuangrui-overview'
   };
   var knowledgeHtmlCache = {};
   var lastKnowledgeId = '';
@@ -2635,8 +2666,15 @@
 
   function knowledgeSectionLabel(topic) {
     if (!topic) return '';
-    if (topic.group === 'app') return '应用说明';
     if (topic.group === 'kuangrui') return '宽睿对接';
+    if (topic.group === 'app') {
+      for (var a = 0; a < APP_KNOWLEDGE_SECTIONS.length; a++) {
+        if (APP_KNOWLEDGE_SECTIONS[a].key === topic.section) {
+          return '应用说明 · ' + APP_KNOWLEDGE_SECTIONS[a].label;
+        }
+      }
+      return '应用说明';
+    }
     for (var i = 0; i < STOCK_KNOWLEDGE_SECTIONS.length; i++) {
       if (STOCK_KNOWLEDGE_SECTIONS[i].key === topic.section) {
         return '量化知识 · ' + STOCK_KNOWLEDGE_SECTIONS[i].label;
@@ -2645,29 +2683,28 @@
     return '量化知识';
   }
 
-  function initKnowledge() {
-    var $stock = $('#stockKnowledgeMenu').empty();
-    var $app = $('#appRelatedMenu').empty();
-    STOCK_KNOWLEDGE_SECTIONS.forEach(function (sec) {
+  function appendKnowledgeMenuItems($menu, group, sections) {
+    sections.forEach(function (sec) {
       var items = knowledgeTopics.filter(function (t) {
-        return t.group === 'stock' && t.section === sec.key;
+        return t.group === group && t.section === sec.key;
       });
       if (!items.length) return;
-      $stock.append(
+      $menu.append(
         $('<li class="side-nav-section" aria-hidden="true"/>').text(sec.label)
       );
       items.forEach(function (t) {
-        $stock.append(
-          $('<li role="button" tabindex="0"/>').text(t.title).attr('data-id', t.id)
-        );
+        var $li = $('<li role="button" tabindex="0"/>').text(t.title).attr('data-id', t.id);
+        if (t.id === 'app') $li.append($('<span class="side-nav-badge"/>').text('荐'));
+        $menu.append($li);
       });
     });
-    knowledgeTopics.forEach(function (t) {
-      if (t.group !== 'app') return;
-      $app.append(
-        $('<li role="button" tabindex="0"/>').text(t.title).attr('data-id', t.id)
-      );
-    });
+  }
+
+  function initKnowledge() {
+    var $stock = $('#stockKnowledgeMenu').empty();
+    var $app = $('#appRelatedMenu').empty();
+    appendKnowledgeMenuItems($stock, 'stock', STOCK_KNOWLEDGE_SECTIONS);
+    appendKnowledgeMenuItems($app, 'app', APP_KNOWLEDGE_SECTIONS);
   }
 
   function setSideNavOpen(bodyId) {
@@ -6635,23 +6672,52 @@
       $('#knowledgePagerMeta').text('');
     }
     $('#knowledgeToc').prop('hidden', true).empty();
+    var $rails = $('#knowledgeAppRails').empty().prop('hidden', true);
+    if (topic && topic.group === 'app') {
+      knowledgeTopicsInGroup('app').forEach(function (t) {
+        $rails.append(
+          $('<button type="button" class="knowledge-rail-btn"/>')
+            .toggleClass('is-active', t.id === topic.id)
+            .attr('data-knowledge', t.id)
+            .attr('title', t.title)
+            .text(t.title)
+        );
+      });
+      $rails.prop('hidden', false);
+    }
   }
 
-  function wrapKnowledgeSysUsage($root) {
+  function wrapKnowledgeHighlightBlocks($root, titles) {
+    var want = {};
+    (titles || []).forEach(function (t) { want[t] = true; });
     $root.find('h4').each(function () {
       var $h = $(this);
       if ($h.closest('.kb-sys-block').length) return;
-      if ($.trim($h.text()) !== '本系统用法') return;
+      var title = $.trim($h.text());
+      if (!want[title]) return;
       var $block = $('<div class="kb-sys-block"/>');
       $h.addClass('kb-sys-title').before($block);
       $block.append($h);
       var $n = $block.next();
-      while ($n.length && !$n.is('h4') && !$n.is('.knowledge-related') && !$n.is('.kb-sys-block')) {
+      while ($n.length && !$n.is('h4') && !$n.is('.knowledge-related') && !$n.is('.kb-sys-block') && !$n.is('details')) {
         var $move = $n;
         $n = $n.next();
         $block.append($move);
       }
     });
+  }
+
+  function openKnowledgeLinkTarget(kid) {
+    if (!kid) return;
+    if (kid === 'kuangrui-overview') {
+      showKuangruiPanel('overview');
+      return;
+    }
+    if (kid === 'kuangrui') {
+      showKuangruiPanel('docs');
+      return;
+    }
+    openKnowledge(kid);
   }
 
   function linkifyKnowledgeRefs($root) {
@@ -6681,15 +6747,22 @@
     var $heads = $root.find('h4').filter(function () {
       return !$(this).closest('.knowledge-related').length;
     });
+    // README：优先用渲染后的 h2 做目录
+    var $readmeH2 = $root.find('.readme-md h2');
+    if ($readmeH2.length >= 3) {
+      $heads = $readmeH2;
+    }
     if ($heads.length < 3) return;
     $toc.append($('<span class="knowledge-toc-label"/>').text('本文目录'));
     $heads.each(function (i) {
       var $h = $(this);
       var tid = 'kb-sec-' + i;
       $h.attr('id', tid);
+      var label = $.trim($h.text()) || ('节 ' + (i + 1));
+      if (label.length > 28) label = label.slice(0, 28) + '…';
       $toc.append(
         $('<a href="#' + tid + '"/>')
-          .text($.trim($h.text()) || ('节 ' + (i + 1)))
+          .text(label)
           .on('click', function (e) {
             e.preventDefault();
             var el = document.getElementById(tid);
@@ -6704,9 +6777,12 @@
 
   function appendKnowledgeRelated(topic, $root) {
     $root.find('.knowledge-related').remove();
-    if (!topic || topic.group !== 'stock' || !topic.related || !topic.related.length) return;
+    if (!topic || !topic.related || !topic.related.length) return;
+    if (topic.group !== 'stock' && topic.group !== 'app') return;
     var $box = $('<div class="knowledge-related"/>');
-    $box.append($('<p class="knowledge-related-title"/>').text('相关功能'));
+    $box.append($('<p class="knowledge-related-title"/>').text(
+      topic.group === 'app' ? '相关入口' : '相关功能'
+    ));
     var $chips = $('<div class="knowledge-related-chips"/>');
     topic.related.forEach(function (r) {
       if (r.knowledge) {
@@ -6714,6 +6790,12 @@
           $('<button type="button" class="secondary"/>')
             .attr('data-knowledge', r.knowledge)
             .text(r.label || r.knowledge)
+        );
+      } else if (r.kuangrui) {
+        $chips.append(
+          $('<button type="button" class="secondary"/>')
+            .attr('data-kuangrui-panel', r.kuangrui)
+            .text(r.label || '宽睿对接')
         );
       } else if (r.key) {
         $chips.append(
@@ -6727,14 +6809,28 @@
     $root.append($box);
   }
 
+  function enhanceAppDocLead($root, topic) {
+    if (!topic || topic.group !== 'app') return;
+    var $first = $root.children('p').first();
+    if ($first.length && !$first.hasClass('memo-lead')) {
+      $first.addClass('app-doc-lead');
+    }
+    if (topic.id === 'app') {
+      wrapKnowledgeHighlightBlocks($root, ['如何启动']);
+    } else if (topic.id === 'rules') {
+      wrapKnowledgeHighlightBlocks($root, ['一、统计口径']);
+    }
+  }
+
   function enhanceKnowledgeArticle(topic, $root) {
-    wrapKnowledgeSysUsage($root);
-    linkifyKnowledgeRefs($root);
-    buildKnowledgeToc($root);
-    appendKnowledgeRelated(topic, $root);
+    wrapKnowledgeHighlightBlocks($root, ['本系统用法']);
+    enhanceAppDocLead($root, topic);
     if (topic && topic.id === 'readme') {
       enhanceReadmeMermaid($root);
     }
+    linkifyKnowledgeRefs($root);
+    buildKnowledgeToc($root);
+    appendKnowledgeRelated(topic, $root);
   }
 
   function paintKnowledgeEmpty(msg, topic) {
@@ -8694,10 +8790,14 @@
     showHome();
   });
 
-  $(document).on('click', '#knowledgePanel [data-knowledge], #knowledgeBody [data-knowledge]', function (e) {
+  $(document).on('click', '#knowledgePanel [data-knowledge]', function (e) {
     e.preventDefault();
-    var kid = $(this).attr('data-knowledge');
-    if (kid) openKnowledge(kid);
+    openKnowledgeLinkTarget($(this).attr('data-knowledge'));
+  });
+
+  $(document).on('click', '#knowledgePanel [data-kuangrui-panel]', function (e) {
+    e.preventDefault();
+    showKuangruiPanel($(this).attr('data-kuangrui-panel') || 'overview');
   });
 
   $(document).on('click', '#knowledgePanel [data-enter]', function (e) {

@@ -1271,6 +1271,82 @@ button.side-nav-toggle:active:not(:disabled) {
   margin-top: 2px;
 }
 
+.side-nav-menu li .side-nav-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  vertical-align: middle;
+}
+
+.knowledge-app-rails {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel-solid) 70%, transparent);
+}
+
+.knowledge-app-rails[hidden] {
+  display: none !important;
+}
+
+.knowledge-rail-btn {
+  appearance: none;
+  margin: 0;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  box-shadow: none;
+  cursor: pointer;
+  transform: none;
+}
+
+.knowledge-rail-btn:hover:not(:disabled) {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  filter: none;
+  transform: none;
+  box-shadow: none;
+}
+
+.knowledge-rail-btn.is-active {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+}
+
+.knowledge-body .app-doc-lead {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border-left: 3px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  color: color-mix(in srgb, var(--text) 92%, var(--muted));
+}
+
+.knowledge-body .memo-focus-title {
+  margin-top: 0;
+}
+
+.knowledge-body .memo-focus-hint {
+  margin: 0 0 8px;
+}
+
 .knowledge-head {
   display: flex;
   justify-content: space-between;

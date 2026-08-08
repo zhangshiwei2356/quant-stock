@@ -6,8 +6,8 @@
 </p>
 
 <div class="memo-todo memo-todo--focus">
-  <h4 style="margin-top:0">一、待办 · 依赖外部 API / 数据源</h4>
-  <p class="hint" style="margin:0 0 8px;">当前真正待推进的能力缺口（本地模拟无法替代）。</p>
+  <h4 class="memo-focus-title">一、待办 · 依赖外部 API / 数据源</h4>
+  <p class="hint memo-focus-hint">当前真正待推进的能力缺口（本地模拟无法替代）。</p>
   <ol>
     <li><b>真实行情 API（优先对接宽睿 MDS）</b> — <b>M1+M5a 可选已落地</b>（默认关）· L1 → <code>market_1min(MDS)</code>；断线异步 close→退避重登/重订阅；死连接勿挡 <code>market-collect</code> 本地回退；运维 <code>/api/ops/kuangrui/mds/*</code>；TDX 抽样对账已落地；仿真浸泡 <code>m5-soak.ps1</code> 已复现。L2 后置</li>
     <li><b>券商交易 API（优先对接宽睿 OES）</b> — <b>M3+M5b+撤单小修可选已落地</b>（默认关）· 限价报/撤；断线先 close 再重建；撤单确认制；状态 <code>6</code>→CANCELLED；仿真浸泡已复现。批量后置</li>
@@ -30,8 +30,8 @@
 </div>
 
 <div class="memo-todo memo-todo--focus">
-  <h4 style="margin-top:0">一（附）、待办 · 应用能力 · 多策略体系</h4>
-  <p class="hint" style="margin:0 0 8px;">
+  <h4 class="memo-focus-title">一（附）、待办 · 应用能力 · 多策略体系</h4>
+  <p class="hint memo-focus-hint">
     不依赖外部券商 API；在现有「单活可切换」之上补齐产品能力。
     会话策略可独立注册；金叉主路径不静默改写。
   </p>
@@ -107,6 +107,7 @@
     <li><b>组合回测冒烟单测</b> — 已落地 · 合成双标的；断言指纹与 <code>atrRisk</code></li>
     <li><b>文档 PDF</b> — 已落地 · 量化知识 / 应用说明介绍页与阅读顶栏一键导出（服务端 iText，<code>GET /api/docs/pdf/{stock|app}</code>；应用说明包不含宽睿梳理，见「宽睿对接」）</li>
     <li><b>量化知识阅读体验</b> — 已落地 · 侧栏分组；上一篇/下一篇（← →）；长文目录；交叉引用可点；「本系统用法」高亮；文末相关功能入口</li>
+    <li><b>应用说明阅读体验</b> — 已落地 · 侧栏入门/规则/路线分组；四篇快切；翻篇与 PDF；README/长文目录；相关入口可跳宽睿；介绍页「从系统概述开始」</li>
     <li><b>项目 README 在线查看</b> — 已落地 · 应用说明 →「项目 README」；<code>GET /api/docs/readme</code> 实时渲染仓库根目录 Markdown（含 Mermaid 架构图）</li>
     <li><b>本地可调度任务</b> — 已落地 · <code>scan-and-trade</code>、<code>pool-rebuild</code>、<code>after-market-batch-scan</code>、<code>settle-after-close</code>、<code>data-validate</code>、<code>factor-daily-rebuild</code>、<code>day-collect</code>、<code>pool-minute-backfill</code>、<code>sync-orders</code>、<code>position-pnl-sync</code>；入池粗筛可读 <code>factor_daily</code>；运维「执行一次」全部后台跑：弹框与页内横幅同步进度（可收起）；长任务（TDX / 因子 / 入池 / 校验 / 行情采集）上报 <code>i/n</code>（入池含因子预刷与粗筛扫描两段）；scan/sync/settle 锁忙与业务失败均返回错误而非假成功</li>
     <li><b>宽睿资料梳理</b> — 已落地（文档）· <code>OESAPI-JAVA-v0.19.4.0</code>；「宽睿文档梳理」含接入面盘点（约 22/24）与 <b>M6 银证已落地</b>（2026-08-08）</li>
