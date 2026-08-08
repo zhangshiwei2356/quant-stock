@@ -4,17 +4,17 @@
   <section class="nav-intro-card">
     <h4><span class="nav-intro-card-tag">二级</span>菜单说明</h4>
     <ul class="nav-intro-list">
-      <li><strong>当前池</strong>：当前生效的可买名单（综合分、入池原因）</li>
+      <li><strong>当前池</strong>：可买名单 + 扫描漏斗（无数据时引导扫描）；入池原因截断悬停查看</li>
       <li><strong>扫描历史</strong>：按批次查看历次入选；也可在此手动「扫描更新」</li>
-      <li><strong>扫描更新</strong>：提交运维任务 <code>pool-rebuild</code>（异步进度弹框），全市场扫描覆盖当前池并写新批次；可下载 PDF 报告</li>
-      <li><strong>刷新列表</strong>：只重载页面数据，不发起扫描</li>
+      <li><strong>扫描更新</strong>：主按钮，提交 <code>pool-rebuild</code>（异步进度弹框）；「下载报告」为文字链接</li>
+      <li><strong>移出</strong>：悬停变红，二次确认（移出≠卖出）；「刷新列表」只重载不扫描</li>
     </ul>
   </section>
   <section class="nav-intro-card nav-intro-card--steps">
     <h4><span class="nav-intro-card-tag">步骤</span>建议流程</h4>
     <ol class="nav-intro-steps">
-      <li>在「当前池」或「扫描历史」点「扫描更新」，或开启定时 <code>pool-rebuild</code></li>
-      <li>不需要的标的在当前池点「移出」（移出≠卖出）</li>
+      <li>漏斗为空时点「扫描更新」生成数据，或开启定时 <code>pool-rebuild</code></li>
+      <li>不需要的标的在当前池点「移出」并确认（移出≠卖出）</li>
       <li>在「扫描历史」核对某批次入选名单</li>
     </ol>
   </section>

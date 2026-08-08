@@ -1280,9 +1280,7 @@
       setCountBadge('#sidePoolCount, #tpPoolBadge', count);
       $('#tpPoolHint').text('目标池 ' + count + ' / 上限 ' + maxFinal);
       applyTradePoolForBacktest(items);
-      if (data && data.lastScan) {
-        renderTpFunnel(data.lastScan);
-      }
+      renderTpFunnel(data && data.lastScan);
 
       var $tb = $('#tpPoolBody').empty();
       if (!items.length) {
@@ -1290,18 +1288,21 @@
       } else {
         items.forEach(function (it) {
           poolNames[it.code] = it.name || it.code;
+          var reason = it.reason || '';
           $tb.append(
             $('<tr class="tp-pool-row"/>')
               .attr('data-code', it.code)
               .attr('data-report-id', it.reportId != null ? it.reportId : '')
               .css('cursor', 'pointer')
               .html(
-                '<td><b>' + escHtml(it.code) + '</b></td>'
-                + '<td>' + escHtml(it.name || '') + '</td>'
-                + '<td class="mono">' + escHtml(fmtPoolScore(it.score)) + '</td>'
-                + '<td>' + escHtml(it.reason || '') + '</td>'
-                + '<td class="mono">' + escHtml(it.enteredAt || '—') + '</td>'
-                + '<td><button type="button" class="secondary tp-remove" data-code="' + escHtml(it.code) + '">移出</button></td>'
+                '<td class="tp-col-code"><b>' + escHtml(it.code) + '</b></td>'
+                + '<td class="tp-col-name">' + escHtml(it.name || '') + '</td>'
+                + '<td class="tp-col-score mono num">' + escHtml(fmtPoolScore(it.score)) + '</td>'
+                + '<td class="tp-col-reason"><span class="tp-reason-text" title="' + escHtml(reason || '—') + '">'
+                + escHtml(reason || '—') + '</span></td>'
+                + '<td class="tp-col-time mono">' + escHtml(it.enteredAt || '—') + '</td>'
+                + '<td class="tp-col-op"><button type="button" class="tp-remove" data-code="'
+                + escHtml(it.code) + '" title="移出目标池（不停仓、不卖出）">移出</button></td>'
               )
           );
         });
@@ -1309,6 +1310,7 @@
     }).fail(function (xhr) {
       var msg = (xhr.responseJSON && xhr.responseJSON.message) || '加载失败';
       $('#tpPoolBody').html('<tr><td colspan="6" class="empty-state">' + escHtml(msg) + '</td></tr>');
+      renderTpFunnel(null);
       toast(msg, 'err');
     });
   }
@@ -7649,9 +7651,41 @@
     toast('已刷新当前池列表（未扫描）', 'info');
   });
 
+  $('#btnTpFunnelCta').on('click', function () {
+    $('#btnTpRebuild').trigger('click');
+  });
+
+  function hasTpFunnelData(res) {
+    if (!res || typeof res !== 'object') return false;
+    return res.universe != null
+      || res.afterCoarse != null
+      || res.afterScan != null
+      || res.scanned != null
+      || res.afterLiquidity != null
+      || res.selected != null
+      || !!res.batchId
+      || !!res.reportFileName;
+  }
+
   function renderTpFunnel(res) {
+    var $funnel = $('#tpFunnel');
+    var $empty = $('#tpFunnelEmpty');
+    var $data = $('#tpFunnelData');
+    if (!$funnel.length) return;
+    $funnel.prop('hidden', false);
+
+    if (!hasTpFunnelData(res)) {
+      $empty.prop('hidden', false);
+      $data.prop('hidden', true);
+      $('#tpFunnelUniverse, #tpFunnelCoarse, #tpFunnelScan, #tpFunnelLiq, #tpFunnelSelected').text('—');
+      $('#tpFunnelMeta').text('—');
+      $('#tpReportLink').prop('hidden', true).hide().attr('href', '#');
+      return;
+    }
+
     res = res || {};
-    $('#tpFunnel').prop('hidden', false);
+    $empty.prop('hidden', true);
+    $data.prop('hidden', false);
     $('#tpFunnelUniverse').text(String(res.universe != null ? res.universe : '—'));
     $('#tpFunnelCoarse').text(String(res.afterCoarse != null ? res.afterCoarse : '—'));
     $('#tpFunnelScan').text(String(res.afterScan != null ? res.afterScan : (res.scanned != null ? res.scanned : '—')));
@@ -7667,7 +7701,7 @@
         .prop('hidden', false)
         .show();
     } else {
-      $('#tpReportLink').prop('hidden', true).hide();
+      $('#tpReportLink').prop('hidden', true).hide().attr('href', '#');
     }
   }
 
@@ -7804,7 +7838,10 @@
     e.stopPropagation();
     var code = $(this).attr('data-code');
     if (!code) return;
-    if (!window.confirm('将 ' + code + ' 移出目标池？\n（不停仓、不卖出持仓）')) {
+    var name = poolNames[code] || '';
+    var tip = '确认将 ' + code + (name ? ('（' + name + '）') : '') + ' 移出目标池？\n\n'
+      + '移出 ≠ 卖出：不停仓、不卖出持仓；实盘扫描将不再盯该标的。';
+    if (!window.confirm(tip)) {
       return;
     }
     $.post('/api/stock/trade-pool/' + encodeURIComponent(code) + '/remove').done(function () {

@@ -2506,6 +2506,26 @@ button.danger:hover:not(:disabled) {
   box-shadow: 0 6px 16px rgba(239, 83, 80, 0.25);
 }
 
+/* 正向恢复：绿色主按钮（跨主题固定成功色） */
+button.success {
+  background: #16a34a !important;
+  color: #fff !important;
+}
+button.success:hover:not(:disabled) {
+  background: #15803d !important;
+  box-shadow: 0 6px 16px rgba(22, 163, 74, 0.28);
+}
+
+/* 高风险警告：橙色（强制恢复等） */
+button.warn {
+  background: #ea580c !important;
+  color: #fff !important;
+}
+button.warn:hover:not(:disabled) {
+  background: #c2410c !important;
+  box-shadow: 0 6px 16px rgba(234, 88, 12, 0.28);
+}
+
 button.linkish,
 button.btn-text {
   background: transparent !important;
@@ -2733,6 +2753,305 @@ button.loading::before {
 .tp-table td.muted {
   color: var(--muted);
   font-size: 12px;
+}
+
+/* 目标池：工具栏分层 + 漏斗空态 + 原因截断 + 移出警示 */
+.tp-panel-head h3 {
+  margin: 0 0 4px;
+}
+.tp-panel-head .hint {
+  margin: 0 0 8px;
+}
+.tp-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-top: 8px;
+}
+.tp-toolbar-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  min-width: 0;
+}
+.tp-toolbar-main #btnTpRebuild {
+  min-width: 96px;
+}
+.tp-report-link {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+  border-radius: 6px;
+  background: transparent;
+}
+.tp-report-link:hover {
+  background: var(--accent-soft);
+  text-decoration: underline;
+  color: var(--accent-deep, var(--accent));
+}
+.tp-report-link[hidden] {
+  display: none !important;
+}
+.tp-funnel {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--chart-bg) 70%, var(--panel-solid));
+}
+.tp-funnel-head {
+  margin-bottom: 10px;
+}
+.tp-funnel-head h4 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.tp-funnel-head .hint {
+  margin: 0;
+}
+.tp-funnel-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  padding: 14px 12px;
+  border: 1px dashed color-mix(in srgb, var(--border) 85%, var(--accent));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel-solid) 88%, transparent);
+}
+.tp-funnel-empty[hidden] {
+  display: none !important;
+}
+.tp-funnel-empty-msg {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  flex: 1 1 220px;
+}
+.tp-funnel-empty #btnTpFunnelCta {
+  flex: 0 0 auto;
+}
+.tp-funnel-data {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+.tp-funnel-data[hidden] {
+  display: none !important;
+}
+.tp-funnel-data .result-group-title {
+  display: none;
+}
+.tp-table-wrap {
+  margin-top: 14px;
+  max-height: none;
+}
+.tp-panel .tp-table {
+  table-layout: fixed;
+  width: 100%;
+}
+.tp-panel .tp-table th.tp-col-code,
+.tp-panel .tp-table td.tp-col-code {
+  width: 88px;
+}
+.tp-panel .tp-table th.tp-col-name,
+.tp-panel .tp-table td.tp-col-name {
+  width: 120px;
+}
+.tp-panel .tp-table th.tp-col-score,
+.tp-panel .tp-table td.tp-col-score {
+  width: 72px;
+}
+.tp-panel .tp-table th.tp-col-reason,
+.tp-panel .tp-table td.tp-col-reason {
+  width: 36%;
+  max-width: 280px;
+}
+.tp-panel .tp-table th.tp-col-time,
+.tp-panel .tp-table td.tp-col-time {
+  width: 150px;
+}
+.tp-panel .tp-table th.tp-col-op,
+.tp-panel .tp-table td.tp-col-op {
+  width: 72px;
+  text-align: center;
+}
+
+/* 账户概览 · 资金权益：通栏核心指标 + 等高三列 */
+.acct-funds-head h3 {
+  margin: 0 0 4px;
+}
+.acct-funds-head .hint {
+  margin: 0 0 8px;
+}
+.acct-funds-toolbar {
+  margin-top: 8px;
+}
+.acct-funds-board {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+.acct-hero-banner {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 55%, transparent), transparent 55%),
+    var(--chart-bg);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.acct-hero-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 20px;
+  min-width: 0;
+}
+.acct-hero-metric + .acct-hero-metric {
+  border-left: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+}
+.acct-hero-metric .label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: left;
+  letter-spacing: 0.04em;
+}
+.acct-hero-metric .value {
+  font-size: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
+  text-align: right;
+  color: var(--text);
+}
+.acct-hero-metric .sub {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.acct-module-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+.acct-module {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-solid);
+}
+.acct-module-title {
+  margin: 0 0 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.acct-module .result-kv {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 6px 0;
+  font-size: 13px;
+}
+.acct-module .result-kv .label {
+  color: var(--muted);
+  text-align: left;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.acct-module .result-kv .value {
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  flex: 1 1 auto;
+  min-width: 4em;
+}
+.acct-retire-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+.acct-retire-actions #btnAcctResume {
+  min-width: 120px;
+}
+.acct-retire-actions #acctRetireHint {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+@media (max-width: 900px) {
+  .acct-hero-banner {
+    grid-template-columns: 1fr;
+  }
+  .acct-hero-metric + .acct-hero-metric {
+    border-left: none;
+    border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  }
+  .acct-module-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tp-reason-text {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: help;
+}
+.tp-col-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+button.tp-remove {
+  min-height: 0;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--btn-secondary);
+  color: var(--text);
+  box-shadow: none;
+}
+button.tp-remove:hover:not(:disabled) {
+  background: var(--sell) !important;
+  color: #fff !important;
+  filter: none;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.28);
+  transform: translateY(-1px);
 }
 
 .result-note {
