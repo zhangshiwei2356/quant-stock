@@ -3718,8 +3718,15 @@ tbody tr:hover { background: var(--row-hover); }
   display: none;
 }
 .kr-result-head h4 {
-  margin: 0 0 4px;
+  margin: 0;
   font-size: 15px;
+}
+.kr-result-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
 }
 .kr-result-head .hint {
   margin: 0;
@@ -3736,12 +3743,29 @@ tbody tr:hover { background: var(--row-hover); }
 .kr-result-block {
   min-width: 0;
 }
+.kr-result-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
 .kr-result-label {
   display: block;
   font-size: 12px;
   font-weight: 600;
   opacity: 0.8;
-  margin-bottom: 4px;
+  margin-bottom: 0;
+}
+.kr-copy-btn {
+  flex-shrink: 0;
+  padding: 2px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.kr-copy-btn--sm {
+  padding: 1px 8px;
+  font-size: 11px;
 }
 .kr-bench-result .kr-json {
   max-height: min(240px, 32vh);

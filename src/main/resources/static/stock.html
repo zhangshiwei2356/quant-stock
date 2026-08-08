@@ -22,7 +22,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css?v=20260808-kr-current-user"/>
+  <link rel="stylesheet" href="/css/style.css?v=20260808-kr-copy-rsp"/>
   <script src="/js/jquery.min.js"></script>
   <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/echarts.min.js"></script>
@@ -946,16 +946,25 @@
           <div class="kr-bench-apis" id="krOesCards"></div>
           <aside class="kr-result kr-bench-result is-empty" id="krOesResult">
             <div class="kr-result-head">
-              <h4>调用结果</h4>
+              <div class="kr-result-head-row">
+                <h4>调用结果</h4>
+                <button type="button" class="secondary kr-copy-btn" data-kr-copy="krOesRsp" title="复制出参 JSON">复制出参</button>
+              </div>
               <p class="hint" id="krOesResultMeta">尚未调用 — 点左侧「调用」后在此展示入参/出参</p>
             </div>
             <div class="kr-result-cols">
               <div class="kr-result-block">
-                <span class="kr-result-label">入参</span>
+                <div class="kr-result-label-row">
+                  <span class="kr-result-label">入参</span>
+                  <button type="button" class="secondary kr-copy-btn kr-copy-btn--sm" data-kr-copy="krOesReq" title="复制入参">复制</button>
+                </div>
                 <pre class="kr-json" id="krOesReq">—</pre>
               </div>
               <div class="kr-result-block">
-                <span class="kr-result-label">出参</span>
+                <div class="kr-result-label-row">
+                  <span class="kr-result-label">出参</span>
+                  <button type="button" class="secondary kr-copy-btn kr-copy-btn--sm" data-kr-copy="krOesRsp" title="复制出参">复制</button>
+                </div>
                 <pre class="kr-json" id="krOesRsp">—</pre>
               </div>
             </div>
@@ -972,16 +981,25 @@
           <div class="kr-bench-apis" id="krMdsCards"></div>
           <aside class="kr-result kr-bench-result is-empty" id="krMdsResult">
             <div class="kr-result-head">
-              <h4>调用结果</h4>
+              <div class="kr-result-head-row">
+                <h4>调用结果</h4>
+                <button type="button" class="secondary kr-copy-btn" data-kr-copy="krMdsRsp" title="复制出参 JSON">复制出参</button>
+              </div>
               <p class="hint" id="krMdsResultMeta">尚未调用 — 点左侧「调用」后在此展示入参/出参</p>
             </div>
             <div class="kr-result-cols">
               <div class="kr-result-block">
-                <span class="kr-result-label">入参</span>
+                <div class="kr-result-label-row">
+                  <span class="kr-result-label">入参</span>
+                  <button type="button" class="secondary kr-copy-btn kr-copy-btn--sm" data-kr-copy="krMdsReq" title="复制入参">复制</button>
+                </div>
                 <pre class="kr-json" id="krMdsReq">—</pre>
               </div>
               <div class="kr-result-block">
-                <span class="kr-result-label">出参</span>
+                <div class="kr-result-label-row">
+                  <span class="kr-result-label">出参</span>
+                  <button type="button" class="secondary kr-copy-btn kr-copy-btn--sm" data-kr-copy="krMdsRsp" title="复制出参">复制</button>
+                </div>
                 <pre class="kr-json" id="krMdsRsp">—</pre>
               </div>
             </div>
@@ -1022,16 +1040,25 @@
           </div>
           <aside class="kr-result kr-bench-result is-empty" id="krOrderResult">
             <div class="kr-result-head">
-              <h4>调用结果</h4>
+              <div class="kr-result-head-row">
+                <h4>调用结果</h4>
+                <button type="button" class="secondary kr-copy-btn" data-kr-copy="krOrderRsp" title="复制出参 JSON">复制出参</button>
+              </div>
               <p class="hint" id="krOrderResultMeta">尚未调用 — 试单后在此展示入参/出参</p>
             </div>
             <div class="kr-result-cols">
               <div class="kr-result-block">
-                <span class="kr-result-label">入参</span>
+                <div class="kr-result-label-row">
+                  <span class="kr-result-label">入参</span>
+                  <button type="button" class="secondary kr-copy-btn kr-copy-btn--sm" data-kr-copy="krOrderReq" title="复制入参">复制</button>
+                </div>
                 <pre class="kr-json" id="krOrderReq">—</pre>
               </div>
               <div class="kr-result-block">
-                <span class="kr-result-label">出参</span>
+                <div class="kr-result-label-row">
+                  <span class="kr-result-label">出参</span>
+                  <button type="button" class="secondary kr-copy-btn kr-copy-btn--sm" data-kr-copy="krOrderRsp" title="复制出参">复制</button>
+                </div>
                 <pre class="kr-json" id="krOrderRsp">—</pre>
               </div>
             </div>
@@ -1615,6 +1642,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260808-kr-current-user"></script>
+<script src="/js/stock-chart.js?v=20260808-kr-copy-rsp"></script>
 </body>
 </html>

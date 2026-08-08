@@ -2526,6 +2526,58 @@
     $panel.addClass('kr-result-flash is-filled');
   }
 
+  /** 一键复制宽睿点测入参/出参文本（排查用）。 */
+  function krCopyByPreId(preId) {
+    var el = document.getElementById(preId);
+    var text = el ? String(el.textContent || '').trim() : '';
+    if (!text || text === '—') {
+      toast('暂无可复制内容', 'info');
+      return;
+    }
+    function ok() {
+      toast('已复制到剪贴板', 'ok');
+    }
+    function fail() {
+      toast('复制失败，请手动选择文本', 'err');
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(ok).catch(function () {
+        // fallback
+        try {
+          var ta = document.createElement('textarea');
+          ta.value = text;
+          ta.setAttribute('readonly', '');
+          ta.style.position = 'fixed';
+          ta.style.left = '-9999px';
+          document.body.appendChild(ta);
+          ta.select();
+          var done = document.execCommand('copy');
+          document.body.removeChild(ta);
+          if (done) ok();
+          else fail();
+        } catch (e) {
+          fail();
+        }
+      });
+      return;
+    }
+    try {
+      var ta2 = document.createElement('textarea');
+      ta2.value = text;
+      ta2.setAttribute('readonly', '');
+      ta2.style.position = 'fixed';
+      ta2.style.left = '-9999px';
+      document.body.appendChild(ta2);
+      ta2.select();
+      var done2 = document.execCommand('copy');
+      document.body.removeChild(ta2);
+      if (done2) ok();
+      else fail();
+    } catch (e2) {
+      fail();
+    }
+  }
+
   function krMarkActiveCard($card) {
     if (!$card || !$card.length) return;
     $card.closest('.kr-bench-apis').find('.kr-api-card').removeClass('is-active');
@@ -5252,6 +5304,15 @@
   $('#viewKuangruiOverview').on('click', '[data-kr-jump]', function () {
     showKuangruiPanel($(this).attr('data-kr-jump') || 'overview');
   });
+  // OES / MDS / 报撤试单结果区：一键复制入参或出参
+  $('#viewKuangruiOes, #viewKuangruiMds, #viewKuangruiOrder, #viewKuangruiAccount').on(
+    'click',
+    '[data-kr-copy]',
+    function (e) {
+      e.preventDefault();
+      krCopyByPreId($(this).attr('data-kr-copy'));
+    }
+  );
   $('#btnKrAccCurrent').on('click', function () { loadKrAccountCurrent(); });
   $('#btnKrAccRefresh').on('click', function () { loadKrAccountStatus(); });
   $('#btnKrAccLogin').on('click', function () {
