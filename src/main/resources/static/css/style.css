@@ -614,13 +614,17 @@ body {
   width: 26px;
   height: 26px;
   border-radius: 8px;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1;
+  line-height: 0;
   color: var(--accent);
   background: var(--accent-soft);
   border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
   flex-shrink: 0;
+}
+
+.side-nav-toggle .nav-ico svg {
+  width: 15px;
+  height: 15px;
+  display: block;
 }
 
 .side-nav-toggle .nav-label {

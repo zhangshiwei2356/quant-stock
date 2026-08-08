@@ -233,7 +233,7 @@
   <li>空库启动时从 <code>classpath:data/kline</code> 导入 1 分钟种子（优先 <code>MIN_1.json</code>，否则拆 <code>MIN_5.json</code>），运行时不再读 JSON 做展示</li>
   <li>行情页展示 / K 线图表：走统一 <code>MarketDataService#getKline</code></li>
   <li>回测时间留空 = 全量；填写则截取区间；初始资金默认 100000</li>
-  <li>侧栏：一级菜单互斥；横向分组 + 可选图标窄栏；回测成功前可隐藏权益/成交等结果面板</li>
+  <li>侧栏：一级菜单互斥；横向分组 + SVG 图标窄栏；回测成功前可隐藏权益/成交等结果面板</li>
   <li>可选：API Key（<code>QUANT_API_KEY</code>）、回测类接口限流（默认 30 次/分钟/IP）</li>
 </ul>
 
