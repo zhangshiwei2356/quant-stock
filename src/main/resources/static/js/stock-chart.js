@@ -2027,7 +2027,7 @@
     { id: 'backtest', group: 'stock', title: '回测要点', src: '/docs/backtest.html?v=20260720-nav-rename' }
   ];
   var knowledgeHtmlCache = {};
-  var HOME_SRC = '/docs/home.html?v=20260808-shell-dash';
+  var HOME_SRC = '/docs/home.html?v=20260808-home-polish';
   var homePanelReady = false;
   var pendingHomeLead = null;
   var docsPdfBusy = false;
@@ -2265,38 +2265,20 @@
   }
 
   /**
-   * 欢迎页入口与侧栏一级菜单对齐（避免 home.html 漏加新菜单）。
-   * 按侧栏 .side-nav-toggle 顺序重建 #homeActions。
+   * 首页已改为仪表盘卡片入口，不再同步底部横向按钮（避免三重导航）。
    */
   function syncHomeActionsFromNav() {
-    var $actions = $('#homeActions');
-    if (!$actions.length) {
-      $actions = $('#homeMount .home-actions').first();
-    }
-    if (!$actions.length) {
-      return;
-    }
-    var $frag = $(document.createDocumentFragment());
-    $('.side-nav-toggle').each(function () {
-      var $btn = $(this);
-      var bodyId = $btn.attr('data-body');
-      var mode = $btn.attr('data-mode') || '';
-      var label = $.trim($btn.find('.nav-label').first().text())
-          || $.trim($btn.attr('data-intro-title') || '');
-      if (!bodyId || !label) {
-        return;
-      }
-      var $a = $('<button type="button" class="home-action"/>')
-          .attr('data-open-nav', bodyId)
-          .attr('data-mode', mode)
-          .text(label);
-      if (mode === 'doc' || $btn.closest('.nav-group--docs').length) {
-        $a.addClass('secondary');
-      }
-      $frag.append($a);
-    });
-    if ($frag[0].childNodes.length) {
-      $actions.empty().append($frag);
+    $('#homeActions').remove();
+  }
+
+  function setHomeNavActive(on) {
+    var $home = $('#btnNavHome');
+    if (!$home.length) return;
+    $home.toggleClass('open active', !!on);
+    if (on) {
+      $home.attr('aria-current', 'page');
+    } else {
+      $home.removeAttr('aria-current');
     }
   }
 
@@ -2384,6 +2366,9 @@
         localStorage.removeItem(NAV_OPEN_BODY_KEY);
       }
     } catch (e) {}
+    if (bodyId) {
+      setHomeNavActive(false);
+    }
   }
 
   var SIDEBAR_COLLAPSE_KEY = 'quant-sidebar-collapsed';
@@ -2400,7 +2385,6 @@
       $btn.attr('aria-expanded', sidebarIconCollapsed ? 'false' : 'true');
       $btn.attr('title', sidebarIconCollapsed ? '展开导航' : '收起为图标导航');
       $btn.attr('aria-label', sidebarIconCollapsed ? '展开导航' : '收起为图标导航');
-      $btn.find('.sidebar-collapse-label').text(sidebarIconCollapsed ? '展开导航' : '收起导航');
     }
     try {
       localStorage.setItem(SIDEBAR_COLLAPSE_KEY, sidebarIconCollapsed ? '1' : '0');
@@ -2559,8 +2543,8 @@
             break;
           }
         }
-        $('#homeMetricStrategy').text(label || '—');
-        $('#homeMetricStrategyHint').text(id ? ('id: ' + id) : '未设置激活策略');
+        $('#homeMetricStrategy').text(label || '—').attr('title', label || '');
+        $('#homeMetricStrategyHint').text(id || '未设置激活策略');
       })
       .fail(function () {
         $('#homeMetricStrategyHint').text('策略接口不可用');
@@ -4954,8 +4938,9 @@
     if (options.collapseNav !== false) {
       setSideNavOpen(null);
     }
+    setHomeNavActive(true);
     setHomeCollapsed(false);
-    updateBreadcrumb([]);
+    updateBreadcrumb([{ label: '工作台' }]);
     saveNavSession({ mode: 'home', panel: '' });
     loadHomePanel(function () {
       loadHomeDashboardMetrics();
@@ -4971,6 +4956,7 @@
     options = options || {};
     var expandNav = options.expandNav !== false;
     lastWorkspaceMode = mode || 'pool';
+    setHomeNavActive(false);
     if (expandNav) {
       ensureSidebarExpanded();
     }
@@ -5911,6 +5897,7 @@
 
   function showDocMode(menuBodyId) {
     ensureSidebarExpanded();
+    setHomeNavActive(false);
     $('body').addClass('mode-doc');
     hideAllWorkspaceViews();
     $('#knowledgePanel').prop('hidden', false);
@@ -6031,7 +6018,12 @@
 
   $('.side-nav-toggle').on('click', function () {
     var $btn = $(this);
+    if ($btn.is('#btnNavHome') || $btn.attr('data-mode') === 'home') {
+      showHome();
+      return;
+    }
     var bodyId = $btn.attr('data-body');
+    if (!bodyId) return;
     var wasOpen = $btn.attr('aria-expanded') === 'true';
     // 标准后台：一级仅展开/收起，不换页、不跳介绍
     if (wasOpen) {

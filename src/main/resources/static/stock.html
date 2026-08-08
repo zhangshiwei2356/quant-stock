@@ -22,7 +22,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css?v=20260808-pool-menu"/>
+  <link rel="stylesheet" href="/css/style.css?v=20260808-home-polish"/>
   <script src="/js/jquery.min.js"></script>
   <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/echarts.min.js"></script>
@@ -44,7 +44,9 @@
   </button>
   <div class="header-actions">
     <div class="header-help" id="headerHelp">
-      <button type="button" id="btnHeaderHelp" class="header-help-btn secondary" aria-expanded="false" aria-haspopup="true" title="帮助与模块介绍">帮助</button>
+      <button type="button" id="btnHeaderHelp" class="header-help-btn" aria-expanded="false" aria-haspopup="true" title="帮助与模块介绍" aria-label="帮助">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.4 2.4 0 1 1 3.3 2.2c-.7.4-1.1.9-1.1 1.7V14"/><path d="M12 17h.01"/></svg>
+      </button>
       <div class="header-help-menu" id="headerHelpMenu" hidden role="menu">
         <div class="header-help-label">模块介绍</div>
         <div id="headerHelpIntros"></div>
@@ -64,9 +66,25 @@
 </header>
 <div class="layout">
   <aside class="sidebar">
+    <div class="sidebar-toolbar">
+      <button type="button" id="btnSidebarCollapse" class="sidebar-collapse-btn"
+              title="收起为图标导航" aria-label="收起为图标导航" aria-expanded="true">
+        <svg class="sidebar-collapse-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/><path d="M9 4v16"/></svg>
+      </button>
+    </div>
     <section class="nav-group" data-group="workbench" aria-label="工作台">
       <div class="nav-group-title">工作台</div>
       <div class="nav-group-body">
+        <div class="side-nav" data-nav="home">
+          <button type="button" class="side-nav-toggle side-nav-leaf" id="btnNavHome" data-mode="home"
+                  title="工作台" aria-current="page">
+            <span class="nav-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5L12 4l8 7.5"/><path d="M6.5 10.5V20h11V10.5"/></svg>
+            </span>
+            <span class="nav-label">工作台</span>
+          </button>
+        </div>
+
         <div class="side-nav" data-nav="pool">
           <button type="button" class="side-nav-toggle" data-body="poolBody" data-mode="pool"
                   data-intro="/docs/nav-pool.html" data-intro-title="行情浏览" aria-expanded="false"
@@ -282,13 +300,6 @@
       </div>
     </section>
 
-    <div class="sidebar-foot-bar">
-      <button type="button" id="btnSidebarCollapse" class="sidebar-collapse-btn"
-              title="收起为图标导航" aria-label="收起为图标导航" aria-expanded="true">
-        <svg class="sidebar-collapse-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/><path d="M9 4v16"/></svg>
-        <span class="sidebar-collapse-label">收起导航</span>
-      </button>
-    </div>
   </aside>
 
   <div class="main">
@@ -1761,6 +1772,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260808-pool-menu"></script>
+<script src="/js/stock-chart.js?v=20260808-home-polish"></script>
 </body>
 </html>

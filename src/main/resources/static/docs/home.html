@@ -18,8 +18,8 @@
     </article>
     <article class="home-metric-card" data-metric="strategy">
       <div class="home-metric-label">运行中策略</div>
-      <div class="home-metric-value home-metric-value--sm" id="homeMetricStrategy">—</div>
-      <div class="home-metric-hint" id="homeMetricStrategyHint">纸面激活</div>
+      <div class="home-metric-value home-metric-value--sm" id="homeMetricStrategy" title="">—</div>
+      <div class="home-metric-hint home-metric-hint--tech" id="homeMetricStrategyHint">纸面激活</div>
     </article>
     <article class="home-metric-card" data-metric="alerts">
       <div class="home-metric-label">待处理告警</div>
@@ -36,20 +36,24 @@
   <div class="home-entry-groups" id="homeEntryGroups">
     <section class="home-entry-group">
       <h4 class="home-section-title">核心分析</h4>
-      <div class="home-entry-grid">
+      <div class="home-entry-grid home-entry-grid--4">
         <button type="button" class="home-entry-card" data-enter="pool">
+          <span class="home-entry-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M22 19V8"/><path d="M2 19h20"/></svg></span>
           <span class="home-entry-name">行情浏览</span>
           <span class="home-entry-desc">全市场选股与多周期 K 线</span>
         </button>
         <button type="button" class="home-entry-card" data-enter="single">
+          <span class="home-entry-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18V10"/><path d="M10 18V6"/><path d="M16 18v-5"/><path d="M3 20h18"/><path d="M18 4l3 3-3 3"/></svg></span>
           <span class="home-entry-name">个股回测</span>
           <span class="home-entry-desc">目标池单股回测 / 扫描 / 历史</span>
         </button>
         <button type="button" class="home-entry-card" data-enter="portfolio">
+          <span class="home-entry-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3.2"/><circle cx="16" cy="9" r="2.6"/><circle cx="12" cy="16.5" r="3"/><path d="M10.5 10.2l1.2 3.2M13.7 11.2l-1.1 2.4"/></svg></span>
           <span class="home-entry-name">组合回测</span>
           <span class="home-entry-desc">多股共享资金池回测</span>
         </button>
         <button type="button" class="home-entry-card" data-enter="strategy">
+          <span class="home-entry-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19V8.5L12 4l7 4.5V19"/><path d="M9 19v-6h6v6"/><path d="M9 10.5h6"/></svg></span>
           <span class="home-entry-name">策略管理</span>
           <span class="home-entry-desc">策略总览与评分</span>
         </button>
@@ -57,16 +61,19 @@
     </section>
     <section class="home-entry-group">
       <h4 class="home-section-title">交易管理</h4>
-      <div class="home-entry-grid">
+      <div class="home-entry-grid home-entry-grid--3">
         <button type="button" class="home-entry-card" data-enter="tradepool">
+          <span class="home-entry-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2"/></svg></span>
           <span class="home-entry-name">目标池</span>
           <span class="home-entry-desc">扫描入池与池内标的</span>
         </button>
         <button type="button" class="home-entry-card" data-enter="account">
+          <span class="home-entry-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="7" width="17" height="12" rx="2.2"/><path d="M7 7V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1"/><path d="M3.5 12h17"/></svg></span>
           <span class="home-entry-name">账户概览</span>
           <span class="home-entry-desc">资金、持仓与风控</span>
         </button>
         <button type="button" class="home-entry-card" data-enter="schedule">
+          <span class="home-entry-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.2M12 18.3v2.2M4.8 6.5l1.6 1.6M17.6 15.9l1.6 1.6M3.5 12h2.2M18.3 12h2.2M4.8 17.5l1.6-1.6M17.6 8.1l1.6-1.6"/></svg></span>
           <span class="home-entry-name">运维中心</span>
           <span class="home-entry-desc">任务、健康与运行参数</span>
         </button>
@@ -74,27 +81,23 @@
     </section>
     <section class="home-entry-group">
       <h4 class="home-section-title">辅助工具</h4>
-      <div class="home-entry-grid">
+      <div class="home-entry-grid home-entry-grid--3">
         <button type="button" class="home-entry-card" data-enter="dbtables">
+          <span class="home-entry-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9.5h16M4 14.5h16M9.5 4v16M14.5 4v16"/></svg></span>
           <span class="home-entry-name">数据表</span>
           <span class="home-entry-desc">白名单表只读浏览</span>
         </button>
         <button type="button" class="home-entry-card" data-enter="kuangrui">
+          <span class="home-entry-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 8.5V7a2 2 0 0 1 2-2h7.5a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2H16"/><rect x="4" y="8.5" width="12" height="11" rx="2"/></svg></span>
           <span class="home-entry-name">宽睿对接</span>
           <span class="home-entry-desc">OES / MDS 联调</span>
         </button>
         <button type="button" class="home-entry-card" data-enter="knowledge">
+          <span class="home-entry-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4.5h9.5A2.5 2.5 0 0 1 18 7v13.5L12.5 17 7 20.5V7A2.5 2.5 0 0 1 9.5 4.5"/><path d="M9.5 9h5M9.5 12.5h5"/></svg></span>
           <span class="home-entry-name">量化知识</span>
           <span class="home-entry-desc">指标与交易规则文档</span>
-        </button>
-        <button type="button" class="home-entry-card" data-enter="app">
-          <span class="home-entry-name">应用说明</span>
-          <span class="home-entry-desc">概述、README、能力与待办</span>
         </button>
       </div>
     </section>
   </div>
-
-  <!-- 无 JS 回退：与侧栏一级对齐的简入口 -->
-  <div class="home-actions" id="homeActions" hidden></div>
 </section>
