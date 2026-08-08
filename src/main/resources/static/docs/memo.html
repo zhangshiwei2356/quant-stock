@@ -109,7 +109,7 @@
     <li><b>宽睿资料梳理</b> — 已落地（文档）· <code>OESAPI-JAVA-v0.19.4.0</code>；「宽睿文档梳理」含 M0～M4 记录与 <b>M5 待做</b>（2026-08-07 复核）</li>
     <li><b>宽睿 M0 环境脚手架</b> — 已完成 · jar <code>0.19.4.0</code>；阿里云模拟；探针 OES+MDS 登录成功；主应用仍默认 sim/db</li>
     <li><b>宽睿 M1 MDS L1 落库</b> — 可选已落地 · 开关默认关；分钟桶写 <code>market_1min(MDS)</code></li>
-    <li><b>宽睿 M2 OES 只读对账</b> — 可选已落地 · 开关默认关；登录后 <code>sendRptSync</code> 多签名适配（失败带明细并重登）；运维 <code>/api/ops/kuangrui/oes/*</code></li>
+    <li><b>宽睿 M2 OES 只读对账</b> — 可选已落地 · 开关默认关；登录后 <code>sendRptSync</code> 多签名适配；同步失败可查询降级（<code>syncDegraded</code> 仍可查资金）；运维 <code>/api/ops/kuangrui/oes/*</code></li>
     <li><b>宽睿 M3 OES 报撤</b> — 可选已落地 · <code>oes.order-enabled</code> 默认关；限价报/撤；sync 按回报/查询推进</li>
     <li><b>宽睿 M4 静态/费率</b> — 可选已落地 · <code>static-enabled</code> 默认关；涨跌停/停牌/股本/交易日/佣金可覆盖本地</li>
   </ol>

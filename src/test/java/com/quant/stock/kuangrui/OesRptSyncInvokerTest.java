@@ -44,6 +44,19 @@ class OesRptSyncInvokerTest {
         }
     }
 
+    /** 仅当 env=0 时成功，验证 subscribeEnvId 候选。 */
+    public static class ClientEnvSensitive {
+        int envUsed = -1;
+
+        public int sendRptSync(int envId, boolean all, long seq) {
+            if (envId != 0) {
+                return -1;
+            }
+            envUsed = envId;
+            return 0;
+        }
+    }
+
     public static class ClientInitThenSend {
         long inited = -1;
         boolean sent;
@@ -109,6 +122,14 @@ class OesRptSyncInvokerTest {
         assertTrue(r.ok);
         assertTrue(c.all);
         assertEquals(99L, c.seq);
+    }
+
+    @Test
+    void invoke_triesEnvCandidates() {
+        ClientEnvSensitive c = new ClientEnvSensitive();
+        OesRptSyncInvoker.Result r = OesRptSyncInvoker.invoke(c, 3L, 99);
+        assertTrue(r.ok, String.valueOf(r.detail));
+        assertEquals(0, c.envUsed);
     }
 
     @Test

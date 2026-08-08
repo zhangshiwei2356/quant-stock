@@ -1,6 +1,7 @@
 package com.quant.stock.kuangrui;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -10,15 +11,18 @@ import java.util.Set;
 /**
  * 适配宽睿 OES 各版本 {@code sendRptSync} / {@code initRptSync} 签名差异。
  * <p>
- * 资料包 Demo：登录后必须回报同步；常见形态包括：
+ * 资料包 Demo：登录后应回报同步；常见形态包括：
  * <ul>
  *   <li>{@code sendRptSync(long)}</li>
  *   <li>{@code initRptSync(long)} + {@code sendRptSync()}</li>
  *   <li>{@code sendRptSync(byte/int envId, boolean/int subscribeAll, long lastRptSeq)}</li>
  *   <li>{@code sendRptSync(OesReportSynchronizationReq)} 等请求对象</li>
  * </ul>
+ * 配置里 {@code subcribeEnvId≤0} 表示订阅全部环境号回报。
  */
 public final class OesRptSyncInvoker {
+
+    private static final int[] ENV_CANDIDATES = {0, 1, 99};
 
     private OesRptSyncInvoker() {
     }
@@ -45,6 +49,13 @@ public final class OesRptSyncInvoker {
     }
 
     public static Result invoke(Object client, long lastInMsgSeq) {
+        return invoke(client, lastInMsgSeq, 0);
+    }
+
+    /**
+     * @param preferSubscribeEnvId 优先使用的订阅环境号（≤0 表示订阅全部，与配置 subcribeEnvId 一致）
+     */
+    public static Result invoke(Object client, long lastInMsgSeq, int preferSubscribeEnvId) {
         if (client == null) {
             return Result.fail("OES 客户端为空");
         }
@@ -54,13 +65,18 @@ public final class OesRptSyncInvoker {
         List<Method> initWithArgs = new ArrayList<Method>();
         List<Method> sendNoArg = new ArrayList<Method>();
 
-        for (Method m : client.getClass().getMethods()) {
+        for (Method m : collectMethods(client.getClass())) {
             if (m.getDeclaringClass() == Object.class) {
                 continue;
             }
             String name = m.getName();
             if (!isSyncMethodName(name)) {
                 continue;
+            }
+            try {
+                m.setAccessible(true);
+            } catch (Exception ignore) {
+                // ignore
             }
             signatures.add(formatSig(m));
             int n = m.getParameterTypes().length;
@@ -75,33 +91,34 @@ public final class OesRptSyncInvoker {
             }
         }
 
-        // 1) 优先：带序号/请求对象的 send*（Demo：用 lastInMsgSeq 同步）
-        Result r = tryMethods(client, sendWithArgs, lastInMsgSeq, errors);
+        int[] envTry = envTryOrder(preferSubscribeEnvId);
+
+        // 1) 优先：带序号/请求对象的 send*
+        Result r = tryMethods(client, sendWithArgs, lastInMsgSeq, envTry, errors);
         if (r.ok) {
             return r;
         }
 
         // 2) init*(seq) + 无参 send*
-        r = tryMethods(client, initWithArgs, lastInMsgSeq, errors);
+        r = tryMethods(client, initWithArgs, lastInMsgSeq, envTry, errors);
         if (r.ok) {
             Result send = tryInvokeMethods(client, sendNoArg, new Object[0], errors);
             if (send.ok) {
                 return Result.success(r.methodUsed + " + " + send.methodUsed);
             }
-            // 部分版本 init 即触发同步
             return Result.success(r.methodUsed + " (init-only)");
         }
 
-        // 3) 兜底无参 send*
+        // 3) 无参 send*
         r = tryInvokeMethods(client, sendNoArg, new Object[0], errors);
         if (r.ok) {
             return r;
         }
 
-        // 4) 按名再试一遍（防 getMethods 遗漏桥接）
-        Result init = tryNamed(client, "initRptSync", lastInMsgSeq, errors, signatures);
+        // 4) 按名再试
+        Result init = tryNamed(client, "initRptSync", lastInMsgSeq, envTry, errors, signatures);
         if (!init.ok) {
-            init = tryNamed(client, "initMsgId", lastInMsgSeq, errors, signatures);
+            init = tryNamed(client, "initMsgId", lastInMsgSeq, envTry, errors, signatures);
         }
         if (init.ok) {
             Result send = tryNoArgSend(client, errors, signatures);
@@ -110,15 +127,27 @@ public final class OesRptSyncInvoker {
             }
         }
 
+        // 附带扫描：所有含 Rpt/Report/Sync 的方法名，便于对照资料包
+        Set<String> related = new LinkedHashSet<String>();
+        for (Method m : collectMethods(client.getClass())) {
+            String n = m.getName().toLowerCase(Locale.ROOT);
+            if (n.contains("rpt") || n.contains("report") || n.contains("sync")) {
+                related.add(formatSig(m));
+            }
+        }
+
         StringBuilder sb = new StringBuilder();
         sb.append("回报同步失败");
         if (!signatures.isEmpty()) {
             sb.append("；可用方法: ").append(signatures);
         } else {
-            sb.append("；客户端上未找到 sendRptSync/initRptSync 等方法（请确认 -Pkuangrui 与 quant360-all-api 0.19.4.0）");
+            sb.append("；未找到 sendRptSync/initRptSync（请确认 IDEA/Maven 勾选 -Pkuangrui 且已安装 quant360-all-api 0.19.4.0 后重新编译启动）");
+        }
+        if (!related.isEmpty() && related.size() <= 12) {
+            sb.append("；相关方法: ").append(related);
         }
         if (!errors.isEmpty()) {
-            int n = Math.min(errors.size(), 6);
+            int n = Math.min(errors.size(), 8);
             sb.append("；尝试: ");
             for (int i = 0; i < n; i++) {
                 if (i > 0) {
@@ -130,16 +159,51 @@ public final class OesRptSyncInvoker {
         return Result.fail(sb.toString());
     }
 
-    private static Result tryMethods(Object client, List<Method> methods, long seq, List<String> errors) {
-        for (Method m : methods) {
-            Object[] args = buildArgs(m.getParameterTypes(), seq);
-            if (args == null) {
-                errors.add(formatSig(m) + ": 无法构造参数");
-                continue;
+    private static List<Method> collectMethods(Class<?> type) {
+        LinkedHashSet<Method> out = new LinkedHashSet<Method>();
+        for (Method m : type.getMethods()) {
+            out.add(m);
+        }
+        Class<?> c = type;
+        while (c != null && c != Object.class) {
+            for (Method m : c.getDeclaredMethods()) {
+                if (Modifier.isStatic(m.getModifiers())) {
+                    continue;
+                }
+                out.add(m);
             }
-            Result r = tryInvokeMethods(client, java.util.Collections.singletonList(m), args, errors);
-            if (r.ok) {
-                return r;
+            c = c.getSuperclass();
+        }
+        return new ArrayList<Method>(out);
+    }
+
+    private static int[] envTryOrder(int prefer) {
+        LinkedHashSet<Integer> set = new LinkedHashSet<Integer>();
+        set.add(Integer.valueOf(prefer));
+        for (int e : ENV_CANDIDATES) {
+            set.add(Integer.valueOf(e));
+        }
+        int[] arr = new int[set.size()];
+        int i = 0;
+        for (Integer v : set) {
+            arr[i++] = v.intValue();
+        }
+        return arr;
+    }
+
+    private static Result tryMethods(Object client, List<Method> methods, long seq, int[] envTry,
+                                     List<String> errors) {
+        for (Method m : methods) {
+            for (int envId : envTry) {
+                Object[] args = buildArgs(m.getParameterTypes(), seq, envId);
+                if (args == null) {
+                    errors.add(formatSig(m) + "@env=" + envId + ": 无法构造参数");
+                    continue;
+                }
+                Result r = tryInvokeMethods(client, java.util.Collections.singletonList(m), args, errors);
+                if (r.ok) {
+                    return Result.success(r.methodUsed + "@env=" + envId);
+                }
             }
         }
         return Result.fail("no match");
@@ -149,6 +213,7 @@ public final class OesRptSyncInvoker {
                                            List<String> errors) {
         for (Method m : methods) {
             try {
+                m.setAccessible(true);
                 Object ret = m.invoke(client, args);
                 if (isNegativeCode(ret)) {
                     errors.add(formatSig(m) + ": 返回 " + ret);
@@ -171,7 +236,7 @@ public final class OesRptSyncInvoker {
         String n = name.toLowerCase(Locale.ROOT);
         return n.contains("rptsync")
                 || n.contains("reportsync")
-                || "sendreportsynchronization".equals(n)
+                || n.contains("reportsynchronization")
                 || "initmsgid".equals(n);
     }
 
@@ -201,36 +266,44 @@ public final class OesRptSyncInvoker {
         return Result.fail("无参 sendRptSync 不可用");
     }
 
-    private static Result tryNamed(Object client, String name, long seq,
+    private static Result tryNamed(Object client, String name, long seq, int[] envTry,
                                    List<String> errors, Set<String> signatures) {
-        for (Method m : client.getClass().getMethods()) {
+        for (Method m : collectMethods(client.getClass())) {
             if (!m.getName().equals(name)) {
                 continue;
             }
             signatures.add(formatSig(m));
-            Object[] args = buildArgs(m.getParameterTypes(), seq);
-            if (args == null) {
-                continue;
-            }
-            try {
-                Object ret = m.invoke(client, args);
-                if (isNegativeCode(ret)) {
-                    errors.add(formatSig(m) + ": 返回 " + ret);
+            for (int envId : envTry) {
+                Object[] args = buildArgs(m.getParameterTypes(), seq, envId);
+                if (args == null) {
                     continue;
                 }
-                return Result.success(formatSig(m));
-            } catch (Exception e) {
-                Throwable cause = e.getCause() != null ? e.getCause() : e;
-                errors.add(formatSig(m) + ": " + cause.getClass().getSimpleName() + " " + safeMsg(cause));
+                try {
+                    m.setAccessible(true);
+                    Object ret = m.invoke(client, args);
+                    if (isNegativeCode(ret)) {
+                        errors.add(formatSig(m) + ": 返回 " + ret);
+                        continue;
+                    }
+                    return Result.success(formatSig(m) + "@env=" + envId);
+                } catch (Exception e) {
+                    Throwable cause = e.getCause() != null ? e.getCause() : e;
+                    errors.add(formatSig(m) + ": " + cause.getClass().getSimpleName() + " " + safeMsg(cause));
+                }
             }
         }
         return Result.fail(name + " 不可用");
     }
 
+    /** 兼容旧测试：默认 envId=0。 */
+    static Object[] buildArgs(Class<?>[] types, long seq) {
+        return buildArgs(types, seq, 0);
+    }
+
     /**
      * 按参数类型构造调用实参；无法适配时返回 null。
      */
-    static Object[] buildArgs(Class<?>[] types, long seq) {
+    static Object[] buildArgs(Class<?>[] types, long seq, int subscribeEnvId) {
         if (types == null) {
             return null;
         }
@@ -238,21 +311,38 @@ public final class OesRptSyncInvoker {
             return new Object[0];
         }
         if (types.length == 1) {
-            Object one = coerceSingle(types[0], seq);
+            Object one = coerceSingle(types[0], seq, subscribeEnvId);
             return one == null ? null : new Object[]{one};
         }
         if (types.length == 2) {
-            // (lastSeq, subscribeAll) 或 (subscribeEnvId, lastSeq)
-            Object a0 = coerceLoose(types[0], seq, true);
-            Object a1 = coerceLoose(types[1], seq, false);
+            // (subscribeEnvId, lastSeq) 或 (lastSeq, subscribeAll)
+            Class<?> t0 = types[0];
+            Class<?> t1 = types[1];
+            if (isIntegral(t0) && isIntegral(t1)) {
+                // 两整型：env + seq
+                Object a0 = coercePrimitiveOrWrapper(t0, subscribeEnvId);
+                Object a1 = coercePrimitiveOrWrapper(t1, seq);
+                if (a0 != null && a1 != null) {
+                    return new Object[]{a0, a1};
+                }
+            }
+            if (isIntegral(t0) && (t1 == Boolean.TYPE || t1 == Boolean.class)) {
+                Object a0 = coercePrimitiveOrWrapper(t0, seq);
+                Object a1 = Boolean.TRUE;
+                if (a0 != null) {
+                    return new Object[]{a0, a1};
+                }
+            }
+            Object a0 = coerceLoose(t0, seq, true);
+            Object a1 = coerceLoose(t1, seq, false);
             if (a0 != null && a1 != null) {
                 return new Object[]{a0, a1};
             }
             return null;
         }
         if (types.length == 3) {
-            // C API 形态：subscribeEnvId, isSubscribeAll, lastRptSeqNum
-            Object envId = coercePrimitiveOrWrapper(types[0], 0);
+            // C API：subscribeEnvId, isSubscribeAll, lastRptSeqNum
+            Object envId = coercePrimitiveOrWrapper(types[0], subscribeEnvId);
             Object all = coerceBooleanOrInt(types[1], true);
             Object last = coercePrimitiveOrWrapper(types[2], seq);
             if (envId != null && all != null && last != null) {
@@ -263,15 +353,21 @@ public final class OesRptSyncInvoker {
         return null;
     }
 
-    private static Object coerceSingle(Class<?> type, long seq) {
+    private static boolean isIntegral(Class<?> type) {
+        return type == Long.TYPE || type == Long.class
+                || type == Integer.TYPE || type == Integer.class
+                || type == Byte.TYPE || type == Byte.class
+                || type == Short.TYPE || type == Short.class;
+    }
+
+    private static Object coerceSingle(Class<?> type, long seq, int subscribeEnvId) {
         Object num = coercePrimitiveOrWrapper(type, seq);
         if (num != null) {
             return num;
         }
-        // 请求对象：new + setLast*
         try {
             Object req = type.getDeclaredConstructor().newInstance();
-            if (fillSeqOnReq(req, seq)) {
+            if (fillSeqOnReq(req, seq, subscribeEnvId)) {
                 return req;
             }
         } catch (Exception ignore) {
@@ -335,6 +431,10 @@ public final class OesRptSyncInvoker {
     }
 
     static boolean fillSeqOnReq(Object req, long seq) {
+        return fillSeqOnReq(req, seq, 0);
+    }
+
+    static boolean fillSeqOnReq(Object req, long seq, int subscribeEnvId) {
         if (req == null) {
             return false;
         }
@@ -342,17 +442,22 @@ public final class OesRptSyncInvoker {
                 "setLastRptSeqNum", "setLastInMsgSeq", "setLastRptSeq",
                 "setRptSeqNum", "setLastMsgSeq", "setMsgSeq"
         };
+        boolean filled = false;
         for (String s : setters) {
             if (trySetLongish(req, s, seq)) {
-                // 常见可选字段
-                trySetLongish(req, "setSubscribeEnvId", 0L);
-                trySetLongish(req, "setIsSubscribeAll", 1L);
-                trySetBoolean(req, "setSubscribeAll", true);
-                trySetBoolean(req, "setIsSubscribeAll", true);
-                return true;
+                filled = true;
+                break;
             }
         }
-        return false;
+        if (!filled) {
+            return false;
+        }
+        trySetLongish(req, "setSubscribeEnvId", subscribeEnvId);
+        trySetLongish(req, "setSubcribeEnvId", subscribeEnvId); // 官方配置拼写
+        trySetLongish(req, "setIsSubscribeAll", subscribeEnvId <= 0 ? 1L : 0L);
+        trySetBoolean(req, "setSubscribeAll", subscribeEnvId <= 0);
+        trySetBoolean(req, "setIsSubscribeAll", subscribeEnvId <= 0);
+        return true;
     }
 
     private static boolean trySetLongish(Object target, String setter, long value) {

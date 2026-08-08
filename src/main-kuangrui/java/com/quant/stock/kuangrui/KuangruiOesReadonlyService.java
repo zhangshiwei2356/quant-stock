@@ -87,6 +87,8 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
         m.put("impl", "kuangrui-oes");
         m.put("loggedIn", client != null);
         m.put("rptSynced", rptSynced.get());
+        m.put("syncDegraded", client != null && !rptSynced.get());
+        m.put("rptSyncEngine", "OesRptSyncInvoker/v2");
         m.put("lastInMsgSeq", lastInMsgSeq);
         m.put("applVerId", applVerId.get());
         m.put("lastError", lastError.get());
@@ -102,9 +104,16 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
         m.put("orderEnabled", quantProperties.getKuangrui() != null
                 && quantProperties.getKuangrui().getOes() != null
                 && quantProperties.getKuangrui().getOes().isOrderEnabled());
-        m.put("hint", isOrderLive()
-                ? "M3 报撤已开：限价 sendOrdReq/撤单 + 回报/查询推进；M4 产品/交易日/佣金可查"
-                : "M2 只读 + M4 查询（stock/tradingDay/commission）；报撤需 oes.order-enabled=true（M3）");
+        String hint;
+        if (client != null && !rptSynced.get()) {
+            hint = "已登录但回报未同步（syncDegraded）：查资金/持仓等查询通道仍可用；报撤需 rptSynced=true。"
+                    + " 若 lastError 仍是旧文案「请核对 API 版本 0.19.4」，说明未用最新代码重编，请 git pull 后 mvn -Pkuangrui 重新编译启动。";
+        } else if (isOrderLive()) {
+            hint = "M3 报撤已开：限价 sendOrdReq/撤单 + 回报/查询推进；M4 产品/交易日/佣金可查";
+        } else {
+            hint = "M2 只读 + M4 查询（stock/tradingDay/commission）；报撤需 oes.order-enabled=true（M3）";
+        }
+        m.put("hint", hint);
         return m;
     }
 
@@ -112,7 +121,8 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
     public boolean ensureReady() {
         try {
             ensureClient();
-            return client != null && rptSynced.get();
+            // 查询通道：登录成功即可；回报同步失败时降级仍允许查资金等
+            return client != null;
         } catch (Exception e) {
             lastError.set(e.getMessage());
             log.warn("[oes] 就绪失败: {}", e.getMessage());
@@ -375,6 +385,10 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
         }
         try {
             ensureReadyOrThrow();
+            if (!rptSynced.get()) {
+                return OesPlaceResult.fail(clSeqNo, "回报未同步(rptSynced=false)，禁止报撤；可先查资金。详情: "
+                        + lastError.get());
+            }
             String code = OesViewMapper.normalizeCode(stockCode);
             int mkt = KuangruiExchangeIds.fromStockCode(code);
             if (mkt == 0 || qty < 100 || priceYuan == null) {
@@ -425,6 +439,10 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
         }
         try {
             ensureReadyOrThrow();
+            if (!rptSynced.get()) {
+                log.warn("[oes] 回报未同步，拒绝撤单 lastError={}", lastError.get());
+                return false;
+            }
             String code = OesViewMapper.normalizeCode(stockCode);
             int mkt = KuangruiExchangeIds.fromStockCode(code);
             Object req = newInstance("com.quant360.api.model.oes.OesOrdCancelReq");
@@ -530,11 +548,17 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
             if (client != null && rptSynced.get()) {
                 return;
             }
-            // 半登录态：回报同步失败后先关掉再整链重登，避免死连接反复 sync
-            if (client != null && !rptSynced.get()) {
-                log.warn("[oes] 已登录但未回报同步，关闭后重登 lastInMsgSeq={}", lastInMsgSeq);
-                rptSynced.set(false);
-                closeClient();
+            // 已登录：再尝试一次 sync；失败则保持查询通道（降级）
+            if (client != null) {
+                if (!rptSynced.get()) {
+                    try {
+                        doRptSync(lastInMsgSeq);
+                    } catch (Exception e) {
+                        lastError.set(e.getMessage());
+                        log.warn("[oes] 再次回报同步失败，保持查询降级: {}", e.getMessage());
+                    }
+                }
+                return;
             }
             Path cfg = resolveOesConfig();
             if (!Files.isRegularFile(cfg)) {
@@ -586,9 +610,10 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
             try {
                 doRptSync(lastInMsgSeq);
             } catch (Exception syncEx) {
+                // 不关闭连接：查询通道仍可查资金/持仓；报撤仍要求 rptSynced
                 rptSynced.set(false);
-                closeClient();
-                throw syncEx;
+                lastError.set(syncEx.getMessage());
+                log.warn("[oes] 回报同步失败，降级为仅查询通道: {}", syncEx.getMessage());
             }
         }
     }
@@ -836,14 +861,15 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
         if (c == null) {
             throw new IllegalStateException("OES 客户端为空");
         }
-        // Demo：登录后必须 sendRptSync；签名/异常明细见 OesRptSyncInvoker
-        OesRptSyncInvoker.Result r = OesRptSyncInvoker.invoke(c, seq);
+        // Demo：登录后应 sendRptSync；签名/异常明细见 OesRptSyncInvoker（subscribeEnvId≤0=全部）
+        OesRptSyncInvoker.Result r = OesRptSyncInvoker.invoke(c, seq, 0);
         if (!r.ok) {
             log.warn("[oes] sendRptSync 失败 seq={} detail={}", seq, r.detail);
             throw new IllegalStateException(r.detail != null ? r.detail
-                    : "sendRptSync 调用失败（请核对 API 版本 0.19.4 与回报通道配置）");
+                    : "回报同步失败（OesRptSyncInvoker/v2；请核对 -Pkuangrui 与 rpt 通道）");
         }
         rptSynced.set(true);
+        lastError.set(null);
         log.info("[oes] sendRptSync 完成 lastInMsgSeq={} via {}", seq, r.methodUsed);
     }
 

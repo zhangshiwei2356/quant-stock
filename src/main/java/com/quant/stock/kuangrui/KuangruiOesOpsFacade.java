@@ -95,8 +95,8 @@ public class KuangruiOesOpsFacade {
         try {
             if (!oesReadonlyService.ensureReady()) {
                 m.put("ok", false);
-                m.put("message", "OES 登录/回报同步失败");
                 m.putAll(oesReadonlyService.status());
+                m.put("message", readyFailMessage(m));
                 return m;
             }
             m.putAll(oesReadonlyService.queryTradingDay());
@@ -259,13 +259,16 @@ public class KuangruiOesOpsFacade {
         try {
             if (!oesReadonlyService.ensureReady()) {
                 m.put("ok", false);
-                m.put("message", "OES 登录/回报同步失败");
                 m.putAll(oesReadonlyService.status());
+                m.put("message", readyFailMessage(m));
                 return m;
             }
             Map<String, Object> snap = oesReadonlyService.snapshot();
             m.putAll(snap);
             m.put("ok", Boolean.TRUE.equals(snap.get("ok")) || snap.get("cash") != null);
+            if (Boolean.TRUE.equals(m.get("syncDegraded"))) {
+                m.put("hint", "回报未同步(syncDegraded)，查询结果仍可用；报撤需 rptSynced=true");
+            }
             return m;
         } catch (Exception e) {
             log.warn("[oes-ops] snapshot 失败: {}", e.getMessage());
@@ -292,9 +295,10 @@ public class KuangruiOesOpsFacade {
         }
         try {
             if (!oesReadonlyService.ensureReady()) {
+                Map<String, Object> st = oesReadonlyService.status();
                 m.put("ok", false);
-                m.put("message", "OES 登录/回报同步失败");
-                m.put("broker", oesReadonlyService.status());
+                m.put("message", readyFailMessage(st));
+                m.put("broker", st);
                 m.put("gaps", new ArrayList<Map<String, Object>>());
                 return m;
             }
@@ -513,9 +517,9 @@ public class KuangruiOesOpsFacade {
         try {
             if (!oesReadonlyService.ensureReady()) {
                 m.put("ok", false);
-                m.put("message", "OES 登录/回报同步失败");
                 m.put(key, new ArrayList<Object>());
                 m.putAll(oesReadonlyService.status());
+                m.put("message", readyFailMessage(m));
                 return m;
             }
             Object data = call.call();
@@ -524,14 +528,33 @@ public class KuangruiOesOpsFacade {
             if (data instanceof List) {
                 m.put("count", ((List<?>) data).size());
             }
+            Map<String, Object> st = oesReadonlyService.status();
+            if (Boolean.TRUE.equals(st.get("syncDegraded"))) {
+                m.put("syncDegraded", true);
+                m.put("rptSynced", false);
+                m.put("hint", "回报未同步(syncDegraded)，查询通道结果仍可用；报撤需 rptSynced=true");
+                if (st.get("lastError") != null) {
+                    m.put("lastError", st.get("lastError"));
+                }
+            }
             return m;
         } catch (Exception e) {
             log.warn("[oes-ops] {} 失败: {}", key, e.getMessage());
             m.put("ok", false);
             m.put("message", e.getMessage());
             m.put(key, new ArrayList<Object>());
+            m.putAll(oesReadonlyService.status());
             return m;
         }
+    }
+
+    /** 把 lastError 拼进失败 message，便于联调页一眼看到根因。 */
+    private static String readyFailMessage(Map<String, Object> status) {
+        Object err = status == null ? null : status.get("lastError");
+        if (err != null && String.valueOf(err).trim().length() > 0) {
+            return "OES 未就绪: " + err;
+        }
+        return "OES 登录失败（无 lastError；请确认 -Pkuangrui 重编后启动，出参应含 rptSyncEngine=OesRptSyncInvoker/v2）";
     }
 
     private interface QueryCall {
