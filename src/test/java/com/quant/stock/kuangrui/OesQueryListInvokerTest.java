@@ -58,6 +58,35 @@ class OesQueryListInvokerTest {
         }
     }
 
+    /** 对齐宽睿 0.19 Demo：queryXxx(Filter, QueryMode) → Rsp.getQryItems() */
+    public enum QueryMode {
+        ALL, PAGE
+    }
+
+    public static class CashRsp {
+        private final List<Item> qryItems;
+
+        CashRsp(List<Item> qryItems) {
+            this.qryItems = qryItems;
+        }
+
+        public List<Item> getQryItems() {
+            return qryItems;
+        }
+    }
+
+    public static class ClientQueryModeRsp {
+        public CashRsp queryCashAsset(FilterA f, QueryMode mode) {
+            if (mode == null) {
+                throw new NullPointerException("mode is null");
+            }
+            if (mode != QueryMode.ALL) {
+                return new CashRsp(Collections.<Item>emptyList());
+            }
+            return new CashRsp(Arrays.asList(new Item("cash1"), new Item("cash2")));
+        }
+    }
+
     @Test
     void listReturn_withFilter() {
         OesQueryListInvoker.Result r = OesQueryListInvoker.invoke(
@@ -97,6 +126,19 @@ class OesQueryListInvokerTest {
                 new String[]{FilterA.class.getName()});
         assertTrue(r.ok);
         assertEquals(1, r.list.size());
+    }
+
+    @Test
+    void queryModeAll_unwrapsQryItems() {
+        OesQueryListInvoker.Result r = OesQueryListInvoker.invoke(
+                new ClientQueryModeRsp(),
+                new String[]{"queryCashAsset"},
+                new String[]{FilterA.class.getName()});
+        assertTrue(r.ok, r.detail);
+        assertEquals(2, r.list.size());
+        assertEquals("cash1", ((Item) r.list.get(0)).id);
+        assertTrue(r.methodUsed != null && r.methodUsed.contains("ALL"));
+        assertTrue(r.methodUsed.contains("getQryItems"));
     }
 
     @Test

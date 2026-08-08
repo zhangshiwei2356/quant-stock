@@ -17,8 +17,9 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * 宽睿 OES 查询列表反射适配：兼容 {@code List queryXxx(Filter)}、无参、
- * {@code int queryXxx(Filter, Callback)} 以及数组返回。
+ * 宽睿 OES 查询列表反射适配：兼容资料包 Demo 的
+ * {@code Rsp queryXxx(Filter, QueryMode.ALL)}（再取 {@code getQryItems()}），以及
+ * {@code List queryXxx(Filter)}、无参、{@code int queryXxx(Filter, Callback)}、数组返回。
  */
 @Slf4j
 public final class OesQueryListInvoker {
@@ -178,8 +179,31 @@ public final class OesQueryListInvoker {
 
     private static Result tryTwoArg(Object client, Method m, Object filter, List<String> errors) {
         Class<?>[] pts = m.getParameterTypes();
-        Class<?> cbType = pts[1];
-        // 1) 第二参 null（部分 Cursor/可选回调）
+        Class<?> second = pts[1];
+
+        // 0) Demo 主路径：Filter + QueryMode（枚举，常用 ALL）
+        if (second.isEnum()) {
+            Object mode = resolveQueryMode(second);
+            if (mode == null) {
+                errors.add(formatSig(m) + "#QueryMode: 枚举无可用常量");
+                return Result.fail("QueryMode unresolved");
+            }
+            try {
+                Object ret = m.invoke(client, filter, mode);
+                Result r = coerceListResult(ret, null, formatSig(m) + "#" + String.valueOf(mode));
+                if (r.ok) {
+                    return r;
+                }
+                errors.add(formatSig(m) + "#" + mode + ": " + r.detail);
+            } catch (Exception e) {
+                log.error("OES 查询列表反射调用异常", e);
+                Throwable cause = e.getCause() != null ? e.getCause() : e;
+                errors.add(formatSig(m) + "#" + mode + ": " + cause.getClass().getSimpleName() + " " + safeMsg(cause));
+            }
+            return Result.fail("two-arg QueryMode failed");
+        }
+
+        // 1) 第二参 null（部分 Cursor/可选回调；枚举不可为 null，已在上方分支处理）
         try {
             Object ret = m.invoke(client, filter, null);
             Result r = coerceListResult(ret, null, formatSig(m) + "#cbNull");
@@ -200,11 +224,11 @@ public final class OesQueryListInvoker {
         }
 
         // 2) 回调代理收集
-        if (cbType.isInterface()) {
+        if (second.isInterface()) {
             List<Object> bucket = new CopyOnWriteArrayList<Object>();
             Object cb = Proxy.newProxyInstance(
-                    cbType.getClassLoader(),
-                    new Class[]{cbType},
+                    second.getClassLoader(),
+                    new Class[]{second},
                     new CollectingHandler(bucket));
             try {
                 Object ret = m.invoke(client, filter, cb);
@@ -222,6 +246,20 @@ public final class OesQueryListInvoker {
         return Result.fail("two-arg failed");
     }
 
+    /** 优先 {@code ALL}（资料包 Demo），否则取枚举第一个常量。 */
+    private static Object resolveQueryMode(Class<?> enumType) {
+        Object[] constants = enumType.getEnumConstants();
+        if (constants == null || constants.length == 0) {
+            return null;
+        }
+        for (Object c : constants) {
+            if (c != null && "ALL".equals(((Enum<?>) c).name())) {
+                return c;
+            }
+        }
+        return constants[0];
+    }
+
     private static Result coerceListResult(Object ret, List<?> callbackBucket, String via) {
         if (ret instanceof List) {
             return Result.success((List<?>) ret, via);
@@ -236,6 +274,11 @@ public final class OesQueryListInvoker {
                 list.add(Array.get(ret, i));
             }
             return Result.success(list, via);
+        }
+        // Demo：OesQryCashAssetRsp / OesQryStkHoldingRsp 等 → getQryItems()
+        List<?> fromRsp = unwrapQryItems(ret);
+        if (fromRsp != null) {
+            return Result.success(fromRsp, via + "#getQryItems");
         }
         if (callbackBucket != null && !callbackBucket.isEmpty()) {
             return Result.success(new ArrayList<Object>(callbackBucket), via);
@@ -253,20 +296,66 @@ public final class OesQueryListInvoker {
         return Result.fail("返回类型=" + ret.getClass().getName() + " value=" + ret);
     }
 
+    /**
+     * 从查询应答对象取出明细列表；无对应 getter 时返回 null（非空 List，含 0 条）。
+     */
+    private static List<?> unwrapQryItems(Object rsp) {
+        if (rsp == null) {
+            return null;
+        }
+        String[] getters = {"getQryItems", "getItems", "getCashAssetItems", "getStkHoldingItems",
+                "getOrdItems", "getTrdItems", "getStockItems"};
+        for (String g : getters) {
+            try {
+                Method m = rsp.getClass().getMethod(g);
+                Object v = m.invoke(rsp);
+                if (v instanceof List) {
+                    return (List<?>) v;
+                }
+                if (v instanceof Collection) {
+                    return new ArrayList<Object>((Collection<?>) v);
+                }
+                if (v != null && v.getClass().isArray()) {
+                    int n = Array.getLength(v);
+                    List<Object> list = new ArrayList<Object>(n);
+                    for (int i = 0; i < n; i++) {
+                        list.add(Array.get(v, i));
+                    }
+                    return list;
+                }
+            } catch (NoSuchMethodException ignore) {
+                // 候选 getter 不存在属正常，换下一个
+            } catch (Exception e) {
+                log.error("OES 查询列表反射调用异常", e);
+            }
+        }
+        return null;
+    }
+
     private static List<Object> buildFilters(String[] filterClassCandidates) {
         List<Object> out = new ArrayList<Object>();
         if (filterClassCandidates == null) {
             return out;
         }
+        ClassLoader cl = Thread.currentThread().getContextClassLoader();
+        if (cl == null) {
+            cl = OesQueryListInvoker.class.getClassLoader();
+        }
         for (String cn : filterClassCandidates) {
             if (cn == null || cn.trim().isEmpty()) {
                 continue;
             }
+            String name = cn.trim();
+            // 候选包名探测：不存在则跳过，避免 ClassNotFound 刷屏
+            String resource = name.replace('.', '/') + ".class";
+            if (cl.getResource(resource) == null) {
+                continue;
+            }
             try {
-                Class<?> cl = Class.forName(cn.trim());
-                out.add(cl.getDeclaredConstructor().newInstance());
-            } catch (Exception ignore) {
-                log.error("OES 查询列表反射调用异常", ignore);
+                Class<?> clazz = Class.forName(name, false, cl);
+                out.add(clazz.getDeclaredConstructor().newInstance());
+            } catch (Exception e) {
+                log.error("OES 查询列表反射调用异常", e);
                 // next candidate
             }
         }

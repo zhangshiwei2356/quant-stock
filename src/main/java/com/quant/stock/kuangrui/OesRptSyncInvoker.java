@@ -489,17 +489,24 @@ public final class OesRptSyncInvoker {
         return false;
     }
 
+    /**
+     * 按方法名扫描 setter；本版 {@code OesReportSynchronizationReq} 无 subscribeAll 字段时静默跳过，
+     * 避免 {@code NoSuchMethodException} 误报 ERROR。
+     */
     private static void trySetBoolean(Object target, String setter, boolean value) {
-        try {
-            Method m = target.getClass().getMethod(setter, boolean.class);
-            m.invoke(target, Boolean.valueOf(value));
-        } catch (Exception ignore) {
+        for (Method m : target.getClass().getMethods()) {
+            if (!m.getName().equals(setter) || m.getParameterTypes().length != 1) {
+                continue;
+            }
+            Class<?> pt = m.getParameterTypes()[0];
+            if (pt != boolean.class && pt != Boolean.class) {
+                continue;
+            }
             try {
-                Method m = target.getClass().getMethod(setter, Boolean.class);
                 m.invoke(target, Boolean.valueOf(value));
-            } catch (Exception ignore2) {
-                log.error("OES 回报同步反射调用异常", ignore2);
-                // ignore
+                return;
+            } catch (Exception e) {
+                log.error("OES 回报同步反射调用异常", e);
             }
         }
     }
