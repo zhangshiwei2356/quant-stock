@@ -5023,10 +5023,12 @@
       lastWorkspaceMode = 'pool';
       $('#viewPool').prop('hidden', false);
       if (expandNav) setSideNavOpen('poolBody');
+      $('#poolMenu li').removeClass('active');
+      $('#poolMenu li[data-pool-panel="workspace"]').addClass('active');
       renderStockPicker('pool');
       setTimeout(function () { $('#poolStockQ').trigger('focus'); }, 80);
-      breadcrumbForMode('pool');
-      saveNavSession({ mode: 'pool', panel: '' });
+      breadcrumbForMode('pool', '行情工作台');
+      saveNavSession({ mode: 'pool', panel: 'workspace' });
     }
     resizeCharts();
   }
@@ -7726,9 +7728,15 @@
     showMode(lastWorkspaceMode || 'pool');
   });
 
-  $('#btnEnterPool').on('click', function () {
+  $('#poolMenu').on('click', 'li', function () {
     showMode('pool');
     pushRecentVisit({ key: 'pool', label: '行情浏览', mode: 'pool' });
+  });
+  $('#poolMenu').on('keydown', 'li', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      $(this).trigger('click');
+    }
   });
 
   $('#btnEnterSingle').on('click', function () {

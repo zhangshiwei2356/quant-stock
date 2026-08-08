@@ -22,7 +22,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css?v=20260808-shell-dash"/>
+  <link rel="stylesheet" href="/css/style.css?v=20260808-pool-menu"/>
   <script src="/js/jquery.min.js"></script>
   <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/echarts.min.js"></script>
@@ -78,8 +78,9 @@
             <span class="chevron">▸</span>
           </button>
           <div id="poolBody" class="side-nav-body">
-            <p id="dataHint" class="hint" hidden></p>
-            <button type="button" id="btnEnterPool" class="secondary" style="width:100%;margin-top:6px;">进入行情浏览</button>
+            <ul id="poolMenu" class="side-nav-menu">
+              <li data-pool-panel="workspace" role="button" tabindex="0" id="btnEnterPool">行情工作台</li>
+            </ul>
           </div>
         </div>
 
@@ -324,6 +325,7 @@
     <div id="viewPool" class="workspace-view" hidden>
       <section class="panel">
         <h3>选股 <span class="trade-pool-count" id="poolUniverseCount">0</span></h3>
+        <p id="dataHint" class="hint" hidden></p>
         <p class="hint">输入代码或名称模糊筛选；点击加入下方已开启标签（可多只）。</p>
         <div class="stock-picker" id="poolStockPicker">
           <div class="stock-picker-bar">
@@ -1759,6 +1761,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260808-shell-dash"></script>
+<script src="/js/stock-chart.js?v=20260808-pool-menu"></script>
 </body>
 </html>
