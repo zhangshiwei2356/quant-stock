@@ -22,7 +22,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css?v=20260808-pool-table"/>
+  <link rel="stylesheet" href="/css/style.css?v=20260808-single-bt"/>
   <script src="/js/jquery.min.js"></script>
   <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/echarts.min.js"></script>
@@ -415,90 +415,124 @@
     <!-- 个股回测 -->
     <div id="viewSingle" class="workspace-view" hidden>
       <section class="panel" id="singlePanelWorkspace">
-        <h3>回测标的 <span class="trade-pool-count" id="singleUniverseCount">0</span></h3>
-        <p class="hint">仅从「目标池」选股；代码/名称模糊筛选后点击选定。池空请先到目标池「扫描更新」。</p>
-        <div class="stock-picker" id="singleStockPicker">
-          <div class="stock-picker-bar">
-            <input type="search" id="singleStockQ" class="stock-picker-input" placeholder="搜索：600036 / 招商 / 银行" autocomplete="off"/>
-            <span class="field-hint" id="singleStockMatchHint"></span>
-          </div>
-          <ul class="stock-picker-list" id="singleStockResults"></ul>
-        </div>
-        <div class="selected-stock-bar" id="singleSelectedBar" style="margin-top:12px;">
-          <div>
-            <div class="selected-stock-code" id="singleSelectedCode">未选择</div>
-            <div class="selected-stock-name" id="singleSelectedName">请在上方搜索并选择股票</div>
-          </div>
-          <span class="selected-stock-tag">当前标的</span>
-        </div>
-        <h3>回测参数</h3>
-        <div class="toolbar">
-          <label class="field">股票代码
-            <input id="stockCode" type="text" placeholder="600036" readonly/>
-          </label>
-          <label class="field">K线周期
-            <select id="barPeriod">
-              <option value="DAY" selected>日K</option>
-              <option value="WEEK">周K</option>
-              <option value="MONTH">月K</option>
-              <option value="MIN_60">60分钟</option>
-              <option value="MIN_30">30分钟</option>
-              <option value="MIN_15">15分钟</option>
-              <option value="MIN_5">5分钟</option>
-              <option value="MIN_1">1分钟(末段)</option>
-            </select>
-          </label>
-          <label class="field">回测开始
-            <input id="singleBackStart" type="text" placeholder="yyyy-MM-dd HH:mm:ss"/>
-          </label>
-          <label class="field">回测结束
-            <input id="singleBackEnd" type="text" placeholder="yyyy-MM-dd HH:mm:ss"/>
-          </label>
-          <label class="field">初始资金 <span id="initCapitalHint" class="field-hint">(10万)</span>
-            <input id="initCapital" type="number" value="100000"/>
-          </label>
-          <label class="field">策略 <span class="field-hint">（仅本次回测；overnightGap=session/MIN_1）</span>
-            <select id="singleStrategyId" title="不影响纸面扫描的 quant.active-strategy；隔日高开走旁路会话引擎">
-              <option value="">加载中…</option>
-            </select>
-          </label>
-          <button id="btnLoadKline" class="secondary">加载K线</button>
-          <button id="btnBacktest">执行回测</button>
-          <button id="btnBatch" class="secondary">批量扫描</button>
-        </div>
-        <details class="panel" id="singleOverridePanel" style="margin-top:10px;padding:10px 12px;">
-          <summary style="cursor:pointer;font-weight:600;">本次临时参数（不落库 · 叠在策略包之上）</summary>
-          <p class="hint" style="margin:6px 0 8px;">留空=不覆盖。白名单键与运维可写参数一致。</p>
-          <div class="toolbar" style="flex-wrap:wrap;gap:8px;">
-            <label class="field">佣金费率
-              <input id="btOvFeeRate" type="text" placeholder="如 0.0003"/>
+        <header class="bt-workspace-head">
+          <h3>回测工作台 <span class="trade-pool-count" id="singleUniverseCount">0</span></h3>
+          <p class="hint bt-workspace-hint">仅从「目标池」选股。下拉直选，或搜索池内代码/名称（全量匹配，不截断）。池空请先到目标池「扫描更新」。</p>
+        </header>
+
+        <div class="bt-group" data-bt-group="symbol">
+          <h4 class="bt-group-title">标的信息</h4>
+          <div class="toolbar bt-group-fields">
+            <label class="field">目标池股票
+              <select id="singlePoolSelect" title="从当前目标池选择回测标的">
+                <option value="">加载中…</option>
+              </select>
             </label>
-            <label class="field">ATR止损倍数
-              <input id="btOvAtrStop" type="text" placeholder="如 2.0"/>
+            <label class="field field--grow">搜索筛选
+              <span class="stock-picker stock-picker--compact" id="singleStockPicker">
+                <span class="stock-picker-bar">
+                  <input type="search" id="singleStockQ" class="stock-picker-input" placeholder="池内搜索：600036 / 招商 / 银行" autocomplete="off"/>
+                  <span class="field-hint" id="singleStockMatchHint"></span>
+                </span>
+                <ul class="stock-picker-list stock-picker-list--suggest" id="singleStockResults" hidden></ul>
+              </span>
             </label>
-            <label class="field">单票仓位上限
-              <input id="btOvMaxSingle" type="text" placeholder="如 0.3"/>
+            <label class="field">股票代码
+              <input id="stockCode" type="text" placeholder="600036" readonly/>
             </label>
-            <label class="field">最大持仓日
-              <input id="btOvMaxHold" type="text" placeholder="0=关"/>
-            </label>
-            <label class="field">RSI买入上限
-              <input id="btOvRsiMax" type="text" placeholder="如 60"/>
+            <label class="field">K线周期
+              <select id="barPeriod">
+                <option value="DAY" selected>日K</option>
+                <option value="WEEK">周K</option>
+                <option value="MONTH">月K</option>
+                <option value="MIN_60">60分钟</option>
+                <option value="MIN_30">30分钟</option>
+                <option value="MIN_15">15分钟</option>
+                <option value="MIN_5">5分钟</option>
+                <option value="MIN_1">1分钟(末段)</option>
+              </select>
             </label>
           </div>
-        </details>
-        <p id="singleHint" class="hint" style="margin:8px 0 0;"></p>
-        <div class="metrics" id="btMetrics" style="margin-top:8px;"></div>
-        <div class="metrics" id="singleKlineMeta" style="margin-top:6px;"></div>
+          <div class="selected-stock-bar" id="singleSelectedBar">
+            <div>
+              <div class="selected-stock-code" id="singleSelectedCode">未选择</div>
+              <div class="selected-stock-name" id="singleSelectedName">请从目标池下拉选择，或搜索后点选</div>
+            </div>
+            <span class="selected-stock-tag">当前标的</span>
+          </div>
+        </div>
+
+        <div class="bt-group" data-bt-group="config">
+          <h4 class="bt-group-title">回测配置 <span class="bt-group-sub">时间 / 资金</span></h4>
+          <div class="toolbar bt-group-fields">
+            <label class="field">回测开始
+              <input id="singleBackStart" type="text" placeholder="yyyy-MM-dd HH:mm:ss · 空=全量"/>
+            </label>
+            <label class="field">回测结束
+              <input id="singleBackEnd" type="text" placeholder="yyyy-MM-dd HH:mm:ss · 空=全量"/>
+            </label>
+            <label class="field">初始资金 <span id="initCapitalHint" class="field-hint">(10万)</span>
+              <input id="initCapital" type="number" value="100000"/>
+            </label>
+          </div>
+        </div>
+
+        <div class="bt-group" data-bt-group="strategy">
+          <h4 class="bt-group-title">策略选择</h4>
+          <div class="toolbar bt-group-fields">
+            <label class="field field--wide">策略 <span class="field-hint">（仅本次回测；overnightGap=session/MIN_1）</span>
+              <select id="singleStrategyId" title="不影响纸面扫描的 quant.active-strategy；隔日高开走旁路会话引擎">
+                <option value="">加载中…</option>
+              </select>
+            </label>
+          </div>
+          <details class="bt-override" id="singleOverridePanel">
+            <summary>本次临时参数（不落库 · 叠在策略包之上）</summary>
+            <p class="hint">留空=不覆盖。白名单键与运维可写参数一致。</p>
+            <div class="toolbar bt-group-fields">
+              <label class="field">佣金费率
+                <input id="btOvFeeRate" type="text" placeholder="如 0.0003"/>
+              </label>
+              <label class="field">ATR止损倍数
+                <input id="btOvAtrStop" type="text" placeholder="如 2.0"/>
+              </label>
+              <label class="field">单票仓位上限
+                <input id="btOvMaxSingle" type="text" placeholder="如 0.3"/>
+              </label>
+              <label class="field">最大持仓日
+                <input id="btOvMaxHold" type="text" placeholder="0=关"/>
+              </label>
+              <label class="field">RSI买入上限
+                <input id="btOvRsiMax" type="text" placeholder="如 60"/>
+              </label>
+            </div>
+          </details>
+        </div>
+
+        <div class="bt-actions">
+          <button type="button" id="btnBacktest">执行回测</button>
+          <button type="button" id="btnLoadKline" class="secondary">加载K线</button>
+          <button type="button" id="btnBatch" class="btn-text">批量扫描</button>
+        </div>
+        <p id="singleHint" class="hint"></p>
+        <div class="metrics" id="btMetrics"></div>
+        <div class="metrics" id="singleKlineMeta"></div>
       </section>
-      <section class="charts" id="singlePanelCharts">
-        <div class="panel">
-          <h3>K线与指标</h3>
-          <div id="singleBaseChart" class="chart-box"></div>
-        </div>
-        <div class="panel">
-          <h3>买卖信号</h3>
-          <div id="signalChart" class="chart-box"></div>
+
+      <section class="bt-result-block" id="singlePanelCharts">
+        <header class="bt-result-head">
+          <h3>行情与信号</h3>
+          <p class="hint">加载 K 线或执行回测后展示；左图为标的 K 线与指标，右图为买卖信号。</p>
+        </header>
+        <div class="charts bt-charts">
+          <div class="panel bt-chart-panel">
+            <h4 class="bt-chart-title">K线与指标</h4>
+            <div id="singleBaseChart" class="chart-box chart-box--primary"></div>
+          </div>
+          <div class="panel bt-chart-panel">
+            <h4 class="bt-chart-title">买卖信号</h4>
+            <div id="signalChart" class="chart-box"></div>
+          </div>
         </div>
       </section>
       <section class="panel" id="singleEquityPanel" hidden>
@@ -552,13 +586,15 @@
         </div>
       </section>
       <section class="panel" id="singlePanelBars">
-        <h3>K线明细</h3>
-        <p class="hint" style="margin:0 0 8px;">当前回测区间末尾若干根。</p>
+        <header class="bt-result-head bt-result-head--inline">
+          <h3>K线明细</h3>
+          <p class="hint">当前回测区间末尾若干根</p>
+        </header>
         <div class="table-wrap" style="max-height:240px;">
           <table>
             <thead>
             <tr>
-              <th>时间</th><th>开</th><th>高</th><th>低</th><th>收</th><th>量</th>
+              <th>时间</th><th class="num">开</th><th class="num">高</th><th class="num">低</th><th class="num">收</th><th class="num">量</th>
             </tr>
             </thead>
             <tbody id="singleBarTableBody"></tbody>
@@ -606,7 +642,7 @@
             <input type="checkbox" id="onlyCanBuy"/> 仅可买入
           </label>
         </h3>
-        <p class="hint" style="margin:0 0 8px;">对股票池批量跑回测摘要；可在上方「回测参数」区点击「批量扫描」执行。</p>
+        <p class="hint" style="margin:0 0 8px;">对股票池批量跑回测摘要；可在回测工作台动作区点击「批量扫描」执行。</p>
         <div class="table-wrap">
           <table>
             <thead>
@@ -1799,6 +1835,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260808-pool-table"></script>
+<script src="/js/stock-chart.js?v=20260808-single-bt"></script>
 </body>
 </html>
