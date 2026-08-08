@@ -22,7 +22,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css?v=20260808-st-ux"/>
+  <link rel="stylesheet" href="/css/style.css?v=20260809-kr-ux"/>
   <script src="/js/jquery.min.js"></script>
   <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/echarts.min.js"></script>
@@ -1029,16 +1029,18 @@
     <div id="viewKuangruiOverview" class="workspace-view" hidden>
       <section class="panel">
         <h3>宽睿 · 接入总览</h3>
-        <p class="hint">一眼看 MDS / OES / 报撤 / 静态是否 live。只读须 <code>-Pkuangrui</code> + 开关；报撤另开 <code>order-enabled</code>（仅 yml）。</p>
+        <p class="hint">一眼看 MDS / OES / 报撤 / 静态是否 live。只读须 <code>-Pkuangrui</code> + 开关；报撤另开 <code>order-enabled</code>（仅 yml）。点卡片「进入」跳转点测。</p>
         <div class="toolbar kr-overview-toolbar">
-          <button type="button" id="btnKrOverviewRefresh">刷新状态</button>
+          <button type="button" id="btnKrOverviewRefresh" class="secondary">刷新状态</button>
           <span class="field-hint" id="krOverviewMeta"></span>
-          <span class="kr-overview-jumps">
-            <button type="button" class="secondary" data-kr-jump="account">账号登录</button>
-            <button type="button" class="secondary" data-kr-jump="oes">OES 只读</button>
-            <button type="button" class="secondary" data-kr-jump="mds">MDS 行情</button>
-            <button type="button" class="secondary" data-kr-jump="order">报撤试单</button>
-          </span>
+        </div>
+        <div id="krOverviewVerdict" class="kr-overview-verdict is-off" aria-live="polite">
+          <span class="kr-gate-dot" aria-hidden="true"></span>
+          <div class="kr-overview-verdict-main">
+            <strong id="krOverviewVerdictTitle">接入结论 · 加载中</strong>
+            <p class="hint" id="krOverviewVerdictDetail">正在拉取各通道 status…</p>
+          </div>
+          <div class="kr-overview-cta" id="krOverviewCta"></div>
         </div>
         <div id="krOverviewSummary" class="kr-overview-summary" aria-live="polite"></div>
         <div id="krOverviewCards" class="kr-status-grid"></div>
@@ -1061,21 +1063,21 @@
           <div class="kr-bench-apis" id="krAccCards">
             <div class="kr-api-card" data-kr-acc-api="login" data-kr-intro="account.login">
               <div class="kr-api-card-head">
-                <h4>登录并保存 <code>account/login</code></h4>
+                <h4><span class="kr-api-title">登录并保存</span> <code class="tech-id">account/login</code></h4>
                 <div class="kr-api-card-actions">
                   <button type="button" class="kr-api-intro" data-kr-intro="account.login" title="查看接口说明">介绍</button>
                   <span class="kr-api-method">POST</span>
                 </div>
               </div>
-              <div class="toolbar" style="flex-wrap:wrap;gap:8px;">
-                <label class="field-inline">用户名 <input type="text" id="krAccUser" autocomplete="username" style="width:140px;"/></label>
-                <label class="field-inline">密码 <input type="password" id="krAccPass" autocomplete="current-password" style="width:140px;"/></label>
+              <div class="toolbar kr-api-params">
+                <label class="field-inline">用户名 <input type="text" id="krAccUser" autocomplete="username" class="kr-input-md"/></label>
+                <label class="field-inline">密码 <input type="password" id="krAccPass" autocomplete="current-password" class="kr-input-md"/></label>
                 <button type="button" id="btnKrAccLogin">登录并保存</button>
               </div>
             </div>
             <div class="kr-api-card" data-kr-acc-api="logout" data-kr-intro="account.logout">
               <div class="kr-api-card-head">
-                <h4>清除当前账号 <code>account/logout</code></h4>
+                <h4><span class="kr-api-title">清除当前账号</span> <code class="tech-id">account/logout</code></h4>
                 <div class="kr-api-card-actions">
                   <button type="button" class="kr-api-intro" data-kr-intro="account.logout" title="查看接口说明">介绍</button>
                   <span class="kr-api-method">POST</span>
@@ -1091,6 +1093,13 @@
             <div class="kr-result-head">
               <h4>状态 / 结果</h4>
               <p class="hint" id="krAccResultMeta">登录或清除后在此展示出入参</p>
+            </div>
+            <div class="kr-empty-cta">
+              <p class="hint">尚无操作结果。可先登录验柜，或回总览看通道状态。</p>
+              <div class="toolbar">
+                <button type="button" class="secondary" data-kr-jump="overview">接入总览</button>
+                <button type="button" class="secondary" data-kr-jump="docs">宽睿文档</button>
+              </div>
             </div>
             <div class="kr-result-cols">
               <div class="kr-result-block">
@@ -1124,6 +1133,14 @@
               <h4>调用结果</h4>
               <p class="hint" id="krOesResultMeta">尚未调用 — 点左侧「调用」后在此展示入参/出参</p>
             </div>
+            <div class="kr-empty-cta">
+              <p class="hint">建议：总览确认 OES LIVE → 左侧点「调用」。写操作会二次确认。</p>
+              <div class="toolbar">
+                <button type="button" class="secondary" data-kr-jump="overview">接入总览</button>
+                <button type="button" class="secondary" data-kr-jump="account">账号登录</button>
+                <button type="button" class="secondary" data-kr-jump="docs">宽睿文档</button>
+              </div>
+            </div>
             <div class="kr-result-cols">
               <div class="kr-result-block">
                 <div class="kr-result-label-row">
@@ -1156,6 +1173,13 @@
               <h4>调用结果</h4>
               <p class="hint" id="krMdsResultMeta">尚未调用 — 点左侧「调用」后在此展示入参/出参</p>
             </div>
+            <div class="kr-empty-cta">
+              <p class="hint">建议：总览确认 MDS LIVE → 左侧点「调用」。pull / 订阅等写操作会二次确认。</p>
+              <div class="toolbar">
+                <button type="button" class="secondary" data-kr-jump="overview">接入总览</button>
+                <button type="button" class="secondary" data-kr-jump="docs">宽睿文档</button>
+              </div>
+            </div>
             <div class="kr-result-cols">
               <div class="kr-result-block">
                 <div class="kr-result-label-row">
@@ -1180,71 +1204,93 @@
     <div id="viewKuangruiOrder" class="workspace-view" hidden>
       <section class="panel">
         <h3>宽睿 · 报撤试单</h3>
-        <p class="hint" id="krOrderGateHint">须 <code>orderLive=true</code>（yml 打开 order-enabled + -Pkuangrui）。提交前弹框确认。</p>
+        <div id="krOrderGateBanner" class="kr-gate-banner is-off" aria-live="polite">
+          <span class="kr-gate-dot" aria-hidden="true"></span>
+          <div class="kr-gate-main">
+            <strong id="krOrderGateLabel">报撤闸 · …</strong>
+            <p class="hint" id="krOrderGateHint">须 <code>orderLive=true</code>（yml 打开 order-enabled + -Pkuangrui）。提交前弹框确认。</p>
+          </div>
+        </div>
+        <div class="kr-order-tabs" role="tablist" aria-label="报撤试单分区">
+          <button type="button" class="kr-order-tab is-active" role="tab" aria-selected="true" data-kr-order-tab="place">限价报单</button>
+          <button type="button" class="kr-order-tab" role="tab" aria-selected="false" data-kr-order-tab="cancel">撤单</button>
+          <button type="button" class="kr-order-tab" role="tab" aria-selected="false" data-kr-order-tab="cash">银证转账</button>
+        </div>
         <div class="kr-bench">
           <div class="kr-bench-apis kr-order-forms">
-            <div class="kr-api-card" data-kr-intro="sendOrdReq">
-              <div class="kr-api-card-head">
-                <h4>限价报单 <code>sendOrdReq</code></h4>
-                <div class="kr-api-card-actions">
-                  <button type="button" class="kr-api-intro" data-kr-intro="sendOrdReq" title="查看接口说明">介绍</button>
+            <div class="kr-order-panel" data-kr-order-panel="place">
+              <div class="kr-api-card is-active" data-kr-intro="sendOrdReq">
+                <div class="kr-api-card-head">
+                  <h4><span class="kr-api-title">限价报单</span> <code class="tech-id">sendOrdReq</code></h4>
+                  <div class="kr-api-card-actions">
+                    <button type="button" class="kr-api-intro" data-kr-intro="sendOrdReq" title="查看接口说明">介绍</button>
+                  </div>
                 </div>
-              </div>
-              <p class="hint mono kr-api-path">POST /api/ops/kuangrui/oes/place-test</p>
-              <div class="toolbar kr-api-params">
-                <label class="field-inline">代码 <input type="text" id="krPlaceCode" value="600036" style="width:88px;"/></label>
-                <label class="field-inline">方向
-                  <select id="krPlaceSide"><option value="BUY">BUY</option><option value="SELL">SELL</option></select>
-                </label>
-                <label class="field-inline">价 <input type="number" id="krPlacePrice" step="0.01" value="30" style="width:88px;"/></label>
-                <label class="field-inline">量 <input type="number" id="krPlaceQty" step="100" value="100" style="width:88px;"/></label>
-                <label class="field-inline">clientId <input type="text" id="krPlaceCid" placeholder="可选" style="width:120px;"/></label>
-                <button type="button" id="btnKrPlace">报单试单</button>
+                <p class="hint mono kr-api-path">POST /api/ops/kuangrui/oes/place-test</p>
+                <div class="toolbar kr-api-params">
+                  <label class="field-inline">代码 <input type="text" id="krPlaceCode" value="600036" class="kr-input-sm"/></label>
+                  <label class="field-inline">方向
+                    <select id="krPlaceSide"><option value="BUY">BUY</option><option value="SELL">SELL</option></select>
+                  </label>
+                  <label class="field-inline">价 <input type="number" id="krPlacePrice" step="0.01" value="30" class="kr-input-sm"/></label>
+                  <label class="field-inline">量 <input type="number" id="krPlaceQty" step="100" value="100" class="kr-input-sm"/></label>
+                  <label class="field-inline">clientId <input type="text" id="krPlaceCid" placeholder="可选" class="kr-input-md"/></label>
+                  <button type="button" id="btnKrPlace" class="warn">报单试单</button>
+                </div>
               </div>
             </div>
-            <div class="kr-api-card" data-kr-intro="sendOrdCancelReq">
-              <div class="kr-api-card-head">
-                <h4>撤单 <code>sendOrdCancelReq</code></h4>
-                <div class="kr-api-card-actions">
-                  <button type="button" class="kr-api-intro" data-kr-intro="sendOrdCancelReq" title="查看接口说明">介绍</button>
+            <div class="kr-order-panel" data-kr-order-panel="cancel" hidden>
+              <div class="kr-api-card" data-kr-intro="sendOrdCancelReq">
+                <div class="kr-api-card-head">
+                  <h4><span class="kr-api-title">撤单</span> <code class="tech-id">sendOrdCancelReq</code></h4>
+                  <div class="kr-api-card-actions">
+                    <button type="button" class="kr-api-intro" data-kr-intro="sendOrdCancelReq" title="查看接口说明">介绍</button>
+                  </div>
                 </div>
-              </div>
-              <p class="hint mono kr-api-path">POST /api/ops/kuangrui/oes/cancel-test</p>
-              <div class="toolbar kr-api-params">
-                <label class="field-inline">origClSeqNo <input type="number" id="krCancelSeq" style="width:120px;"/></label>
-                <label class="field-inline">代码 <input type="text" id="krCancelCode" value="600036" style="width:88px;"/></label>
-                <button type="button" id="btnKrCancel" class="secondary">撤单试单</button>
+                <p class="hint mono kr-api-path">POST /api/ops/kuangrui/oes/cancel-test</p>
+                <div class="toolbar kr-api-params">
+                  <label class="field-inline">origClSeqNo <input type="number" id="krCancelSeq" class="kr-input-md"/></label>
+                  <label class="field-inline">代码 <input type="text" id="krCancelCode" value="600036" class="kr-input-sm"/></label>
+                  <button type="button" id="btnKrCancel" class="secondary">撤单试单</button>
+                </div>
               </div>
             </div>
-            <div class="kr-api-card" data-kr-intro="sendCashTrsfReq">
-              <div class="kr-api-card-head">
-                <h4>银证转账 <code>sendCashTrsfReq</code></h4>
-                <div class="kr-api-card-actions">
-                  <button type="button" class="kr-api-intro" data-kr-intro="sendCashTrsfReq" title="查看接口说明">介绍</button>
+            <div class="kr-order-panel" data-kr-order-panel="cash" hidden>
+              <div class="kr-api-card" data-kr-intro="sendCashTrsfReq">
+                <div class="kr-api-card-head">
+                  <h4><span class="kr-api-title">银证转账</span> <code class="tech-id">sendCashTrsfReq</code></h4>
+                  <div class="kr-api-card-actions">
+                    <button type="button" class="kr-api-intro" data-kr-intro="sendCashTrsfReq" title="查看接口说明">介绍</button>
+                  </div>
                 </div>
-              </div>
-              <p class="hint mono kr-api-path">POST /api/ops/kuangrui/oes/cash-transfer-test</p>
-              <p class="hint">真仓运维；不改本地 sim 账本。须 orderLive；提交前弹框确认。密码仅发柜台，不回显。</p>
-              <div class="toolbar kr-api-params">
-                <label class="field-inline">方向
-                  <select id="krCashDirect">
-                    <option value="IN">IN 银行→证券</option>
-                    <option value="OUT" selected>OUT 证券→银行</option>
-                  </select>
-                </label>
-                <label class="field-inline">金额(元) <input type="number" id="krCashAmt" step="0.01" value="100" style="width:100px;"/></label>
-                <label class="field-inline">资金账号 <input type="text" id="krCashAcct" placeholder="可选" style="width:120px;"/></label>
-                <label class="field-inline">类型
-                  <select id="krCashTrsfType">
-                    <option value="BANK" selected>BANK OES↔银行</option>
-                    <option value="COUNTER">COUNTER OES↔主柜</option>
-                    <option value="COUNTER_BANK">COUNTER_BANK 主柜↔银行</option>
-                    <option value="OES_TO_OES">OES_TO_OES</option>
-                  </select>
-                </label>
-                <label class="field-inline">交易密码 <input type="password" id="krCashTrdPwd" autocomplete="off" style="width:100px;"/></label>
-                <label class="field-inline">转账密码 <input type="password" id="krCashTrsfPwd" autocomplete="off" style="width:100px;"/></label>
-                <button type="button" id="btnKrCashTrsf">银证试转</button>
+                <p class="hint mono kr-api-path">POST /api/ops/kuangrui/oes/cash-transfer-test</p>
+                <p class="hint">真仓运维；不改本地 sim 账本。须 orderLive；提交前弹框确认。密码仅发柜台，不回显。</p>
+                <div class="toolbar kr-api-params">
+                  <label class="field-inline">方向
+                    <select id="krCashDirect">
+                      <option value="IN">IN 银行→证券</option>
+                      <option value="OUT" selected>OUT 证券→银行</option>
+                    </select>
+                  </label>
+                  <label class="field-inline">金额(元) <input type="number" id="krCashAmt" step="0.01" value="100" class="kr-input-sm"/></label>
+                  <label class="field-inline">资金账号 <input type="text" id="krCashAcct" placeholder="可选" class="kr-input-md"/></label>
+                  <button type="button" id="btnKrCashTrsf" class="warn">银证试转</button>
+                </div>
+                <details class="kr-adv-params">
+                  <summary>高级参数（类型 / 密码）</summary>
+                  <div class="toolbar kr-api-params">
+                    <label class="field-inline">类型
+                      <select id="krCashTrsfType">
+                        <option value="BANK" selected>BANK OES↔银行</option>
+                        <option value="COUNTER">COUNTER OES↔主柜</option>
+                        <option value="COUNTER_BANK">COUNTER_BANK 主柜↔银行</option>
+                        <option value="OES_TO_OES">OES_TO_OES</option>
+                      </select>
+                    </label>
+                    <label class="field-inline">交易密码 <input type="password" id="krCashTrdPwd" autocomplete="off" class="kr-input-sm"/></label>
+                    <label class="field-inline">转账密码 <input type="password" id="krCashTrsfPwd" autocomplete="off" class="kr-input-sm"/></label>
+                  </div>
+                </details>
               </div>
             </div>
           </div>
@@ -1252,6 +1298,13 @@
             <div class="kr-result-head">
               <h4>调用结果</h4>
               <p class="hint" id="krOrderResultMeta">尚未调用 — 试单后在此展示入参/出参</p>
+            </div>
+            <div class="kr-empty-cta">
+              <p class="hint">高危试单：确认报撤闸 LIVE 后再提交。可先只读点测。</p>
+              <div class="toolbar">
+                <button type="button" class="secondary" data-kr-jump="overview">接入总览</button>
+                <button type="button" class="secondary" data-kr-jump="oes">OES 只读</button>
+              </div>
             </div>
             <div class="kr-result-cols">
               <div class="kr-result-block">
@@ -1271,6 +1324,24 @@
             </div>
           </aside>
         </div>
+      </section>
+    </div>
+
+    <div id="viewKuangruiDocs" class="workspace-view" hidden>
+      <section class="panel kr-docs-panel">
+        <div class="kr-docs-head">
+          <div>
+            <h3>宽睿 · 文档梳理</h3>
+            <p class="hint">资料包 / 手册要点 / M0～M5 计划。与联调页同属「宽睿对接」，不切换文档模式。</p>
+          </div>
+          <div class="toolbar">
+            <button type="button" class="secondary" data-kr-jump="overview">回接入总览</button>
+            <button type="button" id="btnKrDocsReload" class="secondary">重新加载</button>
+          </div>
+        </div>
+        <article id="krDocsBody" class="knowledge-body kr-docs-body">
+          <p class="hint">加载中…</p>
+        </article>
       </section>
     </div>
 
@@ -1892,6 +1963,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260808-st-ux"></script>
+<script src="/js/stock-chart.js?v=20260809-kr-ux"></script>
 </body>
 </html>

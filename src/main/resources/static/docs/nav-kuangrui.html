@@ -4,18 +4,18 @@
   <section class="nav-intro-card">
     <h4><span class="nav-intro-card-tag">二级</span>菜单说明</h4>
     <ul class="nav-intro-list">
-      <li><strong>接入总览</strong>：账号凭据 / MDS / OES / order / static 状态一览</li>
+      <li><strong>接入总览</strong>：接入结论条 + 账号/MDS/OES/报撤/静态状态卡；卡片进入点测</li>
       <li><strong>账号登录</strong>：进入自动展示当前生效账号；验柜成功后加密落库；清除 active 回退 env</li>
-      <li><strong>OES 只读</strong>：左窄列表；「介绍」弹层摘要；右侧入参/出参可复制</li>
+      <li><strong>OES 只读</strong>：左窄列表；「介绍」弹层摘要；入参可展开；右侧入参/出参可复制</li>
       <li><strong>MDS 行情</strong>：同上；pull / subscribe / flush / stop</li>
-      <li><strong>报撤试单</strong>：限价买/卖/撤 + <b>银证试转</b>（含介绍）；仅 <code>orderLive</code>；弹框确认；银证不改 sim 账本</li>
-      <li><strong>宽睿文档梳理</strong>：资料包 / 手册要点 / M0～M5 计划（原「应用说明」下文档迁入本菜单）</li>
+      <li><strong>报撤试单</strong>：报单 / 撤单 / 银证分 Tab；高危按钮橙色；须 <code>orderLive</code> + 弹框确认</li>
+      <li><strong>宽睿文档梳理</strong>：工作台内嵌文档（资料包 / 手册 / M0～M5），不切文档模式</li>
     </ul>
   </section>
   <section class="nav-intro-card nav-intro-card--steps">
     <h4><span class="nav-intro-card-tag">步骤</span>建议流程</h4>
     <ol class="nav-intro-steps">
-      <li>先读「宽睿文档梳理」（含接入面与最新计划），再确认 <code>-Pkuangrui</code> 与 <code>config/kuangrui/local</code></li>
+      <li>先读「宽睿文档梳理」，再确认 <code>-Pkuangrui</code> 与 <code>config/kuangrui/local</code></li>
       <li>「账号登录」验柜入库，或设置 <code>QUANT_KUANGRUI_USER</code> / <code>PASSWORD</code></li>
       <li>先开 <code>kuangrui.enabled</code> + <code>oes.enabled</code> / <code>mds.enabled</code> 做只读点测</li>
       <li>报撤另开 <code>oes.order-enabled=true</code>（仅 yml，非运行参数页）</li>
@@ -24,10 +24,7 @@
 </div>
 <div class="nav-intro-cta">
   <button type="button" class="nav-intro-btn" data-enter-mode="kuangrui" data-kuangrui-panel="overview">进入接入总览</button>
-  <button type="button" class="nav-intro-btn secondary" data-enter-mode="kuangrui" data-kuangrui-panel="account">账号登录</button>
-  <button type="button" class="nav-intro-btn secondary" data-enter-mode="kuangrui" data-kuangrui-panel="oes">OES 只读</button>
-  <button type="button" class="nav-intro-btn secondary" data-enter-mode="kuangrui" data-kuangrui-panel="mds">MDS 行情</button>
-  <button type="button" class="nav-intro-btn secondary" data-enter-mode="kuangrui" data-kuangrui-panel="order">报撤试单</button>
   <button type="button" class="nav-intro-btn secondary" data-enter-mode="kuangrui" data-kuangrui-panel="docs">宽睿文档梳理</button>
+  <button type="button" class="nav-intro-btn secondary" data-enter-mode="kuangrui" data-kuangrui-panel="account">账号登录</button>
 </div>
 <p class="nav-intro-hint">本页为可选模块介绍（顶栏「帮助」可打开）。日常请从侧栏二级菜单或首页入口直接进入功能；点顶栏 Logo 回首页仪表盘。</p>

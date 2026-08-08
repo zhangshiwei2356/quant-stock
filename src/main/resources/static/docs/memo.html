@@ -69,7 +69,7 @@
     <li><b>运维中心</b> — 已落地 · 任务管理（总闸醒目标签；行内启停/执行，配置展开改 cron 含预设；执行一次弹进度框+页内横幅可收起）/ 数据健康（覆盖检查异步进度；待处置告警 vs 特殊项分表；分钟自洽；MDS/TDX 抽样对账）/ 运行参数（白名单可写 + 中文说明；与策略总览职责分离）</li>
     <li><b>策略管理</b> — 已落地 · 一级菜单（运维与数据表之间）；二级「策略总览」：280px 列表 + 综合评分卡/分项网格 + 历史筛选排序；平均夏普仅展示不计入评分；无回测自动/手动目标池补种；按 <code>strategy_id</code> 关联</li>
     <li><b>数据表</b> — 已落地 · MySQL 白名单分页只读浏览；列表/详情展示 information_schema 磁盘占用（数据/索引）</li>
-    <li><b>宽睿对接</b> — 已落地 · 侧栏「扩展与文档」；接入总览 + <b>账号登录</b>（进入自动展示当前账号；验柜→AES 密文；DB active 优先，env 回退；密钥独立表同库）+ OES / MDS / 报撤左窄右宽（接口「介绍」弹层摘要可跳转文档）+ 二级「宽睿文档梳理」；开关基线关、本机 <code>application-local.yml</code>（默认 profile=local）可开；真客户端须 <code>-Pkuangrui</code>；报撤须 <code>orderLive</code>+二次确认</li>
+    <li><b>宽睿对接</b> — 已落地 · 侧栏「扩展与文档」；接入总览（接入结论条）+ <b>账号登录</b>（进入自动展示当前账号；验柜→AES 密文；DB active 优先，env 回退；密钥独立表同库）+ OES / MDS 左窄右宽（介绍弹层、入参可展开、空态引导）+ 报撤分 Tab（高危橙按钮、闸状态条）+ 二级「宽睿文档梳理」工作台内嵌；开关基线关、本机 <code>application-local.yml</code>（默认 profile=local）可开；真客户端须 <code>-Pkuangrui</code>；报撤须 <code>orderLive</code>+二次确认</li>
     <li><b>回测工作台</b> — 已落地 · 行情全市场选股；个股/组合回测<strong>仅从目标池</strong>选股（个股：下拉全量直选 + 池内搜索不截断）；个股二级：回测工作台 / 批量扫描（yml 列表）/ 回测历史；组合二级：回测工作台 / 回测历史；结果含 <code>configFingerprint</code> / <code>atrRisk</code>；历史落库带注册策略 <code>strategy_id</code></li>
     <li><b>ADV 参与率硬顶</b> — 已落地 · <code>quant.max-participation-adv</code> 默认 0.10；买入/死叉卖受限，止损与熔断卖不受限</li>
     <li><b>退出优先级契约</b> — 已落地 · <code>ExitPriority</code>（止损 &gt; 熔断挂卖 &gt; 时间止损 &gt; 死叉）；见交易规则</li>

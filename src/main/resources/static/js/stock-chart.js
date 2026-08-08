@@ -3043,7 +3043,7 @@
   }
 
   function hideAllWorkspaceViews() {
-    $('#viewHome, #viewNavIntro, #viewPool, #viewSingle, #viewPortfolio, #viewTradePool, #viewTpHistory, #viewDbTable, #viewSchedule, #viewStrategy, #viewDataHealth, #viewSysParams, #viewAcctFunds, #viewAcctPositions, #viewAcctOrders, #viewAcctCashflows, #viewAcctRiskLogs, #viewAcctRiskDash, #viewAcctPaperGap, #viewKuangruiOverview, #viewKuangruiAccount, #viewKuangruiOes, #viewKuangruiMds, #viewKuangruiOrder').prop('hidden', true);
+    $('#viewHome, #viewNavIntro, #viewPool, #viewSingle, #viewPortfolio, #viewTradePool, #viewTpHistory, #viewDbTable, #viewSchedule, #viewStrategy, #viewDataHealth, #viewSysParams, #viewAcctFunds, #viewAcctPositions, #viewAcctOrders, #viewAcctCashflows, #viewAcctRiskLogs, #viewAcctRiskDash, #viewAcctPaperGap, #viewKuangruiOverview, #viewKuangruiAccount, #viewKuangruiOes, #viewKuangruiMds, #viewKuangruiOrder, #viewKuangruiDocs').prop('hidden', true);
     $('body').removeClass('home-theme-peek');
     $('#btnExpandHome').prop('hidden', true);
   }
@@ -3177,13 +3177,8 @@
 
   function showKuangruiPanel(panel) {
     panel = panel || lastKuangruiPanel || 'overview';
-    if (panel === 'docs') {
-      lastKuangruiPanel = 'docs';
-      lastWorkspaceMode = 'kuangrui';
-      openKnowledge('kuangrui');
-      return;
-    }
-    if (panel !== 'overview' && panel !== 'account' && panel !== 'oes' && panel !== 'mds' && panel !== 'order') {
+    if (panel !== 'overview' && panel !== 'account' && panel !== 'oes'
+        && panel !== 'mds' && panel !== 'order' && panel !== 'docs') {
       panel = 'overview';
     }
     lastKuangruiPanel = panel;
@@ -3211,16 +3206,57 @@
     } else if (panel === 'order') {
       $('#viewKuangruiOrder').prop('hidden', false);
       ensureKrCopyControls('krOrder');
+      setKrOrderTab(($('#viewKuangruiOrder .kr-order-tab.is-active').attr('data-kr-order-tab')) || 'place');
       refreshKrOrderGate();
+    } else if (panel === 'docs') {
+      $('#viewKuangruiDocs').prop('hidden', false);
+      loadKrDocs(false);
     } else {
       $('#viewKuangruiOverview').prop('hidden', false);
       loadKrOverview();
     }
     breadcrumbForMode('kuangrui', panel === 'account' ? '账号登录'
       : (panel === 'oes' ? 'OES 只读' : (panel === 'mds' ? 'MDS 行情'
-        : (panel === 'order' ? '报撤试单' : '接入总览'))));
+        : (panel === 'order' ? '报撤试单' : (panel === 'docs' ? '宽睿文档梳理' : '接入总览')))));
     saveNavSession({ mode: 'kuangrui', panel: panel });
     resizeCharts();
+  }
+
+  var KR_DOCS_SRC = '/docs/kuangrui.html?v=20260808-plan';
+
+  function loadKrDocs(force) {
+    var $body = $('#krDocsBody');
+    if (!$body.length) return;
+    if (!force && $body.attr('data-loaded') === KR_DOCS_SRC) return;
+    var gen = String(Date.now());
+    $body.attr('data-load-gen', gen).attr('data-loaded', '').html('<p class="hint">加载中…</p>');
+    function render(html) {
+      if ($body.attr('data-load-gen') !== gen) return;
+      $body.attr('data-loaded', KR_DOCS_SRC).html(html || '<p class="hint">暂无内容</p>');
+    }
+    if (!force && knowledgeHtmlCache[KR_DOCS_SRC]) {
+      render(knowledgeHtmlCache[KR_DOCS_SRC]);
+      return;
+    }
+    $.get(KR_DOCS_SRC)
+      .done(function (html) {
+        knowledgeHtmlCache[KR_DOCS_SRC] = html;
+        render(html);
+      })
+      .fail(function () {
+        render('<p class="hint">文档加载失败：' + KR_DOCS_SRC + '</p>');
+      });
+  }
+
+  function setKrOrderTab(tab) {
+    tab = tab || 'place';
+    if (tab !== 'place' && tab !== 'cancel' && tab !== 'cash') tab = 'place';
+    var $view = $('#viewKuangruiOrder');
+    $view.find('.kr-order-tab').removeClass('is-active').attr('aria-selected', 'false');
+    $view.find('.kr-order-tab[data-kr-order-tab="' + tab + '"]').addClass('is-active').attr('aria-selected', 'true');
+    $view.find('.kr-order-panel').prop('hidden', true);
+    var $panel = $view.find('.kr-order-panel[data-kr-order-panel="' + tab + '"]').prop('hidden', false);
+    krMarkActiveCard($panel.find('.kr-api-card').first());
   }
 
   function krPretty(obj) {
@@ -3617,11 +3653,18 @@
     $('#krIntroModal').prop('hidden', true);
   }
 
-  function openKrApiIntro(introKey) {
+  function openKrApiIntro(introKey, $from) {
     var info = KR_API_INTROS[introKey];
     if (!info) {
       toast('暂无该接口介绍', 'info');
       return;
+    }
+    if ($from && $from.length) {
+      var $card = $from.closest('.kr-api-card');
+      if ($card.length) krMarkActiveCard($card);
+    } else {
+      var $match = $('.kr-api-card[data-kr-intro="' + introKey + '"]').first();
+      if ($match.length) krMarkActiveCard($match);
     }
     var titleHtml = escHtml(info.title || '接口介绍');
     if (info.sdk) {
@@ -3651,7 +3694,10 @@
     var introKey = krIntroKeyForApi(a, channel);
     var $card = $('<div class="kr-api-card"/>').attr('data-kr-intro', introKey);
     var $hd = $('<div class="kr-api-card-head"/>');
-    $hd.append($('<h4/>').html(escHtml(a.title) + ' <code>' + escHtml(a.sdk) + '</code>'));
+    $hd.append($('<h4/>').html(
+      '<span class="kr-api-title">' + escHtml(a.title) + '</span> '
+      + '<code class="tech-id">' + escHtml(a.sdk) + '</code>'
+    ));
     var $actions = $('<div class="kr-api-card-actions"/>');
     var $intro = $('<button type="button" class="kr-api-intro"/>')
       .attr('data-kr-intro', introKey)
@@ -3662,19 +3708,34 @@
     $hd.append($actions);
     $card.append($hd);
     $card.append($('<p class="hint mono kr-api-path"/>').text(a.method + ' ' + a.path));
-    if (a.code) {
-      $card.append($('<div class="toolbar kr-api-params"/>')
-        .append($('<label class="field-inline"/>').html('代码 <input type="text" class="kr-code" value="600036" style="width:88px;"/>')));
-    }
-    if (a.tradable) {
-      $card.append($('<div class="toolbar kr-api-params"/>')
-        .append($('<label class="field-inline"/>').html('代码 <input type="text" class="kr-code" value="600036" style="width:88px;"/>'))
-        .append($('<label class="field-inline"/>').html('方向 <select class="kr-side"><option value="BUY">BUY</option><option value="SELL">SELL</option></select>'))
-        .append($('<label class="field-inline"/>').html('价格 <input type="text" class="kr-price" value="10.00" style="width:72px;"/>')));
-    }
-    if (a.cashAcct) {
-      $card.append($('<div class="toolbar kr-api-params"/>')
-        .append($('<label class="field-inline"/>').html('资金账号 <input type="text" class="kr-cash-acct" placeholder="可选" style="width:120px;"/>')));
+    var needParams = !!(a.code || a.tradable || a.cashAcct);
+    if (needParams) {
+      var $wrap = $('<details class="kr-api-params-wrap"/>');
+      $wrap.append($('<summary/>').text('入参（可选展开）'));
+      var $tb = $('<div class="toolbar kr-api-params"/>');
+      if (a.code) {
+        $tb.append($('<label class="field-inline"/>').html(
+          '代码 <input type="text" class="kr-code kr-input-sm" value="600036"/>'
+        ));
+      }
+      if (a.tradable) {
+        $tb.append($('<label class="field-inline"/>').html(
+          '代码 <input type="text" class="kr-code kr-input-sm" value="600036"/>'
+        ));
+        $tb.append($('<label class="field-inline"/>').html(
+          '方向 <select class="kr-side"><option value="BUY">BUY</option><option value="SELL">SELL</option></select>'
+        ));
+        $tb.append($('<label class="field-inline"/>').html(
+          '价格 <input type="text" class="kr-price kr-input-sm" value="10.00"/>'
+        ));
+      }
+      if (a.cashAcct) {
+        $tb.append($('<label class="field-inline"/>').html(
+          '资金账号 <input type="text" class="kr-cash-acct kr-input-md" placeholder="可选"/>'
+        ));
+      }
+      $wrap.append($tb);
+      $card.append($wrap);
     }
     $btn.on('click', function () {
       var data = undefined;
@@ -3935,9 +3996,8 @@
       }
 
       if (slot.panel && slot.panel !== 'overview') {
-        var goLabel = slot.key === 'Account' ? '查询账号 / 登录' : '进入点测';
         var $go = $('<button type="button" class="secondary kr-status-go"/>')
-          .text(goLabel)
+          .text(slot.key === 'Account' ? '前往账号' : '进入点测')
           .attr('data-kr-jump', slot.panel);
         $c.append($go);
       }
@@ -3947,10 +4007,14 @@
     function paintSummary() {
       $chips.empty();
       var on = 0;
+      var anyErr = false;
+      var anyLoad = false;
       slots.forEach(function (s) {
         var r = results[s.key];
         var live = r && r.state === 'ok' ? pickLive(s, r.data) : null;
         if (live) on++;
+        if (r && r.state === 'err') anyErr = true;
+        if (!r || r.state === 'load') anyLoad = true;
         var cls = 'kr-chip';
         var t = s.key + ' · —';
         if (!r || r.state === 'load') {
@@ -3968,9 +4032,81 @@
         }
         $chips.append($('<span/>').attr('class', cls).text(t));
       });
+
+      var accR = results.Account;
+      var hasCred = !!(accR && accR.state === 'ok' && accR.data && boolish(accR.data.hasCred));
+      var oesLive = !!(results.OES && results.OES.state === 'ok' && pickLive(slots[2], results.OES.data));
+      var mdsLive = !!(results.MDS && results.MDS.state === 'ok' && pickLive(slots[1], results.MDS.data));
+      var orderLiveNow = !!(results.Order && results.Order.state === 'ok' && pickLive(slots[3], results.Order.data));
+
+      var verdictCls = 'is-off';
+      var verdictTitle = '旁路关闭 / 未就绪';
+      var verdictDetail = '当前均为 noop。请确认 -Pkuangrui 与 yml 开关，并准备账号凭据。';
+      var ctas = [];
+      if (anyLoad && on === 0 && !anyErr) {
+        verdictCls = 'is-off';
+        verdictTitle = '接入结论 · 加载中';
+        verdictDetail = '正在拉取各通道 status…';
+      } else if (orderLiveNow) {
+        verdictCls = 'is-live';
+        verdictTitle = '可报撤';
+        verdictDetail = 'orderLive 已开；试单仍会二次确认。建议先只读对账再试报撤。';
+        ctas = [
+          { panel: 'order', label: '去报撤试单', primary: true },
+          { panel: 'oes', label: 'OES 只读', primary: false }
+        ];
+      } else if (oesLive || mdsLive) {
+        verdictCls = 'is-read';
+        verdictTitle = '可联调（只读）';
+        verdictDetail = '已 live ' + on + '/' + slots.length + ' 项。可点测 OES/MDS；报撤仍须打开 order-enabled。';
+        ctas = [
+          { panel: oesLive ? 'oes' : 'mds', label: oesLive ? 'OES 只读' : 'MDS 行情', primary: true },
+          { panel: 'docs', label: '宽睿文档', primary: false }
+        ];
+      } else if (hasCred) {
+        verdictCls = 'is-warn';
+        verdictTitle = '有账号 · 通道未 live';
+        verdictDetail = '凭据已就绪，但 MDS/OES 仍旁路。检查 -Pkuangrui 与 enabled 开关。';
+        ctas = [
+          { panel: 'oes', label: 'OES 点测', primary: true },
+          { panel: 'docs', label: '宽睿文档', primary: false }
+        ];
+      } else if (anyErr) {
+        verdictCls = 'is-err';
+        verdictTitle = '状态拉取异常';
+        verdictDetail = '部分 status 失败；请确认服务已启动且宽睿运维接口可达。';
+        ctas = [
+          { panel: 'docs', label: '宽睿文档', primary: false },
+          { panel: 'account', label: '账号登录', primary: false }
+        ];
+      } else {
+        ctas = [
+          { panel: 'account', label: '账号登录', primary: true },
+          { panel: 'docs', label: '宽睿文档', primary: false }
+        ];
+      }
+
+      var $verdict = $('#krOverviewVerdict')
+        .removeClass('is-live is-read is-warn is-err is-off')
+        .addClass(verdictCls);
+      $('#krOverviewVerdictTitle').text(verdictTitle);
+      $('#krOverviewVerdictDetail').text(verdictDetail);
+      var $cta = $('#krOverviewCta').empty();
+      ctas.forEach(function (c) {
+        $cta.append(
+          $('<button type="button"/>')
+            .addClass(c.primary ? '' : 'secondary')
+            .attr('data-kr-jump', c.panel)
+            .text(c.label)
+        );
+      });
+      if (!$verdict.length) {
+        /* 兼容旧 DOM */
+      }
+
       var tip = on === 0
-        ? '当前均为旁路关闭（noop）。要真连柜台请用 -Pkuangrui 并打开对应开关。'
-        : ('已 live ' + on + '/' + slots.length + ' 项；可点下方卡片或右上快捷入口进入点测。');
+        ? '卡片「进入」可跳转点测；建议：文档 → 账号 → 只读 → 报撤。'
+        : ('已 live ' + on + '/' + slots.length + ' 项；点下方卡片进入点测。');
       $sum.find('.kr-overview-tip').remove();
       $sum.append($('<p class="kr-overview-tip"/>').text(tip));
     }
@@ -4020,7 +4156,7 @@
     } else if (src === 'env') {
       $src.addClass('kr-pill--on').text('来源 环境变量');
     } else {
-      $src.addClass('kr-pill--off').text('来源 无');
+      $src.addClass('kr-pill--mute').text('来源 无');
     }
     var meta = has
       ? ('生效账号 ' + user + (d.lastLoginAt ? ' · 最近验柜 ' + d.lastLoginAt : ''))
@@ -4100,16 +4236,20 @@
     $.getJSON('/api/ops/kuangrui/oes/order-status').done(function (d) {
       krOrderLive = !!(d && d.orderLive);
       var hint = (d && (d.hint || d.orderHint || d.message)) || '';
+      $('#krOrderGateBanner').toggleClass('is-on', krOrderLive).toggleClass('is-off', !krOrderLive);
+      $('#krOrderGateLabel').text(krOrderLive ? '报撤闸 · LIVE' : '报撤闸 · OFF');
       $('#krOrderGateHint').html(
         krOrderLive
-          ? 'orderLive=<b>true</b>，可试单（仍会弹框确认）。'
-          : 'orderLive=<b>false</b>，试单按钮禁用。' + (hint ? ' ' + hint : '')
+          ? 'orderLive=<b>true</b>，可试单（仍会弹框确认）。高危操作请核对代码/数量/金额。'
+          : 'orderLive=<b>false</b>，试单按钮禁用。' + (hint ? ' ' + escHtml(hint) : '')
           + ' 开关：<code>quant.kuangrui.oes.order-enabled</code>（yml，默认 false）。'
       );
       $('#btnKrPlace, #btnKrCancel, #btnKrCashTrsf').prop('disabled', !krOrderLive);
     }).fail(function () {
       krOrderLive = false;
       $('#btnKrPlace, #btnKrCancel, #btnKrCashTrsf').prop('disabled', true);
+      $('#krOrderGateBanner').removeClass('is-on').addClass('is-off');
+      $('#krOrderGateLabel').text('报撤闸 · 未知');
       $('#krOrderGateHint').text('无法读取 order-status');
     });
   }
@@ -6366,6 +6506,11 @@
   }
 
   function openKnowledge(id) {
+    // 宽睿文档梳理改为 workspace 内嵌，避免切 mode-doc 丢联调台
+    if (id === 'kuangrui') {
+      showKuangruiPanel('docs');
+      return;
+    }
     var topic = null;
     for (var i = 0; i < knowledgeTopics.length; i++) {
       if (knowledgeTopics[i].id === id) { topic = knowledgeTopics[i]; break; }
@@ -6560,14 +6705,19 @@
     }
   });
   $('#btnKrOverviewRefresh').on('click', function () { loadKrOverview(); });
-  $('#viewKuangruiOverview').on('click', '[data-kr-jump]', function () {
+  $(document).on('click', '[data-kr-jump]', function (e) {
+    e.preventDefault();
     showKuangruiPanel($(this).attr('data-kr-jump') || 'overview');
   });
+  $('#viewKuangruiOrder').on('click', '.kr-order-tab', function () {
+    setKrOrderTab($(this).attr('data-kr-order-tab') || 'place');
+  });
+  $('#btnKrDocsReload').on('click', function () { loadKrDocs(true); });
 
   $(document).on('click', '.kr-api-intro', function (e) {
     e.preventDefault();
     e.stopPropagation();
-    openKrApiIntro($(this).attr('data-kr-intro'));
+    openKrApiIntro($(this).attr('data-kr-intro'), $(this));
   });
   $('#btnKrIntroClose, #btnKrIntroCloseX').on('click', function () {
     closeKrApiIntro();
