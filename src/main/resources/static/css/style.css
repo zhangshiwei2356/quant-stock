@@ -3737,7 +3737,7 @@ tbody tr:hover { background: var(--row-hover); }
   min-height: 2.5em;
 }
 .kr-result-head h4 {
-  margin: 0;
+  margin: 0 0 4px;
   font-size: 15px;
 }
 .kr-result-head-row {

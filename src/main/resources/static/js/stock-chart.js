@@ -2521,37 +2521,20 @@
     try { return JSON.stringify(obj == null ? null : obj, null, 2); } catch (e) { return String(obj); }
   }
 
-  /** 确保结果区有复制按钮（旧缓存 HTML / 空态隐藏时也能点到）。 */
+  /** 确保入参/出参旁有复制按钮；结果头不再放「复制出参」（避免重复）。 */
   function ensureKrCopyControls(prefix) {
     var $panel = $('#' + prefix + 'Result');
     if (!$panel.length) return;
-    var $head = $panel.find('.kr-result-head').first();
-    if ($head.length) {
-      var $row = $head.children('.kr-result-head-row');
-      if (!$row.length) {
-        var $h4 = $head.children('h4').first();
-        if ($h4.length) {
-          $row = $('<div class="kr-result-head-row"/>');
-          $h4.before($row);
-          $row.append($h4);
-        } else {
-          $row = $('<div class="kr-result-head-row"/>').prependTo($head);
-          $row.append($('<h4/>').text('调用结果'));
-        }
+    // 去掉结果头上的重复复制按钮（历史 HTML / 旧逻辑可能留下）
+    $panel.find('.kr-result-head [data-kr-copy="' + prefix + 'Rsp"]').remove();
+    var $headRow = $panel.find('.kr-result-head .kr-result-head-row');
+    if ($headRow.length) {
+      var $h4 = $headRow.children('h4').first();
+      if ($h4.length) {
+        $headRow.before($h4);
       }
-      if (!$row.find('[data-kr-copy="' + prefix + 'Rsp"]').length) {
-        $row.append(
-          $('<button type="button" class="kr-copy-btn kr-copy-btn--rsp"/>')
-            .attr('data-kr-copy', prefix + 'Rsp')
-            .attr('title', '复制出参 JSON')
-            .text('复制出参')
-        );
-      } else {
-        $row.find('[data-kr-copy="' + prefix + 'Rsp"]')
-          .addClass('kr-copy-btn kr-copy-btn--rsp')
-          .text(function (_i, t) {
-            return (t && String(t).indexOf('出参') >= 0) ? t : '复制出参';
-          });
+      if ($headRow.children().length === 0) {
+        $headRow.remove();
       }
     }
     [
