@@ -41,7 +41,7 @@ public class BacktestStrategyIdBackfillService {
             Map<String, Object> r = backfill();
             log.info("回测 strategy_id 补全: {}", r);
         } catch (Exception e) {
-            log.warn("回测 strategy_id 补全失败: {}", e.getMessage());
+            log.error("回测 strategy_id 补全失败: {}", e.getMessage(), e);
         }
     }
 

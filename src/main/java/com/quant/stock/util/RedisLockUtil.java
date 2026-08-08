@@ -56,7 +56,7 @@ public class RedisLockUtil {
                 }
                 return false;
             } catch (Exception e) {
-                log.warn("Redis锁失败，降级本地锁: {}", e.getMessage());
+                log.error("Redis锁失败，降级本地锁: {}", e.getMessage(), e);
             }
         }
         ReentrantLock lock = localLocks.computeIfAbsent(lockKey, k -> new ReentrantLock());
@@ -94,7 +94,7 @@ public class RedisLockUtil {
                     stringRedisTemplate.delete(lockKey);
                 }
             } catch (Exception e) {
-                log.debug("Redis解锁失败: {}", e.getMessage());
+                log.error("Redis解锁失败: {}", e.getMessage(), e);
             }
         }
     }

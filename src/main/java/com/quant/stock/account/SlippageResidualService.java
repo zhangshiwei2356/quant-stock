@@ -1,5 +1,7 @@
 package com.quant.stock.account;
 
+
+import lombok.extern.slf4j.Slf4j;
 import com.quant.stock.config.QuantProperties;
 import com.quant.stock.trade.TradeCostModel;
 import org.springframework.stereotype.Service;
@@ -16,6 +18,7 @@ import java.util.Map;
  * 纸面滑点/费用残差日报（P0-99）：相对委托价与 TradeCostModel 费用模型。
  * 不回写改价；只出报告供校准决策。
  */
+@Slf4j
 @Service
 public class SlippageResidualService {
 
@@ -126,6 +129,7 @@ public class SlippageResidualService {
         try {
             return new BigDecimal(String.valueOf(o));
         } catch (Exception e) {
+            log.error("滑点残差异常", e);
             return BigDecimal.ZERO;
         }
     }
@@ -137,6 +141,7 @@ public class SlippageResidualService {
         try {
             return Integer.parseInt(String.valueOf(o));
         } catch (Exception e) {
+            log.error("滑点残差异常", e);
             return 0;
         }
     }

@@ -1,5 +1,7 @@
 package com.quant.stock.pdf;
 
+
+import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -20,6 +22,7 @@ import java.util.Map;
 /**
  * 将 static/docs 下知识/应用说明合并为服务端 PDF。
  */
+@Slf4j
 @Service
 public class DocsPdfService {
 
@@ -115,6 +118,7 @@ public class DocsPdfService {
             }
             return StreamUtils.copyToString(res.getInputStream(), StandardCharsets.UTF_8);
         } catch (Exception e) {
+            log.error("文档 PDF 服务异常", e);
             return "<p>（文档读取失败：" + esc(fileName) + "）</p>";
         }
     }

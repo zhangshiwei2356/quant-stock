@@ -260,7 +260,7 @@ public class StrategyTask {
                 }
                 accountRiskState.importState(m);
             } catch (Exception e) {
-                log.warn("恢复风控状态失败: {}", e.getMessage());
+                log.error("恢复风控状态失败: {}", e.getMessage(), e);
             }
         }
         String retJson = ledger.loadConfigOrNull(LiveLedgerService.KEY_RETIREMENT);
@@ -273,7 +273,7 @@ public class StrategyTask {
                 }
                 strategyRetirementService.importState(m);
             } catch (Exception e) {
-                log.warn("恢复退役状态失败: {}", e.getMessage());
+                log.error("恢复退役状态失败: {}", e.getMessage(), e);
             }
         }
         String booksJson = ledger.loadConfigOrNull(LiveLedgerService.KEY_BOOKS_META);
@@ -303,6 +303,7 @@ public class StrategyTask {
                         try {
                             book.sessionState.hold = HoldDayState.valueOf(hold);
                         } catch (Exception ignore) {
+                            log.error("纸面策略任务异常", ignore);
                             book.sessionState.hold = HoldDayState.FLAT;
                         }
                     }
@@ -310,7 +311,7 @@ public class StrategyTask {
                     book.sessionState.sessionDay = sd == null || sd.isEmpty() ? null : LocalDate.parse(sd);
                 }
             } catch (Exception e) {
-                log.warn("恢复挂单/金字塔元数据失败: {}", e.getMessage());
+                log.error("恢复挂单/金字塔元数据失败: {}", e.getMessage(), e);
             }
         }
     }
@@ -356,7 +357,7 @@ public class StrategyTask {
             }
             ledger.saveConfig(LiveLedgerService.KEY_BOOKS_META, JSONUtil.toJsonStr(meta), "模拟挂单与金字塔元数据");
         } catch (Exception e) {
-            log.warn("落库运行时状态失败: {}", e.getMessage());
+            log.error("落库运行时状态失败: {}", e.getMessage(), e);
         }
     }
 
@@ -370,8 +371,8 @@ public class StrategyTask {
             ledger.persistTradeState(simCash, order, signalDate, executionDate, fee,
                     code, book == null ? null : book.pos);
         } catch (Exception e) {
-            log.warn("账本落库失败 code={} order={}: {}", code,
-                    order == null ? null : order.getOrderId(), e.getMessage());
+            log.error("账本落库失败 code={} order={}: {}", code,
+                    order == null ? null : order.getOrderId(), e.getMessage(), e);
         }
     }
 
@@ -1108,7 +1109,7 @@ public class StrategyTask {
         try {
             ledger.upsertOrder(order, signalDate, executionDate, fee);
         } catch (Exception e) {
-            log.warn("委托落库失败 order={}: {}", order.getOrderId(), e.getMessage());
+            log.error("委托落库失败 order={}: {}", order.getOrderId(), e.getMessage(), e);
         }
     }
 
@@ -1160,7 +1161,7 @@ public class StrategyTask {
                 try {
                     marketDataService.fetchAndPersistMinute(code);
                 } catch (Exception e) {
-                    log.warn("收盘落库失败 code={}: {}", code, e.getMessage());
+                    log.error("收盘落库失败 code={}: {}", code, e.getMessage(), e);
                 }
             }
             log.info("收盘清算/1分钟落库完成 tradeDay={}", tradeDay);
@@ -1353,6 +1354,7 @@ public class StrategyTask {
                 return bars.get(bars.size() - 1).getClose();
             }
         } catch (Exception ignored) {
+            log.error("纸面策略任务异常", ignored);
             // fall through
         }
         LiveBook book = books.get(code);

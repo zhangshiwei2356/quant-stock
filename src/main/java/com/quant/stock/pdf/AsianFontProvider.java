@@ -1,5 +1,7 @@
 package com.quant.stock.pdf;
 
+
+import lombok.extern.slf4j.Slf4j;
 import com.itextpdf.text.BaseColor;
 import com.itextpdf.text.Font;
 import com.itextpdf.text.pdf.BaseFont;
@@ -8,6 +10,7 @@ import com.itextpdf.tool.xml.XMLWorkerFontProvider;
 /**
  * 中文字体（与 zsw-utils / zulin 相同：itext-asian STSong-Light）。
  */
+@Slf4j
 public class AsianFontProvider extends XMLWorkerFontProvider {
 
     /** 为 HTML 转 PDF 提供 STSong-Light 中文字体，失败时回退默认字体。 */
@@ -22,6 +25,7 @@ public class AsianFontProvider extends XMLWorkerFontProvider {
             }
             return font;
         } catch (Exception e) {
+            log.error("PDF 中文字体加载失败，回退默认字体", e);
             return super.getFont(fontname, encoding, embedded, size, style, color);
         }
     }

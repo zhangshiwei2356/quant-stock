@@ -1,5 +1,7 @@
 package com.quant.stock.admin;
 
+
+import lombok.extern.slf4j.Slf4j;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.quant.stock.config.QuantProperties;
@@ -11,6 +13,7 @@ import java.util.Map;
 /**
  * 单次回测/组合回测的临时参数覆盖：仅白名单键，不落库、不影响全局与策略包。
  */
+@Slf4j
 public final class RunParamOverrides {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -29,6 +32,7 @@ public final class RunParamOverrides {
                     });
             return normalize(raw);
         } catch (Exception e) {
+            log.error("运行参数覆盖应用异常", e);
             throw new IllegalArgumentException("paramOverrides JSON 非法: " + e.getMessage());
         }
     }

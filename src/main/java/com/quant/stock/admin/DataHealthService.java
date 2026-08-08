@@ -127,7 +127,7 @@ public class DataHealthService {
                         state.message = e.getMessage() == null ? "覆盖检查失败" : e.getMessage();
                         state.summary = "覆盖检查失败：" + state.message;
                         state.detail = state.summary;
-                        log.warn("数据健康覆盖检查失败: {}", state.message);
+                        log.error("数据健康覆盖检查失败: {}", state.message, e);
                     } finally {
                         state.running = false;
                         state.finishedAt = LocalDateTime.now();
@@ -398,7 +398,7 @@ public class DataHealthService {
                         return null;
                     });
         } catch (Exception e) {
-            log.warn("批量加载 market_daily 汇总失败，将回退逐只查询: {}", e.getMessage());
+            log.error("批量加载 market_daily 汇总失败，将回退逐只查询: {}", e.getMessage(), e);
         }
         return map;
     }
@@ -441,7 +441,7 @@ public class DataHealthService {
                         });
             }
         } catch (Exception e) {
-            log.warn("批量加载 market_1min 汇总失败: {}", e.getMessage());
+            log.error("批量加载 market_1min 汇总失败: {}", e.getMessage(), e);
         }
         return map;
     }

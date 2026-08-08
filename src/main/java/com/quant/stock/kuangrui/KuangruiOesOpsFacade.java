@@ -105,7 +105,7 @@ public class KuangruiOesOpsFacade {
             }
             return m;
         } catch (Exception e) {
-            log.warn("[oes-ops] tradingDay 失败: {}", e.getMessage());
+            log.error("[oes-ops] tradingDay 失败: {}", e.getMessage(), e);
             m.put("ok", false);
             m.put("message", e.getMessage());
             return m;
@@ -168,7 +168,7 @@ public class KuangruiOesOpsFacade {
             m.put("clientOrderId", cid);
             return m;
         } catch (Exception e) {
-            log.warn("[oes-ops] placeTest 失败: {}", e.getMessage());
+            log.error("[oes-ops] placeTest 失败: {}", e.getMessage(), e);
             m.put("ok", false);
             m.put("message", e.getMessage());
             return m;
@@ -200,7 +200,7 @@ public class KuangruiOesOpsFacade {
             m.put("message", sent ? "撤单请求已发出（非柜台最终确认）" : "撤单请求失败");
             return m;
         } catch (Exception e) {
-            log.warn("[oes-ops] cancelTest 失败: {}", e.getMessage());
+            log.error("[oes-ops] cancelTest 失败: {}", e.getMessage(), e);
             m.put("ok", false);
             m.put("message", e.getMessage());
             return m;
@@ -271,7 +271,7 @@ public class KuangruiOesOpsFacade {
             }
             return m;
         } catch (Exception e) {
-            log.warn("[oes-ops] snapshot 失败: {}", e.getMessage());
+            log.error("[oes-ops] snapshot 失败: {}", e.getMessage(), e);
             m.put("ok", false);
             m.put("message", e.getMessage());
             return m;
@@ -310,7 +310,7 @@ public class KuangruiOesOpsFacade {
             m.put("gapCount", gaps.size());
             return m;
         } catch (Exception e) {
-            log.warn("[oes-ops] reconcile 失败: {}", e.getMessage());
+            log.error("[oes-ops] reconcile 失败: {}", e.getMessage(), e);
             m.put("ok", false);
             m.put("message", e.getMessage());
             m.put("gaps", new ArrayList<Map<String, Object>>());
@@ -358,7 +358,7 @@ public class KuangruiOesOpsFacade {
                 }
             }
         } catch (Exception e) {
-            log.warn("[oes-reconcile] job={} 失败: {}", jobCode, e.getMessage());
+            log.error("[oes-reconcile] job={} 失败: {}", jobCode, e.getMessage(), e);
         }
     }
 
@@ -544,7 +544,7 @@ public class KuangruiOesOpsFacade {
             }
             return m;
         } catch (Exception e) {
-            log.warn("[oes-ops] {} 失败: {}", key, e.getMessage());
+            log.error("[oes-ops] {} 失败: {}", key, e.getMessage(), e);
             m.put("ok", false);
             m.put("message", e.getMessage());
             m.put(key, new ArrayList<Object>());

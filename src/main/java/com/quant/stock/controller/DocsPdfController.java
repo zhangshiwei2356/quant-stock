@@ -1,5 +1,7 @@
 package com.quant.stock.controller;
 
+
+import lombok.extern.slf4j.Slf4j;
 import com.quant.stock.pdf.DocsPdfService;
 import com.quant.stock.pdf.DocsReadmeService;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +22,7 @@ import java.util.Map;
 /**
  * 文档：PDF 导出 + README 在线查看。
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/docs")
 @RequiredArgsConstructor
@@ -38,6 +41,7 @@ public class DocsPdfController {
                     .contentType(new MediaType("text", "html", StandardCharsets.UTF_8))
                     .body(html);
         } catch (Exception e) {
+            log.error("文档 PDF 导出异常", e);
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "README 渲染失败: " + e.getMessage());
         }
@@ -57,8 +61,10 @@ public class DocsPdfController {
                     .contentLength(bytes.length)
                     .body(bytes);
         } catch (IllegalArgumentException e) {
+            log.error("文档 PDF 导出异常", e);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         } catch (Exception e) {
+            log.error("文档 PDF 导出异常", e);
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "PDF 生成失败: " + e.getMessage());
         }

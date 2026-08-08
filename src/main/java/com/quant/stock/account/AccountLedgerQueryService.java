@@ -1,5 +1,7 @@
 package com.quant.stock.account;
 
+
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -17,6 +19,7 @@ import java.util.Map;
 /**
  * 账户落库只读查询：委托、权益日结、风控事件。
  */
+@Slf4j
 @Service
 @ConditionalOnProperty(prefix = "quant", name = "db-enabled", havingValue = "true")
 public class AccountLedgerQueryService {
@@ -69,6 +72,7 @@ public class AccountLedgerQueryService {
             }
             return out;
         } catch (Exception e) {
+            log.error("账本查询异常", e);
             return new ArrayList<Map<String, Object>>();
         }
     }
@@ -129,6 +133,7 @@ public class AccountLedgerQueryService {
             }
             return out;
         } catch (Exception e) {
+            log.error("账本查询异常", e);
             return new ArrayList<Map<String, Object>>();
         }
     }
@@ -155,6 +160,7 @@ public class AccountLedgerQueryService {
             }
             return out;
         } catch (Exception e) {
+            log.error("账本查询异常", e);
             return new ArrayList<Map<String, Object>>();
         }
     }

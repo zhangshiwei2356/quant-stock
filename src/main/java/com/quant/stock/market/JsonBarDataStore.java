@@ -174,7 +174,7 @@ public class JsonBarDataStore {
             log.info("加载JSON {} {} bars={} {}ms", code, period, list.size(), System.currentTimeMillis() - t0);
             return list;
         } catch (Exception e) {
-            log.warn("加载JSON失败 {}: {}", path, e.getMessage());
+            log.error("加载JSON失败 {}: {}", path, e.getMessage(), e);
             return Collections.emptyList();
         }
     }

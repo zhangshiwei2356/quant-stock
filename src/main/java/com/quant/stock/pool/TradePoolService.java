@@ -209,7 +209,7 @@ public class TradePoolService {
             }
             return m;
         } catch (Exception e) {
-            log.warn("解析目标池报告 JSON 失败 id={}: {}", reportId, e.getMessage());
+            log.error("解析目标池报告 JSON 失败 id={}: {}", reportId, e.getMessage(), e);
             return null;
         }
     }
@@ -351,6 +351,7 @@ public class TradePoolService {
                         continue;
                     }
                 } catch (Exception ignored) {
+                    log.error("目标池服务异常", ignored);
                     // 日期异常不拦截
                 }
             }
@@ -384,7 +385,7 @@ public class TradePoolService {
                 }
             }
         } catch (Exception e) {
-            log.warn("读取 factor_daily 失败，跳过因子粗筛: {}", e.getMessage());
+            log.error("读取 factor_daily 失败，跳过因子粗筛: {}", e.getMessage(), e);
             return codes;
         }
         if (latest.isEmpty()) {
@@ -464,6 +465,7 @@ public class TradePoolService {
             try {
                 out.put("reportFileName", Paths.get(reportPath).getFileName().toString());
             } catch (Exception ignored) {
+                log.error("目标池服务异常", ignored);
                 // leave unset
             }
         }
@@ -512,6 +514,7 @@ public class TradePoolService {
         try {
             return Files.readAllBytes(file);
         } catch (Exception e) {
+            log.error("目标池服务异常", e);
             throw new IllegalArgumentException("读取报告失败: " + e.getMessage());
         }
     }
@@ -536,7 +539,7 @@ public class TradePoolService {
                         });
                 log.info("[pool-rebuild] factor_daily 预刷新 {}", factorRefresh);
             } catch (Exception e) {
-                log.warn("[pool-rebuild] factor_daily 预刷新失败，继续扫池: {}", e.getMessage());
+                log.error("[pool-rebuild] factor_daily 预刷新失败，继续扫池: {}", e.getMessage(), e);
             }
         }
         jobProgressHub.phase("running", "执行中", "入池：粗筛与扫描…");
@@ -601,7 +604,7 @@ public class TradePoolService {
                 Map<String, Object> bf = tdxScriptBackfillService.backfillPoolMinuteAsync();
                 out.put("minuteBackfill", bf);
             } catch (Exception e) {
-                log.warn("[pool-rebuild] 池内分钟异步回填提交失败: {}", e.getMessage());
+                log.error("[pool-rebuild] 池内分钟异步回填提交失败: {}", e.getMessage(), e);
                 Map<String, Object> bf = new LinkedHashMap<String, Object>();
                 bf.put("ok", false);
                 bf.put("message", e.getMessage());
@@ -725,7 +728,7 @@ public class TradePoolService {
                 log.info("已补齐列 {}.{}", table, column);
             }
         } catch (Exception e) {
-            log.warn("检查/补齐列 {}.{} 失败: {}", table, column, e.getMessage());
+            log.error("检查/补齐列 {}.{} 失败: {}", table, column, e.getMessage(), e);
         }
     }
 
@@ -771,7 +774,7 @@ public class TradePoolService {
             log.info("目标池分析报告已写入 {}", file.toAbsolutePath());
             return file.toAbsolutePath().toString();
         } catch (Exception e) {
-            log.warn("写目标池报告失败: {}", e.getMessage());
+            log.error("写目标池报告失败: {}", e.getMessage(), e);
             return null;
         }
     }

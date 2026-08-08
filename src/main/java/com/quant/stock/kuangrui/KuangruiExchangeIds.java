@@ -1,9 +1,12 @@
 package com.quant.stock.kuangrui;
 
+
+import lombok.extern.slf4j.Slf4j;
 /**
  * A 股代码 → 宽睿交易所枚举数值（与资料包 {@code MdsExchangeId} 一致）：
  * 1=上交所 / 2=深交所 / 3=北交所。
  */
+@Slf4j
 public final class KuangruiExchangeIds {
 
     public static final int SSE = 1;
@@ -49,6 +52,7 @@ public final class KuangruiExchangeIds {
         try {
             return Integer.parseInt(c);
         } catch (NumberFormatException e) {
+            log.error("宽睿交易所 ID 解析异常", e);
             return 0;
         }
     }

@@ -229,7 +229,7 @@ public class DynamicScheduleService implements ApplicationRunner {
                 log.info("入池任务互斥：启用 {} 已自动关闭 {}", jobCode, peer);
             }
         } catch (Exception e) {
-            log.debug("入池互斥检查跳过: {}", e.getMessage());
+            log.error("入池互斥检查跳过: {}", e.getMessage(), e);
         }
     }
 
@@ -289,6 +289,7 @@ public class DynamicScheduleService implements ApplicationRunner {
                 jobProgressHub.attach(new ManualRunProgressListener(state));
                 manualRunExecutor.submit(new ManualRunTask(state, jobCode));
             } catch (RuntimeException e) {
+                log.error("动态调度异常", e);
                 // 避免 set 成功但提交失败留下永远「已受理/排队中」的僵尸任务
                 jobProgressHub.detach();
                 state.running = false;
@@ -397,6 +398,7 @@ public class DynamicScheduleService implements ApplicationRunner {
                 return job.getJobName();
             }
         } catch (Exception ignored) {
+            log.error("动态调度异常", ignored);
             // fall through
         }
         return jobCode;
@@ -525,7 +527,7 @@ public class DynamicScheduleService implements ApplicationRunner {
                 state.message = e.getMessage() == null ? "执行失败" : e.getMessage();
                 state.summary = "「" + state.jobName + "」失败：" + state.message;
                 state.detail = state.summary;
-                log.warn("手动任务后台失败 {}: {}", jobCode, state.message);
+                log.error("手动任务后台失败 {}: {}", jobCode, state.message, e);
             } finally {
                 jobProgressHub.detach();
                 state.running = false;
@@ -570,6 +572,7 @@ public class DynamicScheduleService implements ApplicationRunner {
         try {
             CronExpression.parse(job.getCronExpr().trim());
         } catch (Exception e) {
+            log.error("动态调度异常", e);
             throw new IllegalArgumentException("非法 cron 表达式: " + e.getMessage());
         }
     }

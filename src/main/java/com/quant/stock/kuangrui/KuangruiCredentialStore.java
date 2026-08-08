@@ -91,7 +91,7 @@ public class KuangruiCredentialStore {
                 log.warn("[kuangrui-cred] active 账号解密失败，回退环境变量");
             }
         } catch (Exception e) {
-            log.warn("[kuangrui-cred] 读库失败，回退环境变量: {}", e.getMessage());
+            log.error("[kuangrui-cred] 读库失败，回退环境变量: {}", e.getMessage(), e);
         }
         String user = trimToNull(System.getenv("QUANT_KUANGRUI_USER"));
         String pass = trimToNull(System.getenv("QUANT_KUANGRUI_PASSWORD"));
@@ -158,6 +158,7 @@ public class KuangruiCredentialStore {
                 lastLoginOk = rows.get(0).get("last_login_ok");
             }
         } catch (Exception ignore) {
+            log.error("宽睿凭证存取异常", ignore);
             // ignore
         }
         m.put("hasDbAccount", Boolean.valueOf(hasDb));
@@ -212,6 +213,7 @@ public class KuangruiCredentialStore {
             log.info("[kuangrui-cred] 已生成主密钥并写入 kuangrui_crypto_key");
             return key;
         } catch (Exception e) {
+            log.error("宽睿凭证存取异常", e);
             throw new IllegalStateException("生成宽睿主密钥失败: " + e.getMessage(), e);
         }
     }
@@ -228,6 +230,7 @@ public class KuangruiCredentialStore {
                     Base64.getEncoder().encodeToString(enc),
                     Base64.getEncoder().encodeToString(iv));
         } catch (Exception e) {
+            log.error("宽睿凭证存取异常", e);
             throw new IllegalStateException("加密失败: " + e.getMessage(), e);
         }
     }
@@ -244,7 +247,7 @@ public class KuangruiCredentialStore {
             cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(GCM_TAG_BITS, iv));
             return new String(cipher.doFinal(enc), StandardCharsets.UTF_8);
         } catch (Exception e) {
-            log.warn("[kuangrui-cred] 解密失败: {}", e.getMessage());
+            log.error("[kuangrui-cred] 解密失败: {}", e.getMessage(), e);
             return null;
         }
     }

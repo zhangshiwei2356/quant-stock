@@ -1,5 +1,7 @@
 package com.quant.stock.config;
 
+
+import lombok.extern.slf4j.Slf4j;
 import com.quant.stock.risk.ShortSellPolicy;
 
 import java.math.BigDecimal;
@@ -17,6 +19,7 @@ import java.util.Map;
  * 关键约束：输出格式 {@code v1:<16位hex>}；{@link #canonical(QuantProperties, String, BigDecimal)} 键序稳定，便于单测与对照实验。
  * </p>
  */
+@Slf4j
 public final class ConfigFingerprint {
 
     private ConfigFingerprint() {
@@ -158,6 +161,7 @@ public final class ConfigFingerprint {
             }
             return hex.toString();
         } catch (Exception e) {
+            log.error("配置指纹计算异常", e);
             return "0000000000000000";
         }
     }

@@ -1,5 +1,7 @@
 package com.quant.stock.admin;
 
+
+import lombok.extern.slf4j.Slf4j;
 import com.quant.stock.config.QuantProperties;
 import com.quant.stock.market.BarPeriod;
 import com.quant.stock.market.MarketDataService;
@@ -24,6 +26,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * 行情自洽闸（原 P0-107 多源对账）：在仅 {@code market_1min} 真相源下，
  * 检查 1 分钟覆盖/滞后/稀疏日/OHLC 合法性；外部双源仍 {@code UNAVAILABLE}。
  */
+@Slf4j
 @Service
 public class DataReconcileGateService {
 
@@ -204,6 +207,7 @@ public class DataReconcileGateService {
             row.put("diverged", diverged);
             row.put("issues", issues);
         } catch (Exception e) {
+            log.error("数据对账门禁异常", e);
             row.put("diverged", true);
             row.put("skip", e.getMessage());
             issues.add("校验异常: " + e.getMessage());

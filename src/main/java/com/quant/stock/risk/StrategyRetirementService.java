@@ -1,5 +1,7 @@
 package com.quant.stock.risk;
 
+
+import lombok.extern.slf4j.Slf4j;
 import com.quant.stock.calendar.TradingCalendar;
 import com.quant.stock.config.QuantProperties;
 import org.springframework.stereotype.Service;
@@ -15,6 +17,7 @@ import java.util.UUID;
  * 策略退役与冷却（P0-92）：预注册停机状态，禁新开；冷却满后方可 resume。
  * 强制恢复需双人复核（两步令牌），不改金叉信号逻辑。
  */
+@Slf4j
 @Service
 public class StrategyRetirementService {
 
@@ -194,6 +197,7 @@ public class StrategyRetirementService {
             try {
                 retiredOn = LocalDate.parse(on.trim());
             } catch (Exception e) {
+                log.error("策略退役状态解析异常", e);
                 retiredOn = null;
             }
         }

@@ -1,5 +1,7 @@
 package com.quant.stock.pdf;
 
+
+import lombok.extern.slf4j.Slf4j;
 import com.itextpdf.text.Document;
 import com.itextpdf.text.PageSize;
 import com.itextpdf.text.pdf.PdfWriter;
@@ -14,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 /**
  * HTML → PDF（对齐 zulin {@code PdfFileUtils.saveChinesePdf}）。
  */
+@Slf4j
 public final class HtmlPdfExporter {
 
     private HtmlPdfExporter() {
@@ -40,11 +43,13 @@ public final class HtmlPdfExporter {
                     Charset.forName("UTF-8"),
                     new AsianFontProvider());
         } catch (Exception e) {
+            log.error("HTML 转 PDF 异常", e);
             throw new IllegalStateException("HTML 转 PDF 失败: " + e.getMessage(), e);
         } finally {
             try {
                 document.close();
             } catch (Exception ignored) {
+                log.error("HTML 转 PDF 异常", ignored);
                 // ignore
             }
         }

@@ -112,7 +112,7 @@ public class MarketSourceSampleReconcileService {
                 }
             }
         } catch (Exception e) {
-            log.warn("抽样对账读取目标池失败: {}", e.getMessage());
+            log.error("抽样对账读取目标池失败: {}", e.getMessage(), e);
         }
         for (String src : new String[]{MarketDataSources.MDS, MarketDataSources.TDX}) {
             try {
@@ -129,7 +129,7 @@ public class MarketSourceSampleReconcileService {
                     }
                 }
             } catch (Exception e) {
-                log.warn("抽样对账读取 {} 标的失败: {}", src, e.getMessage());
+                log.error("抽样对账读取 {} 标的失败: {}", src, e.getMessage(), e);
             }
         }
         return new ArrayList<String>(ordered);
@@ -203,7 +203,7 @@ public class MarketSourceSampleReconcileService {
                         return null;
                     });
         } catch (Exception e) {
-            log.warn("抽样对账统计 {} {} 失败: {}", code, source, e.getMessage());
+            log.error("抽样对账统计 {} {} 失败: {}", code, source, e.getMessage(), e);
         }
         return s;
     }
@@ -260,7 +260,7 @@ public class MarketSourceSampleReconcileService {
             ov.warnBars = warn;
             ov.avgCloseDiffBp = n <= 0 ? 0 : (int) Math.round(sumBp * 1.0 / n);
         } catch (Exception e) {
-            log.warn("抽样对账重叠比较 {} 失败: {}", code, e.getMessage());
+            log.error("抽样对账重叠比较 {} 失败: {}", code, e.getMessage(), e);
         }
         return ov;
     }
@@ -275,6 +275,7 @@ public class MarketSourceSampleReconcileService {
         try {
             return new BigDecimal(String.valueOf(v));
         } catch (Exception e) {
+            log.error("行情抽样对账异常", e);
             return null;
         }
     }

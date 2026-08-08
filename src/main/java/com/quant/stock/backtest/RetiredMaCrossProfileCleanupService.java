@@ -64,7 +64,7 @@ public class RetiredMaCrossProfileCleanupService {
             Map<String, Object> r = cleanup();
             log.info("下线金叉对照画像清理: {}", r);
         } catch (Exception e) {
-            log.warn("下线金叉对照画像清理失败: {}", e.getMessage());
+            log.error("下线金叉对照画像清理失败: {}", e.getMessage(), e);
         }
     }
 
@@ -161,7 +161,7 @@ public class RetiredMaCrossProfileCleanupService {
                     reset = true;
                 }
             } catch (Exception e) {
-                log.warn("重置激活策略配置失败: {}", e.getMessage());
+                log.error("重置激活策略配置失败: {}", e.getMessage(), e);
             }
         }
         return reset;

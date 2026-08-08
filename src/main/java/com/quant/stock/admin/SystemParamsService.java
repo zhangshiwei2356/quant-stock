@@ -68,7 +68,7 @@ public class SystemParamsService {
                 applyToProps(e.getKey(), e.getValue());
                 n++;
             } catch (Exception ex) {
-                log.warn("忽略非法运行参数覆盖 {}={}: {}", e.getKey(), e.getValue(), ex.getMessage());
+                log.error("忽略非法运行参数覆盖 {}={}: {}", e.getKey(), e.getValue(), ex.getMessage(), ex);
             }
         }
         if (n > 0) {
@@ -165,6 +165,7 @@ public class SystemParamsService {
                 persistProp(key, WritableParamApplier.formatStored(key, raw));
                 applied.add(key);
             } catch (Exception ex) {
+                log.error("系统运行参数异常", ex);
                 errors.add(key + ": " + ex.getMessage());
             }
         }
@@ -227,7 +228,7 @@ public class SystemParamsService {
                 out.put(key, val == null ? "" : String.valueOf(val));
             }
         } catch (Exception e) {
-            log.warn("读取 quant.prop.* 失败: {}", e.getMessage());
+            log.error("读取 quant.prop.* 失败: {}", e.getMessage(), e);
         }
         return out;
     }
@@ -334,6 +335,7 @@ public class SystemParamsService {
                 out.add(m);
             }
         } catch (Exception ignored) {
+            log.error("系统运行参数异常", ignored);
             // empty
         }
         return out;

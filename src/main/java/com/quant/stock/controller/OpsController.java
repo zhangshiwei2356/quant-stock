@@ -1,5 +1,7 @@
 package com.quant.stock.controller;
 
+
+import lombok.extern.slf4j.Slf4j;
 import com.quant.stock.admin.ActiveStrategyService;
 import com.quant.stock.admin.DataHealthService;
 import com.quant.stock.admin.DataReconcileGateService;
@@ -37,6 +39,7 @@ import java.util.Map;
 /**
  * 运维：数据健康、运行参数、分钟行情自洽、激活策略切换。
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/ops")
 @RequiredArgsConstructor
@@ -89,6 +92,7 @@ public class OpsController {
         try {
             return svc.startAsync();
         } catch (IllegalStateException e) {
+            log.error("运维接口异常", e);
             throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
         }
     }
@@ -273,6 +277,7 @@ public class OpsController {
             try {
                 version = Integer.valueOf(String.valueOf(body.get("version")));
             } catch (Exception ignored) {
+                log.error("运维接口异常", ignored);
                 // leave null
             }
         }
@@ -745,6 +750,7 @@ public class OpsController {
         try {
             return Integer.valueOf(String.valueOf(o).trim());
         } catch (Exception e) {
+            log.error("运维接口异常", e);
             return null;
         }
     }
@@ -762,6 +768,7 @@ public class OpsController {
         try {
             return new BigDecimal(String.valueOf(o).trim());
         } catch (Exception e) {
+            log.error("运维接口异常", e);
             return null;
         }
     }

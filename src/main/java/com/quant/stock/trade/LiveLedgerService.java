@@ -50,7 +50,7 @@ public class LiveLedgerService {
             }
             return new BigDecimal(rows.get(0).trim());
         } catch (Exception e) {
-            log.warn("读取模拟现金失败: {}", e.getMessage());
+            log.error("读取模拟现金失败: {}", e.getMessage(), e);
             return null;
         }
     }
@@ -60,7 +60,7 @@ public class LiveLedgerService {
         try {
             doSaveCash(cash);
         } catch (Exception e) {
-            log.warn("保存模拟现金失败: {}", e.getMessage());
+            log.error("保存模拟现金失败: {}", e.getMessage(), e);
         }
     }
 
@@ -80,7 +80,7 @@ public class LiveLedgerService {
         try {
             doUpsertOrder(order, signalDate, executionDate, fee);
         } catch (Exception e) {
-            log.warn("保存委托失败 {}: {}", order == null ? null : order.getOrderId(), e.getMessage());
+            log.error("保存委托失败 {}: {}", order == null ? null : order.getOrderId(), e.getMessage(), e);
         }
     }
 
@@ -89,7 +89,7 @@ public class LiveLedgerService {
         try {
             doUpsertPosition(symbol, pos);
         } catch (Exception e) {
-            log.warn("保存持仓失败 {}: {}", symbol, e.getMessage());
+            log.error("保存持仓失败 {}: {}", symbol, e.getMessage(), e);
         }
     }
 
@@ -248,7 +248,7 @@ public class LiveLedgerService {
                 }
             }
         } catch (Exception e) {
-            log.warn("加载持仓失败: {}", e.getMessage());
+            log.error("加载持仓失败: {}", e.getMessage(), e);
         }
         return map;
     }
@@ -281,7 +281,7 @@ public class LiveLedgerService {
                     drawdownRate,
                     consecutiveLossCount);
         } catch (Exception e) {
-            log.warn("保存权益日表失败: {}", e.getMessage());
+            log.error("保存权益日表失败: {}", e.getMessage(), e);
         }
     }
 
@@ -302,7 +302,7 @@ public class LiveLedgerService {
                     key.trim(), value == null ? "" : value,
                     description == null ? key : description);
         } catch (Exception e) {
-            log.warn("保存配置失败 {}: {}", key, e.getMessage());
+            log.error("保存配置失败 {}: {}", key, e.getMessage(), e);
         }
     }
 
@@ -321,7 +321,7 @@ public class LiveLedgerService {
             }
             return rows.get(0);
         } catch (Exception e) {
-            log.warn("读取配置失败 {}: {}", key, e.getMessage());
+            log.error("读取配置失败 {}: {}", key, e.getMessage(), e);
             return null;
         }
     }
@@ -358,7 +358,7 @@ public class LiveLedgerService {
                 list.add(row);
             }
         } catch (Exception e) {
-            log.warn("加载未完结委托失败: {}", e.getMessage());
+            log.error("加载未完结委托失败: {}", e.getMessage(), e);
         }
         return list;
     }

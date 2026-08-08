@@ -1,5 +1,7 @@
 package com.quant.stock.admin;
 
+
+import lombok.extern.slf4j.Slf4j;
 import com.quant.stock.config.QuantProperties;
 
 import java.util.concurrent.Callable;
@@ -7,6 +9,7 @@ import java.util.concurrent.Callable;
 /**
  * 线程内生效参数快照：纸面扫描 / 回测入口安装，策略与风控通过 {@link #current} 读取。
  */
+@Slf4j
 public final class ParamsScope {
 
     private static final ThreadLocal<QuantProperties> TL = new ThreadLocal<QuantProperties>();
@@ -39,8 +42,10 @@ public final class ParamsScope {
         try {
             return action.call();
         } catch (RuntimeException e) {
+            log.error("线程内参数快照执行异常", e);
             throw e;
         } catch (Exception e) {
+            log.error("线程内参数快照执行异常", e);
             throw new IllegalStateException(e);
         } finally {
             if (prev != null) {

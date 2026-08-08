@@ -216,7 +216,7 @@ public class TdxScriptBackfillService {
                             }
                         }
                     } catch (Exception e) {
-                        log.warn("[tdx-script] 读输出失败: {}", e.getMessage());
+                        log.error("[tdx-script] 读输出失败: {}", e.getMessage(), e);
                     }
                 }
             }, "tdx-script-stdout-" + tag);
@@ -243,7 +243,7 @@ public class TdxScriptBackfillService {
         } catch (Exception e) {
             out.put("ok", false);
             out.put("message", e.getMessage());
-            log.warn("[tdx-script] 执行失败 tag={}: {}", tag, e.getMessage());
+            log.error("[tdx-script] 执行失败 tag={}: {}", tag, e.getMessage(), e);
             rememberFinished(out);
             return out;
         } finally {
@@ -267,6 +267,7 @@ public class TdxScriptBackfillService {
                 progressIndex = Integer.parseInt(matcher.group(1));
                 progressTotal = Integer.parseInt(matcher.group(2));
             } catch (NumberFormatException ignored) {
+                log.error("通达信脚本回填异常", ignored);
                 // keep previous
             }
         }
@@ -306,6 +307,7 @@ public class TdxScriptBackfillService {
                         progressIndex = 0;
                     }
                 } catch (NumberFormatException ignored) {
+                    log.error("通达信脚本回填异常", ignored);
                     // ignore
                 }
             }
@@ -332,6 +334,7 @@ public class TdxScriptBackfillService {
                     progressIndex = Integer.parseInt(sm.group(1));
                     progressTotal = Integer.parseInt(sm.group(2));
                 } catch (NumberFormatException ignored) {
+                    log.error("通达信脚本回填异常", ignored);
                     // ignore
                 }
             }

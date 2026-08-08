@@ -1,5 +1,7 @@
 package com.quant.stock.controller;
 
+
+import lombok.extern.slf4j.Slf4j;
 import com.quant.stock.backtest.BackTestAnalysisStore;
 import com.quant.stock.backtest.BackTestEngine;
 import com.quant.stock.backtest.BackTestHistoryStore;
@@ -40,6 +42,7 @@ import java.util.Map;
 /**
  * 行情与单股回测 REST：K 线、数据概览、回测执行及历史/分析查询。
  */
+@Slf4j
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
@@ -120,6 +123,7 @@ public class StockController {
         try {
             barPeriod = BarPeriod.valueOf(period.toUpperCase());
         } catch (Exception e) {
+            log.error("行情/回测接口异常", e);
             barPeriod = BarPeriod.DAY;
         }
         List<BarDTO> bars = marketDataService.getKline(code, barPeriod, start, end);
@@ -203,6 +207,7 @@ public class StockController {
         try {
             barPeriod = BarPeriod.valueOf(period.toUpperCase());
         } catch (Exception e) {
+            log.error("行情/回测接口异常", e);
             barPeriod = BarPeriod.DAY;
         }
         List<BarDTO> bars = marketDataService.getKline(code, barPeriod, backStart, backEnd);

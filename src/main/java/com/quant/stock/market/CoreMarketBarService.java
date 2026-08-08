@@ -58,7 +58,7 @@ public class CoreMarketBarService {
                 log.info("market_1min 存量 data_source 标为 TDX，更新行数={}", n);
             }
         } catch (Exception e) {
-            log.warn("market_1min data_source 回填跳过: {}", e.getMessage());
+            log.error("market_1min data_source 回填跳过: {}", e.getMessage(), e);
         }
     }
 
@@ -84,7 +84,7 @@ public class CoreMarketBarService {
                             + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 "
                             + "COMMENT='日线行情(全市场选股真相源)'");
         } catch (Exception e) {
-            log.warn("ensure market_daily 失败: {}", e.getMessage());
+            log.error("ensure market_daily 失败: {}", e.getMessage(), e);
         }
     }
 
@@ -100,7 +100,7 @@ public class CoreMarketBarService {
             jdbcTemplate.execute(alterSql);
             log.info("market_1min 已增加列 {}", column);
         } catch (Exception e) {
-            log.warn("market_1min ensureColumn {} 失败: {}", column, e.getMessage());
+            log.error("market_1min ensureColumn {} 失败: {}", column, e.getMessage(), e);
         }
     }
 
@@ -116,7 +116,7 @@ public class CoreMarketBarService {
             jdbcTemplate.execute(alterSql);
             log.info("market_1min 已增加索引 {}", indexName);
         } catch (Exception e) {
-            log.warn("market_1min ensureIndex {} 失败: {}", indexName, e.getMessage());
+            log.error("market_1min ensureIndex {} 失败: {}", indexName, e.getMessage(), e);
         }
     }
 

@@ -1,5 +1,7 @@
 package com.quant.stock.kuangrui;
 
+
+import lombok.extern.slf4j.Slf4j;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -20,6 +22,7 @@ import java.util.Set;
  * </ul>
  * 配置里 {@code subcribeEnvId≤0} 表示订阅全部环境号回报。
  */
+@Slf4j
 public final class OesRptSyncInvoker {
 
     private static final int[] ENV_CANDIDATES = {0, 1, 99};
@@ -76,6 +79,7 @@ public final class OesRptSyncInvoker {
             try {
                 m.setAccessible(true);
             } catch (Exception ignore) {
+                log.error("OES 回报同步反射调用异常", ignore);
                 // ignore
             }
             signatures.add(formatSig(m));
@@ -221,6 +225,7 @@ public final class OesRptSyncInvoker {
                 }
                 return Result.success(formatSig(m));
             } catch (Exception e) {
+                log.error("OES 回报同步反射调用异常", e);
                 Throwable cause = e.getCause() != null ? e.getCause() : e;
                 errors.add(formatSig(m) + ": " + cause.getClass().getSimpleName()
                         + " " + safeMsg(cause));
@@ -257,8 +262,10 @@ public final class OesRptSyncInvoker {
                 }
                 return Result.success(formatSig(m));
             } catch (NoSuchMethodException ignore) {
+                log.error("OES 回报同步反射调用异常", ignore);
                 // next
             } catch (Exception e) {
+                log.error("OES 回报同步反射调用异常", e);
                 Throwable cause = e.getCause() != null ? e.getCause() : e;
                 errors.add(name + "(): " + cause.getClass().getSimpleName() + " " + safeMsg(cause));
             }
@@ -287,6 +294,7 @@ public final class OesRptSyncInvoker {
                     }
                     return Result.success(formatSig(m) + "@env=" + envId);
                 } catch (Exception e) {
+                    log.error("OES 回报同步反射调用异常", e);
                     Throwable cause = e.getCause() != null ? e.getCause() : e;
                     errors.add(formatSig(m) + ": " + cause.getClass().getSimpleName() + " " + safeMsg(cause));
                 }
@@ -371,6 +379,7 @@ public final class OesRptSyncInvoker {
                 return req;
             }
         } catch (Exception ignore) {
+            log.error("OES 回报同步反射调用异常", ignore);
             // not a bean req
         }
         return null;
@@ -473,6 +482,7 @@ public final class OesRptSyncInvoker {
                 m.invoke(target, arg);
                 return true;
             } catch (Exception ignore) {
+                log.error("OES 回报同步反射调用异常", ignore);
                 // try next
             }
         }
@@ -488,6 +498,7 @@ public final class OesRptSyncInvoker {
                 Method m = target.getClass().getMethod(setter, Boolean.class);
                 m.invoke(target, Boolean.valueOf(value));
             } catch (Exception ignore2) {
+                log.error("OES 回报同步反射调用异常", ignore2);
                 // ignore
             }
         }

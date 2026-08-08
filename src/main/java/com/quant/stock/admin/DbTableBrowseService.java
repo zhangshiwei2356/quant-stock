@@ -160,6 +160,7 @@ public class DbTableBrowseService {
                 m.put("rowCount", cnt == null ? 0L : cnt);
                 m.put("exists", true);
             } catch (Exception e) {
+                log.error("数据表浏览异常", e);
                 m.put("rowCount", null);
                 m.put("exists", false);
                 m.put("error", e.getMessage());
@@ -200,6 +201,7 @@ public class DbTableBrowseService {
             Long cnt = jdbcTemplate.queryForObject("SELECT COUNT(1) FROM `" + def.getName() + "`", Long.class);
             total = cnt == null ? 0L : cnt;
         } catch (Exception e) {
+            log.error("数据表浏览异常", e);
             throw new IllegalArgumentException("表不存在或不可访问: " + def.getName() + " (" + e.getMessage() + ")");
         }
 
@@ -288,7 +290,7 @@ public class DbTableBrowseService {
                 map.put(String.valueOf(name), toSizeMap(row));
             }
         } catch (Exception e) {
-            log.warn("批量读取表磁盘占用失败: {}", e.getMessage());
+            log.error("批量读取表磁盘占用失败: {}", e.getMessage(), e);
         }
         return map;
     }
@@ -305,7 +307,7 @@ public class DbTableBrowseService {
             }
             return toSizeMap(rows.get(0));
         } catch (Exception e) {
-            log.warn("读取表磁盘占用失败 {}: {}", table, e.getMessage());
+            log.error("读取表磁盘占用失败 {}: {}", table, e.getMessage(), e);
             return Collections.emptyMap();
         }
     }
@@ -328,6 +330,7 @@ public class DbTableBrowseService {
         try {
             return Long.parseLong(String.valueOf(v));
         } catch (NumberFormatException e) {
+            log.error("数据表浏览异常", e);
             return 0L;
         }
     }
@@ -364,7 +367,7 @@ public class DbTableBrowseService {
             }
             return map;
         } catch (Exception e) {
-            log.warn("读取列注释失败 {}: {}", table, e.getMessage());
+            log.error("读取列注释失败 {}: {}", table, e.getMessage(), e);
             return new LinkedHashMap<String, String>();
         }
     }
@@ -378,7 +381,7 @@ public class DbTableBrowseService {
                     (rs, i) -> rs.getString(1),
                     table);
         } catch (Exception e) {
-            log.warn("读取列信息失败 {}: {}", table, e.getMessage());
+            log.error("读取列信息失败 {}: {}", table, e.getMessage(), e);
             return new ArrayList<String>();
         }
     }

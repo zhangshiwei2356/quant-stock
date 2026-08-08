@@ -1,0 +1,18 @@
+---
+description: Java catch 必须打 error 级日志
+globs: **/*.{java}
+alwaysApply: false
+---
+
+# catch → log.error
+
+对本仓库 **Java** 代码（`src/main/java`、`src/main-kuangrui`）：
+
+1. 凡出现 `catch`，**必须**在 catch 块内打 **`log.error(..., throwable)`**（或至少带异常对象的 `log.error(msg, e)`）
+2. **禁止**仅用 `log.warn` / `log.debug`、空 catch、或只改返回值/状态而不打 error
+3. 即使随后 `throw` / 转成 `ResponseStatusException` / 降级回退，仍须先 `log.error`
+4. 新增类若尚无日志器：加 `@Slf4j`（或等价 `LoggerFactory`）
+
+前端 JS 的 try/catch（如 localStorage）不在本规则范围。
+
+说明见 `README.md`「安全与运维配置 → 日志约定」。

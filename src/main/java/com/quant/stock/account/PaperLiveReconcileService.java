@@ -1,5 +1,7 @@
 package com.quant.stock.account;
 
+
+import lombok.extern.slf4j.Slf4j;
 import com.quant.stock.config.ConfigFingerprint;
 import com.quant.stock.config.QuantProperties;
 import com.quant.stock.kuangrui.OesReadonlyService;
@@ -23,6 +25,7 @@ import java.util.Set;
  * 纸面-实盘差异对账闸（P0-91）：成本残差 / 部成闪烁 / 选股池漂移 / 撮合假设。
  * 不改金叉主路径；真券商对账仍依赖外部 API。
  */
+@Slf4j
 @Service
 public class PaperLiveReconcileService {
 
@@ -306,6 +309,7 @@ public class PaperLiveReconcileService {
         try {
             return new BigDecimal(String.valueOf(o));
         } catch (Exception e) {
+            log.error("纸面对账异常", e);
             return BigDecimal.ZERO;
         }
     }
@@ -320,6 +324,7 @@ public class PaperLiveReconcileService {
         try {
             return Integer.parseInt(String.valueOf(o));
         } catch (Exception e) {
+            log.error("纸面对账异常", e);
             return 0;
         }
     }

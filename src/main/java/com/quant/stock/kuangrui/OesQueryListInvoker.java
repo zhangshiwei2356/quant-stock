@@ -1,5 +1,7 @@
 package com.quant.stock.kuangrui;
 
+
+import lombok.extern.slf4j.Slf4j;
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -18,6 +20,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * 宽睿 OES 查询列表反射适配：兼容 {@code List queryXxx(Filter)}、无参、
  * {@code int queryXxx(Filter, Callback)} 以及数组返回。
  */
+@Slf4j
 public final class OesQueryListInvoker {
 
     private OesQueryListInvoker() {
@@ -79,6 +82,7 @@ public final class OesQueryListInvoker {
                 try {
                     m.setAccessible(true);
                 } catch (Exception ignore) {
+                    log.error("OES 查询列表反射调用异常", ignore);
                     // ignore
                 }
                 signatures.add(formatSig(m));
@@ -127,6 +131,7 @@ public final class OesQueryListInvoker {
                         }
                     }
                 } catch (Exception e) {
+                    log.error("OES 查询列表反射调用异常", e);
                     Throwable cause = e.getCause() != null ? e.getCause() : e;
                     errors.add(formatSig(m) + ": " + cause.getClass().getSimpleName() + " " + safeMsg(cause));
                 }
@@ -163,6 +168,7 @@ public final class OesQueryListInvoker {
             errors.add(formatSig(m) + ": " + r.detail);
             return r;
         } catch (Exception e) {
+            log.error("OES 查询列表反射调用异常", e);
             Throwable cause = e.getCause() != null ? e.getCause() : e;
             String msg = formatSig(m) + ": " + cause.getClass().getSimpleName() + " " + safeMsg(cause);
             errors.add(msg);
@@ -188,6 +194,7 @@ public final class OesQueryListInvoker {
                 errors.add(formatSig(m) + ": " + r.detail);
             }
         } catch (Exception e) {
+            log.error("OES 查询列表反射调用异常", e);
             Throwable cause = e.getCause() != null ? e.getCause() : e;
             errors.add(formatSig(m) + "#cbNull: " + cause.getClass().getSimpleName() + " " + safeMsg(cause));
         }
@@ -207,6 +214,7 @@ public final class OesQueryListInvoker {
                 }
                 errors.add(formatSig(m) + "#callback: " + r.detail);
             } catch (Exception e) {
+                log.error("OES 查询列表反射调用异常", e);
                 Throwable cause = e.getCause() != null ? e.getCause() : e;
                 errors.add(formatSig(m) + "#callback: " + cause.getClass().getSimpleName() + " " + safeMsg(cause));
             }
@@ -258,6 +266,7 @@ public final class OesQueryListInvoker {
                 Class<?> cl = Class.forName(cn.trim());
                 out.add(cl.getDeclaredConstructor().newInstance());
             } catch (Exception ignore) {
+                log.error("OES 查询列表反射调用异常", ignore);
                 // next candidate
             }
         }

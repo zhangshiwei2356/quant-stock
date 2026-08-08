@@ -186,7 +186,7 @@ public class KuangruiStaticInfoService {
             }
             return oesReadonlyService.queryTradingDay();
         } catch (Exception e) {
-            log.debug("[m4] tradingDay: {}", e.getMessage());
+            log.error("[m4] tradingDay: {}", e.getMessage(), e);
             return java.util.Collections.emptyMap();
         }
     }
@@ -201,7 +201,7 @@ public class KuangruiStaticInfoService {
             }
             return oesReadonlyService.queryCommissionRate();
         } catch (Exception e) {
-            log.debug("[m4] commission: {}", e.getMessage());
+            log.error("[m4] commission: {}", e.getMessage(), e);
             return java.util.Collections.emptyList();
         }
     }
@@ -213,7 +213,7 @@ public class KuangruiStaticInfoService {
         try {
             return mdsMinuteIngestService.queryStockStatic(code);
         } catch (Exception e) {
-            log.debug("[m4] mds static: {}", e.getMessage());
+            log.error("[m4] mds static: {}", e.getMessage(), e);
             return java.util.Collections.emptyList();
         }
     }
@@ -225,7 +225,7 @@ public class KuangruiStaticInfoService {
         try {
             return mdsMinuteIngestService.querySecurityStatus(code);
         } catch (Exception e) {
-            log.debug("[m4] mds status: {}", e.getMessage());
+            log.error("[m4] mds status: {}", e.getMessage(), e);
             return java.util.Collections.emptyList();
         }
     }
@@ -237,7 +237,7 @@ public class KuangruiStaticInfoService {
         try {
             return mdsMinuteIngestService.queryTrdSessionStatus();
         } catch (Exception e) {
-            log.debug("[m4] mds session: {}", e.getMessage());
+            log.error("[m4] mds session: {}", e.getMessage(), e);
             return java.util.Collections.emptyList();
         }
     }
@@ -289,7 +289,7 @@ public class KuangruiStaticInfoService {
                     }
                 }
             } catch (Exception e) {
-                log.debug("[m4] oes stock: {}", e.getMessage());
+                log.error("[m4] oes stock: {}", e.getMessage(), e);
             }
         }
         if (!merged.containsKey("code")) {
@@ -314,6 +314,7 @@ public class KuangruiStaticInfoService {
                 try {
                     day = LocalDate.parse((String) s);
                 } catch (Exception ignore) {
+                    log.error("宽睿静态信息异常", ignore);
                     // ignore
                 }
             }

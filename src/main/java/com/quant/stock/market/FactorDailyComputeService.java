@@ -86,6 +86,7 @@ public class FactorDailyComputeService {
             try {
                 progress.onProgress(0, total, null);
             } catch (Exception ignored) {
+                log.error("日频因子计算异常", ignored);
                 // ignore
             }
         }
@@ -107,7 +108,7 @@ public class FactorDailyComputeService {
                         }
                     } catch (Exception e) {
                         fail.incrementAndGet();
-                        log.warn("factor_daily 重算失败 {}: {}", code, e.getMessage());
+                        log.error("factor_daily 重算失败 {}: {}", code, e.getMessage(), e);
                     } finally {
                         int d = done.incrementAndGet();
                         // 降频：每 10 只或首尾上报，减轻进度槽竞争
@@ -115,6 +116,7 @@ public class FactorDailyComputeService {
                             try {
                                 progress.onProgress(d, total, code);
                             } catch (Exception ignored) {
+                                log.error("日频因子计算异常", ignored);
                                 // 进度不影响主流程
                             }
                         }

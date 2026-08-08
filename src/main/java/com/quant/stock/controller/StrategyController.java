@@ -1,5 +1,7 @@
 package com.quant.stock.controller;
 
+
+import lombok.extern.slf4j.Slf4j;
 import com.quant.stock.strategy.StrategyEvalService;
 import com.quant.stock.strategy.StrategyPoolSeedService;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,7 @@ import java.util.NoSuchElementException;
 /**
  * 策略总览 API：overview（含介绍与评分）/ 按策略历史 / 单条详情 / 目标池补回测。
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/strategy")
 @RequiredArgsConstructor
@@ -43,8 +46,10 @@ public class StrategyController {
         try {
             return strategyPoolSeedService.start(id, force);
         } catch (NoSuchElementException e) {
+            log.error("策略接口异常", e);
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
         } catch (IllegalStateException e) {
+            log.error("策略接口异常", e);
             throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
         }
     }
@@ -62,6 +67,7 @@ public class StrategyController {
         try {
             return strategyEvalService.history(id, kind);
         } catch (NoSuchElementException e) {
+            log.error("策略接口异常", e);
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "未知策略: " + id);
         }
     }
@@ -72,6 +78,7 @@ public class StrategyController {
         try {
             return strategyEvalService.detail(recordId);
         } catch (NoSuchElementException e) {
+            log.error("策略接口异常", e);
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "未知回测记录: " + recordId);
         }
     }

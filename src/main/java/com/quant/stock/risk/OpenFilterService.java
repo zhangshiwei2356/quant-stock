@@ -1,5 +1,7 @@
 package com.quant.stock.risk;
 
+
+import lombok.extern.slf4j.Slf4j;
 import com.quant.stock.admin.ParamsScope;
 import com.quant.stock.backtest.FillTimingHelper;
 import com.quant.stock.config.QuantProperties;
@@ -28,6 +30,7 @@ import java.util.Set;
  * 涨跌停相对<strong>上一交易日收盘</strong>判定（分钟序列不取相邻 bar）。
  * M4：{@code static-enabled} 时停牌/涨跌停/股本可取宽睿静态，失败回退本地启发式。
  */
+@Slf4j
 @Service
 public class OpenFilterService {
 
@@ -295,6 +298,7 @@ public class OpenFilterService {
                     }
                 }
             } catch (Exception ignored) {
+                log.error("开仓过滤异常", ignored);
                 if (cache != null) {
                     next = cache;
                 }

@@ -1,5 +1,7 @@
 package com.quant.stock.account;
 
+
+import lombok.extern.slf4j.Slf4j;
 import com.quant.stock.config.QuantProperties;
 import com.quant.stock.mapper.StockBasicMapper;
 import com.quant.stock.market.dto.StockBasicDO;
@@ -26,6 +28,7 @@ import java.util.Map;
 /**
  * 账户概览：本地模拟账本（StrategyTask + TradeGateway）只读汇总。
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AccountOverviewService {
@@ -217,6 +220,7 @@ public class AccountOverviewService {
                     }
                 }
             } catch (Exception ignored) {
+                log.error("账户概览异常", ignored);
                 // ignore
             }
         }

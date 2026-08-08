@@ -104,7 +104,7 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
             ensureClient();
         } catch (Exception e) {
             lastError.set(e.getMessage());
-            log.warn("[mds] 登录失败: {}", e.getMessage());
+            log.error("[mds] 登录失败: {}", e.getMessage(), e);
             return 0;
         }
         int ok = 0;
@@ -114,7 +114,7 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
                     ok++;
                 }
             } catch (Exception e) {
-                log.debug("[mds] 查询失败 code={}: {}", code, e.getMessage());
+                log.error("[mds] 查询失败 code={}: {}", code, e.getMessage(), e);
             }
         }
         return aggregator.flush(true);
@@ -136,7 +136,7 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
                 return true;
             } catch (Exception e) {
                 lastError.set(e.getMessage());
-                log.warn("[mds] 订阅失败: {}", e.getMessage());
+                log.error("[mds] 订阅失败: {}", e.getMessage(), e);
                 return false;
             }
         }
@@ -177,7 +177,7 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
             }
         } catch (Exception e) {
             lastError.set(e.getMessage());
-            log.debug("[mds] qryStockStaticInfo {}: {}", norm, e.getMessage());
+            log.error("[mds] qryStockStaticInfo {}: {}", norm, e.getMessage(), e);
         }
         return out;
     }
@@ -201,7 +201,7 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
             }
         } catch (Exception e) {
             lastError.set(e.getMessage());
-            log.debug("[mds] qrySecurityStatus {}: {}", norm, e.getMessage());
+            log.error("[mds] qrySecurityStatus {}: {}", norm, e.getMessage(), e);
         }
         return out;
     }
@@ -224,7 +224,7 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
             }
         } catch (Exception e) {
             lastError.set(e.getMessage());
-            log.debug("[mds] qryTrdSessionStatus: {}", e.getMessage());
+            log.error("[mds] qryTrdSessionStatus: {}", e.getMessage(), e);
         }
         return out;
     }
@@ -331,6 +331,7 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
                         java.lang.reflect.Method valueOf = pt.getMethod("valueOf", int.class);
                         arg = valueOf.invoke(null, Integer.valueOf(((Number) value).intValue()));
                     } catch (Exception ignore) {
+                        log.error("MDS 分钟摄入异常", ignore);
                         arg = value;
                     }
                 } else if (!pt.isInstance(value) && value instanceof Number) {
@@ -345,7 +346,7 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
                     return;
                 }
             } catch (Exception e) {
-                log.debug("[mds] setBean {} 失败: {}", setter, e.getMessage());
+                log.error("[mds] setBean {} 失败: {}", setter, e.getMessage(), e);
             }
         }
     }
@@ -361,13 +362,14 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
             try {
                 return m.invoke(target, args);
             } catch (Exception e) {
-                log.debug("[mds] invoke {} 失败: {}", name, e.getMessage());
+                log.error("[mds] invoke {} 失败: {}", name, e.getMessage(), e);
             }
         }
         if (args.length > 0) {
             try {
                 return target.getClass().getMethod(name).invoke(target);
             } catch (Exception ignore) {
+                log.error("MDS 分钟摄入异常", ignore);
                 // ignore
             }
         }
@@ -378,6 +380,7 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
         try {
             return Class.forName(className).getDeclaredConstructor().newInstance();
         } catch (Exception e) {
+            log.error("MDS 分钟摄入异常", e);
             return null;
         }
     }
@@ -402,6 +405,7 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
         try {
             return target.getClass().getMethod(getter).invoke(target);
         } catch (Exception e) {
+            log.error("MDS 分钟摄入异常", e);
             return null;
         }
     }
@@ -424,6 +428,7 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
                     return ((Number) v).longValue();
                 }
             } catch (Exception ignore) {
+                log.error("MDS 分钟摄入异常", ignore);
                 // fallthrough
             }
             return ((Enum<?>) o).ordinal();
@@ -431,6 +436,7 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
         try {
             return Long.parseLong(o.toString());
         } catch (NumberFormatException e) {
+            log.error("MDS 分钟摄入异常", e);
             return 0L;
         }
     }
@@ -528,7 +534,7 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
                     try {
                         feed(head, data);
                     } catch (Exception ex) {
-                        log.debug("[mds] 回调处理失败: {}", ex.getMessage());
+                        log.error("[mds] 回调处理失败: {}", ex.getMessage(), ex);
                     }
                 }
             });
@@ -546,6 +552,7 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
                 try {
                     c.close();
                 } catch (Exception ignore) {
+                    log.error("MDS 分钟摄入异常", ignore);
                     // ignore
                 }
                 throw new IllegalStateException("MDS 登录失败 rsp=" + rsp);
@@ -584,7 +591,7 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
             try {
                 c.close();
             } catch (Exception e) {
-                log.debug("[mds] close: {}", e.getMessage());
+                log.error("[mds] close: {}", e.getMessage(), e);
             }
         }
     }

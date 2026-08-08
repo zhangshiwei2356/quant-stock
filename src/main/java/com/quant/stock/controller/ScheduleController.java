@@ -1,5 +1,7 @@
 package com.quant.stock.controller;
 
+
+import lombok.extern.slf4j.Slf4j;
 import com.quant.stock.config.QuantProperties;
 import com.quant.stock.task.DynamicScheduleService;
 import com.quant.stock.task.dto.ScheduleJobUpdateRequest;
@@ -24,6 +26,7 @@ import java.util.Map;
  * 定时任务：列表 / 启停 / 改 cron / 立即执行 / 重载调度。
  * 需 {@code quant.db-enabled=true}；任务配置存 MySQL {@code sys_schedule_job}。
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/schedule")
 @RequiredArgsConstructor
@@ -65,6 +68,7 @@ public class ScheduleController {
         try {
             return requireService().updateJob(jobCode, body == null ? new ScheduleJobUpdateRequest() : body);
         } catch (IllegalArgumentException e) {
+            log.error("调度接口异常", e);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }
     }
@@ -76,6 +80,7 @@ public class ScheduleController {
         try {
             return requireService().toggle(jobCode, enabled);
         } catch (IllegalArgumentException e) {
+            log.error("调度接口异常", e);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }
     }
@@ -86,10 +91,13 @@ public class ScheduleController {
         try {
             return requireService().runOnce(jobCode);
         } catch (IllegalArgumentException e) {
+            log.error("调度接口异常", e);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         } catch (IllegalStateException e) {
+            log.error("调度接口异常", e);
             throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
         } catch (Exception e) {
+            log.error("调度接口异常", e);
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "执行失败: " + e.getMessage());
         }

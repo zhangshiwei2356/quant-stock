@@ -125,7 +125,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
             return client != null;
         } catch (Exception e) {
             lastError.set(e.getMessage());
-            log.warn("[oes] 就绪失败: {}", e.getMessage());
+            log.error("[oes] 就绪失败: {}", e.getMessage(), e);
             return false;
         }
     }
@@ -397,6 +397,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
             m.put("tradeCount", trades.size());
             lastError.set(null);
         } catch (Exception e) {
+            log.error("OES 只读通道异常", e);
             lastError.set(e.getMessage());
             m.put("ok", false);
             m.put("message", e.getMessage());
@@ -459,7 +460,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
             return OesPlaceResult.ok(clSeqNo, clOrdId);
         } catch (Exception e) {
             lastError.set(e.getMessage());
-            log.warn("[oes] 报单失败 clSeqNo={}: {}", clSeqNo, e.getMessage());
+            log.error("[oes] 报单失败 clSeqNo={}: {}", clSeqNo, e.getMessage(), e);
             return OesPlaceResult.fail(clSeqNo, e.getMessage());
         }
     }
@@ -505,7 +506,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
             return true;
         } catch (Exception e) {
             lastError.set(e.getMessage());
-            log.warn("[oes] 撤单失败 origClSeqNo={}: {}", origClSeqNo, e.getMessage());
+            log.error("[oes] 撤单失败 origClSeqNo={}: {}", origClSeqNo, e.getMessage(), e);
             return false;
         }
     }
@@ -540,7 +541,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
                     ));
                 }
             } catch (Exception ex) {
-                log.debug("[oes] poll 查询补强失败: {}", ex.getMessage());
+                log.error("[oes] poll 查询补强失败: {}", ex.getMessage(), ex);
             }
         }
         return out;
@@ -587,7 +588,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
                         doRptSync(lastInMsgSeq);
                     } catch (Exception e) {
                         lastError.set(e.getMessage());
-                        log.warn("[oes] 再次回报同步失败，保持查询降级: {}", e.getMessage());
+                        log.error("[oes] 再次回报同步失败，保持查询降级: {}", e.getMessage(), e);
                     }
                 }
                 return;
@@ -629,6 +630,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
                 try {
                     c.close();
                 } catch (Exception ignore) {
+                    log.error("OES 只读通道异常", ignore);
                     // ignore
                 }
                 throw new IllegalStateException("OES 登录失败 rsp=" + rsp);
@@ -645,7 +647,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
                 // 不关闭连接：查询通道仍可查资金/持仓；报撤仍要求 rptSynced
                 rptSynced.set(false);
                 lastError.set(syncEx.getMessage());
-                log.warn("[oes] 回报同步失败，降级为仅查询通道: {}", syncEx.getMessage());
+                log.error("[oes] 回报同步失败，降级为仅查询通道: {}", syncEx.getMessage(), syncEx);
             }
         }
     }
@@ -698,6 +700,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
             m.put("message", "柜台验柜成功");
             return m;
         } catch (Exception e) {
+            log.error("OES 只读通道异常", e);
             m.put("ok", false);
             m.put("message", "柜台验柜异常: " + e.getMessage());
             return m;
@@ -706,6 +709,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
                 try {
                     c.close();
                 } catch (Exception ignore) {
+                    log.error("OES 只读通道异常", ignore);
                     // ignore
                 }
             }
@@ -792,7 +796,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
                     null
             ));
         } catch (Exception e) {
-            log.debug("[oes] enqueueOrder: {}", e.getMessage());
+            log.error("[oes] enqueueOrder: {}", e.getMessage(), e);
         }
     }
 
@@ -814,7 +818,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
                     KuangruiPriceScale.toYuan(px)
             ));
         } catch (Exception e) {
-            log.debug("[oes] enqueueTrade: {}", e.getMessage());
+            log.error("[oes] enqueueTrade: {}", e.getMessage(), e);
         }
     }
 
@@ -835,7 +839,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
                 m.invoke(target, arg);
                 return;
             } catch (Exception e) {
-                log.debug("[oes] setBean {} 失败: {}", setter, e.getMessage());
+                log.error("[oes] setBean {} 失败: {}", setter, e.getMessage(), e);
             }
         }
     }
@@ -850,6 +854,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
                 Method valueOf = pt.getMethod("valueOf", int.class);
                 return valueOf.invoke(null, Integer.valueOf(v));
             } catch (Exception ignore) {
+                log.error("OES 只读通道异常", ignore);
                 // try name/ordinal
             }
             Object[] constants = pt.getEnumConstants();
@@ -862,6 +867,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
                             return c;
                         }
                     } catch (Exception ignore) {
+                        log.error("OES 只读通道异常", ignore);
                         // ignore
                     }
                 }
@@ -933,7 +939,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
                 }
                 return m.invoke(target, callArgs);
             } catch (Exception e) {
-                log.debug("[oes] invoke {} 失败: {}", name, e.getMessage());
+                log.error("[oes] invoke {} 失败: {}", name, e.getMessage(), e);
             }
         }
         // 再试：无参
@@ -942,6 +948,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
                 Method m0 = target.getClass().getMethod(name);
                 return m0.invoke(target);
             } catch (Exception ignore) {
+                log.error("OES 只读通道异常", ignore);
                 // ignore
             }
         }
@@ -952,7 +959,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
         try {
             return Class.forName(className).getDeclaredConstructor().newInstance();
         } catch (Exception e) {
-            log.debug("[oes] 无法实例化 {}: {}", className, e.getMessage());
+            log.error("[oes] 无法实例化 {}: {}", className, e.getMessage(), e);
             return null;
         }
     }
@@ -965,6 +972,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
             Method m = target.getClass().getMethod(getter);
             return m.invoke(target);
         } catch (Exception e) {
+            log.error("OES 只读通道异常", e);
             return null;
         }
     }
@@ -988,6 +996,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
                     return ((Number) v).longValue();
                 }
             } catch (Exception ignore) {
+                log.error("OES 只读通道异常", ignore);
                 // fallthrough
             }
             try {
@@ -997,12 +1006,14 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
                     return ((Number) v).longValue();
                 }
             } catch (Exception ignore) {
+                log.error("OES 只读通道异常", ignore);
                 // fallthrough
             }
         }
         try {
             return Long.parseLong(o.toString());
         } catch (NumberFormatException e) {
+            log.error("OES 只读通道异常", e);
             return 0L;
         }
     }
@@ -1022,6 +1033,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
                     return ((Number) v).intValue();
                 }
             } catch (Exception ignore) {
+                log.error("OES 只读通道异常", ignore);
                 // fallthrough
             }
             return ((Enum<?>) st).ordinal();
@@ -1029,6 +1041,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
         try {
             return Integer.parseInt(st.toString());
         } catch (NumberFormatException e) {
+            log.error("OES 只读通道异常", e);
             return -1;
         }
     }
@@ -1040,7 +1053,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
             try {
                 c.close();
             } catch (Exception e) {
-                log.debug("[oes] close: {}", e.getMessage());
+                log.error("[oes] close: {}", e.getMessage(), e);
             }
         }
     }

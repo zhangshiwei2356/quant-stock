@@ -1,5 +1,7 @@
 package com.quant.stock.admin;
 
+
+import lombok.extern.slf4j.Slf4j;
 import com.quant.stock.mapper.StockBasicMapper;
 import com.quant.stock.market.dto.StockBasicDO;
 import org.springframework.beans.factory.ObjectProvider;
@@ -20,6 +22,7 @@ import java.util.Map;
  * 行业分类 reclass as-of 日志（P0-121）。
  * 中性化/归因用当时行业；不并金叉主路径。
  */
+@Slf4j
 @Service
 @ConditionalOnProperty(name = "quant.db-enabled", havingValue = "true")
 public class IndustryReclassService {
@@ -53,6 +56,7 @@ public class IndustryReclassService {
                     rs -> rs.next() ? rs.getString(1) : null,
                     symbol.trim(), day);
         } catch (Exception e) {
+            log.error("行业 reclass 异常", e);
             return snapshotIndustry(symbol.trim());
         }
     }
@@ -126,6 +130,7 @@ public class IndustryReclassService {
                             + "industry_to AS industryTo, source, note, created_at AS createdAt "
                             + "FROM industry_reclass_log ORDER BY effective_date DESC, id DESC LIMIT " + lim);
         } catch (Exception e) {
+            log.error("行业 reclass 异常", e);
             return new ArrayList<Map<String, Object>>();
         }
     }
@@ -172,6 +177,7 @@ public class IndustryReclassService {
                         "SEED_SNAPSHOT", "initial industry from stock_basic", LocalDateTime.now());
             }
         } catch (Exception ignored) {
+            log.error("行业 reclass 异常", ignored);
             // empty
         }
     }
@@ -188,6 +194,7 @@ public class IndustryReclassService {
                 }
             }
         } catch (Exception ignored) {
+            log.error("行业 reclass 异常", ignored);
             // empty
         }
         return null;
@@ -198,6 +205,7 @@ public class IndustryReclassService {
             Integer n = jdbc.queryForObject("SELECT COUNT(1) FROM industry_reclass_log", Integer.class);
             return n == null ? 0 : n;
         } catch (Exception e) {
+            log.error("行业 reclass 异常", e);
             return 0;
         }
     }

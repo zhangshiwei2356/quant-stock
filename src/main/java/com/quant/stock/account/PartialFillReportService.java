@@ -1,5 +1,7 @@
 package com.quant.stock.account;
 
+
+import lombok.extern.slf4j.Slf4j;
 import com.quant.stock.config.QuantProperties;
 import org.springframework.stereotype.Service;
 
@@ -14,6 +16,7 @@ import java.util.Map;
 /**
  * 部成率日报（P0-95）：对照委托量与成交量；不改金叉。
  */
+@Slf4j
 @Service
 public class PartialFillReportService {
 
@@ -104,6 +107,7 @@ public class PartialFillReportService {
         try {
             return Integer.parseInt(String.valueOf(o));
         } catch (Exception e) {
+            log.error("部成报告异常", e);
             return 0;
         }
     }

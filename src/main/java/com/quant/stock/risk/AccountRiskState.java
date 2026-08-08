@@ -1,5 +1,7 @@
 package com.quant.stock.risk;
 
+
+import lombok.extern.slf4j.Slf4j;
 import com.quant.stock.admin.ParamsScope;
 import com.quant.stock.config.QuantProperties;
 import lombok.Getter;
@@ -21,6 +23,7 @@ import java.util.concurrent.atomic.AtomicReference;
  *   <li>回撤持续期（P0-122）：低于峰值满 N 交易日降仓 / 满 M 日熔断</li>
  * </ul>
  */
+@Slf4j
 public class AccountRiskState {
 
     /** 熔断原因：峰值回撤深度 */
@@ -148,6 +151,7 @@ public class AccountRiskState {
         try {
             return new BigDecimal(s.trim());
         } catch (Exception e) {
+            log.error("账户风控状态解析异常", e);
             return null;
         }
     }
@@ -159,6 +163,7 @@ public class AccountRiskState {
         try {
             return LocalDate.parse(s.trim());
         } catch (Exception e) {
+            log.error("账户风控状态解析异常", e);
             return null;
         }
     }
@@ -170,6 +175,7 @@ public class AccountRiskState {
         try {
             return Integer.parseInt(s.trim());
         } catch (Exception e) {
+            log.error("账户风控状态解析异常", e);
             return def;
         }
     }

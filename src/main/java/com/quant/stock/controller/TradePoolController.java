@@ -1,5 +1,7 @@
 package com.quant.stock.controller;
 
+
+import lombok.extern.slf4j.Slf4j;
 import com.quant.stock.pool.TradePoolService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
@@ -23,6 +25,7 @@ import java.util.Map;
 /**
  * 唯一目标池 API：盘后扫描自动覆盖 {@code trade_pool}；人工可移出；无确认/忽略。
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/stock")
 @RequiredArgsConstructor
@@ -58,6 +61,7 @@ public class TradePoolController {
         try {
             return require().analysis(code);
         } catch (IllegalArgumentException e) {
+            log.error("目标池接口异常", e);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }
     }
@@ -68,6 +72,7 @@ public class TradePoolController {
         try {
             return require().reportById(id);
         } catch (IllegalArgumentException e) {
+            log.error("目标池接口异常", e);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }
     }
@@ -84,6 +89,7 @@ public class TradePoolController {
         try {
             return require().listScanBatchDetail(batchId);
         } catch (IllegalArgumentException e) {
+            log.error("目标池接口异常", e);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }
     }
@@ -114,6 +120,7 @@ public class TradePoolController {
             headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"");
             return new ResponseEntity<byte[]>(body, headers, HttpStatus.OK);
         } catch (IllegalArgumentException e) {
+            log.error("目标池接口异常", e);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }
     }
@@ -124,6 +131,7 @@ public class TradePoolController {
         try {
             return require().removeFromPool(code);
         } catch (IllegalArgumentException e) {
+            log.error("目标池接口异常", e);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }
     }

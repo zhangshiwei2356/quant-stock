@@ -61,7 +61,7 @@ public class EffectiveParamsService {
                             + "PRIMARY KEY (`strategy_id`)"
                             + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         } catch (Exception e) {
-            log.warn("确保 strategy_param 表失败: {}", e.getMessage());
+            log.error("确保 strategy_param 表失败: {}", e.getMessage(), e);
         }
     }
 
@@ -82,7 +82,7 @@ public class EffectiveParamsService {
             }
             return parseJson(row.getParamsJson());
         } catch (Exception e) {
-            log.warn("读取 strategy_param 失败 id={}: {}", id, e.getMessage());
+            log.error("读取 strategy_param 失败 id={}: {}", id, e.getMessage(), e);
             return Collections.emptyMap();
         }
     }
@@ -97,6 +97,7 @@ public class EffectiveParamsService {
             StrategyParamDO row = mapper.selectByStrategyId(id);
             return row == null ? null : row.getVersion();
         } catch (Exception e) {
+            log.error("策略生效参数异常", e);
             return null;
         }
     }
@@ -121,12 +122,13 @@ public class EffectiveParamsService {
             try {
                 WritableParamApplier.apply(snap, e.getKey(), e.getValue());
             } catch (Exception ex) {
-                log.warn("忽略非法策略包键 {}={}: {}", e.getKey(), e.getValue(), ex.getMessage());
+                log.error("忽略非法策略包键 {}={}: {}", e.getKey(), e.getValue(), ex.getMessage(), ex);
             }
         }
         try {
             RunParamOverrides.apply(snap, runOverrides);
         } catch (Exception ex) {
+            log.error("策略生效参数异常", ex);
             throw new IllegalArgumentException("临时参数非法: " + ex.getMessage());
         }
         return snap;
@@ -191,6 +193,7 @@ public class EffectiveParamsService {
                     sparse.put(key, WritableParamApplier.formatStored(key, raw));
                     applied.add(key);
                 } catch (Exception ex) {
+                    log.error("策略生效参数异常", ex);
                     errors.add(key + ": " + ex.getMessage());
                 }
             }
@@ -220,6 +223,7 @@ public class EffectiveParamsService {
                     ? ("策略包已更新 " + applied.size() + " 项")
                     : ("部分失败：成功 " + applied.size() + "，错误 " + errors.size()));
         } catch (Exception e) {
+            log.error("策略生效参数异常", e);
             out.put("ok", false);
             out.put("message", "保存失败: " + e.getMessage());
         }

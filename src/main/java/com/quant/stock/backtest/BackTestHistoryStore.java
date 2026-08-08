@@ -350,7 +350,7 @@ public class BackTestHistoryStore {
                 log.info("已补齐列 {}.{}", table, column);
             }
         } catch (Exception e) {
-            log.warn("检查/补齐列 {}.{} 失败: {}", table, column, e.getMessage());
+            log.error("检查/补齐列 {}.{} 失败: {}", table, column, e.getMessage(), e);
         }
     }
 
@@ -366,7 +366,7 @@ public class BackTestHistoryStore {
                 log.info("已补齐索引 {}.{}", table, indexName);
             }
         } catch (Exception e) {
-            log.warn("检查/补齐索引 {}.{} 失败: {}", table, indexName, e.getMessage());
+            log.error("检查/补齐索引 {}.{} 失败: {}", table, indexName, e.getMessage(), e);
         }
     }
 }

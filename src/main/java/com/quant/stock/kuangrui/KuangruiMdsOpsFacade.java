@@ -96,7 +96,7 @@ public class KuangruiMdsOpsFacade {
             m.put("count", list.size());
             return m;
         } catch (Exception e) {
-            log.warn("[mds-ops] stockStatic 失败: {}", e.getMessage());
+            log.error("[mds-ops] stockStatic 失败: {}", e.getMessage(), e);
             m.put("ok", false);
             m.put("message", e.getMessage());
             m.put("stockStatic", java.util.Collections.emptyList());
@@ -121,7 +121,7 @@ public class KuangruiMdsOpsFacade {
             m.put("count", list.size());
             return m;
         } catch (Exception e) {
-            log.warn("[mds-ops] securityStatus 失败: {}", e.getMessage());
+            log.error("[mds-ops] securityStatus 失败: {}", e.getMessage(), e);
             m.put("ok", false);
             m.put("message", e.getMessage());
             m.put("securityStatus", java.util.Collections.emptyList());
@@ -146,7 +146,7 @@ public class KuangruiMdsOpsFacade {
             m.put("count", list.size());
             return m;
         } catch (Exception e) {
-            log.warn("[mds-ops] sessionStatus 失败: {}", e.getMessage());
+            log.error("[mds-ops] sessionStatus 失败: {}", e.getMessage(), e);
             m.put("ok", false);
             m.put("message", e.getMessage());
             m.put("sessionStatus", java.util.Collections.emptyList());
@@ -182,7 +182,7 @@ public class KuangruiMdsOpsFacade {
                 }
             }
         } catch (Exception e) {
-            log.debug("[mds-ops] universe 读取失败: {}", e.getMessage());
+            log.error("[mds-ops] universe 读取失败: {}", e.getMessage(), e);
         }
         if (codes.isEmpty()) {
             codes.addAll(quantProperties.stockCodeList());

@@ -221,7 +221,7 @@ public class StrategyPoolSeedService {
                     state.singleOk++;
                 } catch (Exception e) {
                     state.singleFail++;
-                    log.warn("策略补种单股失败 {} {}: {}", sid, code, e.getMessage());
+                    log.error("策略补种单股失败 {} {}: {}", sid, code, e.getMessage(), e);
                 } finally {
                     state.singleDone = i + 1;
                 }
@@ -236,6 +236,7 @@ public class StrategyPoolSeedService {
                 runPortfolio(strategy, codes, useSession);
                 state.portfolioOk = true;
             } catch (Exception e) {
+                log.error("策略池补种异常", e);
                 state.portfolioOk = false;
                 throw new IllegalStateException("组合回测失败: "
                         + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()), e);
@@ -254,7 +255,7 @@ public class StrategyPoolSeedService {
             state.phaseLabel = "失败";
             state.message = e.getMessage() == null ? "补种失败" : e.getMessage();
             state.summary = "「" + sid + "」补种失败：" + state.message;
-            log.warn("策略目标池补种失败 {}: {}", sid, state.message);
+            log.error("策略目标池补种失败 {}: {}", sid, state.message, e);
         } finally {
             state.running = false;
             state.finishedAt = LocalDateTime.now();

@@ -1,5 +1,7 @@
 package com.quant.stock.controller;
 
+
+import lombok.extern.slf4j.Slf4j;
 import com.quant.stock.admin.DbTableBrowseService;
 import com.quant.stock.admin.DbTableCatalog;
 import com.quant.stock.admin.DbTableCatalog.TableDef;
@@ -21,6 +23,7 @@ import java.util.Map;
 /**
  * 应用 MySQL 表白名单浏览（只读分页）。
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/db")
 @RequiredArgsConstructor
@@ -57,6 +60,7 @@ public class DbTableController {
         try {
             return svc.page(name, page, size);
         } catch (IllegalArgumentException e) {
+            log.error("数据表浏览接口异常", e);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }
     }

@@ -58,7 +58,7 @@ public class ActiveStrategyService {
             props.setActiveStrategy(resolved);
             log.info("已从 system_config 加载激活策略: {}", resolved);
         } catch (Exception e) {
-            log.warn("加载激活策略失败: {}", e.getMessage());
+            log.error("加载激活策略失败: {}", e.getMessage(), e);
         }
     }
 

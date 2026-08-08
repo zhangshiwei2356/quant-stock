@@ -75,7 +75,7 @@ public class MarketDataService {
                     return closed;
                 }
             } catch (Exception e) {
-                log.warn("核心行情表查询失败 code={} period={}: {}", code, period, e.getMessage());
+                log.error("核心行情表查询失败 code={} period={}: {}", code, period, e.getMessage(), e);
             }
         }
 
@@ -135,7 +135,7 @@ public class MarketDataService {
                 int n = coreMarketBarService.saveMinutes1(bars);
                 log.info("1分钟K已落库 market_1min code={} size={} upsert≈{}", code, bars.size(), n);
             } catch (Exception e) {
-                log.warn("1分钟K落库失败 code={}: {}", code, e.getMessage());
+                log.error("1分钟K落库失败 code={}: {}", code, e.getMessage(), e);
             }
         } else {
             log.debug("CoreMarketBarService 未启用，跳过 market_1min 落库 code={}", code);
@@ -168,7 +168,7 @@ public class MarketDataService {
                     return fromDb;
                 }
             } catch (Exception e) {
-                log.debug("读取 market_1min 失败 code={}: {}", code, e.getMessage());
+                log.error("读取 market_1min 失败 code={}: {}", code, e.getMessage(), e);
             }
         }
         if (jsonBarDataStore.available() && !"db".equalsIgnoreCase(quantProperties.getMarketMode())) {
@@ -235,7 +235,7 @@ public class MarketDataService {
                 return (List<BarDTO>) val;
             }
         } catch (Exception e) {
-            log.debug("Redis读取行情失败: {}", e.getMessage());
+            log.error("Redis读取行情失败: {}", e.getMessage(), e);
         }
         return null;
     }
@@ -247,7 +247,7 @@ public class MarketDataService {
         try {
             redisTemplate.opsForValue().set(CACHE_KEY_PREFIX + period.name() + ":" + code, bars, 5, TimeUnit.MINUTES);
         } catch (Exception e) {
-            log.debug("Redis写入行情失败: {}", e.getMessage());
+            log.error("Redis写入行情失败: {}", e.getMessage(), e);
         }
     }
 

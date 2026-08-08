@@ -284,6 +284,8 @@ sequenceDiagram
 | `quant.kuangrui.config-dir` | MDS/OES JSON 目录（默认 `config/kuangrui/local`，可用 `QUANT_KUANGRUI_CONFIG_DIR`） |
 | `spring.profiles.active` | 默认 **`local`**（可用 `SPRING_PROFILES_ACTIVE` 覆盖）；加载 `application-local.yml` |
 
+**日志约定**：后端 Java 凡 `catch` 必须打 **`log.error`**（含吞掉后降级/回退、以及转成 HTTP 4xx 再抛出的分支），便于排障；禁止仅 `warn`/`debug` 或静默吞异常。
+
 ---
 
 ## 主要接口

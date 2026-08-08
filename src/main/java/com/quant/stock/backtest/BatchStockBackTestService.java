@@ -83,6 +83,7 @@ public class BatchStockBackTestService {
             try {
                 progress.onProgress(0, total, null);
             } catch (Exception ignored) {
+                log.error("批量回测单股异常", ignored);
                 // 进度不影响主流程
             }
         }
@@ -100,6 +101,7 @@ public class BatchStockBackTestService {
                             try {
                                 progress.onProgress(d, total, code);
                             } catch (Exception ignored) {
+                                log.error("批量回测单股异常", ignored);
                                 // 进度不影响主流程
                             }
                         }
@@ -191,7 +193,7 @@ public class BatchStockBackTestService {
                     .ma60SlopeUp(ma60SlopeUp)
                     .build();
         } catch (Exception e) {
-            log.warn("扫描失败 {}: {}", code, e.getMessage());
+            log.error("扫描失败 {}: {}", code, e.getMessage(), e);
             return null;
         }
     }

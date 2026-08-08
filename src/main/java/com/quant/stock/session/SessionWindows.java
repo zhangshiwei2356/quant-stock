@@ -1,5 +1,7 @@
 package com.quant.stock.session;
 
+
+import lombok.extern.slf4j.Slf4j;
 import com.quant.stock.config.QuantProperties;
 
 import java.time.LocalTime;
@@ -9,6 +11,7 @@ import java.time.format.DateTimeParseException;
 /**
  * 可配置的会话三分支墙钟窗口；解析失败时回退 {@link SessionBranch} 默认值。
  */
+@Slf4j
 public final class SessionWindows {
 
     private static final DateTimeFormatter HM = DateTimeFormatter.ofPattern("H:mm");
@@ -77,6 +80,7 @@ public final class SessionWindows {
         try {
             return LocalTime.parse(raw.trim(), HM);
         } catch (DateTimeParseException e) {
+            log.error("交易时段窗口解析异常", e);
             return fallback;
         }
     }

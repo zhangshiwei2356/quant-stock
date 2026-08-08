@@ -40,7 +40,7 @@ public class RiskControlLogService {
                     triggerValue,
                     actionTaken == null ? "" : actionTaken);
         } catch (Exception e) {
-            log.warn("risk_control_log 写入失败: {}", e.getMessage());
+            log.error("risk_control_log 写入失败: {}", e.getMessage(), e);
         }
     }
 }

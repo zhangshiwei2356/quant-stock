@@ -73,7 +73,7 @@ public class KuangruiAccountLoginService {
         try {
             credentialStore.saveActiveAfterLogin(user, password);
         } catch (Exception e) {
-            log.warn("[kuangrui-account] 验柜成功但落库失败: {}", e.getMessage());
+            log.error("[kuangrui-account] 验柜成功但落库失败: {}", e.getMessage(), e);
             m.put("ok", false);
             m.put("message", "验柜成功但写入数据库失败: " + e.getMessage());
             return m;

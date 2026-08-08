@@ -111,7 +111,7 @@ public class MdsMinuteAggregator {
             upsertCount.addAndGet(n);
             return n;
         } catch (Exception e) {
-            log.warn("[mds] 落库失败 size={}: {}", batch.size(), e.getMessage());
+            log.error("[mds] 落库失败 size={}: {}", batch.size(), e.getMessage(), e);
             // 回队避免丢（仅闭合队列）；开盘桶仍在 map 中
             for (BarDTO b : batch) {
                 if (b != null) {

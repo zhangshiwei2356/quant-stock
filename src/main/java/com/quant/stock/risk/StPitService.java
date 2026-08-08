@@ -1,5 +1,7 @@
 package com.quant.stock.risk;
 
+
+import lombok.extern.slf4j.Slf4j;
 import com.quant.stock.config.QuantProperties;
 import com.quant.stock.mapper.StockBasicMapper;
 import com.quant.stock.market.dto.StockBasicDO;
@@ -21,6 +23,7 @@ import java.util.Map;
  * ST as-of 日切（P0-101）：优先 {@code st_status_hist}；无历史则回退 {@code stock_basic.is_st} 快照。
  * 财报公告时钟本地无数据，见 {@link #earningsClockStatus()}。
  */
+@Slf4j
 @Service
 @ConditionalOnProperty(name = "quant.db-enabled", havingValue = "true")
 public class StPitService {
@@ -58,6 +61,7 @@ public class StPitService {
                 return v == 1;
             }
         } catch (Exception ignored) {
+            log.error("ST as-of 查询异常", ignored);
             // fall through
         }
         return snapshotIsSt(code.trim());
@@ -106,6 +110,7 @@ public class StPitService {
                     "SELECT symbol, effective_date AS effectiveDate, is_st AS isSt, note, updated_at AS updatedAt "
                             + "FROM st_status_hist ORDER BY effective_date DESC, id DESC LIMIT " + lim);
         } catch (Exception e) {
+            log.error("ST as-of 查询异常", e);
             return new ArrayList<Map<String, Object>>();
         }
     }
@@ -150,6 +155,7 @@ public class StPitService {
                         b.getSymbol().trim(), today, st, "seed_from_stock_basic_snapshot", LocalDateTime.now());
             }
         } catch (Exception ignored) {
+            log.error("ST as-of 查询异常", ignored);
             // empty
         }
     }
@@ -170,6 +176,7 @@ public class StPitService {
                 }
             }
         } catch (Exception ignored) {
+            log.error("ST as-of 查询异常", ignored);
             // empty
         }
         return false;
@@ -180,6 +187,7 @@ public class StPitService {
             Integer n = jdbc.queryForObject("SELECT COUNT(1) FROM st_status_hist", Integer.class);
             return n == null ? 0 : n;
         } catch (Exception e) {
+            log.error("ST as-of 查询异常", e);
             return 0;
         }
     }

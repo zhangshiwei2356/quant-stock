@@ -95,7 +95,7 @@ public class ScheduleJobHandlers {
                         }
                     } catch (Exception e) {
                         fail++;
-                        log.warn("[market-collect] 失败 code={}: {}", code, e.getMessage());
+                        log.error("[market-collect] 失败 code={}: {}", code, e.getMessage(), e);
                     }
                     jobProgressHub.tick(i, total, code,
                             "行情采集 " + i + "/" + total + " · ok=" + ok + " fail=" + fail);
@@ -145,7 +145,7 @@ public class ScheduleJobHandlers {
                 return true;
             }
         } catch (Exception e) {
-            log.warn("[market-collect] MDS 路径失败，回退本地: {}", e.getMessage());
+            log.error("[market-collect] MDS 路径失败，回退本地: {}", e.getMessage(), e);
             return false;
         }
         return false;
@@ -320,7 +320,7 @@ public class ScheduleJobHandlers {
                         }
                     } catch (Exception e) {
                         dailyWarn++;
-                        log.warn("[data-validate] {} 校验异常: {}", code, e.getMessage());
+                        log.error("[data-validate] {} 校验异常: {}", code, e.getMessage(), e);
                     }
                     if (i == total || i % 50 == 0) {
                         jobProgressHub.tick(i, total, code,
@@ -340,7 +340,7 @@ public class ScheduleJobHandlers {
                             "校验完成 dailyWarn=" + dailyWarn + " minuteWarn=" + minuteWarn
                                     + " · diverge=" + recon.get("divergeCodeCount"));
                 } catch (Exception e) {
-                    log.warn("[data-validate] 分钟自洽失败: {}", e.getMessage());
+                    log.error("[data-validate] 分钟自洽失败: {}", e.getMessage(), e);
                     jobProgressHub.tick(total, total, null,
                             "校验完成 dailyWarn=" + dailyWarn + " minuteWarn=" + minuteWarn
                                     + "（自洽失败：" + e.getMessage() + "）");
@@ -408,6 +408,7 @@ public class ScheduleJobHandlers {
                     "SELECT COUNT(1) FROM (SELECT 1 FROM market_daily LIMIT 1) t", Integer.class);
             return n != null && n > 0;
         } catch (Exception e) {
+            log.error("定时任务处理器异常", e);
             return false;
         }
     }
