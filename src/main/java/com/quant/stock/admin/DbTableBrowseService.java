@@ -112,6 +112,7 @@ public class DbTableBrowseService {
         m.put("max_drawdown", "最大回撤");
         m.put("total_trade_num", "交易次数");
         m.put("win_rate", "胜率");
+        m.put("sharpe", "年化夏普");
         m.put("trade_stats_json", "交易统计JSON");
         m.put("trades_json", "成交明细JSON");
         m.put("stock_results_json", "分股结果JSON");

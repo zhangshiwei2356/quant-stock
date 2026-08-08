@@ -192,8 +192,9 @@ sequenceDiagram
 | 策略总览 | 注册策略列表（含介绍、满分 100 综合评分）+ 聚合指标与回测历史；历史表可筛全部/单股/组合，点行展开详情 |
 
 - **职责分离**：本菜单只做效果总览与评分；全局/按策略改参、纸面激活切换仍在 **运维中心 → 运行参数**
-- 数据：`GET /api/strategy/overview`（含 `detailIntro`、加权 `score`/`scoreComponents`）、`GET /api/strategy/{id}/history?kind=`、`GET /api/strategy/history/{recordId}`；按注册 `strategy_id` 聚合（查询含历史别名如 `MaCrossStrategy`）；启动自动补全空白→`maCross`、旧名→注册 id；运维 `POST /api/ops/backtest/backfill-strategy-id`；overview 仍可含 `unknownCount`
+- 数据：`GET /api/strategy/overview`（含 `detailIntro`、加权 `score`/`scoreComponents`、`avgSharpe`）、`GET /api/strategy/{id}/history?kind=`、`GET /api/strategy/history/{recordId}`；按注册 `strategy_id` 聚合（查询含历史别名如 `MaCrossStrategy`）；启动自动补全空白→`maCross`、旧名→注册 id；运维 `POST /api/ops/backtest/backfill-strategy-id`；overview 仍可含 `unknownCount`
 - **评分（满分 100）**：收益 30 + 回撤 25 + 胜率 20 + 盈利占比 15 + 样本 10；无回测则不评分；样本少时仅供对照
+- **夏普（仅展示）**：落库时由权益曲线算年化夏普（无风险利率=0；日线 √252 等）；overview 给 `avgSharpe`，历史表有「夏普」列；**不计入**综合评分；旧回测无该列则为空
 - **无回测补种**：选中 `runCount=0` 的策略时自动（亦可手动）`POST /api/strategy/{id}/seed-pool-backtest`：对目标池活跃股逐只单股回测 + 全池组合回测一次（初始资金默认 10 万；经典策略用日线，`SessionStrategy` 如 `overnightGap` 走 session）；进度 `GET /api/strategy/seed-status`；已有记录需 `force=true`
 
 ### 8. 数据表

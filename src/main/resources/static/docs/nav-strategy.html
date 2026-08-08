@@ -7,7 +7,7 @@
       <li>左侧列出已注册策略（含综合评分徽章）；当前激活策略带角标</li>
       <li>策略介绍默认收起，可展开查看买卖逻辑与用途说明</li>
       <li>无回测时自动用目标池补种（逐只单股 + 全池组合），并显示进度</li>
-      <li>卡片展示满分 100 的加权评分与聚合指标；历史表点行可看详情</li>
+      <li>卡片展示满分 100 的加权评分、平均夏普（仅展示）与聚合指标；历史表点行可看详情</li>
     </ul>
   </section>
   <section class="nav-intro-card nav-intro-card--steps">
@@ -22,4 +22,4 @@
 <div class="nav-intro-cta">
   <button type="button" class="nav-intro-btn" data-enter-mode="strategy" data-strategy-panel="eval">进入策略总览</button>
 </div>
-<p class="nav-intro-hint">评分来自历史回测加权（收益/回撤/胜率/盈利占比/样本），样本少时仅供对照。旧回测若无 <code>strategy_id</code> 不会计入。再点一次「策略管理」可收起并回初始化页。</p>
+<p class="nav-intro-hint">评分来自历史回测加权（收益/回撤/胜率/盈利占比/样本），样本少时仅供对照。夏普为权益曲线年化（RF=0），只展示不进评分；旧回测无 <code>sharpe</code>/<code>strategy_id</code> 则对应为空或不计入。再点一次「策略管理」可收起并回初始化页。</p>

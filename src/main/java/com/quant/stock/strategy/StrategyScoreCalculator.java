@@ -17,6 +17,7 @@ import java.util.Map;
  *   <li>盈利占比 15：收益&gt;0 的回测条数占比</li>
  *   <li>样本 10：回测次数（0→0，≥10→满分）</li>
  * </ul>
+ * 年化夏普仅在策略总览/历史表展示，<strong>不计入</strong>本评分。
  * 无回测时 {@code score=null}。
  */
 public final class StrategyScoreCalculator {

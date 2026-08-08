@@ -203,6 +203,7 @@ CREATE TABLE IF NOT EXISTS `bt_backtest_record` (
   `max_drawdown` DECIMAL(12,6) DEFAULT NULL,
   `total_trade_num` INT DEFAULT NULL,
   `win_rate` DECIMAL(12,6) DEFAULT NULL,
+  `sharpe` DECIMAL(12,6) DEFAULT NULL COMMENT '年化夏普 RF=0 展示用',
   `trade_stats_json` MEDIUMTEXT DEFAULT NULL COMMENT 'BackTestTradeStats JSON',
   `trades_json` LONGTEXT DEFAULT NULL COMMENT '成交明细JSON',
   `stock_results_json` LONGTEXT DEFAULT NULL COMMENT '组合分股结果JSON',

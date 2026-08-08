@@ -129,6 +129,7 @@ public class StrategyEvalService {
             List<BigDecimal> rates = new ArrayList<BigDecimal>();
             List<BigDecimal> drawdowns = new ArrayList<BigDecimal>();
             List<BigDecimal> winRates = new ArrayList<BigDecimal>();
+            List<BigDecimal> sharpes = new ArrayList<BigDecimal>();
             int positiveCount = 0;
             int rateCount = 0;
             for (BtBacktestRecordDO r : records) {
@@ -145,11 +146,15 @@ public class StrategyEvalService {
                 if (r.getWinRate() != null) {
                     winRates.add(r.getWinRate());
                 }
+                if (r.getSharpe() != null) {
+                    sharpes.add(r.getSharpe());
+                }
             }
 
             BigDecimal avgRate = avg(rates);
             BigDecimal avgDd = avg(drawdowns);
             BigDecimal avgWin = avg(winRates);
+            BigDecimal avgSharpe = avg(sharpes);
             BigDecimal positiveRatio = rateCount == 0 ? null
                     : BigDecimal.valueOf(positiveCount)
                     .divide(BigDecimal.valueOf(rateCount), SCALE, RoundingMode.HALF_UP);
@@ -159,6 +164,9 @@ public class StrategyEvalService {
             row.put("medianTotalRate", median(rates));
             row.put("avgMaxDrawdown", avgDd);
             row.put("avgWinRate", avgWin);
+            row.put("avgSharpe", avgSharpe);
+            row.put("sharpeCount", sharpes.size());
+            row.put("sharpeNote", "年化夏普（RF=0）；仅展示，不计入综合评分；旧回测无权益曲线则为空");
             row.put("positiveRatio", positiveRatio);
 
             Map<String, Object> scoreMap = StrategyScoreCalculator.score(
@@ -256,6 +264,7 @@ public class StrategyEvalService {
             m.put("maxDrawdown", r.getMaxDrawDown());
             m.put("totalTradeNum", r.getTotalTradeNum());
             m.put("winRate", r.getWinRate());
+            m.put("sharpe", r.getSharpe());
             m.put("configFingerprint", r.getConfigFingerprint());
             m.put("tradeStats", r.getTradeStats());
             if (withDetail) {
@@ -278,6 +287,7 @@ public class StrategyEvalService {
             m.put("maxDrawdown", r.getMaxDrawDown());
             m.put("totalTradeNum", r.getTotalTradeNum());
             m.put("winRate", r.getWinRate());
+            m.put("sharpe", r.getSharpe());
             m.put("configFingerprint", r.getConfigFingerprint());
             m.put("tradeStats", r.getTradeStats());
             if (withDetail) {

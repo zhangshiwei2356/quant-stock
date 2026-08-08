@@ -54,16 +54,17 @@
 ### overview 每项字段（最低集）
 
 - `strategyId`、`displayName`（可用 `name()` / 已有标题）、`active`（是否当前纸面激活）
-- `runCount`、`avgTotalRate`、`medianTotalRate`、`avgMaxDrawdown`
+- `runCount`、`avgTotalRate`、`medianTotalRate`、`avgMaxDrawdown`、`avgSharpe`（有值条数的算术平均；仅展示）
 - `lastSavedAt`、`lastTotalRate`（最近一次；无历史则 null）
 - 聚合**仅统计** `strategy_id = 该 id` 的行；空 id 旧行不计入任一策略（可另给 overview 顶层 `unknownCount` 可选）
+- 夏普：落库列 `sharpe`（权益曲线年化，RF=0）；**不计入**综合评分
 
 ### history 摘要行
 
 - `id`（recordId）、`kind`、`savedAt`、`strategyId`
 - 单股：`stockCode`；组合：`stockCodes`（数组或短字符串）
 - `period`、`backStart`、`backEnd`
-- `initCapital`、`finalAsset`、`totalRate`、`maxDrawdown`、`totalTradeNum`、`winRate`
+- `initCapital`、`finalAsset`、`totalRate`、`maxDrawdown`、`totalTradeNum`、`winRate`、`sharpe`
 - `configFingerprint`（可前端截短展示）
 
 ### 详情

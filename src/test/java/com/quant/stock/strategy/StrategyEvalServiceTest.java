@@ -94,6 +94,7 @@ class StrategyEvalServiceTest {
                                         .totalRate(new BigDecimal("0.10"))
                                         .maxDrawdown(new BigDecimal("0.05"))
                                         .winRate(new BigDecimal("0.60"))
+                                        .sharpe(new BigDecimal("1.25"))
                                         .savedAt(LocalDateTime.of(2026, 8, 1, 10, 0))
                                         .build());
                     }
@@ -123,6 +124,8 @@ class StrategyEvalServiceTest {
         assertEquals(1, ma.get("runCount"));
         assertEquals(0, ((BigDecimal) ma.get("avgTotalRate")).compareTo(bd("0.100000")));
         assertEquals(0, ((BigDecimal) ma.get("medianTotalRate")).compareTo(bd("0.100000")));
+        assertEquals(0, ((BigDecimal) ma.get("avgSharpe")).compareTo(bd("1.250000")));
+        assertEquals(1, ma.get("sharpeCount"));
         assertNotNull(ma.get("score"));
         assertNotNull(ma.get("detailIntro"));
         assertFalse(String.valueOf(ma.get("displayName")).equals("maCross"));
@@ -132,6 +135,7 @@ class StrategyEvalServiceTest {
         assertNotNull(balanced);
         assertEquals(0, balanced.get("runCount"));
         assertNull(balanced.get("score"));
+        assertNull(balanced.get("avgSharpe"));
     }
 
     @Test
@@ -139,6 +143,7 @@ class StrategyEvalServiceTest {
         SingleBacktestHistoryRecord rec = new SingleBacktestHistoryRecord();
         rec.setId("s1");
         rec.setStrategyId("maCross");
+        rec.setSharpe(new BigDecimal("0.85"));
         doReturn(Collections.singletonList(rec))
                 .when(historyStore).listSummaryByStrategyIds(any(), eq(null));
 
@@ -147,5 +152,6 @@ class StrategyEvalServiceTest {
         verify(historyStore).listSummaryByStrategyIds(any(), eq(null));
         assertEquals(1, rows.size());
         assertEquals("maCross", rows.get(0).get("strategyId"));
+        assertEquals(0, ((BigDecimal) rows.get(0).get("sharpe")).compareTo(bd("0.85")));
     }
 }

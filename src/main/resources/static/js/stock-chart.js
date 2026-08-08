@@ -3074,7 +3074,7 @@
     seedHintShown: {},
     autoSeedStarted: {}
   };
-  var STRATEGY_HIST_COLSPAN = 10;
+  var STRATEGY_HIST_COLSPAN = 11;
 
   function setStrategyMenuActive(panel) {
     $('#strategyMenu li').removeClass('active');
@@ -3207,6 +3207,13 @@
     $cards.append(card('中位收益率', pct(s.medianTotalRate)));
     $cards.append(card('平均回撤', pct(s.avgMaxDrawdown)));
     $cards.append(card('平均胜率', pct(s.avgWinRate)));
+    var sharpeSub = '年化·RF=0·不计入评分';
+    if (s.sharpeCount != null && s.runCount != null && Number(s.sharpeCount) < Number(s.runCount)) {
+      sharpeSub += '（有夏普 ' + s.sharpeCount + '/' + s.runCount + '）';
+    }
+    $cards.append(card('平均夏普',
+      s.avgSharpe != null && s.avgSharpe !== '' ? num(s.avgSharpe, 2) : '—',
+      sharpeSub));
     $cards.append(card('盈利占比', pct(s.positiveRatio)));
     $cards.append(card('最近收益', pct(s.lastTotalRate),
       s.lastSavedAt ? ('最近：' + fmtDateTimeDisplay(s.lastSavedAt)) : '暂无回测'));
@@ -3417,6 +3424,7 @@
         .append($('<td/>').text(pct(r.totalRate)))
         .append($('<td/>').text(pct(r.maxDrawdown != null ? r.maxDrawdown : r.maxDrawDown)))
         .append($('<td/>').text(pct(r.winRate)))
+        .append($('<td/>').text(r.sharpe != null && r.sharpe !== '' ? num(r.sharpe, 2) : '—'))
         .append($('<td/>').text((s.buyCount || 0) + ' / ' + (s.sellCount || 0)));
       $tb.append($tr);
     });

@@ -64,6 +64,9 @@ public class BackTestHistoryStore {
         ensureColumn(jdbc, "bt_backtest_record", "strategy_id",
                 "ALTER TABLE `bt_backtest_record` ADD COLUMN `strategy_id` VARCHAR(64) DEFAULT NULL "
                         + "COMMENT '注册策略 id' AFTER `config_fingerprint`");
+        ensureColumn(jdbc, "bt_backtest_record", "sharpe",
+                "ALTER TABLE `bt_backtest_record` ADD COLUMN `sharpe` DECIMAL(12,6) DEFAULT NULL "
+                        + "COMMENT '年化夏普 RF=0 展示用' AFTER `win_rate`");
         ensureIndex(jdbc, "bt_backtest_record", "idx_strategy_saved",
                 "CREATE INDEX idx_strategy_saved ON bt_backtest_record (strategy_id, saved_at)");
     }
@@ -97,6 +100,7 @@ public class BackTestHistoryStore {
                 .maxDrawdown(result.getMaxDrawDown())
                 .totalTradeNum(result.getTotalTradeNum())
                 .winRate(result.getWinRate())
+                .sharpe(rec.getSharpe())
                 .tradeStatsJson(JSON.toJSONString(rec.getTradeStats()))
                 .tradesJson(JSON.toJSONString(rec.getTrades()))
                 .configFingerprint(result.getConfigFingerprint())
@@ -138,6 +142,7 @@ public class BackTestHistoryStore {
                 .maxDrawdown(result.getMaxDrawDown())
                 .totalTradeNum(result.getTotalTradeNum())
                 .winRate(result.getWinRate())
+                .sharpe(rec.getSharpe())
                 .tradeStatsJson(JSON.toJSONString(rec.getTradeStats()))
                 .tradesJson(JSON.toJSONString(rec.getTrades()))
                 .stockResultsJson(JSON.toJSONString(rec.getStockResults()))
@@ -281,6 +286,7 @@ public class BackTestHistoryStore {
                 .maxDrawDown(r.getMaxDrawdown())
                 .totalTradeNum(r.getTotalTradeNum())
                 .winRate(r.getWinRate())
+                .sharpe(r.getSharpe())
                 .tradeStats(stats)
                 .trades(trades)
                 .configFingerprint(r.getConfigFingerprint())
@@ -312,6 +318,7 @@ public class BackTestHistoryStore {
                 .maxDrawDown(r.getMaxDrawdown())
                 .totalTradeNum(r.getTotalTradeNum())
                 .winRate(r.getWinRate())
+                .sharpe(r.getSharpe())
                 .tradeStats(stats)
                 .stockResults(stockResults == null ? new ArrayList<SingleStockBackResult>() : stockResults)
                 .trades(trades)

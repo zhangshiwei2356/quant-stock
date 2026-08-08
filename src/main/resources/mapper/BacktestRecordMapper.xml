@@ -19,6 +19,7 @@
         <result column="max_drawdown" property="maxDrawdown"/>
         <result column="total_trade_num" property="totalTradeNum"/>
         <result column="win_rate" property="winRate"/>
+        <result column="sharpe" property="sharpe"/>
         <result column="trade_stats_json" property="tradeStatsJson"/>
         <result column="trades_json" property="tradesJson"/>
         <result column="stock_results_json" property="stockResultsJson"/>
@@ -29,12 +30,12 @@
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO bt_backtest_record
         (record_id, kind, saved_at, stock_code, stock_codes_json, period, back_start, back_end,
-         init_capital, final_asset, total_rate, max_drawdown, total_trade_num, win_rate,
+         init_capital, final_asset, total_rate, max_drawdown, total_trade_num, win_rate, sharpe,
          trade_stats_json, trades_json, stock_results_json, config_fingerprint, strategy_id)
         VALUES
         (#{recordId}, #{kind}, #{savedAt}, #{stockCode}, #{stockCodesJson}, #{period},
          #{backStart}, #{backEnd}, #{initCapital}, #{finalAsset}, #{totalRate}, #{maxDrawdown},
-         #{totalTradeNum}, #{winRate}, #{tradeStatsJson}, #{tradesJson}, #{stockResultsJson},
+         #{totalTradeNum}, #{winRate}, #{sharpe}, #{tradeStatsJson}, #{tradesJson}, #{stockResultsJson},
          #{configFingerprint}, #{strategyId})
     </insert>
 
@@ -57,7 +58,7 @@
 
     <select id="selectSummaryByStrategyId" resultMap="RecMap">
         SELECT id, record_id, kind, saved_at, stock_code, stock_codes_json, period, back_start, back_end,
-               init_capital, final_asset, total_rate, max_drawdown, total_trade_num, win_rate,
+               init_capital, final_asset, total_rate, max_drawdown, total_trade_num, win_rate, sharpe,
                trade_stats_json, config_fingerprint, strategy_id
         FROM bt_backtest_record
         WHERE strategy_id = #{strategyId}
@@ -70,7 +71,7 @@
     <!-- 按注册 id + 历史别名批量匹配（解决 MaCrossStrategy 等无法关联） -->
     <select id="selectSummaryByStrategyIds" resultMap="RecMap">
         SELECT id, record_id, kind, saved_at, stock_code, stock_codes_json, period, back_start, back_end,
-               init_capital, final_asset, total_rate, max_drawdown, total_trade_num, win_rate,
+               init_capital, final_asset, total_rate, max_drawdown, total_trade_num, win_rate, sharpe,
                trade_stats_json, config_fingerprint, strategy_id
         FROM bt_backtest_record
         WHERE strategy_id IN

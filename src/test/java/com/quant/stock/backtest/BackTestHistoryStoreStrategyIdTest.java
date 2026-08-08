@@ -78,17 +78,26 @@ class BackTestHistoryStoreStrategyIdTest {
                 .totalTradeNum(2)
                 .winRate(new BigDecimal("0.5"))
                 .trades(Collections.emptyList())
+                .equityCurve(java.util.Arrays.asList(
+                        new BigDecimal("100000"),
+                        new BigDecimal("102000"),
+                        new BigDecimal("101000"),
+                        new BigDecimal("105000"),
+                        new BigDecimal("110000")))
                 .build();
 
         SingleBacktestHistoryRecord hist = store.appendSingle(
                 "DAY", null, null, result, "maCross");
         assertNotNull(hist);
         assertEquals("maCross", hist.getStrategyId());
+        assertNotNull(hist.getSharpe());
 
         ArgumentCaptor<BtBacktestRecordDO> cap = ArgumentCaptor.forClass(BtBacktestRecordDO.class);
         verify(mapper).insert(cap.capture());
         assertEquals("maCross", cap.getValue().getStrategyId());
         assertEquals("SINGLE", cap.getValue().getKind());
+        assertNotNull(cap.getValue().getSharpe());
+        assertEquals(0, hist.getSharpe().compareTo(cap.getValue().getSharpe()));
     }
 
     @Test

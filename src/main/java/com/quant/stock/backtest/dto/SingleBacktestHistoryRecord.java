@@ -1,5 +1,6 @@
 package com.quant.stock.backtest.dto;
 
+import com.quant.stock.backtest.SharpeRatioCalculator;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -30,6 +31,8 @@ public class SingleBacktestHistoryRecord {
     private BigDecimal maxDrawDown;
     private Integer totalTradeNum;
     private BigDecimal winRate;
+    /** 年化夏普（权益曲线，RF=0；展示用，不计入综合评分） */
+    private BigDecimal sharpe;
     /** 买卖次数/股数/手数/金额/费用/总盈亏 */
     private BackTestTradeStats tradeStats;
     private List<BackTradeRecord> trades;
@@ -57,6 +60,7 @@ public class SingleBacktestHistoryRecord {
                 .maxDrawDown(result.getMaxDrawDown())
                 .totalTradeNum(result.getTotalTradeNum())
                 .winRate(result.getWinRate())
+                .sharpe(SharpeRatioCalculator.fromEquityCurve(result.getEquityCurve(), period))
                 .tradeStats(BackTestTradeStats.from(tradeList, result.getInitCapital(), result.getFinalAsset()))
                 .trades(tradeList)
                 .configFingerprint(result.getConfigFingerprint())

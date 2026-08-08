@@ -37,6 +37,8 @@ public class BtBacktestRecordDO {
     private BigDecimal maxDrawdown;
     private Integer totalTradeNum;
     private BigDecimal winRate;
+    /** 年化夏普（权益曲线，RF=0；展示用） */
+    private BigDecimal sharpe;
     /** {@link BackTestTradeStats} JSON */
     private String tradeStatsJson;
     /** 成交流水 JSON */
