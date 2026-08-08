@@ -244,13 +244,16 @@ quant:
 
 业务挂钩（仅 `static-enabled`）：开仓停牌/涨跌停/股本、当日交易日、`TradeCostModel` 默认佣金。
 
-## 下一步（M5，未落地 · 2026-08-07）
+## 最新接入计划（未落地 · 2026-08-08）
 
-对照资料包 Demo/Javadoc 与当前实现，现货主路径 M0～M4 已可选落地；下一刀：
+现货主路径 M0～M4 已可选落地（具名接口约 15/24）。推荐顺序：
 
 1. **M5a MDS**：`onDisConn` → 异步 `closeClient`；退避重登；需则重订阅；`market-collect` 死连接/全失败勿挡本地回退  
 2. **M5b OES**：断线先 `close` 再重建 + `sendRptSync`  
-3. **小修**：`PARTIALLY_CANCELED(6)`→本地 `CANCELLED`；撤单确认制  
-4. 仿真浸泡验收后再考虑 overview/批量快照/银证/L2  
+3. **报撤小修**：`PARTIALLY_CANCELED(6)`→本地 `CANCELLED`；撤单确认制  
+4. **仿真浸泡**验收  
+5. **查询/效率增强**：overview / invAcct / 可买量 / `qrySnapshotList`；批量下单按需  
+6. **M6 银证**（真仓）：`sendCashTrsfReq` + `queryCashTransferSerial`（sim 可不接）  
+7. **后置**：L2/UDP；两融/期权/ETF 不进主路径  
 
-详情见页面「应用说明 → 宽睿文档梳理」待做表。
+详情见页面「宽睿对接 → 宽睿文档梳理」。

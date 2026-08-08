@@ -9,9 +9,9 @@
   更新：2026-08-08 ·
   <b>M0</b> 仿真登录 COMPLETE ·
   <b>M1</b>～<b>M4</b> 可选已落地（默认关）·
-  下一步 <b>M5</b> 连接韧性（先 MDS，再 OES）·
-  后置 L2/批量/银证。
-  侧栏「扩展与文档 → <b>宽睿对接</b>」可点测运维 API（入参/出参）；含<strong>账号登录</strong>（验柜后密文入库）；本页为同菜单二级「宽睿文档梳理」；接口旁「介绍」轻量弹层对齐本页摘要；报撤试单须 yml <code>order-enabled</code>。
+  现货具名接口约 <b>15/24</b> 已接 ·
+  <b>最新计划</b>：① M5 连接韧性 → ② 报撤小修+浸泡 → ③ 查询/效率增强 → ④ <b>M6 银证</b>（真仓）→ ⑤ L2/批量/两融后置。
+  侧栏「扩展与文档 → <b>宽睿对接</b>」可点测运维 API；含账号登录与二级「宽睿文档梳理」；接口「介绍」弹层对齐本页摘要；报撤须 yml <code>order-enabled</code>。
 </p>
 
 <div class="memo-todo">
@@ -65,9 +65,10 @@
       <tr><td>回报同步</td><td><code>sendRptSync</code></td><td><b>登录后必做</b>；超时易断连</td></tr>
       <tr><td>查委托 / 成交</td><td><code>queryOrder</code> / <code>queryTrade</code></td><td><b>M2/M3</b>：对账 + sync 推进补强</td></tr>
       <tr><td>查资金 / 持仓</td><td><code>queryCashAsset</code> / <code>queryStkHolding</code></td><td><b>M2 已用</b>：运维查询 + <code>position-pnl-sync</code> 对账</td></tr>
-      <tr><td>总览 / 柜台资金</td><td><code>queryClientOverview</code> / <code>queryCounterCash</code></td><td>纸面对账</td></tr>
+      <tr><td>总览 / 柜台资金</td><td><code>queryClientOverview</code> / <code>queryCounterCash</code></td><td><b>计划 M5 后增强</b>：纸面对账补强</td></tr>
       <tr><td>佣金 / 产品 / 交易日</td><td><code>queryCommissionRate</code> / <code>queryStock</code> / <code>queryTradingDay</code></td><td><b>M4 已用</b>：可开关覆盖本地费率/日历/涨跌停</td></tr>
-      <tr><td>两融 / 期权 / ETF / 银证</td><td>扩展接口族</td><td>超出现货范围，暂缓</td></tr>
+      <tr><td>银证转账</td><td><code>sendCashTrsfReq</code> / <code>queryCashTransferSerial</code></td><td><b>计划 M6</b>：真仓运维；sim 可不接</td></tr>
+      <tr><td>两融 / 期权 / ETF</td><td>扩展接口族</td><td>超出现货范围，不做</td></tr>
     </tbody>
   </table>
   <h5 style="margin:8px 0 4px;">2.4 常用错误码</h5>
@@ -161,63 +162,111 @@
     <li>对照与 JSON：<code>config/kuangrui/examples/aliyun-sim.md</code>；通道配置仅 <code>local/</code>（gitignore）；账号优先页面验柜入库，或环境变量</li>
   </ul>
 
-  <h5 style="margin:12px 0 4px;">待做（2026-08-07 对照 Demo/Javadoc 复核）</h5>
+  <h5 style="margin:12px 0 4px;">接入面盘点（现货具名接口 · 2026-08-08）</h5>
   <p class="hint" style="margin:0 0 8px;">
-    现货主路径 M0～M4 <b>代码可选已落地</b>（默认关）；联机浸泡需再跑证据。
-    Demo 能力远大于接入面：两融/期权/L2 不进主路径。SDK 无公开 reconnect，须应用层实现（回调内勿重活）。
+    口径：手册典型 SDK 名（非 jar 全部重载）。MDS≈8、OES≈16，合计约 24；已接 15（≈63%）。
+    整包含 L2/两融等远大于此；主路径有意裁剪。
   </p>
   <table>
-    <thead><tr><th>阶段</th><th>目标</th><th>要点</th><th>Done 标准</th></tr></thead>
+    <thead><tr><th>状态</th><th>接口</th></tr></thead>
     <tbody>
       <tr>
+        <td><b>已接（15）</b></td>
+        <td>
+          MDS：<code>subscribeMarketData</code>、<code>qryMktDataSnapshot</code>、<code>qrySecurityStatus</code>、<code>qryTrdSessionStatus</code>、<code>qryStockStaticInfo</code>；
+          OES：<code>sendRptSync</code>、<code>sendOrdReq</code>、<code>sendOrdCancelReq</code>、
+          <code>queryCashAsset</code>、<code>queryStkHolding</code>、<code>queryOrder</code>、<code>queryTrade</code>、
+          <code>queryStock</code>、<code>queryTradingDay</code>、<code>queryCommissionRate</code>
+        </td>
+      </tr>
+      <tr>
+        <td><b>计划接入</b></td>
+        <td>
+          增强：<code>queryClientOverview</code> / <code>queryCounterCash</code> / <code>queryInvAcct</code> / <code>queryMaxTradableQty</code> /
+          <code>qrySnapshotList</code>；批量 <code>sendBatchOrdsReq</code>（按需）；
+          <b>M6 银证</b>：<code>sendCashTrsfReq</code> + <code>queryCashTransferSerial</code>
+        </td>
+      </tr>
+      <tr>
+        <td><b>后置 / 不做</b></td>
+        <td>L2、UDP、<code>MdsUdpClient</code>；两融 / 期权 / ETF 申赎（超出现货）</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h5 style="margin:12px 0 4px;">最新接入计划（2026-08-08）</h5>
+  <p class="hint" style="margin:0 0 8px;">
+    现货主路径 M0～M4 <b>代码可选已落地</b>（默认关）。优先把「能连稳、报撤对」做完，再补查询增强与真仓银证。
+    SDK 无公开 reconnect，须应用层实现（回调内勿重活）。
+  </p>
+  <table>
+    <thead><tr><th>顺序</th><th>阶段</th><th>目标</th><th>要点</th><th>Done 标准</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>①</td>
         <td><b>M5a MDS</b></td>
-        <td>连接韧性（优先）</td>
+        <td>连接韧性（最先）</td>
         <td>
           现状：<code>onDisConn</code> 只清 <code>subscribed</code>，不清 <code>client</code>；
           <code>ensureClient</code> 见非空直接返回 → 易顶死连接；
-          <code>market-collect</code> pull 空窗时仍可能 <code>return true</code> 挡住本地回退。
+          <code>market-collect</code> pull 空窗时仍可能挡本地回退。
           改：异步 <code>closeClient</code> → 退避重登 → 需则重订阅；全失败勿冒充成功。
         </td>
         <td>断线后采集可自愈或明确回退本地；status 可见断线/重连</td>
       </tr>
       <tr>
+        <td>②</td>
         <td><b>M5b OES</b></td>
         <td>连接韧性</td>
         <td>
-          现状：断线置 <code>client=null</code> 可懒重连，但未先 <code>close</code>（泄漏/重复登录风险）。
+          现状：断线置 <code>client=null</code> 可懒重连，但未先 <code>close</code>。
           改：先 close 再重建 + <code>sendRptSync</code>；退避；status 暴露断线计数。
         </td>
         <td>断线后只读/报撤可恢复；仿真无长期假死</td>
       </tr>
       <tr>
+        <td>③</td>
         <td><b>M3/M5 小修</b></td>
         <td>状态与撤单</td>
         <td>
-          粗映射已有（含 REJECTED≥10）。缺口：
-          <code>PARTIALLY_CANCELED(6)</code> 现映 <code>PARTIAL</code>，应映 <code>CANCELLED</code>（保留已成量）；
-          撤单现乐观本地 CANCELLED，应等回报/查询确认。
+          <code>PARTIALLY_CANCELED(6)</code>→本地 <code>CANCELLED</code>（保留已成量）；
+          撤单等回报/查询确认，勿乐观假撤。
         </td>
         <td>单测覆盖状态 6；撤拒不永久假撤</td>
       </tr>
       <tr>
+        <td>④</td>
         <td><b>验收</b></td>
         <td>仿真浸泡</td>
         <td>开关开一轮：登录 → MDS pull/订 → OES reconcile → 买/卖/撤 → sync → static 抽检</td>
         <td>有日志/运维结果可复现</td>
       </tr>
       <tr>
-        <td><b>增强（可选）</b></td>
-        <td>查询/效率</td>
+        <td>⑤</td>
+        <td><b>M5+ 增强</b></td>
+        <td>查询 / 效率</td>
         <td>
-          M2：<code>queryInvAcct</code> / <code>queryClientOverview</code> / <code>queryMaxTradableQty</code> 等；
-          M1：<code>qrySnapshotList</code> 批量 pull；需要时再 <code>sendBatchOrdsReq</code>
+          <code>queryClientOverview</code> / <code>queryCounterCash</code> /
+          <code>queryInvAcct</code> / <code>queryMaxTradableQty</code>；
+          MDS <code>qrySnapshotList</code> 批量 pull；需要时再 <code>sendBatchOrdsReq</code>
         </td>
-        <td>按需验收</td>
+        <td>运维点测可查；可买量可挂钩下单前校验（可选）</td>
       </tr>
       <tr>
+        <td>⑥</td>
+        <td><b>M6 银证</b></td>
+        <td>真仓资金运维</td>
+        <td>
+          <code>sendCashTrsfReq</code> + <code>queryCashTransferSerial</code>；
+          宽睿对接页点测（二次确认）；sim 账本可不接。
+        </td>
+        <td>仿真/真仓可发起转入转出并查流水；失败可观测</td>
+      </tr>
+      <tr>
+        <td>⑦</td>
         <td><b>后置</b></td>
         <td>可选</td>
-        <td>L2/UDP/LOB、银证（<code>sendCashTrsfReq</code>）、两融/期权/ETF 申赎不进主路径</td>
+        <td>L2/UDP/LOB；两融/期权/ETF 申赎不进主路径</td>
         <td>—</td>
       </tr>
     </tbody>

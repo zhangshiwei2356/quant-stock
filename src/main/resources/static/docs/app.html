@@ -64,7 +64,9 @@
   <li>限价/执行/对账/行业边界可查；组合回测对齐部成/压力降仓/成交缩量/停牌拒卖/ST as-of 强平/`atrRisk`；退役强制恢复双人复核</li>
   <li>账户「风控日报」含相关监控；委托支持撤/部成/改价；运维数据健康可「检查分钟自洽」与「MDS/TDX 抽样对账」；scan/sync/settle 锁忙手动执行 failLoud</li>
   <li>单股 / 组合 / 扫描交易对齐核心规则；实盘为<strong>本地模拟账本</strong>（含风控/挂单持久化与路径对齐）</li>
-  <li>宽睿 OES/MDS：资料包 <code>v0.19.4.0</code>；见「宽睿对接 → 宽睿文档梳理」。M0 COMPLETE；M1～M4 均为可选旁路（默认关）；下一步 <b>M5 连接韧性</b>（先 MDS）；报撤需 <code>oes.order-enabled</code>+<code>trade-mode=sdk</code>；默认仍 <code>sim</code>+<code>db</code></li>
+  <li>宽睿 OES/MDS：资料包 <code>v0.19.4.0</code>；见「宽睿对接 → 宽睿文档梳理」。M0 COMPLETE；M1～M4 可选旁路（默认关；具名约 15/24）；
+    <b>最新计划</b>：M5 韧性 → 报撤小修 → 浸泡 → 查询增强 → <b>M6 银证</b> → L2/两融后置；
+    报撤需 <code>oes.order-enabled</code>+<code>trade-mode=sdk</code>；默认仍 <code>sim</code>+<code>db</code></li>
   <li>细则：「应用说明 → 交易规则」</li>
 </ul>
 
