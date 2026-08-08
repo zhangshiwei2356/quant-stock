@@ -61,7 +61,7 @@ public class MockDataImporter {
         PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
         Resource metaRes = resolver.getResource(BASE + "meta.json");
         if (!metaRes.exists()) {
-            log.warn("未找到 meta.json，无法导入");
+            log.info("未找到 meta.json，无法导入");
             return;
         }
         JSONObject meta = JSON.parseObject(readAll(metaRes.getInputStream()));
@@ -81,7 +81,7 @@ public class MockDataImporter {
             log.info("增量导入模拟 1 分钟行情 symbol={} ...", code);
             int n = importOneMin(resolver, code);
             if (n <= 0) {
-                log.warn("跳过 symbol={}：无 MIN_1.json / MIN_5.json 可导入", code);
+                log.info("跳过 symbol={}：无 MIN_1.json / MIN_5.json 可导入", code);
                 continue;
             }
             factorDailyComputeService.rebuildOne(code);

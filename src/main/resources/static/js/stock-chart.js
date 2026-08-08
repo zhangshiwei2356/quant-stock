@@ -5247,7 +5247,7 @@
       try {
         window.mermaid.run({ nodes: $root.find('.readme-mermaid').toArray() });
       } catch (e1) {
-        console.warn('mermaid render failed', e1);
+        console.error('mermaid render failed', e1);
       }
     }
     if (window.mermaid) {
@@ -5268,7 +5268,7 @@
     };
     s.onerror = function () {
       window.__quantMermaidLoading = null;
-      console.warn('mermaid CDN 加载失败，架构图将显示为源码');
+      console.error('mermaid CDN 加载失败，架构图将显示为源码');
     };
     document.head.appendChild(s);
   }

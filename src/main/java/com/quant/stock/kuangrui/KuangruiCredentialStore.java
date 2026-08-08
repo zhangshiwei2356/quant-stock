@@ -88,7 +88,7 @@ public class KuangruiCredentialStore {
                 if (StringUtils.hasText(user) && StringUtils.hasText(pass)) {
                     return new KuangruiCredentials(user, pass, "db");
                 }
-                log.warn("[kuangrui-cred] active 账号解密失败，回退环境变量");
+                log.error("[kuangrui-cred] active 账号解密失败，回退环境变量");
             }
         } catch (Exception e) {
             log.error("[kuangrui-cred] 读库失败，回退环境变量: {}", e.getMessage(), e);

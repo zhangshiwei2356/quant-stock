@@ -51,7 +51,7 @@ public class ActiveStrategyService {
             }
             String id = stored.trim();
             if (!strategyRegistry.contains(id)) {
-                log.warn("忽略未知激活策略 system_config {}={}", CONFIG_KEY, id);
+                log.error("忽略未知激活策略 system_config {}={}", CONFIG_KEY, id);
                 return;
             }
             String resolved = strategyRegistry.resolve(id).name();

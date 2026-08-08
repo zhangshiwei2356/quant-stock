@@ -84,7 +84,7 @@ public class TradeGatewayService {
 
         if (idempotentIndex.containsKey(cid)) {
             String existId = idempotentIndex.get(cid);
-            log.warn("幂等拒绝重复下单 clientOrderId={} -> {}", cid, existId);
+            log.info("幂等拒绝重复下单 clientOrderId={} -> {}", cid, existId);
             return orders.get(existId);
         }
 
@@ -140,7 +140,7 @@ public class TradeGatewayService {
         }
         OrderDTO.Status st = order.getStatus();
         if (st != OrderDTO.Status.SUBMITTED && st != OrderDTO.Status.PARTIAL) {
-            log.warn("不可撤单 orderId={} status={}", orderId, st);
+            log.info("不可撤单 orderId={} status={}", orderId, st);
             return null;
         }
         OesOrderService oes = oesOrder();
@@ -148,7 +148,7 @@ public class TradeGatewayService {
         if (oes != null && oes.isOrderLive() && clSeq != null) {
             boolean sent = oes.cancelByClSeqNo(clSeq.intValue(), order.getStockCode());
             if (!sent) {
-                log.warn("OES 撤单请求失败 orderId={} clSeqNo={}", orderId, clSeq);
+                log.error("OES 撤单请求失败 orderId={} clSeqNo={}", orderId, clSeq);
                 return null;
             }
             // 请求已发：先本地置 CANCELLED（与原桩行为一致）；回报若拒绝可在后续增强
@@ -178,7 +178,7 @@ public class TradeGatewayService {
         int vol = newVolume == null || newVolume <= 0 ? leftover : newVolume;
         vol = (vol / 100) * 100;
         if (vol < 100 || newPrice == null || newPrice.compareTo(BigDecimal.ZERO) <= 0) {
-            log.warn("改价补单失败：余量或价格非法 orderId={} vol={} px={}", orderId, vol, newPrice);
+            log.error("改价补单失败：余量或价格非法 orderId={} vol={} px={}", orderId, vol, newPrice);
             return null;
         }
         String cid = "RPL-" + IdUtil.fastSimpleUUID();
@@ -278,7 +278,7 @@ public class TradeGatewayService {
             if (!r.isAccepted()) {
                 order.setStatus(OrderDTO.Status.REJECTED);
                 order.setFilledVolume(0);
-                log.warn("OES 报单拒绝 orderId={} clSeqNo={} msg={}", orderId, clSeq, r.getMessage());
+                log.error("OES 报单拒绝 orderId={} clSeqNo={} msg={}", orderId, clSeq, r.getMessage());
                 return orderId;
             }
             orderIdToClSeq.put(orderId, Integer.valueOf(clSeq));

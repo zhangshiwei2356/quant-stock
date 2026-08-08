@@ -519,7 +519,7 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
             c.initCallBack(new MdsCallBack() {
                 @Override
                 public void onDisConn(MdsClient cl) {
-                    log.warn("[mds] 连接中断");
+                    log.error("[mds] 连接中断");
                     subscribed.set(false);
                     lastError.set("disconnected");
                 }

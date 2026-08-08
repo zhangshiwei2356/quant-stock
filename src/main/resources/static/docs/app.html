@@ -72,7 +72,7 @@
 <ul>
   <li>定时总闸 <code>quant.schedule.enabled</code>；API：<code>GET /api/schedule</code></li>
   <li>安全：可选 <code>QUANT_API_KEY</code>；限流 <code>QUANT_RATE_LIMIT</code></li>
-  <li>日志：后端凡 <code>catch</code> 须打 <code>log.error</code>（含降级回退与转 HTTP 错误），禁止静默吞异常</li>
+  <li>日志：应用侧只用 <code>info</code>/<code>error</code>（不用 <code>warn</code>）；凡 <code>catch</code> 须打 <code>log.error</code>，禁止静默吞异常</li>
   <li>扩展：<code>KlineSdkClient</code> / <code>trade-mode=sdk</code>（当前为桩）</li>
 </ul>
 

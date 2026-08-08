@@ -801,7 +801,7 @@
       wantActive = true;
       initScene();
     }).catch(function (err) {
-      console.warn('[QuantStarfieldBg]', err);
+      console.error('[QuantStarfieldBg]', err);
       stop();
     });
   }

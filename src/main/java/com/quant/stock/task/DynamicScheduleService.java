@@ -329,7 +329,7 @@ public class DynamicScheduleService implements ApplicationRunner {
         long elapsed = elapsedSecOf(cur);
         // 超过 20s 仍停在排队/已受理 → 判定未真正开跑
         if (notStarted && elapsed >= 20L) {
-            log.warn("回收僵尸手动任务 {} phase={} elapsed={}s", cur.jobCode, ph, elapsed);
+            log.info("回收僵尸手动任务 {} phase={} elapsed={}s", cur.jobCode, ph, elapsed);
             jobProgressHub.detach();
             cur.running = false;
             cur.ok = false;
@@ -612,7 +612,7 @@ public class DynamicScheduleService implements ApplicationRunner {
                         if (failLoud) {
                             throw new IllegalStateException("scan-and-trade 锁忙，未执行");
                         }
-                        log.warn("scan-and-trade 锁忙，定时触发跳过");
+                        log.info("scan-and-trade 锁忙，定时触发跳过");
                         return;
                     }
                     break;
@@ -621,7 +621,7 @@ public class DynamicScheduleService implements ApplicationRunner {
                         if (failLoud) {
                             throw new IllegalStateException("sync-orders 锁忙，未执行");
                         }
-                        log.warn("sync-orders 锁忙，定时触发跳过");
+                        log.info("sync-orders 锁忙，定时触发跳过");
                         return;
                     }
                     break;
@@ -630,7 +630,7 @@ public class DynamicScheduleService implements ApplicationRunner {
                         if (failLoud) {
                             throw new IllegalStateException("settle-after-close 锁忙，未执行");
                         }
-                        log.warn("settle-after-close 锁忙，定时触发跳过");
+                        log.info("settle-after-close 锁忙，定时触发跳过");
                         return;
                     }
                     break;
@@ -659,7 +659,7 @@ public class DynamicScheduleService implements ApplicationRunner {
                     scheduleJobHandlers.poolRebuild();
                     break;
                 default:
-                    log.warn("未知定时任务编码: {}", jobCode);
+                    log.error("未知定时任务编码: {}", jobCode);
                     if (failLoud) {
                         throw new IllegalArgumentException("未知定时任务编码: " + jobCode);
                     }

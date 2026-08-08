@@ -339,7 +339,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
         return finishQueryResult(methodName, r);
     }
 
-    /** 增强查询：多方法名 / Filter 类 / 回调收集；失败写入 lastError 并 WARN。 */
+    /** 增强查询：多方法名 / Filter 类 / 回调收集；失败写入 lastError 并打 error 日志。 */
     private List<?> invokeOesQuery(String[] methodNames, String[] filterClasses) {
         OesClientImpl c = client;
         if (c == null) {
@@ -352,7 +352,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
     private List<?> finishQueryResult(String methodName, OesQueryListInvoker.Result r) {
         if (!r.ok) {
             lastError.set(r.detail);
-            log.warn("[oes] {} 查询失败: {}", methodName, r.detail);
+            log.error("[oes] {} 查询失败: {}", methodName, r.detail);
             return Collections.emptyList();
         }
         if (r.list.isEmpty()) {
@@ -473,7 +473,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
         try {
             ensureReadyOrThrow();
             if (!rptSynced.get()) {
-                log.warn("[oes] 回报未同步，拒绝撤单 lastError={}", lastError.get());
+                log.error("[oes] 回报未同步，拒绝撤单 lastError={}", lastError.get());
                 return false;
             }
             String code = OesViewMapper.normalizeCode(stockCode);
@@ -499,7 +499,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
                 ret = invokeReturning(client, "sendOrderCancelReq", req);
             }
             if (ret instanceof Number && ((Number) ret).intValue() < 0) {
-                log.warn("[oes] 撤单返回码 {}", ret);
+                log.error("[oes] 撤单返回码 {}", ret);
                 return false;
             }
             log.info("[oes] 撤单已发 origClSeqNo={} code={}", origClSeqNo, code);
@@ -762,7 +762,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
         }
         String n = name.toLowerCase();
         if (n.contains("disconn")) {
-            log.warn("[oes] 连接中断");
+            log.error("[oes] 连接中断");
             rptSynced.set(false);
             lastError.set("disconnected");
             client = null;
@@ -902,7 +902,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
         // Demo：登录后应 sendRptSync；签名/异常明细见 OesRptSyncInvoker（subscribeEnvId≤0=全部）
         OesRptSyncInvoker.Result r = OesRptSyncInvoker.invoke(c, seq, 0);
         if (!r.ok) {
-            log.warn("[oes] sendRptSync 失败 seq={} detail={}", seq, r.detail);
+            log.error("[oes] sendRptSync 失败 seq={} detail={}", seq, r.detail);
             throw new IllegalStateException(r.detail != null ? r.detail
                     : "回报同步失败（OesRptSyncInvoker/v2；请核对 -Pkuangrui 与 rpt 通道）");
         }

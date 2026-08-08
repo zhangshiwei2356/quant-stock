@@ -72,7 +72,7 @@ public class ScheduleJobHandlers {
                     codes.add(u.get("code"));
                 }
                 if (codes.isEmpty()) {
-                    log.warn("[market-collect] 全市场为空，跳过");
+                    log.info("[market-collect] 全市场为空，跳过");
                     return;
                 }
                 int ok = 0;
@@ -86,7 +86,7 @@ public class ScheduleJobHandlers {
                         List<BarDTO> bars = marketDataService.fetchAndPersistMinute(code);
                         if (bars == null || bars.isEmpty()) {
                             fail++;
-                            log.warn("[market-collect] 无数据 code={}", code);
+                            log.info("[market-collect] 无数据 code={}", code);
                         } else {
                             ok++;
                             BarDTO last = bars.get(bars.size() - 1);
@@ -298,7 +298,7 @@ public class ScheduleJobHandlers {
                     universe.add(u.get("code"));
                 }
                 if (universe.isEmpty()) {
-                    log.warn("[data-validate] 全市场为空，跳过");
+                    log.info("[data-validate] 全市场为空，跳过");
                     return;
                 }
                 Set<String> pool = new HashSet<String>(tradePoolService.listActiveCodes());
@@ -365,12 +365,12 @@ public class ScheduleJobHandlers {
             dayCnt = maxDaily == null ? 0 : 1;
         }
         if (dayCnt == null || dayCnt <= 0 || maxDaily == null) {
-            log.warn("[data-validate] {} 日线为空", code);
+            log.error("[data-validate] {} 日线为空", code);
             return false;
         }
         long lagDays = ChronoUnit.DAYS.between(maxDaily, today);
         if (lagDays > DAILY_STALE_DAYS) {
-            log.warn("[data-validate] {} 日线滞后 {} 天 (last={})", code, lagDays, maxDaily);
+            log.error("[data-validate] {} 日线滞后 {} 天 (last={})", code, lagDays, maxDaily);
             return false;
         }
         return true;
@@ -384,18 +384,18 @@ public class ScheduleJobHandlers {
                 rs -> rs.next() ? rs.getObject(1, LocalDateTime.class) : null,
                 code);
         if (oneMinCnt == null || oneMinCnt <= 0 || maxOneMin == null) {
-            log.warn("[data-validate] {} 池内1分钟为空", code);
+            log.error("[data-validate] {} 池内1分钟为空", code);
             return false;
         }
         long lagDays = ChronoUnit.DAYS.between(maxOneMin.toLocalDate(), today);
         if (lagDays > DAILY_STALE_DAYS) {
-            log.warn("[data-validate] {} 池内1分钟覆盖日滞后 {} 天 (last={})",
+            log.error("[data-validate] {} 池内1分钟覆盖日滞后 {} 天 (last={})",
                     code, lagDays, maxOneMin.toLocalDate());
             return false;
         }
         long lagHours = ChronoUnit.HOURS.between(maxOneMin, now);
         if (lagHours > MINUTE_STALE_HOURS) {
-            log.warn("[data-validate] {} 池内1分钟滞后 {} 小时 (last={})",
+            log.error("[data-validate] {} 池内1分钟滞后 {} 小时 (last={})",
                     code, lagHours, maxOneMin);
             return false;
         }

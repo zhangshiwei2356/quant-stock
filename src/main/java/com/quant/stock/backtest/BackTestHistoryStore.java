@@ -83,7 +83,7 @@ public class BackTestHistoryStore {
         SingleBacktestHistoryRecord rec = SingleBacktestHistoryRecord.fromResult(
                 id, savedAt, period, emptyToNull(backStart), emptyToNull(backEnd), result, sid);
         if (backtestRecordMapper == null) {
-            log.warn("未启用 MySQL，单股回测历史未持久化 id={}", id);
+            log.info("未启用 MySQL，单股回测历史未持久化 id={}", id);
             return rec;
         }
         BtBacktestRecordDO row = BtBacktestRecordDO.builder()
@@ -122,7 +122,7 @@ public class BackTestHistoryStore {
         PortfolioBacktestHistoryRecord rec = PortfolioBacktestHistoryRecord.fromResult(
                 id, savedAt, query, result, sid);
         if (backtestRecordMapper == null) {
-            log.warn("未启用 MySQL，组合回测历史未持久化 id={}", id);
+            log.info("未启用 MySQL，组合回测历史未持久化 id={}", id);
             return rec;
         }
         BtBacktestRecordDO row = BtBacktestRecordDO.builder()

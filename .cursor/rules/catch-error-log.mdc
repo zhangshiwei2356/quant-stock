@@ -1,18 +1,22 @@
 ---
-description: Java catch 必须打 error 级日志
+description: Java 应用日志仅 info/error；catch 必须 error
 globs: **/*.{java}
 alwaysApply: false
 ---
 
-# catch → log.error
+# 日志级别：仅 info / error
 
 对本仓库 **Java** 代码（`src/main/java`、`src/main-kuangrui`）：
 
-1. 凡出现 `catch`，**必须**在 catch 块内打 **`log.error(..., throwable)`**（或至少带异常对象的 `log.error(msg, e)`）
-2. **禁止**仅用 `log.warn` / `log.debug`、空 catch、或只改返回值/状态而不打 error
-3. 即使随后 `throw` / 转成 `ResponseStatusException` / 降级回退，仍须先 `log.error`
-4. 新增类若尚无日志器：加 `@Slf4j`（或等价 `LoggerFactory`）
+1. **禁止** `log.warn` / `log.debug` 作为应用业务日志
+2. 可预期运维状态（锁忙跳过、空池跳过、未开库不落盘、回退 mock 等）→ **`log.info`**
+3. 失败、拒绝、连接中断、数据异常、需处置问题 → **`log.error`**
+4. 凡出现 `catch`，**必须**在 catch 块内打 **`log.error(..., throwable)`**
+5. 即使随后 `throw` / 转成 `ResponseStatusException` / 降级回退，仍须先 `log.error`
+6. 新增类若尚无日志器：加 `@Slf4j`（或等价 `LoggerFactory`）
+
+说明：业务告警枚举 `AlertSeverity.WARN`（软预算等）**不是**日志级别，勿与 `log.warn` 混淆。
 
 前端 JS 的 try/catch（如 localStorage）不在本规则范围。
 
-说明见 `README.md`「安全与运维配置 → 日志约定」。
+见 `README.md`「安全与运维配置 → 日志约定」。

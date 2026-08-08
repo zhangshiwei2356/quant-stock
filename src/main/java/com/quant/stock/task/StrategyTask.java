@@ -383,7 +383,7 @@ public class StrategyTask {
      */
     public boolean scanAndTrade() {
         if (!redisLockUtil.tryLock("strategy-scan", 120)) {
-            log.warn("scan-and-trade 锁忙，跳过本轮");
+            log.info("scan-and-trade 锁忙，跳过本轮");
             return false;
         }
         try {
@@ -402,7 +402,7 @@ public class StrategyTask {
     private boolean doScanAndTrade() {
             List<String> targets = resolveLiveScanCodes();
             if (targets.isEmpty()) {
-                log.warn("目标池为空，跳过分钟扫描（请先执行盘后扫描写入目标池）");
+                log.info("目标池为空，跳过分钟扫描（请先执行盘后扫描写入目标池）");
                 return true;
             }
             for (String code : targets) {
@@ -769,7 +769,7 @@ public class StrategyTask {
      */
     public boolean syncOrders() {
         if (!redisLockUtil.tryLock("strategy-scan", 60)) {
-            log.warn("sync-orders 锁忙，跳过本轮");
+            log.info("sync-orders 锁忙，跳过本轮");
             return false;
         }
         try {
@@ -780,7 +780,7 @@ public class StrategyTask {
                 }
                 PendingFill pending = pendingFills.remove(order.getOrderId());
                 if (pending == null) {
-                    log.warn("同步成交无本地待入账上下文 orderId={}", order.getOrderId());
+                    log.error("同步成交无本地待入账上下文 orderId={}", order.getOrderId());
                     continue;
                 }
                 LiveBook book = books.computeIfAbsent(pending.code, k -> new LiveBook());
@@ -812,7 +812,7 @@ public class StrategyTask {
      */
     public OrderDTO cancelOrder(String orderId) {
         if (!redisLockUtil.tryLock("strategy-scan", 60)) {
-            log.warn("cancelOrder 锁忙 orderId={}", orderId);
+            log.info("cancelOrder 锁忙 orderId={}", orderId);
             return null;
         }
         try {
@@ -829,7 +829,7 @@ public class StrategyTask {
         String id = orderId.trim();
         OrderDTO order = tradeGatewayService.cancelOrder(id);
         if (order == null) {
-            log.warn("策略撤单失败（不存在或不可撤） orderId={}", id);
+            log.error("策略撤单失败（不存在或不可撤） orderId={}", id);
             return null;
         }
         PendingFill pending = pendingFills.remove(id);
@@ -855,7 +855,7 @@ public class StrategyTask {
             return null;
         }
         if (!redisLockUtil.tryLock("strategy-scan", 60)) {
-            log.warn("replaceOrder 锁忙 orderId={}", orderId);
+            log.info("replaceOrder 锁忙 orderId={}", orderId);
             return null;
         }
         try {
@@ -933,7 +933,7 @@ public class StrategyTask {
             return null;
         }
         if (!redisLockUtil.tryLock("strategy-scan", 60)) {
-            log.warn("partial-fill 锁忙 orderId={}", orderId);
+            log.info("partial-fill 锁忙 orderId={}", orderId);
             return null;
         }
         try {
@@ -944,7 +944,7 @@ public class StrategyTask {
                 return null;
             }
             if (pending == null) {
-                log.warn("部成无本地待入账上下文（可能重启后丢失） orderId={} filled={}",
+                log.error("部成无本地待入账上下文（可能重启后丢失） orderId={} filled={}",
                         id, order.getFilledVolume());
                 return order;
             }
@@ -1123,7 +1123,7 @@ public class StrategyTask {
      */
     public boolean settleAfterClose() {
         if (!redisLockUtil.tryLock("strategy-scan", 120)) {
-            log.warn("settle-after-close 锁忙，跳过本轮");
+            log.info("settle-after-close 锁忙，跳过本轮");
             return false;
         }
         try {
@@ -1177,7 +1177,7 @@ public class StrategyTask {
     public void afterMarketBatchScan() {
         log.info("盘后入池扫描触发（覆盖唯一目标池）");
         if (tradePoolService == null) {
-            log.warn("TradePoolService 不可用，回退批量扫描 stock-codes");
+            log.info("TradePoolService 不可用，回退批量扫描 stock-codes");
             batchStockBackTestService.scanAll();
             return;
         }

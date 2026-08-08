@@ -48,7 +48,7 @@ public class JsonBarDataStore {
             PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
             Resource metaRes = resolver.getResource(BASE + "meta.json");
             if (!metaRes.exists()) {
-                log.warn("未找到模拟K线 meta.json，JsonBarDataStore 空载");
+                log.info("未找到模拟K线 meta.json，JsonBarDataStore 空载");
                 return;
             }
             try (InputStream in = metaRes.getInputStream()) {

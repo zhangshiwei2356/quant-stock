@@ -148,7 +148,7 @@ public class BackTestAnalysisStore {
 
     private void persist(BackTestAnalysisRecord rec) {
         if (backtestAnalysisMapper == null) {
-            log.warn("未启用 MySQL，分析记录未持久化 id={}", rec.getId());
+            log.info("未启用 MySQL，分析记录未持久化 id={}", rec.getId());
             return;
         }
         BtBacktestAnalysisDO row = BtBacktestAnalysisDO.builder()

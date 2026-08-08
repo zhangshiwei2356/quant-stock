@@ -284,7 +284,7 @@ sequenceDiagram
 | `quant.kuangrui.config-dir` | MDS/OES JSON 目录（默认 `config/kuangrui/local`，可用 `QUANT_KUANGRUI_CONFIG_DIR`） |
 | `spring.profiles.active` | 默认 **`local`**（可用 `SPRING_PROFILES_ACTIVE` 覆盖）；加载 `application-local.yml` |
 
-**日志约定**：后端 Java 凡 `catch` 必须打 **`log.error`**（含吞掉后降级/回退、以及转成 HTTP 4xx 再抛出的分支），便于排障；禁止仅 `warn`/`debug` 或静默吞异常。
+**日志约定**：后端应用日志只使用 **`info` / `error`**（禁止 `warn`/`debug` 作为业务日志）。凡 `catch` 必须打 **`log.error`**（含降级回退与转 HTTP 错误）；可预期跳过/回退用 `info`，失败与需处置问题用 `error`。业务告警枚举 `AlertSeverity`（含 WARN）与日志级别无关。
 
 ---
 

@@ -185,7 +185,7 @@ public class MarketDataService {
         if ("sdk".equalsIgnoreCase(quantProperties.getMarketMode())) {
             bars = loadKlineFromSdk(code);
             if (bars == null || bars.isEmpty()) {
-                log.warn("SDK行情为空，回退 mock 数据, code={}", code);
+                log.info("SDK行情为空，回退 mock 数据, code={}", code);
                 bars = generateMockBars(code, quantProperties.getMockBarDays());
             }
         } else {
