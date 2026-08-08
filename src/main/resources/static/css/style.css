@@ -3961,13 +3961,89 @@ td.muted {
   margin-top: 0;
 }
 
+/* 组合回测工作台：紧凑参数 + 批量选择 + 已选紧贴选股 */
+.pf-workspace-head {
+  margin-bottom: 4px;
+}
+.pf-workspace-head h3 {
+  margin: 0 0 4px;
+}
+.pf-workspace-head .hint {
+  margin: 0 0 8px;
+}
+.pf-group {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+.pf-workspace-head + .pf-group {
+  margin-top: 8px;
+  padding-top: 0;
+  border-top: none;
+}
+.pf-group-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.02em;
+}
+.pf-group-sub {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.stock-picker--portfolio .stock-picker-bar {
+  margin-bottom: 8px;
+}
+.stock-picker--portfolio .stock-picker-list {
+  max-height: 180px;
+  margin-top: 8px;
+}
+.pf-batch {
+  position: relative;
+  flex: 0 0 auto;
+}
+.pf-batch-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 45;
+  min-width: 128px;
+  padding: 4px 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-solid);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+}
+.pf-batch-menu[hidden] {
+  display: none !important;
+}
+.pf-batch-menu button {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  padding: 8px 14px;
+  border-radius: 0;
+  background: transparent !important;
+  color: var(--text) !important;
+  font-weight: 500;
+  text-align: left;
+  box-shadow: none !important;
+  transform: none !important;
+}
+.pf-batch-menu button:hover:not(:disabled) {
+  background: var(--accent-soft) !important;
+  color: var(--accent) !important;
+}
 .pf-chips-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
   gap: 10px 14px;
-  margin-top: 12px;
-  padding: 10px 12px;
+  margin: 0;
+  padding: 8px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: color-mix(in srgb, var(--panel-2, var(--bg)) 88%, var(--panel));
@@ -4035,6 +4111,63 @@ td.muted {
 }
 .pf-chip:hover i {
   color: var(--danger, #e85d5d);
+}
+.pf-params-row {
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+}
+.pf-params-row .field {
+  margin: 0;
+  flex: 1 1 140px;
+  min-width: 132px;
+}
+.pf-params-row .field--wide {
+  flex: 1.4 1 200px;
+  min-width: 180px;
+}
+.pf-override {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--chart-bg) 80%, transparent);
+}
+.pf-override > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.pf-override .pf-params-row {
+  margin-top: 8px;
+}
+.pf-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+/* 正向主操作：强制品牌蓝，避免主题/误类名落到红色 */
+#btnPortfolio,
+.pf-actions #btnPortfolio {
+  background: var(--accent) !important;
+  color: #fff !important;
+  min-width: 132px;
+}
+#btnPortfolio:hover:not(:disabled),
+.pf-actions #btnPortfolio:hover:not(:disabled) {
+  background: var(--accent-deep) !important;
+}
+#pfPanelWorkspace #backTimeHint {
+  margin: 8px 0 0;
+}
+#pfPanelWorkspace .pf-engine-hint {
+  margin: 4px 0 0;
+}
+#pfPanelWorkspace #pfMetrics {
+  margin-top: 8px;
 }
 
 /* 策略管理 · 策略总览 */

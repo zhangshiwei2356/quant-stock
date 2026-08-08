@@ -450,10 +450,35 @@
     renderStockPicker('portfolio');
   }
 
+  /** 全选当前目标池 */
+  function selectPortfolioAll() {
+    portfolioSelected = (tradePoolList || []).map(function (it) { return it.code; }).filter(Boolean);
+    syncPortfolioCodes();
+    renderStockPicker('portfolio');
+  }
+
+  /** 反选：相对目标池取补集 */
+  function invertPortfolioSelection() {
+    var selected = {};
+    (portfolioSelected || []).forEach(function (c) { selected[c] = true; });
+    portfolioSelected = (tradePoolList || []).map(function (it) { return it.code; })
+      .filter(function (c) { return c && !selected[c]; });
+    syncPortfolioCodes();
+    renderStockPicker('portfolio');
+  }
+
   function clearPortfolioSelection() {
     portfolioSelected = [];
     syncPortfolioCodes();
     renderStockPicker('portfolio');
+  }
+
+  function setPfBatchMenuOpen(open) {
+    var $menu = $('#pfBatchMenu');
+    var $btn = $('#btnPfPickTop3');
+    if (!$menu.length) return;
+    $menu.prop('hidden', !open);
+    $btn.attr('aria-expanded', open ? 'true' : 'false');
   }
 
   function syncPortfolioCodes() {
@@ -468,7 +493,7 @@
       $bar.addClass('empty');
       $chips.append($('<span class="pf-chips-empty"/>').text(
         (tradePoolList || []).length
-          ? '尚未选择 · 在上方列表点击添加'
+          ? '尚未选择 · 在下方列表点击添加，或用「批量选择」'
           : '目标池为空 · 请先在「目标池」扫描更新'
       ));
     } else {
@@ -8153,12 +8178,35 @@
     togglePortfolioStock($(this).attr('data-code'));
   });
 
-  $('#btnPfPickTop3').on('click', function () {
-    selectPortfolioTopN(3);
+  $('#btnPfPickTop3').on('click', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    setPfBatchMenuOpen($('#pfBatchMenu').prop('hidden'));
   });
 
-  $('#btnPfClearPick').on('click', function () {
-    clearPortfolioSelection();
+  $('#pfBatchMenu').on('click', '[data-pf-batch]', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    var act = $(this).attr('data-pf-batch');
+    if (act === 'all') {
+      selectPortfolioAll();
+      toast('已全选目标池 ' + portfolioSelected.length + ' 只', 'ok');
+    } else if (act === 'clear') {
+      clearPortfolioSelection();
+      toast('已清空已选', 'info');
+    } else if (act === 'invert') {
+      invertPortfolioSelection();
+      toast('已反选 · 当前 ' + portfolioSelected.length + ' 只', 'ok');
+    } else if (act === 'top3') {
+      selectPortfolioTopN(3);
+    }
+    setPfBatchMenuOpen(false);
+  });
+
+  $(document).on('click.pfBatch', function (e) {
+    if (!$(e.target).closest('.pf-batch').length) {
+      setPfBatchMenuOpen(false);
+    }
   });
 
   $('#barPeriod').on('change', function () {

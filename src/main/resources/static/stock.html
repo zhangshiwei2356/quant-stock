@@ -22,7 +22,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css?v=20260808-single-bt"/>
+  <link rel="stylesheet" href="/css/style.css?v=20260808-pf-ux"/>
   <script src="/js/jquery.min.js"></script>
   <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/echarts.min.js"></script>
@@ -1671,60 +1671,78 @@
     <!-- 组合回测 -->
     <div id="viewPortfolio" class="workspace-view" hidden>
       <section class="panel" id="pfPanelWorkspace">
-        <h3>组合成分 <span class="trade-pool-count" id="pfUniverseCount">0</span></h3>
-        <p class="hint">仅从「目标池」多选；搜索后点击勾选，标签可移除。建议至少 2 只；池空请先扫描更新。</p>
-        <div class="stock-picker" id="pfStockPicker">
-          <div class="stock-picker-bar">
-            <input type="search" id="pfStockQ" class="stock-picker-input" placeholder="搜索：600036 / 招商 / 银行" autocomplete="off"/>
-            <button type="button" id="btnPfPickTop3" class="secondary">选前3只</button>
-            <button type="button" id="btnPfClearPick" class="secondary">清空</button>
-            <span class="field-hint" id="pfStockMatchHint"></span>
+        <header class="pf-workspace-head">
+          <h3>组合回测工作台 <span class="trade-pool-count" id="pfUniverseCount">0</span></h3>
+          <p class="hint">仅从「目标池」多选；搜索后点击勾选，已选标签可点移除。建议至少 2 只；池空请先扫描更新。</p>
+        </header>
+
+        <div class="pf-group" data-pf-group="symbols">
+          <h4 class="pf-group-title">成分选择</h4>
+          <div class="stock-picker stock-picker--portfolio" id="pfStockPicker">
+            <div class="stock-picker-bar">
+              <input type="search" id="pfStockQ" class="stock-picker-input" placeholder="搜索：600036 / 招商 / 银行" autocomplete="off"/>
+              <div class="pf-batch">
+                <button type="button" id="btnPfPickTop3" class="secondary" aria-haspopup="menu" aria-expanded="false" title="全选 / 清空 / 反选">批量选择 ▾</button>
+                <div id="pfBatchMenu" class="pf-batch-menu" hidden role="menu" aria-label="批量选择">
+                  <button type="button" role="menuitem" data-pf-batch="all">全选</button>
+                  <button type="button" role="menuitem" data-pf-batch="clear" id="btnPfClearPick">清空</button>
+                  <button type="button" role="menuitem" data-pf-batch="invert">反选</button>
+                </div>
+              </div>
+              <span class="field-hint" id="pfStockMatchHint"></span>
+            </div>
+            <div class="pf-chips-bar" id="pfChipsBar">
+              <span class="pf-chips-label">已选 <b id="pfSelectedCountNum">0</b> 只</span>
+              <div class="pf-chips" id="pfChips"></div>
+            </div>
+            <ul class="stock-picker-list stock-picker-list--multi" id="pfStockResults"></ul>
           </div>
-          <ul class="stock-picker-list stock-picker-list--multi" id="pfStockResults"></ul>
+          <input id="portfolioCodes" type="hidden"/>
         </div>
-        <div class="pf-chips-bar" id="pfChipsBar">
-          <span class="pf-chips-label">已选 <b id="pfSelectedCountNum">0</b> 只</span>
-          <div class="pf-chips" id="pfChips"></div>
+
+        <div class="pf-group" data-pf-group="config">
+          <h4 class="pf-group-title">回测参数 <span class="pf-group-sub">时间 / 资金 / 策略</span></h4>
+          <div class="toolbar pf-params-row">
+            <label class="field">回测开始
+              <input id="backStart" type="text" placeholder="yyyy-MM-dd HH:mm:ss（可空）"/>
+            </label>
+            <label class="field">回测结束
+              <input id="backEnd" type="text" placeholder="yyyy-MM-dd HH:mm:ss（可空）"/>
+            </label>
+            <label class="field">初始资金 <span id="pfInitCapitalHint" class="field-hint">(10万)</span>
+              <input id="pfInitCapital" type="number" value="100000"/>
+            </label>
+            <label class="field field--wide">策略 <span class="field-hint">（仅本次；overnightGap=session 共享资金池）</span>
+              <select id="pfStrategyId" title="不影响纸面扫描；隔日高开走 MIN_1 共享资金池会话旁路">
+                <option value="">加载中…</option>
+              </select>
+            </label>
+          </div>
+          <details class="pf-override" id="pfOverridePanel">
+            <summary>本次临时参数（不落库）</summary>
+            <div class="toolbar pf-params-row">
+              <label class="field">佣金费率
+                <input id="pfOvFeeRate" type="text" placeholder="默认用下方 body.feeRate"/>
+              </label>
+              <label class="field">ATR止损倍数
+                <input id="pfOvAtrStop" type="text" placeholder="如 2.0"/>
+              </label>
+              <label class="field">单票仓位上限
+                <input id="pfOvMaxSingle" type="text" placeholder="如 0.3"/>
+              </label>
+              <label class="field">RSI买入上限
+                <input id="pfOvRsiMax" type="text" placeholder="如 60"/>
+              </label>
+            </div>
+          </details>
         </div>
-        <input id="portfolioCodes" type="hidden"/>
-        <h3 style="margin-top:16px;">回测参数</h3>
-        <div class="toolbar">
-          <label class="field">回测开始
-            <input id="backStart" type="text" placeholder="yyyy-MM-dd HH:mm:ss（可空）"/>
-          </label>
-          <label class="field">回测结束
-            <input id="backEnd" type="text" placeholder="yyyy-MM-dd HH:mm:ss（可空）"/>
-          </label>
-          <label class="field">初始资金 <span id="pfInitCapitalHint" class="field-hint">(10万)</span>
-            <input id="pfInitCapital" type="number" value="100000"/>
-          </label>
-          <label class="field">策略 <span class="field-hint">（仅本次；overnightGap=session 共享资金池）</span>
-            <select id="pfStrategyId" title="不影响纸面扫描；隔日高开走 MIN_1 共享资金池会话旁路">
-              <option value="">加载中…</option>
-            </select>
-          </label>
+
+        <div class="pf-actions">
           <button id="btnPortfolio" class="primary" type="button">执行组合回测</button>
         </div>
-        <details class="panel" id="pfOverridePanel" style="margin-top:10px;padding:10px 12px;">
-          <summary style="cursor:pointer;font-weight:600;">本次临时参数（不落库）</summary>
-          <div class="toolbar" style="flex-wrap:wrap;gap:8px;margin-top:8px;">
-            <label class="field">佣金费率
-              <input id="pfOvFeeRate" type="text" placeholder="默认用下方 body.feeRate"/>
-            </label>
-            <label class="field">ATR止损倍数
-              <input id="pfOvAtrStop" type="text" placeholder="如 2.0"/>
-            </label>
-            <label class="field">单票仓位上限
-              <input id="pfOvMaxSingle" type="text" placeholder="如 0.3"/>
-            </label>
-            <label class="field">RSI买入上限
-              <input id="pfOvRsiMax" type="text" placeholder="如 60"/>
-            </label>
-          </div>
-        </details>
-        <p id="backTimeHint" class="hint" style="margin:8px 0 0;"></p>
-        <p class="hint" style="margin:4px 0 0;">默认日K共享资金池；选 overnightGap 时为 session MIN_1 共享资金池（账户风控，无金叉五步）。</p>
-        <div class="metrics" id="pfMetrics" style="margin-top:8px;"></div>
+        <p id="backTimeHint" class="hint"></p>
+        <p class="hint pf-engine-hint">默认日K共享资金池；选 overnightGap 时为 session MIN_1 共享资金池（账户风控，无金叉五步）。</p>
+        <div class="metrics" id="pfMetrics"></div>
       </section>
       <section class="panel" id="pfSessionPanel" hidden>
         <h3>会话引擎 · 共享池分支与事件</h3>
@@ -1835,6 +1853,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260808-single-bt"></script>
+<script src="/js/stock-chart.js?v=20260808-pf-ux"></script>
 </body>
 </html>
