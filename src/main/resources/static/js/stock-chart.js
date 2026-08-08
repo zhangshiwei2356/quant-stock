@@ -4145,13 +4145,24 @@
     strategies: [],
     selectedId: '',
     kind: 'ALL',
+    sort: 'time_desc',
+    historyRows: [],
     enabled: true,
     unknownCount: 0,
     seedPollTimer: null,
     seedHintShown: {},
     autoSeedStarted: {}
   };
-  var STRATEGY_HIST_COLSPAN = 11;
+  var STRATEGY_HIST_COLSPAN = 7;
+
+  function strategyGradeTagClass(grade) {
+    var g = String(grade || '').toUpperCase();
+    if (g === 'S' || g === 'A') return 'strategy-tag strategy-tag--grade-a';
+    if (g === 'B') return 'strategy-tag strategy-tag--grade-b';
+    if (g === 'C') return 'strategy-tag strategy-tag--grade-c';
+    if (g === 'D' || g === 'E') return 'strategy-tag strategy-tag--grade-d';
+    return 'strategy-tag strategy-tag--muted';
+  }
 
   function setStrategyMenuActive(panel) {
     $('#strategyMenu li').removeClass('active');
@@ -4194,17 +4205,20 @@
       $top.append($('<span class="strategy-list-name"/>').text(label));
       var $badges = $('<span class="strategy-list-badges"/>');
       if (s.active) {
-        $badges.append($('<span class="strategy-active-badge"/>').text('激活'));
+        $badges.append($('<span class="strategy-tag strategy-tag--active"/>').text('激活'));
       }
       if (s.score != null && s.score !== '') {
-        $badges.append($('<span class="strategy-score-badge"/>')
-          .text(String(s.score) + (s.grade ? ('·' + s.grade) : '')));
+        $badges.append($('<span class="strategy-tag strategy-tag--score"/>')
+          .text(String(s.score)));
+        if (s.grade) {
+          $badges.append($('<span/>').attr('class', strategyGradeTagClass(s.grade)).text(s.grade));
+        }
       } else {
-        $badges.append($('<span class="strategy-score-badge muted"/>').text('未评'));
+        $badges.append($('<span class="strategy-tag strategy-tag--muted"/>').text('未评'));
       }
       $top.append($badges);
       $item.append($top);
-      $item.append($('<div class="strategy-list-id"/>').text(id || '—'));
+      $item.append($('<div class="strategy-list-id tech-id"/>').text(id || '—'));
       $list.append($item);
     });
   }
@@ -4256,47 +4270,68 @@
       $cards.append($('<div class="hint"/>').text('请选择左侧策略'));
       return;
     }
-    function card(label, value, sub, extraClass) {
-      var $c = $('<div class="strategy-eval-card"/>');
+    function metricCard(label, value, sub, extraClass) {
+      var $c = $('<div class="strategy-metric-card"/>');
       if (extraClass) $c.addClass(extraClass);
       $c.append($('<div class="label"/>').text(label));
       $c.append($('<div class="value"/>').text(value == null || value === '' ? '—' : String(value)));
       if (sub) $c.append($('<div class="sub"/>').text(sub));
       return $c;
     }
+
     var scoreText = s.score != null && s.score !== ''
       ? (String(s.score) + ' / ' + (s.scoreMax != null ? s.scoreMax : 100))
       : '—';
-    var gradeSub = s.grade ? ('等级 ' + s.grade) : null;
-    if (s.score == null) gradeSub = '暂无回测，无法评分';
-    $cards.append(card('综合评分', scoreText, gradeSub, 'strategy-eval-card--score'));
+    var $hero = $('<div class="strategy-score-hero"/>');
+    var $heroMain = $('<div class="strategy-score-hero-main"/>');
+    $heroMain.append($('<div class="label"/>').text('综合评分'));
+    $heroMain.append($('<div class="value"/>').text(scoreText));
+    var $tags = $('<div class="strategy-score-hero-tags"/>');
+    if (s.active) {
+      $tags.append($('<span class="strategy-tag strategy-tag--active"/>').text('激活'));
+    }
+    if (s.grade) {
+      $tags.append($('<span/>').attr('class', strategyGradeTagClass(s.grade)).text('等级 ' + s.grade));
+    } else if (s.score == null) {
+      $tags.append($('<span class="strategy-tag strategy-tag--muted"/>').text('暂无回测，无法评分'));
+    }
+    $heroMain.append($tags);
+    $hero.append($heroMain);
+    $hero.append($('<p class="hint strategy-score-hero-hint"/>').text(
+      '满分 100：收益 30 + 回撤 25 + 胜率 20 + 盈利占比 15 + 样本 10；夏普仅展示不计入'
+    ));
+    $cards.append($hero);
 
     var comps = s.scoreComponents || [];
     if (comps.length) {
-      var lines = comps.map(function (c) {
-        return (c.label || c.key) + ' ' + (c.points != null ? c.points : '—')
-          + '/' + (c.max != null ? c.max : '—')
-          + (c.detail ? ('（' + c.detail + '）') : '');
+      $cards.append($('<h5 class="strategy-block-title"/>').text('评分分项'));
+      var $scoreGrid = $('<div class="strategy-metric-grid"/>');
+      comps.forEach(function (c) {
+        var pts = (c.points != null ? c.points : '—') + ' / ' + (c.max != null ? c.max : '—');
+        $scoreGrid.append(metricCard(c.label || c.key || '分项', pts, c.detail || null, 'strategy-metric-card--score'));
       });
-      $cards.append(card('评分分项', lines.length + ' 项', lines.join('； '), 'strategy-eval-card--wide'));
+      $cards.append($scoreGrid);
     }
 
-    $cards.append(card('运行次数', s.runCount != null ? s.runCount : 0,
+    $cards.append($('<h5 class="strategy-block-title"/>').text('聚合指标'));
+    var $metricGrid = $('<div class="strategy-metric-grid"/>');
+    $metricGrid.append(metricCard('运行次数', s.runCount != null ? s.runCount : 0,
       strategyEvalState.enabled === false ? '数据库未启用，聚合为 0' : null));
-    $cards.append(card('平均收益率', pct(s.avgTotalRate)));
-    $cards.append(card('中位收益率', pct(s.medianTotalRate)));
-    $cards.append(card('平均回撤', pct(s.avgMaxDrawdown)));
-    $cards.append(card('平均胜率', pct(s.avgWinRate)));
+    $metricGrid.append(metricCard('平均收益率', pct(s.avgTotalRate)));
+    $metricGrid.append(metricCard('中位收益率', pct(s.medianTotalRate)));
+    $metricGrid.append(metricCard('平均回撤', pct(s.avgMaxDrawdown)));
+    $metricGrid.append(metricCard('平均胜率', pct(s.avgWinRate)));
     var sharpeSub = '年化·RF=0·不计入评分';
     if (s.sharpeCount != null && s.runCount != null && Number(s.sharpeCount) < Number(s.runCount)) {
       sharpeSub += '（有夏普 ' + s.sharpeCount + '/' + s.runCount + '）';
     }
-    $cards.append(card('平均夏普',
+    $metricGrid.append(metricCard('平均夏普',
       s.avgSharpe != null && s.avgSharpe !== '' ? num(s.avgSharpe, 2) : '—',
       sharpeSub));
-    $cards.append(card('盈利占比', pct(s.positiveRatio)));
-    $cards.append(card('最近收益', pct(s.lastTotalRate),
+    $metricGrid.append(metricCard('盈利占比', pct(s.positiveRatio)));
+    $metricGrid.append(metricCard('最近收益', pct(s.lastTotalRate),
       s.lastSavedAt ? ('最近：' + fmtDateTimeDisplay(s.lastSavedAt)) : '暂无回测'));
+    $cards.append($metricGrid);
   }
 
   function renderStrategySeedBar(s) {
@@ -4476,36 +4511,58 @@
     return r.stockCode || '—';
   }
 
+  function sortStrategyHistoryRows(rows, sortKey) {
+    var list = (rows || []).slice();
+    var key = sortKey || strategyEvalState.sort || 'time_desc';
+    list.sort(function (a, b) {
+      if (key === 'rate_desc' || key === 'rate_asc') {
+        var ra = Number(a && a.totalRate);
+        var rb = Number(b && b.totalRate);
+        if (!isFinite(ra)) ra = key === 'rate_desc' ? -Infinity : Infinity;
+        if (!isFinite(rb)) rb = key === 'rate_desc' ? -Infinity : Infinity;
+        return key === 'rate_desc' ? (rb - ra) : (ra - rb);
+      }
+      var ta = a && a.savedAt ? Date.parse(String(a.savedAt).replace(' ', 'T')) : 0;
+      var tb = b && b.savedAt ? Date.parse(String(b.savedAt).replace(' ', 'T')) : 0;
+      if (isNaN(ta)) ta = 0;
+      if (isNaN(tb)) tb = 0;
+      return key === 'time_asc' ? (ta - tb) : (tb - ta);
+    });
+    return list;
+  }
+
   function renderStrategyHistory(rows) {
     var $tb = $('#strategyHistoryBody').empty();
     collapseHistoryAnalysis($tb);
-    rows = rows || [];
-    $('#strategyHistMeta').text('共 ' + rows.length + ' 条');
-    if (!rows.length) {
+    strategyEvalState.historyRows = rows || [];
+    var sorted = sortStrategyHistoryRows(strategyEvalState.historyRows, strategyEvalState.sort);
+    $('#strategyHistMeta').text('共 ' + sorted.length + ' 条');
+    if (!sorted.length) {
       $tb.append($('<tr/>').append(
         $('<td colspan="' + STRATEGY_HIST_COLSPAN + '" class="empty-state"/>')
           .text('该策略暂无回测记录')
       ));
       return;
     }
-    rows.forEach(function (r) {
-      var s = resolveTradeStats(r);
+    sorted.forEach(function (r) {
       var kind = String(r.kind || '').toUpperCase();
       var kindLabel = kind === 'PORTFOLIO' ? '组合' : (kind === 'SINGLE' ? '单股' : (r.kind || '—'));
+      var kindClass = kind === 'PORTFOLIO'
+        ? 'strategy-tag strategy-tag--kind-pf'
+        : (kind === 'SINGLE' ? 'strategy-tag strategy-tag--kind-single' : 'strategy-tag strategy-tag--muted');
       var $tr = $('<tr class="history-row"/>')
         .css('cursor', 'pointer')
-        .attr('data-id', r.id || '');
-      $tr.append($('<td/>').text(fmtDateTimeDisplay(r.savedAt)))
-        .append($('<td/>').text(kindLabel))
+        .attr('data-id', r.id || '')
+        .attr('title', '点击展开详情（含区间、资金、买卖次数）');
+      $tr.append($('<td class="mono"/>').text(fmtDateTimeDisplay(r.savedAt)))
+        .append($('<td/>').html('<span class="' + kindClass + '">' + escHtml(kindLabel) + '</span>'))
         .append($('<td/>').html('<b>' + escHtml(strategyTargetText(r)) + '</b>'))
-        .append($('<td/>').text(formatRange(r.backStart, r.backEnd)))
-        .append($('<td/>').text(num(r.initCapital)))
-        .append($('<td/>').text(num(r.finalAsset)))
-        .append($('<td/>').text(pct(r.totalRate)))
-        .append($('<td/>').text(pct(r.maxDrawdown != null ? r.maxDrawdown : r.maxDrawDown)))
-        .append($('<td/>').text(pct(r.winRate)))
-        .append($('<td/>').text(r.sharpe != null && r.sharpe !== '' ? num(r.sharpe, 2) : '—'))
-        .append($('<td/>').text((s.buyCount || 0) + ' / ' + (s.sellCount || 0)));
+        .append($('<td class="num"/>').html(
+          '<span class="' + pnlClass(r.totalRate) + '">' + escHtml(pct(r.totalRate)) + '</span>'
+        ))
+        .append($('<td class="num"/>').text(pct(r.maxDrawdown != null ? r.maxDrawdown : r.maxDrawDown)))
+        .append($('<td class="num"/>').text(pct(r.winRate)))
+        .append($('<td class="num"/>').text(r.sharpe != null && r.sharpe !== '' ? num(r.sharpe, 2) : '—'));
       $tb.append($tr);
     });
   }
@@ -4514,6 +4571,7 @@
     var id = String(strategyId || strategyEvalState.selectedId || '').trim();
     var $tb = $('#strategyHistoryBody');
     if (!id) {
+      strategyEvalState.historyRows = [];
       $tb.html('<tr><td colspan="' + STRATEGY_HIST_COLSPAN + '" class="empty-state">请选择左侧策略</td></tr>');
       $('#strategyHistMeta').text('');
       return;
@@ -4528,6 +4586,7 @@
       })
       .fail(function (xhr) {
         if (String(strategyEvalState.selectedId || '') !== id) return;
+        strategyEvalState.historyRows = [];
         var msg = (xhr && xhr.responseJSON && (xhr.responseJSON.message || xhr.responseJSON.error))
           || '策略历史加载失败';
         $tb.html('<tr><td colspan="' + STRATEGY_HIST_COLSPAN + '" class="empty-state">'
@@ -4622,6 +4681,11 @@
     }
 
     var s = resolveTradeStats(detail);
+    $panel.append($('<p/>').html(
+      '<b>区间 / 资金</b>：' + escHtml(formatRange(detail.backStart, detail.backEnd))
+      + ' · 初始 ' + escHtml(num(detail.initCapital))
+      + ' · 期末 ' + escHtml(num(detail.finalAsset))
+    ));
     $panel.append($('<p/>').html(
       '<b>成交统计</b>：买/卖 ' + (s.buyCount || 0) + '/' + (s.sellCount || 0)
       + ' 次 · 手 ' + (s.buyLots || 0) + '/' + (s.sellLots || 0)
@@ -5572,7 +5636,18 @@
   }
 
   var scheduleJobsByCode = {};
-  var SCHEDULE_COLSPAN = 8;
+  var SCHEDULE_COLSPAN = 6;
+  /** Spring 6 段 cron / 固定间隔常用预设 */
+  var SCHEDULE_CRON_PRESETS = [
+    { label: '工作日 09:30', cron: '0 30 9 * * MON-FRI' },
+    { label: '工作日 15:00', cron: '0 0 15 * * MON-FRI' },
+    { label: '工作日 16:00', cron: '0 0 16 * * MON-FRI' },
+    { label: '工作日 17:00', cron: '0 0 17 * * MON-FRI' },
+    { label: '每小时整点', cron: '0 0 * * * *' },
+    { label: '每 5 分钟', cron: '0 */5 * * * *' },
+    { label: '固定间隔 1 分钟', fixedMs: 60000 },
+    { label: '固定间隔 5 分钟', fixedMs: 300000 }
+  ];
   var scheduleRunPollTimer = null;
   var scheduleProgressModalMinimized = false;
   var scheduleRunTickTimer = null;
@@ -6045,49 +6120,50 @@
     scheduleRunTickTimer = setInterval(tickUi, 1000);
   }
 
+  function updateScheduleMasterBadge(masterOn, registeredCount) {
+    var $badge = $('#scheduleMasterBadge');
+    var on = !!masterOn;
+    $badge.toggleClass('is-on', on).toggleClass('is-off', !on);
+    $('#scheduleMasterLabel').text(on ? '运行中' : '已关闭');
+    $('#scheduleMasterHint').text(on
+      ? ('已注册 ' + (registeredCount || 0) + ' 个触发器 · quant.schedule.enabled=true')
+      : 'quant.schedule.enabled=false（改 yml 后需重启）');
+  }
+
   function loadScheduleJobs() {
     var $body = $('#scheduleJobBody');
-    $body.html('<tr><td colspan="8" class="empty-state">加载中…</td></tr>');
+    $body.html('<tr><td colspan="6" class="empty-state">加载中…</td></tr>');
     $.getJSON('/api/schedule').done(function (data) {
       var masterOn = !!data.enabled;
-      $('#scheduleMasterHint').text(masterOn
-        ? '总闸已开 · 已注册 ' + (data.registeredCount || 0) + ' 个触发器'
-        : '总闸 quant.schedule.enabled=false（改 yml 后需重启）');
+      updateScheduleMasterBadge(masterOn, data.registeredCount);
       var baseHint = data.hint || '';
       $('#scheduleHint').text(baseHint + (baseHint ? ' · ' : '')
-        + '点击行空白处展开任务详细介绍；长任务「执行一次」后台跑并显示进度');
+        + '行内启停/执行；点行或「配置」展开改触发与备注；长任务执行一次显示进度');
       var jobs = data.jobs || [];
       scheduleJobsByCode = {};
       if (!jobs.length) {
-        $body.html('<tr><td colspan="8" class="empty-state">暂无任务（需 quant.db-enabled=true）</td></tr>');
+        $body.html('<tr><td colspan="6" class="empty-state">暂无任务（需 quant.db-enabled=true）</td></tr>');
         return;
       }
       var rows = jobs.map(function (j) {
         scheduleJobsByCode[j.jobCode] = j;
-        var triggerVal = (j.triggerType || '').toUpperCase() === 'FIXED_RATE'
-          ? (j.intervalMs != null ? String(j.intervalMs) : '')
-          : (j.cronExpr || '');
         var impl = j.implemented ? '' : ' <span class="schedule-badge schedule-badge--todo">未实现</span>';
         var eff = j.effective
           ? '<span class="schedule-ok">调度中</span>'
           : (j.enabled ? '<span class="schedule-warn">未生效</span>' : '<span class="schedule-off">关闭</span>');
-        return '<tr class="sch-job-row" data-code="' + escHtml(j.jobCode) + '" style="cursor:pointer;" title="点击空白处查看详细介绍">'
-          + '<td><label class="schedule-switch"><input type="checkbox" class="sch-enabled" '
+        var remark = j.remark || '';
+        return '<tr class="sch-job-row" data-code="' + escHtml(j.jobCode) + '" title="点击空白处展开配置与说明">'
+          + '<td class="sch-col-en"><label class="schedule-switch"><input type="checkbox" class="sch-enabled" '
           + (j.enabled ? 'checked' : '') + '/><span></span></label></td>'
-          + '<td><div class="schedule-name">' + escHtml(j.jobName) + impl + '</div>'
-          + '<div class="schedule-code">' + escHtml(j.jobCode) + '</div></td>'
-          + '<td><select class="sch-type">'
-          + '<option value="CRON"' + ((j.triggerType || '').toUpperCase() === 'CRON' ? ' selected' : '') + '>CRON</option>'
-          + '<option value="FIXED_RATE"' + ((j.triggerType || '').toUpperCase() === 'FIXED_RATE' ? ' selected' : '') + '>FIXED_RATE</option>'
-          + '</select></td>'
-          + '<td><input class="sch-trigger" type="text" value="' + escHtml(triggerVal) + '" '
-          + 'placeholder="cron 或毫秒"/></td>'
-          + '<td>' + eff + '</td>'
-          + '<td class="mono">' + escHtml(j.lastRunAt || '—') + '</td>'
-          + '<td><input class="sch-remark" type="text" value="' + escHtml(j.remark || '') + '"/></td>'
-          + '<td class="schedule-actions">'
-          + '<button type="button" class="secondary sch-save">保存</button> '
-          + '<button type="button" class="secondary sch-run">执行一次</button>'
+          + '<td class="sch-col-name"><div class="schedule-name">' + escHtml(j.jobName) + impl + '</div>'
+          + '<div class="schedule-code tech-id">' + escHtml(j.jobCode) + '</div></td>'
+          + '<td class="sch-col-eff">' + eff + '</td>'
+          + '<td class="sch-col-run mono">' + escHtml(j.lastRunAt || '—') + '</td>'
+          + '<td class="sch-col-remark"><span class="sch-remark-text" title="' + escHtml(remark || '—') + '">'
+          + escHtml(remark || '—') + '</span></td>'
+          + '<td class="sch-col-op schedule-actions">'
+          + '<button type="button" class="secondary sch-config">配置</button> '
+          + '<button type="button" class="sch-run">执行一次</button>'
           + '</td></tr>';
       });
       $body.html(rows.join(''));
@@ -6111,7 +6187,9 @@
       }
     }).fail(function (xhr) {
       var msg = (xhr.responseJSON && xhr.responseJSON.message) || xhr.statusText || '加载失败';
-      $body.html('<tr><td colspan="8" class="empty-state">' + escHtml(msg) + '</td></tr>');
+      $body.html('<tr><td colspan="6" class="empty-state">' + escHtml(msg) + '</td></tr>');
+      updateScheduleMasterBadge(false, 0);
+      $('#scheduleMasterHint').text(msg);
       toast(msg, 'err');
     });
   }
@@ -6141,13 +6219,31 @@
     return $panel;
   }
 
+  function syncSchTriggerHint($form) {
+    if (!$form || !$form.length) return;
+    var type = ($form.find('.sch-type').val() || 'CRON').toUpperCase();
+    var $hint = $form.find('.sch-cron-hint');
+    var $input = $form.find('.sch-trigger');
+    if (type === 'FIXED_RATE') {
+      $hint.text('固定间隔：填写毫秒，至少 1000（如 60000=1 分钟）');
+      $input.attr('placeholder', '间隔毫秒，如 60000');
+    } else {
+      $hint.text('Cron 格式：秒 分 时 日 月 周（Spring 6 段，如 0 0 16 * * MON-FRI）');
+      $input.attr('placeholder', '0 0 16 * * MON-FRI');
+    }
+  }
+
   function renderScheduleJobDetail(job, $panel) {
     job = job || {};
     var d = job.detail || {};
+    var isFixed = (job.triggerType || '').toUpperCase() === 'FIXED_RATE';
+    var triggerVal = isFixed
+      ? (job.intervalMs != null ? String(job.intervalMs) : '')
+      : (job.cronExpr || '');
     $panel.empty();
     var $head = $('<div class="analysis-detail-head"/>');
     $head.append($('<span/>').html(
-      '<b>任务说明</b> · ' + escHtml(job.jobName || '') + ' <code>' + escHtml(job.jobCode || '') + '</code>'
+      '<b>任务配置</b> · ' + escHtml(job.jobName || '') + ' <code class="tech-id">' + escHtml(job.jobCode || '') + '</code>'
       + (job.implemented ? '' : ' <span class="schedule-badge schedule-badge--todo">未实现</span>')
     ));
     var $collapse = $('<button type="button" class="secondary analysis-collapse-btn"/>').text('收起');
@@ -6159,6 +6255,36 @@
     $head.append($collapse);
     $panel.append($head);
 
+    var presetOpts = '<option value="">常用周期预设…</option>';
+    SCHEDULE_CRON_PRESETS.forEach(function (p, idx) {
+      presetOpts += '<option value="' + idx + '">' + escHtml(p.label) + '</option>';
+    });
+
+    var $form = $('<div class="sch-config-form"/>').html(
+      '<div class="sch-config-grid">'
+      + '<label class="field">触发类型'
+      + '<select class="sch-type">'
+      + '<option value="CRON"' + (!isFixed ? ' selected' : '') + '>CRON</option>'
+      + '<option value="FIXED_RATE"' + (isFixed ? ' selected' : '') + '>FIXED_RATE</option>'
+      + '</select></label>'
+      + '<label class="field">常用预设'
+      + '<select class="sch-cron-preset">' + presetOpts + '</select></label>'
+      + '<label class="field field--wide">Cron / 间隔(ms)'
+      + '<input class="sch-trigger" type="text" value="' + escHtml(triggerVal) + '"/>'
+      + '</label>'
+      + '<label class="field field--wide">备注'
+      + '<input class="sch-remark" type="text" value="' + escHtml(job.remark || '') + '" placeholder="可选说明"/>'
+      + '</label>'
+      + '</div>'
+      + '<p class="hint sch-cron-hint"></p>'
+      + '<div class="sch-config-actions">'
+      + '<button type="button" class="primary sch-save">保存配置</button>'
+      + '<span class="field-hint">保存后立即重载调度</span>'
+      + '</div>'
+    );
+    $panel.append($form);
+    syncSchTriggerHint($form);
+
     function row(tag, text) {
       $panel.append(
         $('<p class="sch-detail-line"/>').html(
@@ -6167,18 +6293,16 @@
         )
       );
     }
+    $panel.append($('<h5 class="sch-detail-sec-title"/>').text('任务说明'));
     row('功能', d.purpose);
     row('范围', d.scope);
     row('触发', d.triggerHint);
     row('落库', d.writes);
     row('说明', d.notes);
-    if (job.remark) {
-      row('备注', job.remark);
-    }
-    var trig = (job.triggerType || '').toUpperCase() === 'FIXED_RATE'
+    var trig = isFixed
       ? ('FIXED_RATE · ' + (job.intervalMs != null ? job.intervalMs + ' ms' : '—'))
       : ('CRON · ' + (job.cronExpr || '—'));
-    row('当前配置', (job.enabled ? '启用' : '关闭') + ' · ' + trig
+    row('当前生效', (job.enabled ? '启用' : '关闭') + ' · ' + trig
       + ' · 最近执行 ' + (job.lastRunAt || '—'));
   }
 
@@ -6193,13 +6317,26 @@
     renderScheduleJobDetail(job, $panel);
   }
 
+  function scheduleJobRowFromEl($el) {
+    var $detail = $el.closest('tr.sch-detail-row');
+    if ($detail.length) {
+      return $detail.prev('tr.sch-job-row');
+    }
+    return $el.closest('tr.sch-job-row');
+  }
+
   function schedulePayloadFromRow($tr) {
-    var type = ($tr.find('.sch-type').val() || 'CRON').toUpperCase();
-    var trigger = $.trim($tr.find('.sch-trigger').val() || '');
+    var $form = $tr.next('tr.sch-detail-row').find('.sch-config-form');
+    if (!$form.length) {
+      toast('请先点「配置」展开后再保存', 'info');
+      return null;
+    }
+    var type = ($form.find('.sch-type').val() || 'CRON').toUpperCase();
+    var trigger = $.trim($form.find('.sch-trigger').val() || '');
     var body = {
       enabled: $tr.find('.sch-enabled').prop('checked'),
       triggerType: type,
-      remark: $tr.find('.sch-remark').val() || ''
+      remark: $form.find('.sch-remark').val() || ''
     };
     if (type === 'FIXED_RATE') {
       var ms = parseInt(trigger, 10);
@@ -6627,6 +6764,13 @@
     $(this).addClass('active');
     if (strategyEvalState.selectedId) {
       loadStrategyHistory(strategyEvalState.selectedId);
+    }
+  });
+
+  $('#strategyHistSort').on('change', function () {
+    strategyEvalState.sort = String($(this).val() || 'time_desc');
+    if (strategyEvalState.historyRows && strategyEvalState.historyRows.length) {
+      renderStrategyHistory(strategyEvalState.historyRows);
     }
   });
 
@@ -7865,9 +8009,8 @@
     });
   });
 
-  $('#scheduleJobBody').on('click', 'tr.sch-job-row', function (e) {
-    if ($(e.target).closest('input, select, button, a, label, textarea').length) return;
-    var $tr = $(this);
+  function toggleScheduleJobDetail($tr) {
+    if (!$tr || !$tr.length) return;
     var expanded = $tr.hasClass('active') || $tr.attr('data-expanded') === '1';
     if (expanded) {
       collapseScheduleJobDetail();
@@ -7876,10 +8019,21 @@
     collapseScheduleJobDetail();
     $tr.addClass('active').attr('data-expanded', '1');
     showScheduleJobDetail($tr);
+  }
+
+  $('#scheduleJobBody').on('click', 'tr.sch-job-row', function (e) {
+    if ($(e.target).closest('input, select, button, a, label, textarea').length) return;
+    toggleScheduleJobDetail($(this));
+  });
+
+  $('#scheduleJobBody').on('click', '.sch-config', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleScheduleJobDetail($(this).closest('tr.sch-job-row'));
   });
 
   $('#scheduleJobBody').on('change', '.sch-enabled', function () {
-    var $tr = $(this).closest('tr');
+    var $tr = $(this).closest('tr.sch-job-row');
     var code = $tr.attr('data-code');
     var enabled = $(this).prop('checked');
     $.ajax({
@@ -7894,8 +8048,28 @@
     });
   });
 
+  $('#scheduleJobBody').on('change', '.sch-type', function () {
+    syncSchTriggerHint($(this).closest('.sch-config-form'));
+  });
+
+  $('#scheduleJobBody').on('change', '.sch-cron-preset', function () {
+    var $form = $(this).closest('.sch-config-form');
+    var idx = parseInt($(this).val(), 10);
+    if (!isFinite(idx) || !SCHEDULE_CRON_PRESETS[idx]) return;
+    var p = SCHEDULE_CRON_PRESETS[idx];
+    if (p.fixedMs) {
+      $form.find('.sch-type').val('FIXED_RATE');
+      $form.find('.sch-trigger').val(String(p.fixedMs));
+    } else {
+      $form.find('.sch-type').val('CRON');
+      $form.find('.sch-trigger').val(p.cron || '');
+    }
+    syncSchTriggerHint($form);
+    $(this).val('');
+  });
+
   $('#scheduleJobBody').on('click', '.sch-save', function () {
-    var $tr = $(this).closest('tr');
+    var $tr = scheduleJobRowFromEl($(this));
     var code = $tr.attr('data-code');
     var body = schedulePayloadFromRow($tr);
     if (!body) return;
@@ -7914,7 +8088,7 @@
   });
 
   $('#scheduleJobBody').on('click', '.sch-run', function () {
-    var code = $(this).closest('tr').attr('data-code');
+    var code = $(this).closest('tr.sch-job-row').attr('data-code');
     var job = scheduleJobsByCode[code] || {};
     var $btn = $(this);
     var asyncStarted = false;

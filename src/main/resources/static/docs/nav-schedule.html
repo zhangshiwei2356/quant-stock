@@ -4,7 +4,7 @@
   <section class="nav-intro-card">
     <h4><span class="nav-intro-card-tag">二级</span>菜单说明</h4>
     <ul class="nav-intro-list">
-      <li><strong>任务管理</strong>：启停 / 改 cron；「执行一次」弹出进度框（阶段、进度条、当前动作），页内同步横幅，可收起到页内；长任务有 <code>i/n</code> 百分比</li>
+      <li><strong>任务管理</strong>：总闸状态标签；行内启停+执行一次；点「配置」展开改 cron（常用预设）与备注；执行进度弹框/页内横幅</li>
       <li><strong>数据健康</strong>：覆盖检查（待处置告警 vs 特殊项）/ 分钟自洽 / MDS·TDX 抽样对账</li>
       <li><strong>运行参数</strong>：全局 <code>quant.prop.*</code> + 策略包 <code>strategy_param</code>；其余 yml 只读；已注册策略列表与纸面激活切换</li>
     </ul>
@@ -13,7 +13,7 @@
     <h4><span class="nav-intro-card-tag">步骤</span>建议流程</h4>
     <ol class="nav-intro-steps">
       <li>确认 MySQL 已建库且 <code>quant.db-enabled=true</code></li>
-      <li>在「任务管理」只打开需要的任务并核对 cron</li>
+      <li>在「任务管理」确认总闸为运行中，只打开需要的任务并在「配置」里核对 cron</li>
       <li>用「数据健康」核对行情是否滞后后再开扫描</li>
     </ol>
   </section>

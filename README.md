@@ -179,7 +179,7 @@ sequenceDiagram
 
 | 二级 | 功能 |
 |------|------|
-| 任务管理 | `sys_schedule_job` 启停 / cron / 立即执行（种子默认全关；执行一次弹进度框+页内横幅，可「收起到页内」；长任务 `i/n`） |
+| 任务管理 | 总闸状态醒目标签；行内启停+执行一次，配置（cron/备注）点开再改（含常用周期预设）；种子默认全关；执行一次弹进度框+页内横幅 |
 | 数据健康 | 覆盖检查（异步进度；待处置告警 vs 特殊项分表；北交所空/退市·PT/停牌不计入待处置）+ 分钟自洽 + MDS/TDX 抽样对账（默认不阻断开仓） |
 | 运行参数 | 全局白名单可写（`quant.prop.*`）+ **按策略稀疏参数包**（表 `strategy_param`）；回测还可带 **本次临时改参**（`paramOverrides`，不落库） |
 
@@ -189,7 +189,7 @@ sequenceDiagram
 
 | 二级 | 功能 |
 |------|------|
-| 策略总览 | 注册策略列表（含介绍、满分 100 综合评分）+ 聚合指标与回测历史；历史表可筛全部/单股/组合，点行展开详情 |
+| 策略总览 | 左侧 280px 列表；综合评分卡 + 分项/指标网格；历史表精简列，可按类型筛选、按时间/收益率排序，点行展开详情 |
 
 - **职责分离**：本菜单只做效果总览与评分；全局/按策略改参、纸面激活切换仍在 **运维中心 → 运行参数**
 - 数据：`GET /api/strategy/overview`（含 `detailIntro`、加权 `score`/`scoreComponents`、`avgSharpe`）、`GET /api/strategy/{id}/history?kind=`、`GET /api/strategy/history/{recordId}`；按注册 `strategy_id` 聚合（查询含历史别名如 `MaCrossStrategy`）；启动自动补全空白→`maCross`、旧名→注册 id；运维 `POST /api/ops/backtest/backfill-strategy-id`；overview 仍可含 `unknownCount`
