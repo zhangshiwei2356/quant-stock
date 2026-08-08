@@ -2375,6 +2375,55 @@
     });
   }
 
+  var SIDEBAR_COLLAPSE_KEY = 'quant-sidebar-collapsed';
+  var sidebarIconCollapsed = false;
+
+  function setSidebarCollapsed(collapsed) {
+    sidebarIconCollapsed = !!collapsed;
+    $('.layout').toggleClass('sidebar-collapsed', sidebarIconCollapsed);
+    var $btn = $('#btnSidebarCollapse');
+    if ($btn.length) {
+      $btn.attr('aria-expanded', sidebarIconCollapsed ? 'false' : 'true');
+      $btn.attr('title', sidebarIconCollapsed ? '展开导航' : '收起导航');
+      $btn.attr('aria-label', sidebarIconCollapsed ? '展开导航' : '收起导航');
+      $btn.text(sidebarIconCollapsed ? '»' : '«');
+    }
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSE_KEY, sidebarIconCollapsed ? '1' : '0');
+    } catch (e) {}
+    // 展开后按当前打开项重算高度
+    if (!sidebarIconCollapsed) {
+      var openId = $('.side-nav-toggle.open').first().attr('data-body');
+      if (openId) {
+        setSideNavOpen(openId);
+      }
+    }
+  }
+
+  /** 进入工作台/文档二级时自动展开侧栏，避免窄栏藏住二级菜单 */
+  function ensureSidebarExpanded() {
+    if (sidebarIconCollapsed || $('.layout').hasClass('sidebar-collapsed')) {
+      setSidebarCollapsed(false);
+    }
+  }
+
+  function initSidebarCollapse() {
+    var saved = false;
+    try {
+      saved = localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === '1';
+    } catch (e) {}
+    if (saved && window.matchMedia && !window.matchMedia('(max-width: 1100px)').matches) {
+      setSidebarCollapsed(true);
+    } else {
+      setSidebarCollapsed(false);
+    }
+    $('#btnSidebarCollapse').on('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      setSidebarCollapsed(!sidebarIconCollapsed);
+    });
+  }
+
   var homeCollapsed = false;
 
   function setHomeCollapsed(collapsed) {
@@ -2478,6 +2527,7 @@
     if (panel !== 'pool' && panel !== 'history') panel = 'pool';
     lastTpPanel = panel;
     lastWorkspaceMode = 'tradepool';
+    ensureSidebarExpanded();
     $('body').removeClass('mode-doc');
     $('#knowledgePanel').prop('hidden', true);
     $('.side-nav-menu li').removeClass('active');
@@ -2514,6 +2564,7 @@
     }
     lastKuangruiPanel = panel;
     lastWorkspaceMode = 'kuangrui';
+    ensureSidebarExpanded();
     $('body').removeClass('mode-doc');
     $('#knowledgePanel').prop('hidden', true);
     $('.side-nav-menu li').removeClass('active');
@@ -3440,6 +3491,7 @@
     if (panel !== 'jobs' && panel !== 'health' && panel !== 'params') panel = 'jobs';
     lastSchedulePanel = panel;
     lastWorkspaceMode = 'schedule';
+    ensureSidebarExpanded();
     $('body').removeClass('mode-doc');
     $('#knowledgePanel').prop('hidden', true);
     $('.side-nav-menu li').removeClass('active');
@@ -3480,6 +3532,7 @@
 
   function showStrategyEval() {
     lastWorkspaceMode = 'strategy';
+    ensureSidebarExpanded();
     $('body').removeClass('mode-doc');
     $('#knowledgePanel').prop('hidden', true);
     $('.side-nav-menu li').removeClass('active');
@@ -4596,6 +4649,9 @@
     options = options || {};
     var expandNav = options.expandNav !== false;
     lastWorkspaceMode = mode || 'pool';
+    if (expandNav) {
+      ensureSidebarExpanded();
+    }
     $('body').removeClass('mode-doc');
     $('#knowledgePanel').prop('hidden', true);
     $('.side-nav-menu li').removeClass('active');
@@ -5518,6 +5574,7 @@
   }
 
   function showDocMode(menuBodyId) {
+    ensureSidebarExpanded();
     $('body').addClass('mode-doc');
     hideAllWorkspaceViews();
     $('#knowledgePanel').prop('hidden', false);
@@ -7508,6 +7565,7 @@
   }
 
   initKnowledge();
+  initSidebarCollapse();
   initTheme();
   loadSummary();
   loadPool();

@@ -22,7 +22,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css?v=20260808-sidebar-ab"/>
+  <link rel="stylesheet" href="/css/style.css?v=20260808-sidebar-cd"/>
   <script src="/js/jquery.min.js"></script>
   <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/echarts.min.js"></script>
@@ -60,6 +60,8 @@
         <span class="sidebar-title">Quant Stock</span>
         <span class="sidebar-head-tag">导航</span>
       </div>
+      <button type="button" id="btnSidebarCollapse" class="sidebar-collapse-btn"
+              title="收起导航" aria-label="收起导航" aria-expanded="true">«</button>
     </div>
 
     <section class="nav-group" data-group="workbench" aria-label="工作台">
@@ -67,7 +69,9 @@
       <div class="nav-group-body">
         <div class="side-nav" data-nav="pool">
           <button type="button" class="side-nav-toggle" data-body="poolBody" data-mode="pool"
-                  data-intro="/docs/nav-pool.html" data-intro-title="行情浏览" aria-expanded="false">
+                  data-intro="/docs/nav-pool.html" data-intro-title="行情浏览" aria-expanded="false"
+                  title="行情浏览">
+            <span class="nav-ico" aria-hidden="true">行</span>
             <span class="nav-label">行情浏览</span>
             <span class="chevron">▸</span>
           </button>
@@ -79,7 +83,9 @@
 
         <div class="side-nav" data-nav="single">
           <button type="button" class="side-nav-toggle" data-body="singleBody" data-mode="single"
-                  data-intro="/docs/nav-single.html" data-intro-title="个股回测" aria-expanded="false">
+                  data-intro="/docs/nav-single.html" data-intro-title="个股回测" aria-expanded="false"
+                  title="个股回测">
+            <span class="nav-ico" aria-hidden="true">股</span>
             <span class="nav-label">个股回测</span>
             <span class="chevron">▸</span>
           </button>
@@ -94,7 +100,9 @@
 
         <div class="side-nav" data-nav="portfolio">
           <button type="button" class="side-nav-toggle" data-body="portfolioBody" data-mode="portfolio"
-                  data-intro="/docs/nav-portfolio.html" data-intro-title="组合回测" aria-expanded="false">
+                  data-intro="/docs/nav-portfolio.html" data-intro-title="组合回测" aria-expanded="false"
+                  title="组合回测">
+            <span class="nav-ico" aria-hidden="true">组</span>
             <span class="nav-label">组合回测</span>
             <span class="chevron">▸</span>
           </button>
@@ -108,7 +116,9 @@
 
         <div class="side-nav" data-nav="tradepool">
           <button type="button" class="side-nav-toggle" data-body="tradepoolBody" data-mode="tradepool"
-                  data-intro="/docs/nav-tradepool.html" data-intro-title="目标池" aria-expanded="false">
+                  data-intro="/docs/nav-tradepool.html" data-intro-title="目标池" aria-expanded="false"
+                  title="目标池">
+            <span class="nav-ico" aria-hidden="true">池</span>
             <span class="nav-label">目标池</span>
             <span class="chevron">▸</span>
           </button>
@@ -124,7 +134,9 @@
 
         <div class="side-nav" data-nav="account">
           <button type="button" class="side-nav-toggle" data-body="accountBody" data-mode="account"
-                  data-intro="/docs/nav-account.html" data-intro-title="账户概览" aria-expanded="false">
+                  data-intro="/docs/nav-account.html" data-intro-title="账户概览" aria-expanded="false"
+                  title="账户概览">
+            <span class="nav-ico" aria-hidden="true">账</span>
             <span class="nav-label">账户概览</span>
             <span class="chevron">▸</span>
           </button>
@@ -155,7 +167,9 @@
 
         <div class="side-nav" data-nav="schedule">
           <button type="button" class="side-nav-toggle" data-body="scheduleBody" data-mode="schedule"
-                  data-intro="/docs/nav-schedule.html" data-intro-title="运维中心" aria-expanded="false">
+                  data-intro="/docs/nav-schedule.html" data-intro-title="运维中心" aria-expanded="false"
+                  title="运维中心">
+            <span class="nav-ico" aria-hidden="true">运</span>
             <span class="nav-label">运维中心</span>
             <span class="chevron">▸</span>
           </button>
@@ -170,7 +184,9 @@
 
         <div class="side-nav" data-nav="strategy">
           <button type="button" class="side-nav-toggle" data-body="strategyBody" data-mode="strategy"
-                  data-intro="/docs/nav-strategy.html" data-intro-title="策略管理" aria-expanded="false">
+                  data-intro="/docs/nav-strategy.html" data-intro-title="策略管理" aria-expanded="false"
+                  title="策略管理">
+            <span class="nav-ico" aria-hidden="true">策</span>
             <span class="nav-label">策略管理</span>
             <span class="chevron">▸</span>
           </button>
@@ -183,7 +199,9 @@
 
         <div class="side-nav" data-nav="dbtables">
           <button type="button" class="side-nav-toggle" data-body="dbtablesBody" data-mode="dbtables"
-                  data-intro="/docs/nav-dbtables.html" data-intro-title="数据表" aria-expanded="false">
+                  data-intro="/docs/nav-dbtables.html" data-intro-title="数据表" aria-expanded="false"
+                  title="数据表">
+            <span class="nav-ico" aria-hidden="true">表</span>
             <span class="nav-label">数据表</span>
             <span class="chevron">▸</span>
           </button>
@@ -199,7 +217,9 @@
       <div class="nav-group-body">
         <div class="side-nav" data-nav="kuangrui">
           <button type="button" class="side-nav-toggle" data-body="kuangruiBody" data-mode="kuangrui"
-                  data-intro="/docs/nav-kuangrui.html" data-intro-title="宽睿对接" aria-expanded="false">
+                  data-intro="/docs/nav-kuangrui.html" data-intro-title="宽睿对接" aria-expanded="false"
+                  title="宽睿对接">
+            <span class="nav-ico" aria-hidden="true">宽</span>
             <span class="nav-label">宽睿对接</span>
             <span class="chevron">▸</span>
           </button>
@@ -217,7 +237,9 @@
 
         <div class="side-nav" data-nav="stock-knowledge">
           <button type="button" class="side-nav-toggle" data-body="stockKnowledgeMenu" data-mode="doc"
-                  data-intro="/docs/nav-stock-knowledge.html" data-intro-title="量化知识" aria-expanded="false">
+                  data-intro="/docs/nav-stock-knowledge.html" data-intro-title="量化知识" aria-expanded="false"
+                  title="量化知识">
+            <span class="nav-ico" aria-hidden="true">知</span>
             <span class="nav-label">量化知识</span>
             <span class="chevron">▸</span>
           </button>
@@ -226,7 +248,9 @@
 
         <div class="side-nav" data-nav="app-related">
           <button type="button" class="side-nav-toggle" data-body="appRelatedMenu" data-mode="doc"
-                  data-intro="/docs/nav-app-related.html" data-intro-title="应用说明" aria-expanded="false">
+                  data-intro="/docs/nav-app-related.html" data-intro-title="应用说明" aria-expanded="false"
+                  title="应用说明">
+            <span class="nav-ico" aria-hidden="true">说</span>
             <span class="nav-label">应用说明</span>
             <span class="chevron">▸</span>
           </button>
@@ -1703,6 +1727,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260808-sidebar-ab"></script>
+<script src="/js/stock-chart.js?v=20260808-sidebar-cd"></script>
 </body>
 </html>
