@@ -352,7 +352,14 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
     private List<?> finishQueryResult(String methodName, OesQueryListInvoker.Result r) {
         if (!r.ok) {
             lastError.set(r.detail);
-            log.warn("[oes] {} 查询失败: {}", methodName, r.detail);
+            // 签名探测失败常含 NPE 文案：升级 ERROR，便于 IDEA 按 error 过滤看到
+            if (r.detail != null && (r.detail.contains("NullPointerException")
+                    || r.detail.contains("mode is null")
+                    || r.detail.contains("IllegalArgumentException"))) {
+                log.error("[oes] {} 查询失败（含空参/非法入参迹象）: {}", methodName, r.detail);
+            } else {
+                log.warn("[oes] {} 查询失败: {}", methodName, r.detail);
+            }
             return Collections.emptyList();
         }
         if (r.list.isEmpty()) {
@@ -915,6 +922,26 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
             if (pts.length != args.length) {
                 continue;
             }
+            // 单参枚举且传入 null：逐常量试，禁止直接传 null（同 QueryMode NPE）
+            if (args.length == 1 && args[0] == null && pts[0].isEnum()) {
+                Object hit = invokeWithEnumModes(target, m, pts[0]);
+                if (hit != null) {
+                    return hit;
+                }
+                continue;
+            }
+            boolean skip = false;
+            for (int i = 0; i < args.length; i++) {
+                if (args[i] == null && (pts[i].isEnum() || pts[i].isPrimitive())) {
+                    log.warn("[oes] 跳过 {}{}：禁止对 {} 传 null",
+                            name, formatPts(pts), pts[i].getSimpleName());
+                    skip = true;
+                    break;
+                }
+            }
+            if (skip) {
+                continue;
+            }
             try {
                 Object[] callArgs = new Object[args.length];
                 boolean ok = true;
@@ -933,7 +960,12 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
                 }
                 return m.invoke(target, callArgs);
             } catch (Exception e) {
-                log.debug("[oes] invoke {} 失败: {}", name, e.getMessage());
+                Throwable cause = e.getCause() != null ? e.getCause() : e;
+                if (cause instanceof NullPointerException || cause instanceof IllegalArgumentException) {
+                    log.error("[oes] invoke {}{} 入参异常: {}", name, formatPts(pts), cause.toString(), cause);
+                } else {
+                    log.debug("[oes] invoke {} 失败: {}", name, cause.getMessage());
+                }
             }
         }
         // 再试：无参
@@ -946,6 +978,40 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
             }
         }
         return null;
+    }
+
+    private Object invokeWithEnumModes(Object target, Method m, Class<?> enumType) {
+        Object[] constants = enumType.getEnumConstants();
+        if (constants == null) {
+            return null;
+        }
+        Object empty = null;
+        for (Object mode : constants) {
+            try {
+                Object ret = m.invoke(target, mode);
+                if (ret != null) {
+                    return ret;
+                }
+                empty = ret;
+            } catch (Exception e) {
+                Throwable cause = e.getCause() != null ? e.getCause() : e;
+                if (cause instanceof NullPointerException || cause instanceof IllegalArgumentException) {
+                    log.error("[oes] invoke {}#{} 异常: {}", m.getName(), mode, cause.toString(), cause);
+                }
+            }
+        }
+        return empty;
+    }
+
+    private static String formatPts(Class<?>[] pts) {
+        StringBuilder sb = new StringBuilder("(");
+        for (int i = 0; i < pts.length; i++) {
+            if (i > 0) {
+                sb.append(',');
+            }
+            sb.append(pts[i].getSimpleName());
+        }
+        return sb.append(')').toString();
     }
 
     private static Object newInstance(String className) {

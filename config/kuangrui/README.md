@@ -188,7 +188,16 @@ quant:
 
 1. **先确认跑的是新代码**：出参应含 `rptSyncEngine=OesRptSyncInvoker/v2`。若 `lastError` 仍是整句「请核对 API 版本 0.19.4」，说明 IDEA 未用最新源码重编 → `git pull` 后 **Maven 勾选 profile `kuangrui`** 再 Rebuild / `mvn -Pkuangrui spring-boot:run`
 2. 新逻辑：登录成功但回报同步失败时 **查询通道降级仍可用**（`syncDegraded=true` 可查资金/持仓）；`lastError` 带可用方法与真实异常；报撤仍要求 `rptSynced=true`
-2b. 查资金/持仓返回空：看日志 `[oes] queryCashAsset … via` 或出参 `lastError`（含可用签名）；已兼容 `List`/回调/`Filter` 多包名；须 `-Pkuangrui` 重编
+2b. 查资金/持仓返回空：看日志 `[oes] queryCashAsset … via` 或出参 `lastError`（含可用签名）；已兼容 `List` / `QueryMode` 枚举（勿传 null）/ 回调 / `Filter` 多包名；若见 `mode is null` 说明未用含枚举适配的构建 → `git pull` 后 `-Pkuangrui` 重编
+2c. **对照资料包根因（v0.19.4.0）**：Demo 流程为登录 → `sendRptSync` → 再查账户。本机签名是 `queryCashAsset(OesQryCashAssetFilter, QueryMode)`，第二参是 `Client.QueryMode` **枚举**（不是回调）；传 null 会 `mode.ordinal()` NPE，页面表现为 `cash=[]`。C API 说明 Filter 空/零即可查当前客户全部资金。本机一键对照 Demo/javap：
+
+```powershell
+$env:QUANT_KUANGRUI_HOME = "D:\OESAPI-JAVA-v0.19.4.0-20260430\OESAPI-JAVA-v0.19.4.0-20260430"
+.\scripts\kuangrui\inspect-oes-cash-query.ps1
+# 报告：scripts/kuangrui/out/cash-query-inspect.txt
+```
+
+2d. **为何 IDEA 曾看不到 ERROR 堆栈**：`OesQueryListInvoker` 签名探测会 catch 异常写入 `lastError`/WARN 文案，旧代码**不打 ERROR、不打堆栈**。现已：枚举/具体类禁止 null；探测期 NPE/`IllegalArgumentException` 打 `ERROR`+cause；查询失败文案含 NPE 时 `finishQueryResult` 升为 ERROR。其它仍可能只 WARN/DEBUG 的路径：ops 门面失败、`invokeReturning` 非 NPE、M4 静态回退、`enqueue*`、`setBean`、close。
 3. 核对 `local/oes_api_config.json` 回报通道 `rpt`（模拟常见 `tcp://106.15.58.119:6301`）可达；`subcribeEnvId≤0` 表示订阅全部环境号
 4. 服务端 ApplVerId≈`0.19.1`、客户端 jar `0.19.4.0` 属兼容范围
 

@@ -1,5 +1,8 @@
 package com.quant.stock.kuangrui;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -16,9 +19,15 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * 宽睿 OES 查询列表反射适配：兼容 {@code List queryXxx(Filter)}、无参、
+ * {@code List queryXxx(Filter, QueryMode)}（0.19.x 常见）、
  * {@code int queryXxx(Filter, Callback)} 以及数组返回。
+ * <p>
+ * 签名探测会 catch 异常并汇总到 {@link Result#detail}；对「必填枚举/具体类传 null」
+ * 触发的 NPE 会额外打 ERROR（带 cause），避免只出现 WARN 文案、IDEA 看不到堆栈。
  */
 public final class OesQueryListInvoker {
+
+    private static final Logger log = LoggerFactory.getLogger(OesQueryListInvoker.class);
 
     private OesQueryListInvoker() {
     }
@@ -94,7 +103,15 @@ public final class OesQueryListInvoker {
                         continue;
                     }
                     if (pts.length == 1) {
-                        // null filter
+                        // 单参若是枚举（如 QueryMode），禁止 null
+                        if (pts[0].isEnum()) {
+                            Result r = trySingleArgEnum(client, m, pts[0], errors);
+                            if (r.ok) {
+                                return r;
+                            }
+                            continue;
+                        }
+                        // null filter（C API 允许；Java 若 NPE 会记入 errors 再试实体 Filter）
                         Result r = tryOneArg(client, m, null, errors);
                         if (r.ok) {
                             return r;
@@ -111,19 +128,29 @@ public final class OesQueryListInvoker {
                         continue;
                     }
                     if (pts.length == 2) {
-                        // Filter + Callback / Cursor
+                        // Filter + QueryMode / Callback
+                        Result emptyOk = null;
                         Result r = tryTwoArg(client, m, null, errors);
-                        if (r.ok) {
+                        if (r.ok && !r.list.isEmpty()) {
                             return r;
                         }
+                        if (r.ok) {
+                            emptyOk = r;
+                        }
                         for (Object f : filters) {
-                            if (f != null && !pts[0].isInstance(f)) {
+                            if (f != null && !pts[0].isInstance(f) && !pts[0].isEnum()) {
                                 continue;
                             }
                             r = tryTwoArg(client, m, f, errors);
-                            if (r.ok) {
+                            if (r.ok && !r.list.isEmpty()) {
                                 return r;
                             }
+                            if (r.ok && emptyOk == null) {
+                                emptyOk = r;
+                            }
+                        }
+                        if (emptyOk != null) {
+                            return emptyOk;
                         }
                     }
                 } catch (Exception e) {
@@ -166,38 +193,79 @@ public final class OesQueryListInvoker {
             Throwable cause = e.getCause() != null ? e.getCause() : e;
             String msg = formatSig(m) + ": " + cause.getClass().getSimpleName() + " " + safeMsg(cause);
             errors.add(msg);
+            logProbeThrowable(m, filter == null ? "nullFilter" : "filter", cause);
             return Result.fail(msg);
         }
     }
 
+    private static Result trySingleArgEnum(Object client, Method m, Class<?> enumType, List<String> errors) {
+        Object[] modes = orderEnumConstants(enumType.getEnumConstants());
+        Result emptyOk = null;
+        for (Object mode : modes) {
+            String tag = formatSig(m) + "#" + String.valueOf(mode);
+            try {
+                Object ret = m.invoke(client, mode);
+                Result r = coerceListResult(ret, null, tag);
+                if (r.ok) {
+                    if (!r.list.isEmpty()) {
+                        return r;
+                    }
+                    if (emptyOk == null) {
+                        emptyOk = r;
+                    }
+                    continue;
+                }
+                errors.add(tag + ": " + r.detail);
+            } catch (Exception e) {
+                Throwable cause = e.getCause() != null ? e.getCause() : e;
+                errors.add(tag + ": " + cause.getClass().getSimpleName() + " " + safeMsg(cause));
+                logProbeThrowable(m, String.valueOf(mode), cause);
+            }
+        }
+        if (emptyOk != null) {
+            return emptyOk;
+        }
+        return Result.fail("single-arg enum failed");
+    }
+
     private static Result tryTwoArg(Object client, Method m, Object filter, List<String> errors) {
         Class<?>[] pts = m.getParameterTypes();
-        Class<?> cbType = pts[1];
-        // 1) 第二参 null（部分 Cursor/可选回调）
-        try {
-            Object ret = m.invoke(client, filter, null);
-            Result r = coerceListResult(ret, null, formatSig(m) + "#cbNull");
-            if (r.ok && !r.list.isEmpty()) {
-                return r;
-            }
-            // 空 List 也可能合法；若 ret 是 int>=0 且无回调收集，继续试 callback
-            if (r.ok && ret instanceof List) {
-                return r;
-            }
-            if (r.detail != null) {
-                errors.add(formatSig(m) + ": " + r.detail);
-            }
-        } catch (Exception e) {
-            Throwable cause = e.getCause() != null ? e.getCause() : e;
-            errors.add(formatSig(m) + "#cbNull: " + cause.getClass().getSimpleName() + " " + safeMsg(cause));
+        Class<?> second = pts[1];
+
+        // 0.19.x：queryCashAsset(Filter, Client.QueryMode) — 第二参为枚举，禁止传 null（会 NPE ordinal）
+        if (second.isEnum()) {
+            return tryTwoArgWithEnum(client, m, filter, second, errors);
+        }
+        // 偶发：QueryMode 在前、Filter 在后
+        if (pts[0].isEnum()) {
+            return tryTwoArgEnumFirst(client, m, filter, pts[0], errors);
         }
 
-        // 2) 回调代理收集
-        if (cbType.isInterface()) {
+        // 1) 第二参 null：仅接口（可选回调）可试；具体类禁止（避免必填对象 NPE）
+        if (second.isInterface()) {
+            try {
+                Object ret = m.invoke(client, filter, null);
+                Result r = coerceListResult(ret, null, formatSig(m) + "#cbNull");
+                if (r.ok && !r.list.isEmpty()) {
+                    return r;
+                }
+                if (r.ok && ret instanceof List) {
+                    return r;
+                }
+                if (r.detail != null) {
+                    errors.add(formatSig(m) + ": " + r.detail);
+                }
+            } catch (Exception e) {
+                Throwable cause = e.getCause() != null ? e.getCause() : e;
+                // 接口回调试 null 为预期探测，只记入 errors，不打 ERROR
+                errors.add(formatSig(m) + "#cbNull: " + cause.getClass().getSimpleName() + " " + safeMsg(cause));
+            }
+
+            // 2) 回调代理收集
             List<Object> bucket = new CopyOnWriteArrayList<Object>();
             Object cb = Proxy.newProxyInstance(
-                    cbType.getClassLoader(),
-                    new Class[]{cbType},
+                    second.getClassLoader(),
+                    new Class[]{second},
                     new CollectingHandler(bucket));
             try {
                 Object ret = m.invoke(client, filter, cb);
@@ -209,9 +277,97 @@ public final class OesQueryListInvoker {
             } catch (Exception e) {
                 Throwable cause = e.getCause() != null ? e.getCause() : e;
                 errors.add(formatSig(m) + "#callback: " + cause.getClass().getSimpleName() + " " + safeMsg(cause));
+                logProbeThrowable(m, "callback", cause);
             }
+        } else {
+            errors.add(formatSig(m) + ": 第二参为具体类 " + second.getSimpleName() + "，跳过 null 探测");
         }
         return Result.fail("two-arg failed");
+    }
+
+    /** 探测阶段异常：NPE/非法参数打 ERROR+堆栈；其余 debug（避免刷屏）。 */
+    private static void logProbeThrowable(Method m, String attempt, Throwable cause) {
+        if (cause == null) {
+            return;
+        }
+        if (cause instanceof NullPointerException || cause instanceof IllegalArgumentException) {
+            log.error("[oes-query] 签名探测异常 {} #{}: {}",
+                    formatSig(m), attempt, cause.toString(), cause);
+        } else if (log.isDebugEnabled()) {
+            log.debug("[oes-query] 签名探测失败 {} #{}: {}", formatSig(m), attempt, cause.toString());
+        }
+    }
+
+    private static Result tryTwoArgWithEnum(Object client, Method m, Object filter,
+                                            Class<?> enumType, List<String> errors) {
+        return tryEnumModes(client, m, filter, enumType, errors, false);
+    }
+
+    private static Result tryTwoArgEnumFirst(Object client, Method m, Object filter,
+                                             Class<?> enumType, List<String> errors) {
+        return tryEnumModes(client, m, filter, enumType, errors, true);
+    }
+
+    /**
+     * 枚举第二参（或第一参）逐常量试；优先返回非空列表，避免错误 mode 空结果短路。
+     */
+    private static Result tryEnumModes(Object client, Method m, Object filter,
+                                       Class<?> enumType, List<String> errors, boolean enumFirst) {
+        Object[] modes = orderEnumConstants(enumType.getEnumConstants());
+        if (modes.length == 0) {
+            String msg = formatSig(m) + ": 枚举 " + enumType.getSimpleName() + " 无常量";
+            errors.add(msg);
+            return Result.fail(msg);
+        }
+        Result emptyOk = null;
+        for (Object mode : modes) {
+            String tag = formatSig(m) + "#" + String.valueOf(mode);
+            try {
+                Object ret = enumFirst ? m.invoke(client, mode, filter) : m.invoke(client, filter, mode);
+                Result r = coerceListResult(ret, null, tag);
+                if (r.ok) {
+                    if (!r.list.isEmpty()) {
+                        return r;
+                    }
+                    if (emptyOk == null) {
+                        emptyOk = r;
+                    }
+                    continue;
+                }
+                errors.add(tag + ": " + r.detail);
+            } catch (Exception e) {
+                Throwable cause = e.getCause() != null ? e.getCause() : e;
+                errors.add(tag + ": " + cause.getClass().getSimpleName() + " " + safeMsg(cause));
+                logProbeThrowable(m, String.valueOf(mode), cause);
+            }
+        }
+        if (emptyOk != null) {
+            return emptyOk;
+        }
+        return Result.fail(enumFirst ? "enum-first failed" : "enum modes failed");
+    }
+
+    /** 优先尝试 ALL / DEFAULT 等常见查询模式，其余按声明顺序跟进。 */
+    private static Object[] orderEnumConstants(Object[] constants) {
+        if (constants == null || constants.length == 0) {
+            return new Object[0];
+        }
+        List<Object> preferred = new ArrayList<Object>();
+        List<Object> rest = new ArrayList<Object>();
+        for (Object c : constants) {
+            if (c == null) {
+                continue;
+            }
+            String n = String.valueOf(c).toUpperCase(Locale.ROOT);
+            if (n.contains("ALL") || n.contains("DEFAULT") || n.contains("NORMAL")
+                    || n.contains("FULL") || n.equals("DEF") || n.contains("ANY")) {
+                preferred.add(c);
+            } else {
+                rest.add(c);
+            }
+        }
+        preferred.addAll(rest);
+        return preferred.toArray();
     }
 
     private static Result coerceListResult(Object ret, List<?> callbackBucket, String via) {
