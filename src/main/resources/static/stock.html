@@ -894,6 +894,18 @@
       <section class="panel">
         <h3>宽睿 · 账号登录</h3>
         <p class="hint">先连仿真柜台验柜，成功后再将用户名明文、密码 AES 密文写入库；取密优先库内 active，否则环境变量。主密钥在独立表 <code>kuangrui_crypto_key</code>（同库仅防误读）。须 <code>-Pkuangrui</code>。</p>
+        <div class="kr-acc-current" id="krAccCurrentBox">
+          <div class="kr-acc-current-main">
+            <span class="kr-acc-current-label">当前登录账号</span>
+            <strong class="kr-acc-current-user mono" id="krAccCurrentUser">—</strong>
+            <span class="kr-pill kr-pill--mute" id="krAccCurrentSrc">来源 —</span>
+          </div>
+          <p class="hint" id="krAccCurrentMeta">进入本页或点「查询当前账号」刷新</p>
+          <div class="toolbar" style="margin-top:8px;flex-wrap:wrap;gap:8px;">
+            <button type="button" id="btnKrAccCurrent">查询当前账号</button>
+            <button type="button" id="btnKrAccRefresh" class="secondary">刷新完整状态</button>
+          </div>
+        </div>
         <div class="kr-bench">
           <div class="kr-bench-apis">
             <div class="kr-api-card">
@@ -903,7 +915,6 @@
                 <label class="field-inline">密码 <input type="password" id="krAccPass" autocomplete="current-password" style="width:140px;"/></label>
                 <button type="button" id="btnKrAccLogin">登录并保存</button>
                 <button type="button" id="btnKrAccLogout" class="secondary">清除当前账号</button>
-                <button type="button" id="btnKrAccRefresh" class="secondary">刷新状态</button>
               </div>
             </div>
           </div>
@@ -1604,6 +1615,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260808-sync-home-nav"></script>
+<script src="/js/stock-chart.js?v=20260808-kr-current-user"></script>
 </body>
 </html>

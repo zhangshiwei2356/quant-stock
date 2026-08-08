@@ -451,6 +451,22 @@ public class OpsController {
         return s.status();
     }
 
+    /** 查询当前生效宽睿账号（无密码；currentUsername + 来源）。 */
+    @GetMapping("/kuangrui/account/current")
+    public Map<String, Object> kuangruiAccountCurrent() {
+        KuangruiAccountLoginService s = kuangruiAccountLoginProvider.getIfAvailable();
+        if (s == null) {
+            Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("ok", false);
+            m.put("hasCred", false);
+            m.put("currentUsername", null);
+            m.put("credSource", "none");
+            m.put("message", "需要 quant.db-enabled=true");
+            return m;
+        }
+        return s.current();
+    }
+
     /** 验柜成功后加密落库并设为 active。 */
     @PostMapping("/kuangrui/account/login")
     public Map<String, Object> kuangruiAccountLogin(@RequestBody Map<String, Object> body) {

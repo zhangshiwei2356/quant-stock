@@ -3609,6 +3609,33 @@ tbody tr:hover { background: var(--row-hover); }
   margin-top: 2px;
 }
 .kr-api-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.kr-acc-current {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel-solid) 70%, transparent);
+}
+.kr-acc-current.is-ready {
+  border-color: color-mix(in srgb, #12b76a 45%, var(--border));
+}
+.kr-acc-current.is-empty {
+  border-style: dashed;
+}
+.kr-acc-current-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.kr-acc-current-label {
+  font-size: 12px;
+  color: var(--muted, #667085);
+}
+.kr-acc-current-user {
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+}
 .kr-bench {
   display: grid;
   grid-template-columns: minmax(280px, 0.95fr) minmax(340px, 1.15fr);

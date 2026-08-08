@@ -141,25 +141,56 @@ public class KuangruiCredentialStore {
         KuangruiCredentials c = resolve();
         m.put("credSource", c.getSource());
         m.put("hasCred", Boolean.valueOf(c.isPresent()));
+        // 当前生效用户名（DB active 或 env）；查询「当前登录账号」用此字段
+        m.put("currentUsername", c.isPresent() ? c.getUsername() : null);
         boolean hasDb = false;
         String activeUser = null;
+        Object lastLoginAt = null;
+        Object lastLoginOk = null;
         try {
             List<Map<String, Object>> rows = jdbc.queryForList(
-                    "SELECT username FROM kuangrui_account WHERE active=1 ORDER BY id DESC LIMIT 1");
+                    "SELECT username, last_login_at, last_login_ok FROM kuangrui_account "
+                            + "WHERE active=1 ORDER BY id DESC LIMIT 1");
             if (!rows.isEmpty()) {
                 hasDb = true;
                 activeUser = str(rows.get(0).get("username"));
+                lastLoginAt = rows.get(0).get("last_login_at");
+                lastLoginOk = rows.get(0).get("last_login_ok");
             }
         } catch (Exception ignore) {
             // ignore
         }
         m.put("hasDbAccount", Boolean.valueOf(hasDb));
         m.put("activeUsername", activeUser);
+        if (lastLoginAt != null) {
+            m.put("lastLoginAt", String.valueOf(lastLoginAt));
+        }
+        if (lastLoginOk != null) {
+            m.put("lastLoginOk", lastLoginOk instanceof Number
+                    ? Boolean.valueOf(((Number) lastLoginOk).intValue() != 0)
+                    : lastLoginOk);
+        }
         m.put("hasEnvFallback", Boolean.valueOf(
                 trimToNull(System.getenv("QUANT_KUANGRUI_USER")) != null
                         && trimToNull(System.getenv("QUANT_KUANGRUI_PASSWORD")) != null));
         m.put("hint", "密码密文存 kuangrui_account；主密钥在 kuangrui_crypto_key（同库，仅防误读）。"
-                + "取密：DB active 优先，否则环境变量。");
+                + "取密：DB active 优先，否则环境变量。currentUsername=当前生效账号。");
+        return m;
+    }
+
+    /**
+     * 查询当前生效宽睿账号（无密码）。
+     * {@code currentUsername} 为实际取密用户；{@code activeUsername} 仅为库内 active。
+     */
+    public Map<String, Object> currentAccountView() {
+        Map<String, Object> m = new LinkedHashMap<String, Object>(statusView());
+        m.put("ok", Boolean.TRUE.equals(m.get("hasCred")));
+        if (Boolean.TRUE.equals(m.get("hasCred"))) {
+            m.put("message", "当前生效账号: " + m.get("currentUsername")
+                    + "（来源 " + m.get("credSource") + "）");
+        } else {
+            m.put("message", "当前无可用宽睿账号（库内无 active，且未设置环境变量）");
+        }
         return m;
     }
 

@@ -35,6 +35,15 @@ public class KuangruiAccountLoginService {
         return m;
     }
 
+    /** 查询当前生效宽睿账号（无密码；DB active 或 env）。 */
+    public Map<String, Object> current() {
+        Map<String, Object> m = new LinkedHashMap<String, Object>(credentialStore.currentAccountView());
+        OesReadonlyService oes = oesReadonlyProvider.getIfAvailable();
+        m.put("oesLive", oes != null && oes.isLive());
+        m.put("probeAvailable", oes != null && oes.isLive());
+        return m;
+    }
+
     public Map<String, Object> login(String username, String password) {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         if (!StringUtils.hasText(username) || !StringUtils.hasText(password)) {

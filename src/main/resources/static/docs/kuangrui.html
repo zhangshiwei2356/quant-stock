@@ -39,7 +39,7 @@
     <li><b>价格/金额</b>：整型，精确到元后四位，<code>1 元 = 10000</code>（本应用落库前÷10000，库内一律「元」）</li>
     <li>登录：<code>ClientLogonReq/Rsp</code>；<code>clEnvId</code>∈[0~99]；密码加密类型须与柜台一致</li>
     <li>配置走外部 JSON；通道配置在 <code>config/kuangrui/local/</code>（gitignore）</li>
-    <li>账号：优先「宽睿联调 → 账号登录」验柜后入库（用户名明文、密码 AES-GCM；主密钥在 <code>kuangrui_crypto_key</code>，同库仅防误读）；否则 <code>QUANT_KUANGRUI_USER</code>/<code>PASSWORD</code>。勿把密码写进 yml/Git；数据表白名单不含密钥/账号表</li>
+    <li>账号：优先「宽睿联调 → 账号登录」验柜后入库（用户名明文、密码 AES-GCM；主密钥在 <code>kuangrui_crypto_key</code>，同库仅防误读）；否则 <code>QUANT_KUANGRUI_USER</code>/<code>PASSWORD</code>。页内「查询当前账号」或 <code>GET /api/ops/kuangrui/account/current</code> 看 <code>currentUsername</code>（无密码）。勿把密码写进 yml/Git；数据表白名单不含密钥/账号表</li>
   </ul>
   <h5 style="margin:8px 0 4px;">2.2 MDS 行情</h5>
   <p>入口：<code>MdsClient</code>（TCP）/ <code>MdsUdpClient</code>（组播）；回调 <code>MdsCallBack</code> / <code>MdsUdpCallBack</code>。定位是<strong>实时行情</strong>，不是多年历史 K 线库。</p>
