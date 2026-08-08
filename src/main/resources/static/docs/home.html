@@ -6,25 +6,29 @@
   </div>
 
   <div class="home-metrics" id="homeMetrics">
-    <article class="home-metric-card" data-metric="equity">
+    <article class="home-metric-card home-metric-card--link" data-metric="equity" data-metric-go="account"
+             role="button" tabindex="0" title="查看账户概览">
       <div class="home-metric-label">总资产</div>
       <div class="home-metric-value" id="homeMetricEquity">—</div>
-      <div class="home-metric-hint" id="homeMetricEquityHint">本地模拟</div>
+      <div class="home-metric-hint" id="homeMetricEquityHint">加载中…</div>
     </article>
-    <article class="home-metric-card" data-metric="dayPnl">
+    <article class="home-metric-card home-metric-card--link" data-metric="dayPnl" data-metric-go="account"
+             role="button" tabindex="0" title="查看账户概览">
       <div class="home-metric-label">今日盈亏</div>
       <div class="home-metric-value" id="homeMetricDayPnl">—</div>
-      <div class="home-metric-hint" id="homeMetricDayPnlHint">相对昨收权益</div>
+      <div class="home-metric-hint" id="homeMetricDayPnlHint">加载中…</div>
     </article>
-    <article class="home-metric-card" data-metric="strategy">
+    <article class="home-metric-card home-metric-card--link" data-metric="strategy" data-metric-go="strategy"
+             role="button" tabindex="0" title="查看策略管理">
       <div class="home-metric-label">运行中策略</div>
       <div class="home-metric-value home-metric-value--sm" id="homeMetricStrategy" title="">—</div>
-      <div class="home-metric-hint home-metric-hint--tech" id="homeMetricStrategyHint">纸面激活</div>
+      <div class="home-metric-hint home-metric-hint--tech" id="homeMetricStrategyHint">加载中…</div>
     </article>
-    <article class="home-metric-card" data-metric="alerts">
+    <article class="home-metric-card home-metric-card--link" data-metric="alerts" data-metric-go="health"
+             role="button" tabindex="0" title="查看数据健康">
       <div class="home-metric-label">待处理告警</div>
       <div class="home-metric-value" id="homeMetricAlerts">—</div>
-      <div class="home-metric-hint" id="homeMetricAlertsHint">数据健康覆盖</div>
+      <div class="home-metric-hint" id="homeMetricAlertsHint">加载中…</div>
     </article>
   </div>
 
@@ -61,7 +65,7 @@
     </section>
     <section class="home-entry-group">
       <h4 class="home-section-title">交易管理</h4>
-      <div class="home-entry-grid home-entry-grid--3">
+      <div class="home-entry-grid home-entry-grid--3 home-entry-grid--fill">
         <button type="button" class="home-entry-card" data-enter="tradepool">
           <span class="home-entry-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2"/></svg></span>
           <span class="home-entry-name">目标池</span>
@@ -81,7 +85,7 @@
     </section>
     <section class="home-entry-group">
       <h4 class="home-section-title">辅助工具</h4>
-      <div class="home-entry-grid home-entry-grid--3">
+      <div class="home-entry-grid home-entry-grid--3 home-entry-grid--fill">
         <button type="button" class="home-entry-card" data-enter="dbtables">
           <span class="home-entry-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9.5h16M4 14.5h16M9.5 4v16M14.5 4v16"/></svg></span>
           <span class="home-entry-name">数据表</span>

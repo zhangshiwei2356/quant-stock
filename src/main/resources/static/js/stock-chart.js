@@ -2383,8 +2383,8 @@
     var $btn = $('#btnSidebarCollapse');
     if ($btn.length) {
       $btn.attr('aria-expanded', sidebarIconCollapsed ? 'false' : 'true');
-      $btn.attr('title', sidebarIconCollapsed ? '展开导航' : '收起为图标导航');
-      $btn.attr('aria-label', sidebarIconCollapsed ? '展开导航' : '收起为图标导航');
+      $btn.attr('title', sidebarIconCollapsed ? '展开导航' : '收起导航');
+      $btn.attr('aria-label', sidebarIconCollapsed ? '展开导航' : '收起导航');
     }
     try {
       localStorage.setItem(SIDEBAR_COLLAPSE_KEY, sidebarIconCollapsed ? '1' : '0');
@@ -2495,59 +2495,81 @@
     if (mode === 'doc') {
       $btn = $('.side-nav-toggle.open').first();
     }
-    var group = $btn.closest('.nav-group').attr('data-group') === 'docs' ? '扩展与文档' : '工作台';
+    // 工作台分组名与首页叶子「工作台」撞名，面包屑不再插入分组段；扩展与文档仍保留
+    var isDocs = $btn.closest('.nav-group').attr('data-group') === 'docs';
     var title = $.trim($btn.attr('data-intro-title') || $btn.find('.nav-label').text() || mode);
     var bodyId = $btn.attr('data-body') || '';
-    var parts = [{ label: group }, { label: title, bodyId: bodyId }];
+    var parts = [];
+    if (isDocs) {
+      parts.push({ label: '扩展与文档' });
+    }
+    parts.push({ label: title, bodyId: bodyId });
     if (panelLabel) parts.push({ label: panelLabel });
     updateBreadcrumb(parts);
   }
 
   function loadHomeDashboardMetrics() {
-    $('#homeMetricEquity, #homeMetricDayPnl, #homeMetricStrategy, #homeMetricAlerts').text('—');
-    $('#homeMetricEquityHint').text('加载中…');
-    $('#homeMetricDayPnlHint').text('加载中…');
-    $('#homeMetricStrategyHint').text('加载中…');
-    $('#homeMetricAlertsHint').text('加载中…');
+    $('#homeMetricEquity, #homeMetricDayPnl, #homeMetricStrategy, #homeMetricAlerts').text('—')
+      .removeClass('is-up is-down is-flat');
+    $('#homeMetricEquityHint').text('加载中…').removeClass('home-metric-hint--empty');
+    $('#homeMetricDayPnlHint').text('加载中…').removeClass('home-metric-hint--empty');
+    $('#homeMetricStrategyHint').text('加载中…').removeClass('home-metric-hint--empty');
+    $('#homeMetricAlertsHint').text('加载中…').removeClass('home-metric-hint--empty');
 
     $.getJSON('/api/account/summary')
       .done(function (d) {
         d = d || {};
-        $('#homeMetricEquity').text(formatMoney(d.equity));
-        $('#homeMetricEquityHint').text(d.source === 'LOCAL_SIM' ? '本地模拟账本' : (d.source || '账户'));
+        var equityTxt = formatMoney(d.equity);
+        $('#homeMetricEquity').text(equityTxt || '—');
+        if (!equityTxt || equityTxt === '—') {
+          $('#homeMetricEquityHint').text('暂无账户数据').addClass('home-metric-hint--empty');
+        } else {
+          $('#homeMetricEquityHint').text(d.source === 'LOCAL_SIM' ? '本地模拟账本' : (d.source || '账户'));
+        }
         var day = d.dayPnl;
         var pct = formatPct(d.dayPnlPct);
         var dayTxt = formatMoney(day);
-        if (pct) dayTxt += '（' + pct + '）';
-        $('#homeMetricDayPnl').text(dayTxt);
+        if (dayTxt && dayTxt !== '—' && pct) dayTxt += '（' + pct + '）';
+        $('#homeMetricDayPnl').text(dayTxt || '—');
         var prev = Number(d.prevCloseEquity);
-        $('#homeMetricDayPnlHint').text(prev > 0 ? '相对昨收权益' : '暂无昨收基准');
-        if (Number(day) > 0) $('#homeMetricDayPnl').addClass('is-up').removeClass('is-down');
-        else if (Number(day) < 0) $('#homeMetricDayPnl').addClass('is-down').removeClass('is-up');
-        else $('#homeMetricDayPnl').removeClass('is-up is-down');
+        if (!dayTxt || dayTxt === '—') {
+          $('#homeMetricDayPnlHint').text('暂无盈亏数据').addClass('home-metric-hint--empty');
+          $('#homeMetricDayPnl').removeClass('is-up is-down').addClass('is-flat');
+        } else {
+          $('#homeMetricDayPnlHint').text(prev > 0 ? '相对昨收权益' : '暂无昨收基准');
+          if (Number(day) > 0) $('#homeMetricDayPnl').addClass('is-up').removeClass('is-down is-flat');
+          else if (Number(day) < 0) $('#homeMetricDayPnl').addClass('is-down').removeClass('is-up is-flat');
+          else $('#homeMetricDayPnl').addClass('is-flat').removeClass('is-up is-down');
+        }
       })
       .fail(function () {
-        $('#homeMetricEquityHint').text('账户接口不可用');
-        $('#homeMetricDayPnlHint').text('账户接口不可用');
+        $('#homeMetricEquityHint').text('账户接口暂不可用').addClass('home-metric-hint--empty');
+        $('#homeMetricDayPnlHint').text('账户接口暂不可用').addClass('home-metric-hint--empty');
+        $('#homeMetricDayPnl').addClass('is-flat');
       });
 
     $.getJSON('/api/ops/strategies')
       .done(function (d) {
         d = d || {};
         var id = d.activeStrategy || '';
-        var label = id || '—';
+        var label = '';
         var list = d.strategies || [];
         for (var i = 0; i < list.length; i++) {
-          if (list[i] && String(list[i].id) === String(id)) {
-            label = list[i].label || list[i].displayName || id;
+          if (list[i] && String(list[i].id || list[i].strategyId) === String(id)) {
+            label = list[i].label || list[i].displayName || '';
             break;
           }
         }
-        $('#homeMetricStrategy').text(label || '—').attr('title', label || '');
-        $('#homeMetricStrategyHint').text(id || '未设置激活策略');
+        if (!label && id) label = id;
+        $('#homeMetricStrategy').text(label || '—').attr('title', label || id || '');
+        if (!id) {
+          $('#homeMetricStrategyHint').text('未设置激活策略').addClass('home-metric-hint--empty');
+        } else {
+          $('#homeMetricStrategyHint').text(id === label ? '纸面激活' : id);
+        }
       })
       .fail(function () {
-        $('#homeMetricStrategyHint').text('策略接口不可用');
+        $('#homeMetricStrategyHint').text('策略接口暂不可用').addClass('home-metric-hint--empty');
       });
 
     $.getJSON('/api/ops/data-health/status')
@@ -2556,14 +2578,14 @@
         var r = st.result;
         if (!r && st.hasLastResult === false) {
           $('#homeMetricAlerts').text('—');
-          $('#homeMetricAlertsHint').text('尚未执行覆盖检查');
+          $('#homeMetricAlertsHint').text('尚未执行覆盖检查').addClass('home-metric-hint--empty');
           return;
         }
         if (!r) {
           return $.getJSON('/api/ops/data-health').done(function (res) {
             applyHealthMetric(res);
           }).fail(function () {
-            $('#homeMetricAlertsHint').text('健康接口不可用');
+            $('#homeMetricAlertsHint').text('健康接口暂不可用').addClass('home-metric-hint--empty');
           });
         }
         applyHealthMetric(r);
@@ -2572,7 +2594,7 @@
         $.getJSON('/api/ops/data-health')
           .done(applyHealthMetric)
           .fail(function () {
-            $('#homeMetricAlertsHint').text('健康接口不可用');
+            $('#homeMetricAlertsHint').text('健康接口暂不可用').addClass('home-metric-hint--empty');
           });
       });
   }
@@ -2581,8 +2603,33 @@
     res = res || {};
     var n = res.warnCount;
     if (n == null) n = (res.items && res.items.length) || 0;
+    n = Number(n) || 0;
     $('#homeMetricAlerts').text(String(n));
-    $('#homeMetricAlertsHint').text(res.asOf ? ('覆盖检查 · ' + String(res.asOf).slice(0, 16)) : (res.hint || '数据健康'));
+    if (n === 0) {
+      $('#homeMetricAlertsHint').text('暂无待处理').addClass('home-metric-hint--empty');
+    } else {
+      $('#homeMetricAlertsHint').text(res.asOf ? ('覆盖检查 · ' + String(res.asOf).slice(0, 16)) : (res.hint || '数据健康'));
+    }
+  }
+
+  var HOME_RECENT_ICONS = {
+    pool: '<path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M22 19V8"/><path d="M2 19h20"/>',
+    single: '<path d="M4 18V10"/><path d="M10 18V6"/><path d="M16 18v-5"/><path d="M3 20h18"/><path d="M18 4l3 3-3 3"/>',
+    portfolio: '<circle cx="8" cy="8" r="3.2"/><circle cx="16" cy="9" r="2.6"/><circle cx="12" cy="16.5" r="3"/>',
+    tradepool: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/>',
+    account: '<rect x="3.5" y="7" width="17" height="12" rx="2.2"/><path d="M3.5 12h17"/>',
+    schedule: '<circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2"/>',
+    'schedule-health': '<circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2"/>',
+    strategy: '<path d="M5 19V8.5L12 4l7 4.5V19"/><path d="M9 19v-6h6v6"/>',
+    dbtables: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9.5h16M9.5 4v16"/>',
+    kuangrui: '<rect x="4" y="8.5" width="12" height="11" rx="2"/><path d="M8 8.5V7a2 2 0 0 1 2-2h7.5a2 2 0 0 1 2 2v7.5"/>',
+    knowledge: '<path d="M6 4.5h9.5A2.5 2.5 0 0 1 18 7v13.5L12.5 17 7 20.5V7A2.5 2.5 0 0 1 9.5 4.5"/>',
+    app: '<path d="M5 19V8.5L12 4l7 4.5V19"/>'
+  };
+
+  function homeRecentIconSvg(key) {
+    var paths = HOME_RECENT_ICONS[key] || HOME_RECENT_ICONS.pool;
+    return '<span class="home-recent-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + paths + '</svg></span>';
   }
 
   function renderHomeRecent() {
@@ -2601,10 +2648,11 @@
       return;
     }
     $box.prop('hidden', false);
-    list.forEach(function (it) {
+    list.slice(0, 5).forEach(function (it) {
+      var key = it.key || '';
       $list.append($('<button type="button" class="home-recent-item"/>')
-        .attr('data-recent-key', it.key)
-        .text(it.label || it.key));
+        .attr('data-recent-key', key)
+        .html(homeRecentIconSvg(key) + '<span>' + (it.label || key) + '</span>'));
     });
   }
 
@@ -2633,6 +2681,11 @@
       case 'schedule':
         showSchedulePanel('jobs');
         pushRecentVisit({ key: 'schedule', label: '运维中心', mode: 'schedule', panel: 'jobs' });
+        break;
+      case 'schedule-health':
+      case 'health':
+        showSchedulePanel('health');
+        pushRecentVisit({ key: 'schedule-health', label: '数据健康', mode: 'schedule', panel: 'health' });
         break;
       case 'strategy':
         showStrategyEval();
@@ -7677,6 +7730,17 @@
 
   $('#viewHome').on('click', '[data-enter]', function () {
     enterWorkspaceByKey($(this).attr('data-enter'));
+  });
+
+  $('#viewHome').on('click', '[data-metric-go]', function () {
+    enterWorkspaceByKey($(this).attr('data-metric-go'));
+  });
+
+  $('#viewHome').on('keydown', '[data-metric-go]', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      enterWorkspaceByKey($(this).attr('data-metric-go'));
+    }
   });
 
   $('#viewHome').on('click', '[data-recent-key]', function () {
