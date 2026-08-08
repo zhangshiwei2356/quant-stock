@@ -18,7 +18,7 @@
 
 <h4>架构一览</h4>
 <ul>
-  <li><b>前端</b>：<code>stock.html</code> + <code>stock-chart.js</code>；文档片段 <code>static/docs/*.html</code>；顶栏 Logo / 侧栏「工作台」回首页仪表盘；顶栏「?」可打开模块介绍；侧栏分组「核心功能 / 扩展与文档」，一级只展开/收起（箭头旋转）、二级直达；顶部「«」收为 SVG 图标窄栏；数量角标为 0 时隐藏；面包屑历史路径浅灰可点、当前页深色；仪表盘四卡可点跳转 + 分组入口等宽铺满 + 最近访问；主操作统一品牌蓝（组合回测不再用红）；表格表头/斑马/行 hover，技术标识弱化</li>
+  <li><b>前端</b>：<code>stock.html</code> + <code>stock-chart.js</code>；文档片段 <code>static/docs/*.html</code>；顶栏 Logo / 侧栏「工作台」回首页仪表盘；顶栏「?」可打开模块介绍；侧栏分组「核心功能 / 扩展与文档」，一级只展开/收起（箭头旋转）、二级直达；顶部「«」收为 SVG 图标窄栏；数量角标为 0 时隐藏；面包屑历史路径浅灰可点、当前页深色；仪表盘四卡可点跳转 + 分组入口等宽铺满 + 最近访问（少时收标题旁）；主操作统一品牌蓝（组合回测不再用红）；表格表头/斑马/行 hover，技术标识弱化</li>
   <li><b>后端包</b>：<code>market</code> 行情 · <code>strategy</code> 策略 · <code>backtest</code> 回测 · <code>pool</code> 目标池 · <code>trade</code> 下单账本 · <code>risk</code> 风控 · <code>task</code> 调度 · <code>account</code>/<code>admin</code> 账户与运维 · <code>pdf</code> 文档</li>
   <li><b>数据</b>：行情表 + 目标池 + 模拟账本 + 回测历史 + <code>sys_schedule_job</code></li>
   <li>完整架构图与接口表见侧栏「<b>项目 README</b>」（实时渲染仓库 <code>README.md</code>）</li>
@@ -26,7 +26,7 @@
 
 <h4>功能模块</h4>
 <ul>
-  <li><b>行情浏览</b>：全市场模糊选股、多周期 K 线与指标</li>
+  <li><b>行情浏览</b>：全市场搜索+表格选股（最新价/涨跌幅）、已选标的与周期刷新同行、多周期 K 线与指标</li>
   <li><b>个股回测</b>：回测工作台<strong>仅从目标池选股</strong>（含策略下拉；可选 <code>overnightGap</code> 走 session/MIN_1；可展开「本次临时参数」不落库）/ 批量扫描 / 回测历史（落库带策略 id）</li>
   <li><b>组合回测</b>：目标池多选；默认日 K 共享资金池；<code>overnightGap</code> 等会话策略为 session MIN_1 共享资金池（账户风控/熔断挂卖/AUM+POV，无金叉五步；结果含会话事件与相关摘要）；可临时改参 / 回测历史（落库带策略 id）</li>
   <li><b>目标池</b>：当前池 / 扫描历史；「扫描更新」提交运维任务 <code>pool-rebuild</code>（异步进度弹框，与定时入池同一套）；可下载 PDF 报告；移出≠卖出；也是回测选股来源</li>

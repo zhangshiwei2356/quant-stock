@@ -1322,10 +1322,53 @@ body.mode-doc .side-nav[data-nav="strategy"] .side-nav-toggle {
   font-size: 22px;
 }
 
+.home-dash-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.home-dash-head-main {
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
 .home-dash-sub {
   margin: 6px 0 0;
   font-size: 12px;
   color: var(--muted);
+}
+
+.home-recent-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 auto;
+  max-width: min(100%, 420px);
+  padding-top: 2px;
+}
+
+.home-recent-inline[hidden] {
+  display: none !important;
+}
+
+.home-recent-inline-label {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.home-recent-inline .home-recent-list {
+  justify-content: flex-end;
+}
+
+.home-recent-inline .home-recent-item {
+  padding: 4px 8px !important;
+  font-size: 11px;
 }
 
 .home-metrics {
@@ -3644,6 +3687,95 @@ tbody tr:hover { background: var(--row-hover); }
   font-weight: 700;
   color: var(--accent);
 }
+
+/* 行情浏览：表格选股 + 分块布局 */
+.pool-section + .pool-section {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+.pool-section-head {
+  margin-bottom: 8px;
+}
+.pool-section-head h3 {
+  margin: 0 0 4px;
+}
+.pool-section-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.stock-picker--table .stock-picker-table-wrap {
+  max-height: 280px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-solid);
+}
+.stock-picker-table {
+  margin: 0;
+}
+.stock-picker-table .stock-picker-name {
+  max-width: 180px;
+  font-size: 12px;
+}
+.stock-picker-table tbody tr[data-code] {
+  cursor: pointer;
+}
+.stock-picker-table tbody tr[data-code]:hover {
+  background: var(--row-hover);
+}
+.stock-picker-table tbody tr.open {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.stock-picker-table tbody tr.active {
+  background: var(--accent-soft);
+}
+.stock-picker-table th.pool-sort {
+  cursor: pointer;
+  user-select: none;
+}
+.stock-picker-table th.pool-sort:hover {
+  color: var(--accent);
+}
+.stock-picker-table th.pool-sort.is-desc::after {
+  content: " ↓";
+  font-size: 10px;
+  color: var(--accent);
+}
+.stock-picker-table th.pool-sort.is-asc::after {
+  content: " ↑";
+  font-size: 10px;
+  color: var(--accent);
+}
+.pool-selected-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pool-selected-bar .stock-tabs {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.pool-selected-ops {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+.pool-selected-ops .field {
+  margin: 0;
+}
+#viewPool #poolMeta {
+  margin-top: 8px;
+}
+td.muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .pf-chips-bar {
   display: flex;
   flex-wrap: wrap;

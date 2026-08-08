@@ -18,6 +18,11 @@
   /** 目标池标的缓存：供个股/组合回测选股（不含全市场） */
   var tradePoolList = [];
   var PICKER_LIMIT = 60;
+  /** 行情选股表报价缓存 code -> { lastClose, pctChg } */
+  var poolQuoteCache = {};
+  var poolSortKey = 'pctChg';
+  var poolSortDir = 'desc';
+  var poolQuoteReqSeq = 0;
   /** 组合回测已选成分股代码（有序） */
   var portfolioSelected = [];
   var poolTabs = []; // { code, period }
@@ -753,7 +758,7 @@
   function renderPoolTabs() {
     var $tabs = $('#poolTabs').empty();
     if (!poolTabs.length) {
-      $tabs.append($('<div class="empty-state"/>').text('在上方搜索并点击股票开启信息（可同时打开多只）'));
+      $tabs.append($('<div class="empty-state"/>').text('在上方表格搜索并点击股票加入已选（可同时打开多只）'));
       $('#poolMeta').text('');
       baseChart.clear();
       $('#barTableBody').html('<tr><td colspan="6" class="empty-state">暂无K线数据</td></tr>');
@@ -780,17 +785,112 @@
   }
 
   function markPoolListOpen() {
-    $('#poolStockResults li').removeClass('active open');
+    $('#poolStockResults tr[data-code]').removeClass('active open');
     poolTabs.forEach(function (tab) {
-      $('#poolStockResults li[data-code="' + tab.code + '"]').addClass('open');
+      $('#poolStockResults tr[data-code="' + tab.code + '"]').addClass('open');
     });
     if (activePoolCode) {
-      $('#poolStockResults li[data-code="' + activePoolCode + '"]').addClass('active');
+      $('#poolStockResults tr[data-code="' + activePoolCode + '"]').addClass('active');
     }
   }
 
   function normalizeStockQuery(q) {
     return String(q || '').trim().toLowerCase().replace(/\s+/g, '');
+  }
+
+  function formatQuotePrice(v) {
+    var n = Number(v);
+    if (!isFinite(n)) return '—';
+    return n.toFixed(2);
+  }
+
+  function formatQuotePct(v) {
+    var n = Number(v);
+    if (!isFinite(n)) return '—';
+    var sign = n > 0 ? '+' : '';
+    return sign + (n * 100).toFixed(2) + '%';
+  }
+
+  function sortPoolMatched(list) {
+    var key = poolSortKey || 'pctChg';
+    var dir = poolSortDir === 'asc' ? 1 : -1;
+    return (list || []).slice().sort(function (a, b) {
+      var qa = poolQuoteCache[a.code] || {};
+      var qb = poolQuoteCache[b.code] || {};
+      var va = key === 'lastClose' ? Number(qa.lastClose) : Number(qa.pctChg);
+      var vb = key === 'lastClose' ? Number(qb.lastClose) : Number(qb.pctChg);
+      var aOk = isFinite(va);
+      var bOk = isFinite(vb);
+      if (!aOk && !bOk) return String(a.code).localeCompare(String(b.code));
+      if (!aOk) return 1;
+      if (!bOk) return -1;
+      if (va === vb) return String(a.code).localeCompare(String(b.code));
+      return va > vb ? dir : -dir;
+    });
+  }
+
+  function renderPoolStockTableRows(matched) {
+    var $tb = $('#poolStockResults');
+    if (!$tb.length) return;
+    $tb.empty();
+    if (!matched.length) {
+      var total = (universeList || []).length;
+      var emptyMsg = total ? '无匹配标的' : '暂无股票数据';
+      $tb.append($('<tr/>').append($('<td colspan="5" class="empty-state"/>').text(emptyMsg)));
+      return;
+    }
+    matched.forEach(function (it) {
+      var code = it.code;
+      var q = poolQuoteCache[code] || {};
+      var pct = q.pctChg;
+      var pctCls = '';
+      if (Number(pct) > 0) pctCls = 'pnl-pos';
+      else if (Number(pct) < 0) pctCls = 'pnl-neg';
+      var status = getPoolTab(code) ? (code === activePoolCode ? '当前' : '已选') : '—';
+      var $tr = $('<tr role="button" tabindex="0"/>').attr('data-code', code);
+      if (getPoolTab(code)) $tr.addClass('open');
+      if (code === activePoolCode) $tr.addClass('active');
+      $tr.append(
+        $('<td class="stock-picker-code"/>').text(code),
+        $('<td class="stock-picker-name"/>').text(it.name || ''),
+        $('<td class="num"/>').text(formatQuotePrice(q.lastClose)),
+        $('<td class="num"/>').addClass(pctCls).text(formatQuotePct(pct)),
+        $('<td class="muted"/>').text(status)
+      );
+      $tb.append($tr);
+    });
+  }
+
+  function fillPoolQuotesThenRender(matched) {
+    renderPoolStockTableRows(sortPoolMatched(matched));
+    var codes = [];
+    matched.forEach(function (it) {
+      if (it && it.code && poolQuoteCache[it.code] == null) {
+        codes.push(it.code);
+      }
+    });
+    if (!codes.length) return;
+    var seq = ++poolQuoteReqSeq;
+    $.getJSON('/api/stock/quotes', { codes: codes.join(',') })
+      .done(function (resp) {
+        if (seq !== poolQuoteReqSeq) return;
+        var items = (resp && resp.items) || [];
+        items.forEach(function (row) {
+          if (!row || !row.code) return;
+          poolQuoteCache[row.code] = {
+            lastClose: row.lastClose,
+            pctChg: row.pctChg,
+            asOf: row.asOf
+          };
+        });
+        codes.forEach(function (c) {
+          if (poolQuoteCache[c] == null) {
+            poolQuoteCache[c] = { lastClose: null, pctChg: null };
+          }
+        });
+        var again = filterUniverse($('#poolStockQ').val(), PICKER_LIMIT, 'pool');
+        renderPoolStockTableRows(sortPoolMatched(again));
+      });
   }
 
   /** 代码/名称模糊匹配（包含、前缀优先）；mode=single|portfolio 用目标池，其余用全市场 */
@@ -825,7 +925,6 @@
     var isPool = mode === 'pool';
     var isPf = mode === 'portfolio';
     var q = isPool ? $('#poolStockQ').val() : (isPf ? $('#pfStockQ').val() : $('#singleStockQ').val());
-    var $list = isPool ? $('#poolStockResults') : (isPf ? $('#pfStockResults') : $('#singleStockResults'));
     var $hint = isPool ? $('#poolStockMatchHint') : (isPf ? $('#pfStockMatchHint') : $('#singleStockMatchHint'));
     var matched = filterUniverse(q, PICKER_LIMIT, mode);
     var total = (mode === 'single' || mode === 'portfolio')
@@ -835,6 +934,13 @@
     $hint.text(query
       ? ('匹配 ' + matched.length + (matched.length >= PICKER_LIMIT ? '+' : '') + ' / 共 ' + total)
       : ('展示前 ' + matched.length + ' / 共 ' + total + ' · 输入可筛选'));
+
+    if (isPool) {
+      fillPoolQuotesThenRender(matched);
+      return;
+    }
+
+    var $list = isPf ? $('#pfStockResults') : $('#singleStockResults');
     $list.empty();
     if (!matched.length) {
       var emptyMsg = total
@@ -853,10 +959,7 @@
           '<span class="stock-picker-code">' + escHtml(code) + '</span>'
           + '<span class="stock-picker-name">' + escHtml(it.name || '') + '</span>'
         );
-      if (isPool) {
-        if (getPoolTab(code)) $li.addClass('open');
-        if (code === activePoolCode) $li.addClass('active');
-      } else if (isPf) {
+      if (isPf) {
         if (isPortfolioSelected(code)) $li.addClass('selected');
       } else if (code === singleCode) {
         $li.addClass('active');
@@ -2059,7 +2162,7 @@
     { id: 'backtest', group: 'stock', title: '回测要点', src: '/docs/backtest.html?v=20260720-nav-rename' }
   ];
   var knowledgeHtmlCache = {};
-  var HOME_SRC = '/docs/home.html?v=20260808-home-polish';
+  var HOME_SRC = '/docs/home.html?v=20260808-home-recent';
   var homePanelReady = false;
   var pendingHomeLead = null;
   var docsPdfBusy = false;
@@ -2609,7 +2712,7 @@
         st = st || {};
         var r = st.result;
         if (!r && st.hasLastResult === false) {
-          $('#homeMetricAlerts').text('—');
+          $('#homeMetricAlerts').text('0');
           $('#homeMetricAlertsHint').text('尚未执行覆盖检查').addClass('home-metric-hint--empty');
           return;
         }
@@ -2617,6 +2720,7 @@
           return $.getJSON('/api/ops/data-health').done(function (res) {
             applyHealthMetric(res);
           }).fail(function () {
+            $('#homeMetricAlerts').text('0');
             $('#homeMetricAlertsHint').text('健康接口暂不可用').addClass('home-metric-hint--empty');
           });
         }
@@ -2626,6 +2730,7 @@
         $.getJSON('/api/ops/data-health')
           .done(applyHealthMetric)
           .fail(function () {
+            $('#homeMetricAlerts').text('0');
             $('#homeMetricAlertsHint').text('健康接口暂不可用').addClass('home-metric-hint--empty');
           });
       });
@@ -2665,27 +2770,43 @@
   }
 
   function renderHomeRecent() {
-    var $box = $('#homeRecent');
-    var $list = $('#homeRecentList');
-    if (!$list.length) return;
+    var $section = $('#homeRecent');
+    var $sectionList = $('#homeRecentList');
+    var $inline = $('#homeRecentInline');
+    var $inlineList = $('#homeRecentInlineList');
+    if (!$sectionList.length && !$inlineList.length) return;
     var list = [];
     try {
       list = JSON.parse(localStorage.getItem(NAV_RECENT_KEY) || '[]') || [];
     } catch (e) {
       list = [];
     }
-    $list.empty();
+    list = list.slice(0, 5);
+    if ($sectionList.length) $sectionList.empty();
+    if ($inlineList.length) $inlineList.empty();
     if (!list.length) {
-      $box.prop('hidden', true);
+      if ($section.length) $section.prop('hidden', true);
+      if ($inline.length) $inline.prop('hidden', true);
       return;
     }
-    $box.prop('hidden', false);
-    list.slice(0, 5).forEach(function (it) {
-      var key = it.key || '';
-      $list.append($('<button type="button" class="home-recent-item"/>')
-        .attr('data-recent-key', key)
-        .html(homeRecentIconSvg(key) + '<span>' + (it.label || key) + '</span>'));
-    });
+    function appendItems($target) {
+      list.forEach(function (it) {
+        var key = it.key || '';
+        $target.append($('<button type="button" class="home-recent-item"/>')
+          .attr('data-recent-key', key)
+          .html(homeRecentIconSvg(key) + '<span>' + (it.label || key) + '</span>'));
+      });
+    }
+    // 不足 3 条：收进标题右上角，避免独占一整行；≥3 条用独立模块
+    if (list.length < 3 && $inlineList.length) {
+      appendItems($inlineList);
+      if ($inline.length) $inline.prop('hidden', false);
+      if ($section.length) $section.prop('hidden', true);
+    } else {
+      if ($sectionList.length) appendItems($sectionList);
+      if ($section.length) $section.prop('hidden', false);
+      if ($inline.length) $inline.prop('hidden', true);
+    }
   }
 
   function enterWorkspaceByKey(key) {
@@ -7870,7 +7991,7 @@
     pfSearchTimer = setTimeout(function () { renderStockPicker('portfolio'); }, 120);
   });
 
-  $('#poolStockResults').on('click', 'li[data-code]', function () {
+  $('#poolStockResults').on('click', 'tr[data-code]', function () {
     var code = $(this).attr('data-code');
     showMode('pool');
     openPoolStock(code);
@@ -7888,11 +8009,31 @@
     togglePortfolioStock($(this).attr('data-code'));
   });
 
-  $('#poolStockResults, #singleStockResults, #pfStockResults').on('keydown', 'li[data-code]', function (e) {
+  $('#poolStockResults').on('keydown', 'tr[data-code]', function (e) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       $(this).trigger('click');
     }
+  });
+
+  $('#singleStockResults, #pfStockResults').on('keydown', 'li[data-code]', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      $(this).trigger('click');
+    }
+  });
+
+  $('#viewPool').on('click', 'th.pool-sort', function () {
+    var key = $(this).attr('data-pool-sort') || 'pctChg';
+    if (poolSortKey === key) {
+      poolSortDir = poolSortDir === 'desc' ? 'asc' : 'desc';
+    } else {
+      poolSortKey = key;
+      poolSortDir = 'desc';
+    }
+    $('#viewPool th.pool-sort').removeClass('is-asc is-desc');
+    $(this).addClass(poolSortDir === 'asc' ? 'is-asc' : 'is-desc');
+    renderStockPicker('pool');
   });
 
   $('#pfChips').on('click', '.pf-chip', function () {

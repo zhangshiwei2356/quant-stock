@@ -22,7 +22,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css?v=20260808-global-ux1"/>
+  <link rel="stylesheet" href="/css/style.css?v=20260808-pool-table"/>
   <script src="/js/jquery.min.js"></script>
   <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/echarts.min.js"></script>
@@ -332,51 +332,78 @@
       </section>
     </div>
 
-    <!-- 行情浏览：仅展示，多股信息 -->
+    <!-- 行情浏览：全市场搜索选股 + 多股 K 线 -->
     <div id="viewPool" class="workspace-view" hidden>
-      <section class="panel">
-        <h3>选股 <span class="trade-pool-count" id="poolUniverseCount">0</span></h3>
+      <section class="panel pool-section">
+        <header class="pool-section-head">
+          <h3>选股 <span class="trade-pool-count" id="poolUniverseCount">0</span></h3>
+          <p class="hint pool-section-hint">搜索代码或名称；点击行加入已选标的（可多只）。最新价/涨跌幅来自日线表，无数据时显示「—」。</p>
+        </header>
         <p id="dataHint" class="hint" hidden></p>
-        <p class="hint">输入代码或名称模糊筛选；点击加入下方已开启标签（可多只）。</p>
-        <div class="stock-picker" id="poolStockPicker">
+        <div class="stock-picker stock-picker--table" id="poolStockPicker">
           <div class="stock-picker-bar">
             <input type="search" id="poolStockQ" class="stock-picker-input" placeholder="搜索：600036 / 招商 / 银行" autocomplete="off"/>
             <span class="field-hint" id="poolStockMatchHint"></span>
           </div>
-          <ul class="stock-picker-list" id="poolStockResults"></ul>
+          <div class="table-wrap stock-picker-table-wrap">
+            <table class="stock-picker-table">
+              <thead>
+              <tr>
+                <th>代码</th>
+                <th>名称</th>
+                <th class="num pool-sort" data-pool-sort="lastClose" title="按最新价排序">最新价</th>
+                <th class="num pool-sort" data-pool-sort="pctChg" title="按涨跌幅排序">涨跌幅</th>
+                <th>状态</th>
+              </tr>
+              </thead>
+              <tbody id="poolStockResults"></tbody>
+            </table>
+          </div>
         </div>
       </section>
-      <section class="panel">
-        <h3>已开启股票</h3>
-        <div id="poolTabs" class="stock-tabs"></div>
-        <div class="toolbar" style="margin-top:10px;">
-          <label class="field">K线周期
-            <select id="poolPeriod">
-              <option value="DAY" selected>日K DAY</option>
-              <option value="WEEK">周K WEEK</option>
-              <option value="MONTH">月K MONTH</option>
-              <option value="MIN_60">60分钟</option>
-              <option value="MIN_30">30分钟</option>
-              <option value="MIN_15">15分钟</option>
-              <option value="MIN_5">5分钟</option>
-              <option value="MIN_1">1分钟(末段)</option>
-            </select>
-          </label>
-          <button id="btnPoolRefresh" class="secondary">刷新当前</button>
+
+      <section class="panel pool-section">
+        <header class="pool-section-head">
+          <h3>已选标的</h3>
+        </header>
+        <div class="pool-selected-bar">
+          <div id="poolTabs" class="stock-tabs"></div>
+          <div class="pool-selected-ops">
+            <label class="field">K线周期
+              <select id="poolPeriod">
+                <option value="DAY" selected>日K DAY</option>
+                <option value="WEEK">周K WEEK</option>
+                <option value="MONTH">月K MONTH</option>
+                <option value="MIN_60">60分钟</option>
+                <option value="MIN_30">30分钟</option>
+                <option value="MIN_15">15分钟</option>
+                <option value="MIN_5">5分钟</option>
+                <option value="MIN_1">1分钟(末段)</option>
+              </select>
+            </label>
+            <button type="button" id="btnPoolRefresh" class="secondary">刷新当前</button>
+          </div>
         </div>
-        <div class="metrics" id="poolMeta" style="margin-top:8px;"></div>
+        <div class="metrics" id="poolMeta"></div>
       </section>
-      <section class="panel">
-        <h3>行情图 · MA / BOLL / RSI</h3>
+
+      <section class="panel pool-section">
+        <header class="pool-section-head">
+          <h3>K线行情 · MA / BOLL / RSI</h3>
+        </header>
         <div id="baseChart" class="chart-box"></div>
       </section>
-      <section class="panel">
-        <h3>K线明细（当前周期末尾）</h3>
+
+      <section class="panel pool-section">
+        <header class="pool-section-head">
+          <h3>K线明细</h3>
+          <p class="hint pool-section-hint">当前周期末尾若干根</p>
+        </header>
         <div class="table-wrap" style="max-height:240px;">
           <table>
             <thead>
             <tr>
-              <th>时间</th><th>开</th><th>高</th><th>低</th><th>收</th><th>量</th>
+              <th>时间</th><th class="num">开</th><th class="num">高</th><th class="num">低</th><th class="num">收</th><th class="num">量</th>
             </tr>
             </thead>
             <tbody id="barTableBody"></tbody>
@@ -1772,6 +1799,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260808-global-ux1"></script>
+<script src="/js/stock-chart.js?v=20260808-pool-table"></script>
 </body>
 </html>

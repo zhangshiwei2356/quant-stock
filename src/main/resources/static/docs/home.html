@@ -1,8 +1,14 @@
 <!-- 首页仪表盘：由 stock.html 的 #viewHome 加载 -->
 <section class="panel home-panel home-dashboard" id="homePanel">
   <div class="home-dash-head">
-    <h3 class="home-title">工作台</h3>
-    <p class="home-dash-sub">本地模拟账本与运维概览 · 数据不可用时显示「—」</p>
+    <div class="home-dash-head-main">
+      <h3 class="home-title">工作台</h3>
+      <p class="home-dash-sub">本地模拟账本与运维概览 · 数据不可用时显示「—」</p>
+    </div>
+    <div class="home-recent-inline" id="homeRecentInline" hidden>
+      <span class="home-recent-inline-label">最近</span>
+      <div class="home-recent-list" id="homeRecentInlineList"></div>
+    </div>
   </div>
 
   <div class="home-metrics" id="homeMetrics">

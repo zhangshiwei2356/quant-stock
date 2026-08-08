@@ -132,7 +132,7 @@ sequenceDiagram
 
 ### 1. 行情浏览
 
-- 全市场列表来自 `stock_basic`；工作台内**代码/名称模糊选股**，多标签切换
+- 全市场列表来自 `stock_basic`；工作台内**搜索+表格选股**（代码/名称；日线最新价/涨跌幅，可排序），已选标的与周期/刷新同一操作行，多标签切换 K 线
 - 多周期 K 线（日线物理表；其它周期运行时聚合）+ MA / BOLL / RSI 等
 - 统一查询：`MarketDataService#getKline`
 
@@ -227,7 +227,7 @@ sequenceDiagram
 
 ## 页面与导航
 
-- 进入应用先显示**首页仪表盘**（`docs/home.html`）：账户摘要 / 策略 / 数据健康四卡（可点跳转对应模块；告警 0 显示「暂无待处理」）+ 分组功能入口（含图标）+ 最近访问（带图标，最多 5 条）；无底部重复入口条
+- 进入应用先显示**首页仪表盘**（`docs/home.html`）：账户摘要 / 策略 / 数据健康四卡（可点跳转；告警空态为 `0`+说明）+ 分组入口等宽铺满（无应用说明重复入口）+ 最近访问（≥3 条独立模块，1–2 条收在标题右上角；带图标，最多 5 条）；无底部重复入口条
 - 侧栏首项为「**工作台**」叶子（首页高亮）；分组标题为「**核心功能** / 扩展与文档」；其后一级菜单**仅展开/收起**二级；点击二级（或入口卡）直达功能；顶栏 Logo / 「工作台」回仪表盘
 - 模块介绍（`docs/nav-*.html`）改为顶栏「?」帮助菜单可选阅读，不再作为进功能的必经路径
 - 侧栏为横向分组 + SVG 图标；顶部「«」折叠为纯图标窄栏（hover 提示收起/展开导航，`localStorage`）；展开箭头旋转；子菜单左侧引导线；数量角标为 0 时隐藏；主区面包屑：历史路径浅灰可点、当前页深色；首页仪表盘为「首页 / 工作台」，功能页为「首页 / 模块 / 二级」；菜单展开与最近工作区可记忆恢复
@@ -300,6 +300,7 @@ sequenceDiagram
 | GET `/api/config` | 公开配置（含 `activeStrategy`） |
 | GET `/api/config/strategies` | 已注册策略列表（回测下拉；不改全局激活） |
 | GET `/api/stock/pool` | 标的/股票池 |
+| GET `/api/stock/quotes?codes=` | 选股表批量最新价/涨跌幅（`market_daily`，最多 80 只） |
 | GET `/api/kline?code=&period=` | 统一周期 K 线 |
 | GET `/api/backtest/run` | 单只回测；可选 `engine=classic\|session`、`failOnMissingDep`、`paramOverrides`（JSON，白名单临时改参，不落库） |
 | POST `/api/portfolio/run` | 组合回测；可选 `engine`、`paramOverrides`、`failOnMissingDep`（session=MIN_1 共享资金池） |

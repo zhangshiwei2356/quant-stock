@@ -12,6 +12,7 @@ import com.quant.stock.config.QuantProperties;
 import com.quant.stock.market.BarPeriod;
 import com.quant.stock.market.JsonBarDataStore;
 import com.quant.stock.market.MarketDataService;
+import com.quant.stock.market.StockQuoteService;
 import com.quant.stock.market.dto.BarDTO;
 import com.quant.stock.pool.TradePoolService;
 import com.quant.stock.admin.EffectiveParamsService;
@@ -60,6 +61,7 @@ public class StockController {
     private final ObjectProvider<TradePoolService> tradePoolServiceProvider;
     private final StrategyRegistry strategyRegistry;
     private final EffectiveParamsService effectiveParamsService;
+    private final StockQuoteService stockQuoteService;
 
     /**
      * 浏览/回测用股票列表：优先全市场 stock_basic，其次 json 种子，最后 yml stock-codes。
@@ -84,6 +86,18 @@ public class StockController {
             list.add(m);
         }
         return list;
+    }
+
+    /**
+     * 选股表批量报价：{@code codes} 逗号分隔，最多 80 只；取 market_daily 最近收盘与涨跌幅。
+     */
+    @GetMapping("/stock/quotes")
+    public Map<String, Object> stockQuotes(@RequestParam("codes") String codes) {
+        List<Map<String, Object>> items = stockQuoteService.latestQuotesCsv(codes);
+        Map<String, Object> out = new HashMap<String, Object>();
+        out.put("items", items);
+        out.put("count", items.size());
+        return out;
     }
 
     /** 模拟数据目录概览（不强制加载全部MIN_1） */
