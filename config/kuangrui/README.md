@@ -188,6 +188,7 @@ quant:
 
 1. **先确认跑的是新代码**：出参应含 `rptSyncEngine=OesRptSyncInvoker/v2`。若 `lastError` 仍是整句「请核对 API 版本 0.19.4」，说明 IDEA 未用最新源码重编 → `git pull` 后 **Maven 勾选 profile `kuangrui`** 再 Rebuild / `mvn -Pkuangrui spring-boot:run`
 2. 新逻辑：登录成功但回报同步失败时 **查询通道降级仍可用**（`syncDegraded=true` 可查资金/持仓）；`lastError` 带可用方法与真实异常；报撤仍要求 `rptSynced=true`
+2b. 查资金/持仓返回空：看日志 `[oes] queryCashAsset … via` 或出参 `lastError`（含可用签名）；已兼容 `List`/回调/`Filter` 多包名；须 `-Pkuangrui` 重编
 3. 核对 `local/oes_api_config.json` 回报通道 `rpt`（模拟常见 `tcp://106.15.58.119:6301`）可达；`subcribeEnvId≤0` 表示订阅全部环境号
 4. 服务端 ApplVerId≈`0.19.1`、客户端 jar `0.19.4.0` 属兼容范围
 

@@ -529,6 +529,11 @@ public class KuangruiOesOpsFacade {
                 m.put("count", ((List<?>) data).size());
             }
             Map<String, Object> st = oesReadonlyService.status();
+            // 查询 0 条时把 lastError（若有签名/异常明细）带给联调页
+            if (data instanceof List && ((List<?>) data).isEmpty() && st.get("lastError") != null) {
+                m.put("lastError", st.get("lastError"));
+                m.put("hint", "查询返回 0 条；若 lastError 含签名/异常请对照资料包 Demo");
+            }
             if (Boolean.TRUE.equals(st.get("syncDegraded"))) {
                 m.put("syncDegraded", true);
                 m.put("rptSynced", false);

@@ -133,15 +133,20 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
     @Override
     public List<Map<String, Object>> queryCash() {
         ensureReadyOrThrow();
-        List<?> raw = invokeQueryList("queryCashAsset",
-                "com.quant360.api.model.oes.OesQryCashAssetFilter");
+        List<?> raw = invokeOesQuery(
+                new String[]{"queryCashAsset", "queryCashAssets", "queryCash"},
+                new String[]{
+                        "com.quant360.api.model.oes.OesQryCashAssetFilter",
+                        "com.quant360.api.model.oes.qry.OesQryCashAssetFilter",
+                        "com.quant360.api.model.OesQryCashAssetFilter"
+                });
         List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
         for (Object item : raw) {
             out.add(OesViewMapper.cash(
-                    str(invokeGetter(item, "getCashAcctId")),
-                    lng(invokeGetter(item, "getCurrentTotalBal")),
-                    lng(invokeGetter(item, "getCurrentAvailableBal")),
-                    lng(invokeGetter(item, "getCurrentDrawableBal"))
+                    str(firstGetter(item, "getCashAcctId", "getCashAcctID", "getAccountId")),
+                    lng(firstGetter(item, "getCurrentTotalBal", "getCurrentBal", "getTotalBal")),
+                    lng(firstGetter(item, "getCurrentAvailableBal", "getAvailableBal", "getAvailBal")),
+                    lng(firstGetter(item, "getCurrentDrawableBal", "getDrawableBal", "getDrawBal"))
             ));
         }
         return out;
@@ -150,19 +155,21 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
     @Override
     public List<Map<String, Object>> queryHoldings() {
         ensureReadyOrThrow();
-        List<?> raw = invokeQueryList("queryStkHolding",
-                "com.quant360.api.model.oes.OesQryStkHoldingFilter");
+        List<?> raw = invokeOesQuery(
+                new String[]{"queryStkHolding", "queryStockHolding", "queryHolding", "queryStkHoldings"},
+                new String[]{
+                        "com.quant360.api.model.oes.OesQryStkHoldingFilter",
+                        "com.quant360.api.model.oes.qry.OesQryStkHoldingFilter",
+                        "com.quant360.api.model.OesQryStkHoldingFilter"
+                });
         List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
         for (Object item : raw) {
-            String code = str(invokeGetter(item, "getSecurityId"));
-            if (code == null || code.isEmpty()) {
-                code = str(invokeGetter(item, "getSecurityID"));
-            }
+            String code = str(firstGetter(item, "getSecurityId", "getSecurityID", "getInstrId"));
             out.add(OesViewMapper.holding(
                     code,
-                    lng(invokeGetter(item, "getSumHld")),
-                    lng(invokeGetter(item, "getSellAvlHld")),
-                    lng(invokeGetter(item, "getCostPrice"))
+                    lng(firstGetter(item, "getSumHld", "getTotalHld", "getHldQty")),
+                    lng(firstGetter(item, "getSellAvlHld", "getSellAvailableHld", "getAvailableHld")),
+                    lng(firstGetter(item, "getCostPrice", "getAvgCostPrice", "getCostPx"))
             ));
         }
         return out;
@@ -171,24 +178,27 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
     @Override
     public List<Map<String, Object>> queryOrders() {
         ensureReadyOrThrow();
-        List<?> raw = invokeQueryList("queryOrder",
-                "com.quant360.api.model.oes.OesQryOrdFilter");
+        List<?> raw = invokeOesQuery(
+                new String[]{"queryOrder", "queryOrders", "queryOrd"},
+                new String[]{
+                        "com.quant360.api.model.oes.OesQryOrdFilter",
+                        "com.quant360.api.model.oes.qry.OesQryOrdFilter",
+                        "com.quant360.api.model.oes.OesQryOrderFilter",
+                        "com.quant360.api.model.OesQryOrdFilter"
+                });
         List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
         for (Object item : raw) {
-            String code = str(invokeGetter(item, "getSecurityId"));
-            if (code == null || code.isEmpty()) {
-                code = str(invokeGetter(item, "getSecurityID"));
-            }
-            Object st = invokeGetter(item, "getOrdStatus");
+            String code = str(firstGetter(item, "getSecurityId", "getSecurityID"));
+            Object st = firstGetter(item, "getOrdStatus", "getOrderStatus", "getStatus");
             int status = toStatusInt(st);
             out.add(OesViewMapper.order(
                     code,
-                    lng(invokeGetter(item, "getClOrdId")),
-                    (int) lng(invokeGetter(item, "getClSeqNo")),
+                    lng(firstGetter(item, "getClOrdId", "getClOrdID")),
+                    (int) lng(firstGetter(item, "getClSeqNo", "getClSeqNO")),
                     status,
-                    lng(invokeGetter(item, "getOrdPrice")),
-                    (int) lng(invokeGetter(item, "getOrdQty")),
-                    (int) lng(invokeGetter(item, "getCumQty"))
+                    lng(firstGetter(item, "getOrdPrice", "getOrderPrice", "getPrice")),
+                    (int) lng(firstGetter(item, "getOrdQty", "getOrderQty", "getQty")),
+                    (int) lng(firstGetter(item, "getCumQty", "getFilledQty"))
             ));
         }
         return out;
@@ -197,20 +207,23 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
     @Override
     public List<Map<String, Object>> queryTrades() {
         ensureReadyOrThrow();
-        List<?> raw = invokeQueryList("queryTrade",
-                "com.quant360.api.model.oes.OesQryTrdFilter");
+        List<?> raw = invokeOesQuery(
+                new String[]{"queryTrade", "queryTrades", "queryTrd"},
+                new String[]{
+                        "com.quant360.api.model.oes.OesQryTrdFilter",
+                        "com.quant360.api.model.oes.qry.OesQryTrdFilter",
+                        "com.quant360.api.model.oes.OesQryTradeFilter",
+                        "com.quant360.api.model.OesQryTrdFilter"
+                });
         List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
         for (Object item : raw) {
-            String code = str(invokeGetter(item, "getSecurityId"));
-            if (code == null || code.isEmpty()) {
-                code = str(invokeGetter(item, "getSecurityID"));
-            }
+            String code = str(firstGetter(item, "getSecurityId", "getSecurityID"));
             out.add(OesViewMapper.trade(
                     code,
-                    lng(invokeGetter(item, "getClOrdId")),
-                    lng(invokeGetter(item, "getTrdPrice")),
-                    (int) lng(invokeGetter(item, "getTrdQty")),
-                    lng(invokeGetter(item, "getTrdAmt"))
+                    lng(firstGetter(item, "getClOrdId", "getClOrdID")),
+                    lng(firstGetter(item, "getTrdPrice", "getTradePrice", "getPrice")),
+                    (int) lng(firstGetter(item, "getTrdQty", "getTradeQty", "getQty")),
+                    lng(firstGetter(item, "getTrdAmt", "getTradeAmt", "getAmount"))
             ));
         }
         return out;
@@ -317,18 +330,37 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
         if (c == null) {
             return Collections.emptyList();
         }
-        Object list = invokeReturning(c, methodName, filter);
-        if (list instanceof List) {
-            return (List<?>) list;
+        List<Object> filters = new ArrayList<Object>();
+        if (filter != null) {
+            filters.add(filter);
         }
-        if (list instanceof Collection) {
-            return new ArrayList<Object>((Collection<?>) list);
+        OesQueryListInvoker.Result r = OesQueryListInvoker.invokeWithFilters(
+                c, new String[]{methodName}, filters);
+        return finishQueryResult(methodName, r);
+    }
+
+    /** 增强查询：多方法名 / Filter 类 / 回调收集；失败写入 lastError 并 WARN。 */
+    private List<?> invokeOesQuery(String[] methodNames, String[] filterClasses) {
+        OesClientImpl c = client;
+        if (c == null) {
+            return Collections.emptyList();
         }
-        Object list2 = invokeReturning(c, methodName);
-        if (list2 instanceof List) {
-            return (List<?>) list2;
+        OesQueryListInvoker.Result r = OesQueryListInvoker.invoke(c, methodNames, filterClasses);
+        return finishQueryResult(methodNames[0], r);
+    }
+
+    private List<?> finishQueryResult(String methodName, OesQueryListInvoker.Result r) {
+        if (!r.ok) {
+            lastError.set(r.detail);
+            log.warn("[oes] {} 查询失败: {}", methodName, r.detail);
+            return Collections.emptyList();
         }
-        return Collections.emptyList();
+        if (r.list.isEmpty()) {
+            log.info("[oes] {} 返回 0 条 via {}", methodName, r.methodUsed);
+        } else {
+            log.info("[oes] {} 返回 {} 条 via {}", methodName, r.list.size(), r.methodUsed);
+        }
+        return r.list;
     }
 
     private static Object firstGetter(Object target, String... getters) {
@@ -871,31 +903,6 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
         rptSynced.set(true);
         lastError.set(null);
         log.info("[oes] sendRptSync 完成 lastInMsgSeq={} via {}", seq, r.methodUsed);
-    }
-
-    private List<?> invokeQueryList(String methodName, String filterClassName) {
-        OesClientImpl c = client;
-        if (c == null) {
-            return Collections.emptyList();
-        }
-        Object filter = newInstance(filterClassName);
-        // List queryXxx(Filter)
-        Object list = invokeReturning(c, methodName, filter);
-        if (list instanceof List) {
-            return (List<?>) list;
-        }
-        if (list instanceof Collection) {
-            return new ArrayList<Object>((Collection<?>) list);
-        }
-        // int queryXxx(Filter, callback) — 少见；已有 List 即可
-        if (filter != null) {
-            Object list2 = invokeReturning(c, methodName, new Object[]{null});
-            if (list2 instanceof List) {
-                return (List<?>) list2;
-            }
-        }
-        log.warn("[oes] {} 未返回 List，实际={}", methodName, list == null ? "null" : list.getClass().getName());
-        return Collections.emptyList();
     }
 
     private Object invokeReturning(Object target, String name, Object... args) {

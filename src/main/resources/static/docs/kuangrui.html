@@ -131,7 +131,7 @@
       <tr>
         <td><b>M2 OES 只读</b></td>
         <td><b>可选已落地</b>（默认关 · 2026-08-06）</td>
-        <td>登录 + <code>sendRptSync</code>（多签名反射；失败带明细）；同步失败可<strong>查询降级</strong>仍查资金；报撤仍要 <code>rptSynced</code>；出参含 <code>rptSyncEngine</code> 确认已重编；实现仅 <code>-Pkuangrui</code></td>
+        <td>登录 + <code>sendRptSync</code>；查询经 <code>OesQueryListInvoker</code>（List/回调/多 Filter）；同步失败可查询降级；报撤仍要 <code>rptSynced</code>；出参含 <code>rptSyncEngine</code>；实现仅 <code>-Pkuangrui</code></td>
         <td>运维 <code>/api/ops/kuangrui/oes/{status,cash,holdings,orders,trades,snapshot,reconcile,stop}</code></td>
       </tr>
       <tr>
