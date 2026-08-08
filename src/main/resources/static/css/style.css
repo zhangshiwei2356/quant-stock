@@ -449,22 +449,23 @@ body {
 .crumb-link {
   border: none !important;
   background: transparent !important;
-  color: var(--accent) !important;
+  color: var(--muted) !important;
   padding: 0 !important;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   box-shadow: none !important;
   transform: none !important;
   cursor: pointer;
 }
 
 .crumb-link:hover {
+  color: var(--accent) !important;
   text-decoration: underline;
 }
 
 .crumb-current {
   color: var(--text);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .theme-field {
@@ -2418,8 +2419,10 @@ button {
   border: none;
   border-radius: 6px;
   padding: 8px 14px;
+  min-height: 34px;
   cursor: pointer;
   font-size: 13px;
+  font-weight: 600;
   transition: transform var(--trans), box-shadow var(--trans), filter var(--trans), background var(--trans);
   position: relative;
 }
@@ -2439,7 +2442,15 @@ button:disabled {
   cursor: not-allowed;
 }
 
-button.secondary { background: var(--btn-secondary); }
+button.primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+button.secondary {
+  background: var(--btn-secondary);
+  font-weight: 600;
+}
 button.secondary:hover:not(:disabled) {
   background: var(--btn-secondary-hover);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
@@ -2450,6 +2461,22 @@ button.danger:hover:not(:disabled) {
   background: var(--sell);
   filter: brightness(0.92);
   box-shadow: 0 6px 16px rgba(239, 83, 80, 0.25);
+}
+
+button.linkish,
+button.btn-text {
+  background: transparent !important;
+  color: var(--accent) !important;
+  box-shadow: none !important;
+  transform: none !important;
+  min-height: 0;
+  padding: 4px 8px;
+  font-weight: 600;
+}
+button.linkish:hover:not(:disabled),
+button.btn-text:hover:not(:disabled) {
+  background: var(--accent-soft) !important;
+  text-decoration: underline;
 }
 
 button.loading {
@@ -2709,9 +2736,23 @@ button.loading::before {
   padding: 1px 6px;
   text-align: center;
   font-size: 11px;
-  border-radius: 4px;
-  background: rgba(47, 111, 237, 0.12);
-  color: #2f6fed;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.trade-pool-count.is-zero,
+.trade-pool-count[hidden] {
+  display: none !important;
+}
+
+.trade-pool-count.badge-label {
+  display: inline-block !important;
+  background: color-mix(in srgb, var(--muted) 14%, transparent);
+  color: var(--muted);
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 .trade-pool-list {
   list-style: none;
@@ -3347,7 +3388,18 @@ tr.sch-detail-row td.sch-detail-cell {
 }
 .schedule-switch input:checked + span { background: #2f6fed; }
 .schedule-switch input:checked + span::before { transform: translateX(18px); }
-.mono { font-family: ui-monospace, Consolas, monospace; font-size: 11px; }
+.mono { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: var(--muted); }
+
+code,
+.tech-id {
+  font-family: ui-monospace, Consolas, "Courier New", monospace;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 8%, transparent);
+  border-radius: 4px;
+  padding: 0 4px;
+}
 
 table {
   width: 100%;
@@ -3360,8 +3412,8 @@ thead th {
   top: 0;
   z-index: 1;
   background: var(--table-head);
-  color: var(--muted);
-  font-weight: 600;
+  color: var(--text);
+  font-weight: 700;
   border-bottom: 1px solid var(--border);
   padding: 10px 8px;
   text-align: left;
@@ -3373,6 +3425,18 @@ td {
   padding: 9px 8px;
   text-align: left;
   font-variant-numeric: tabular-nums;
+}
+
+td.num,
+th.num,
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+td.ops,
+th.ops {
+  text-align: center;
 }
 
 tbody tr:nth-child(even) { background: var(--row-alt); }

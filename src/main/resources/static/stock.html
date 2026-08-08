@@ -22,7 +22,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css?v=20260808-home-ux3"/>
+  <link rel="stylesheet" href="/css/style.css?v=20260808-global-ux1"/>
   <script src="/js/jquery.min.js"></script>
   <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/echarts.min.js"></script>
@@ -1354,7 +1354,7 @@
     <!-- 账户概览 · 资金权益 -->
     <div id="viewAcctFunds" class="workspace-view" hidden>
       <section class="panel">
-        <h3>资金权益 <span class="trade-pool-count" id="acctModeBadge">LOCAL_SIM</span></h3>
+        <h3>资金权益 <span class="trade-pool-count badge-label" id="acctModeBadge">LOCAL_SIM</span></h3>
         <p class="hint" id="acctFundsHint">本地模拟账本（非券商柜台）。成交/持仓/现金已落库，重启可恢复。</p>
         <div class="toolbar" style="margin-top:8px;">
           <button type="button" id="btnAcctRefreshFunds" class="secondary">刷新</button>
@@ -1640,7 +1640,7 @@
               <option value="">加载中…</option>
             </select>
           </label>
-          <button id="btnPortfolio" class="danger">执行组合回测</button>
+          <button id="btnPortfolio" class="primary" type="button">执行组合回测</button>
         </div>
         <details class="panel" id="pfOverridePanel" style="margin-top:10px;padding:10px 12px;">
           <summary style="cursor:pointer;font-weight:600;">本次临时参数（不落库）</summary>
@@ -1772,6 +1772,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260808-sharpe-metrics"></script>
+<script src="/js/stock-chart.js?v=20260808-global-ux1"></script>
 </body>
 </html>

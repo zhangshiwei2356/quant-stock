@@ -169,6 +169,38 @@
     }, holdMs);
   }
 
+  /** 数量角标：0 / 无效时隐藏；.badge-label（如 LOCAL_SIM）只改文案不隐藏 */
+  function setCountBadge(target, n) {
+    var $els = typeof target === 'string' ? $(target) : $(target);
+    if (!$els.length) return;
+    $els.each(function () {
+      var $el = $(this);
+      if ($el.hasClass('badge-label')) {
+        $el.text(n == null ? '' : String(n)).removeClass('is-zero').removeAttr('hidden');
+        return;
+      }
+      var num = Number(n);
+      if (!isFinite(num) || num < 0) num = 0;
+      num = Math.floor(num);
+      $el.text(String(num));
+      if (num === 0) {
+        $el.addClass('is-zero').attr('hidden', true);
+      } else {
+        $el.removeClass('is-zero').removeAttr('hidden');
+      }
+    });
+  }
+
+  function syncZeroCountBadges() {
+    $('.trade-pool-count').not('.badge-label').each(function () {
+      var raw = $.trim($(this).text());
+      var num = Number(raw);
+      if (raw === '' || (isFinite(num) && num === 0)) {
+        setCountBadge($(this), isFinite(num) ? num : 0);
+      }
+    });
+  }
+
   function cssVar(name, fallback) {
     var v = getComputedStyle(document.documentElement).getPropertyValue(name);
     v = (v || '').trim();
@@ -834,8 +866,8 @@
   }
 
   function refreshUniverseCounts() {
-    $('#poolUniverseCount').text(String((universeList || []).length));
-    $('#singleUniverseCount, #pfUniverseCount').text(String((tradePoolList || []).length));
+    setCountBadge('#poolUniverseCount', (universeList || []).length);
+    setCountBadge('#singleUniverseCount, #pfUniverseCount', (tradePoolList || []).length);
   }
 
   /** 用目标池 items 刷新回测选股列表 */
@@ -1046,7 +1078,7 @@
       var items = (data && data.items) || [];
       var maxFinal = data && data.maxFinal != null ? data.maxFinal : 30;
       var count = data && data.count != null ? data.count : items.length;
-      $('#sidePoolCount, #tpPoolBadge').text(String(count));
+      setCountBadge('#sidePoolCount, #tpPoolBadge', count);
       $('#tpPoolHint').text('目标池 ' + count + ' / 上限 ' + maxFinal);
       applyTradePoolForBacktest(items);
       if (data && data.lastScan) {
@@ -1107,7 +1139,7 @@
       $.getJSON('/api/stock/trade-pool').done(function (data) {
         var items = (data && data.items) || [];
         var n = data && data.count != null ? data.count : items.length;
-        $('#sidePoolCount').text(String(n || 0));
+        setCountBadge('#sidePoolCount', n || 0);
         applyTradePoolForBacktest(items);
       }).fail(function (xhr) {
         var msg = (xhr && xhr.responseJSON && xhr.responseJSON.message) || '目标池加载失败';
@@ -4453,8 +4485,7 @@
   function renderAccountCashflows(data) {
     data = data || {};
     var rows = data.items || [];
-    $('#acctCfBadge').text(String(data.count != null ? data.count : rows.length));
-    $('#sideCfCount').text(String(data.count != null ? data.count : rows.length));
+    setCountBadge('#acctCfBadge, #sideCfCount', data.count != null ? data.count : rows.length);
     if (data.hint) $('#acctCfHint').text(data.hint);
     $('#acctCfMeta').text(rows.length ? ('共 ' + rows.length + ' 个交易日') : '');
     lastAcctEquity = {
@@ -4493,8 +4524,7 @@
   function renderAccountRiskLogs(data) {
     data = data || {};
     var rows = data.items || [];
-    $('#acctRiskBadge').text(String(data.count != null ? data.count : rows.length));
-    $('#sideRiskCount').text(String(data.count != null ? data.count : rows.length));
+    setCountBadge('#acctRiskBadge, #sideRiskCount', data.count != null ? data.count : rows.length);
     if (data.hint) $('#acctRiskHint').text(data.hint);
     $('#acctRiskMeta').text(rows.length ? ('共 ' + rows.length + ' 条') : '');
     var $tb = $('#acctRiskBody').empty();
@@ -4655,8 +4685,7 @@
         ));
         var okN = 0;
         keys.forEach(function (k) { if (bag[k] && !bag[k]._error) okN++; });
-        $('#acctDashBadge').text(String(okN));
-        $('#sideDashCount').text(String(okN));
+        setCountBadge('#acctDashBadge, #sideDashCount', okN);
         $('#acctDashMeta').text('已加载 ' + okN + '/' + keys.length + ' · ' + new Date().toLocaleString());
         $('#acctDashHint').text('聚合只读监控；外部五档/TWAP/真柜台仍不可用。');
         try {
@@ -4685,8 +4714,7 @@
         $('#acctGapFeeSum').text(sum.feeResidualSum == null ? '—' : num(sum.feeResidualSum));
         $('#acctGapPartial').text(sum.partialCount == null ? '—' : String(sum.partialCount));
         $('#acctGapAdverseBps').text(sum.avgAbsAdverseBps == null ? '—' : String(sum.avgAbsAdverseBps));
-        $('#acctGapBadge').text(String(gaps.length));
-        $('#sideGapCount').text(String(gaps.length));
+        setCountBadge('#acctGapBadge, #sideGapCount', gaps.length);
         $('#acctGapMeta').text(data.asOf ? ('更新：' + data.asOf) : '');
         if (data.gateHint) $('#acctGapHint').text(data.gateHint);
         var $g = $('#acctGapBody').empty();
@@ -4756,7 +4784,7 @@
 
   function renderAccountFunds(data) {
     data = data || {};
-    $('#acctModeBadge').text(data.source || data.mode || 'LOCAL_SIM');
+    setCountBadge('#acctModeBadge', data.source || data.mode || 'LOCAL_SIM');
     if (data.hint) $('#acctFundsHint').text(data.hint);
     $('#acctFundsAsOf').text(data.asOf ? ('更新：' + data.asOf) : '');
     $('#acctEquity').text(num(data.equity));
@@ -4797,8 +4825,7 @@
 
   function renderAccountPositions(items) {
     items = items || [];
-    $('#acctPosBadge').text(String(items.length));
-    $('#sidePosCount').text(String(items.length));
+    setCountBadge('#acctPosBadge, #sidePosCount', items.length);
     var $body = $('#acctPosBody').empty();
     if (!items.length) {
       $body.html('<tr><td colspan="11" class="empty-state">暂无持仓</td></tr>');
@@ -4864,8 +4891,7 @@
 
   function renderAccountOrders(items) {
     items = items || [];
-    $('#acctOrderBadge').text(String(items.length));
-    $('#sideOrderCount').text(String(items.length));
+    setCountBadge('#acctOrderBadge, #sideOrderCount', items.length);
     var $body = $('#acctOrderBody').empty();
     if (!items.length) {
       $body.html('<tr><td colspan="14" class="empty-state">暂无委托</td></tr>');
@@ -4925,8 +4951,8 @@
         renderAccountFunds(data);
         renderAccountPositions(data.positions || []);
         renderAccountOrders(data.orders || []);
-        if (data.positionCount != null) $('#sidePosCount').text(String(data.positionCount));
-        if (data.orderCount != null) $('#sideOrderCount').text(String(data.orderCount));
+        if (data.positionCount != null) setCountBadge('#sidePosCount', data.positionCount);
+        if (data.orderCount != null) setCountBadge('#sideOrderCount', data.orderCount);
       })
       .fail(function (xhr) {
         var msg = (xhr && xhr.responseJSON && xhr.responseJSON.message) || '账户概览加载失败';
@@ -6636,7 +6662,7 @@
       .text(String(data.warnCount == null ? '—' : data.warnCount));
     $('#healthSpecial').attr('class', 'value ' + (data.specialCount > 0 ? '' : ''))
       .text(String(data.specialCount == null ? '—' : data.specialCount));
-    $('#healthBadge').text(String(data.warnCount == null ? 0 : data.warnCount));
+    setCountBadge('#healthBadge', data.warnCount == null ? 0 : data.warnCount);
     $('#healthMeta').text(data.asOf
       ? ('检查时间：' + fmtDateTimeDisplay(data.asOf) + ' · 待处置告警 / 特殊项分表')
       : '');
@@ -8010,6 +8036,7 @@
 
   initKnowledge();
   initSidebarCollapse();
+  syncZeroCountBadges();
   initHeaderHelp();
   initTheme();
   loadSummary();
