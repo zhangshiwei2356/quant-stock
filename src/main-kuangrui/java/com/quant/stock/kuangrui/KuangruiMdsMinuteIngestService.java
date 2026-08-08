@@ -16,6 +16,8 @@ import com.quant360.api.model.mds.MdsMktDataSnapshotHead;
 import com.quant360.api.model.mds.MdsQryMktDataSnapshotReq;
 import com.quant360.api.model.mds.MdsQrySecurityCodeEntry;
 import com.quant360.api.model.mds.MdsQrySecurityStatusReq;
+import com.quant360.api.model.mds.MdsQrySnapshotListFilter;
+import com.quant360.api.model.mds.MdsQrySnapshotListRsp;
 import com.quant360.api.model.mds.MdsQryStockStaticInfoFilter;
 import com.quant360.api.model.mds.MdsQryStockStaticInfoListFilter;
 import com.quant360.api.model.mds.MdsQryStockStaticInfoListRsp;
@@ -26,6 +28,7 @@ import com.quant360.api.model.mds.MdsStockSnapshotBody;
 import com.quant360.api.model.mds.MdsStockStaticInfo;
 import com.quant360.api.model.mds.MdsTradingSessionStatusMsg;
 import com.quant360.api.model.mds.enu.MdsExchangeId;
+import com.quant360.api.model.mds.enu.MdsMdLevel;
 import com.quant360.api.model.mds.enu.MdsMktSubscribeFlag;
 import com.quant360.api.model.mds.enu.MdsSecurityType;
 import com.quant360.api.model.mds.enu.MdsSubscribeDataType;
@@ -242,88 +245,41 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
     /** @return 喂入条数；-1 表示本批调用失败（调用方回退单只） */
     private int querySnapshotListChunk(int exch, List<String> codes) {
         try {
-            Object filter = newInstance("com.quant360.api.model.mds.MdsQrySnapshotListFilter");
-            if (filter == null) {
-                return -1;
-            }
-            setBean(filter, "setExchId", toExch(exch));
-            setBean(filter, "setMdProductType", MdsSecurityType.MDS_SECURITY_TYPE_STOCK);
-            Object mdLevel = resolveMdsMdLevel1();
-            if (mdLevel != null) {
-                setBean(filter, "setMdLevel", mdLevel);
-            }
-            List<Object> entries = new ArrayList<Object>();
+            MdsQrySnapshotListFilter filter = new MdsQrySnapshotListFilter();
+            filter.setExchId(toExch(exch));
+            filter.setMdProductType(MdsSecurityType.MDS_SECURITY_TYPE_STOCK);
+            filter.setMdLevel(MdsMdLevel.MDS_MD_LEVEL_1);
+            List<MdsQrySecurityCodeEntry> entries = new ArrayList<MdsQrySecurityCodeEntry>();
             for (String code : codes) {
-                Object entry = newInstance("com.quant360.api.model.mds.MdsQrySecurityCodeEntry");
-                if (entry == null) {
-                    continue;
-                }
-                setBean(entry, "setExchId", toExch(exch));
-                setBean(entry, "setMdProductType", MdsSecurityType.MDS_SECURITY_TYPE_STOCK);
-                setBean(entry, "setInstrId", Integer.valueOf(KuangruiExchangeIds.toInstrId(code)));
+                MdsQrySecurityCodeEntry entry = new MdsQrySecurityCodeEntry();
+                entry.setExchId(toExch(exch));
+                entry.setMdProductType(MdsSecurityType.MDS_SECURITY_TYPE_STOCK);
+                entry.setInstrId(KuangruiExchangeIds.toInstrId(code));
                 entries.add(entry);
             }
             if (entries.isEmpty()) {
                 return 0;
             }
-            setBean(filter, "setSecurityCodeCnt", Integer.valueOf(entries.size()));
-            setBean(filter, "setSecurityCodeList", entries);
+            filter.setSecurityCodeCnt(entries.size());
+            filter.setSecurityCodeList(entries);
 
-            Object mode = resolveClientQueryModeAll();
-            Object rsp;
-            if (mode != null) {
-                rsp = invokeReturning(client, "qrySnapshotList", filter, mode);
-            } else {
-                rsp = invokeReturning(client, "qrySnapshotList", filter);
-            }
-            if (rsp == null) {
-                return -1;
-            }
-            Object items = firstGetter(rsp, "getQryItems", "getItems");
-            if (!(items instanceof List)) {
+            MdsQrySnapshotListRsp rsp = client.qrySnapshotList(filter, Client.QueryMode.ALL);
+            if (rsp == null || rsp.getQryItems() == null) {
                 return -1;
             }
             int fed = 0;
-            for (Object snap : (List<?>) items) {
-                if (snap == null) {
+            for (MdsMktDataSnapshotBase snap : rsp.getQryItems()) {
+                if (snap == null || snap.getHead() == null || snap.getStock() == null) {
                     continue;
                 }
-                Object head = firstGetter(snap, "getHead", "getSnapshotHead");
-                Object stock = firstGetter(snap, "getStock", "getStockSnapshotBody");
-                if (head instanceof MdsMktDataSnapshotHead && stock instanceof MdsStockSnapshotBody) {
-                    feed((MdsMktDataSnapshotHead) head, (MdsStockSnapshotBody) stock);
-                    fed++;
-                } else if (snap instanceof MdsMktDataSnapshotBase) {
-                    MdsMktDataSnapshotBase base = (MdsMktDataSnapshotBase) snap;
-                    if (base.getHead() != null && base.getStock() != null) {
-                        feed(base.getHead(), base.getStock());
-                        fed++;
-                    }
-                }
+                feed(snap.getHead(), snap.getStock());
+                fed++;
             }
             return fed;
         } catch (Exception e) {
             log.error("[mds] qrySnapshotList chunk 失败 exch={} size={}: {}",
                     exch, codes.size(), e.getMessage(), e);
             return -1;
-        }
-    }
-
-    private static Object resolveClientQueryModeAll() {
-        try {
-            Class<?> clz = Class.forName("com.quant360.api.client.Client$QueryMode");
-            return clz.getMethod("valueOf", String.class).invoke(null, "ALL");
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private static Object resolveMdsMdLevel1() {
-        try {
-            Class<?> clz = Class.forName("com.quant360.api.model.mds.enu.MdsMdLevel");
-            return clz.getMethod("valueOf", String.class).invoke(null, "MDS_MD_LEVEL_1");
-        } catch (Exception e) {
-            return null;
         }
     }
 
@@ -550,106 +506,6 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
             m.put("tradingSessionId", sessionId);
         }
         return m;
-    }
-
-    private void setBean(Object target, String setter, Object value) {
-        if (target == null || value == null) {
-            return;
-        }
-        for (java.lang.reflect.Method m : target.getClass().getMethods()) {
-            if (!m.getName().equals(setter) || m.getParameterTypes().length != 1) {
-                continue;
-            }
-            try {
-                Class<?> pt = m.getParameterTypes()[0];
-                Object arg = value;
-                if (pt.isEnum() && value instanceof Number) {
-                    // try valueOf(int)
-                    try {
-                        java.lang.reflect.Method valueOf = pt.getMethod("valueOf", int.class);
-                        arg = valueOf.invoke(null, Integer.valueOf(((Number) value).intValue()));
-                    } catch (Exception ignore) {
-                        log.error("MDS 分钟摄入异常", ignore);
-                        arg = value;
-                    }
-                } else if (!pt.isInstance(value) && value instanceof Number) {
-                    if (pt == Integer.TYPE || pt == Integer.class) {
-                        arg = Integer.valueOf(((Number) value).intValue());
-                    } else if (pt == Byte.TYPE || pt == Byte.class) {
-                        arg = Byte.valueOf(((Number) value).byteValue());
-                    }
-                }
-                if (pt.isInstance(arg) || pt.isPrimitive()) {
-                    m.invoke(target, arg);
-                    return;
-                }
-            } catch (Exception e) {
-                log.error("[mds] setBean {} 失败: {}", setter, e.getMessage(), e);
-            }
-        }
-    }
-
-    private Object invokeReturning(Object target, String name, Object... args) {
-        if (target == null) {
-            return null;
-        }
-        for (java.lang.reflect.Method m : target.getClass().getMethods()) {
-            if (!m.getName().equals(name) || m.getParameterTypes().length != args.length) {
-                continue;
-            }
-            try {
-                return m.invoke(target, args);
-            } catch (Exception e) {
-                log.error("[mds] invoke {} 失败: {}", name, e.getMessage(), e);
-            }
-        }
-        if (args.length > 0) {
-            try {
-                return target.getClass().getMethod(name).invoke(target);
-            } catch (Exception ignore) {
-                log.error("MDS 分钟摄入异常", ignore);
-                // ignore
-            }
-        }
-        return null;
-    }
-
-    private static Object newInstance(String className) {
-        try {
-            return Class.forName(className).getDeclaredConstructor().newInstance();
-        } catch (Exception e) {
-            log.error("MDS 分钟摄入异常", e);
-            return null;
-        }
-    }
-
-    private static Object firstGetter(Object target, String... getters) {
-        if (target == null || getters == null) {
-            return null;
-        }
-        for (String g : getters) {
-            Object v = invokeGetter(target, g);
-            if (v != null) {
-                return v;
-            }
-        }
-        return null;
-    }
-
-    private static Object invokeGetter(Object target, String getter) {
-        if (target == null) {
-            return null;
-        }
-        try {
-            return target.getClass().getMethod(getter).invoke(target);
-        } catch (Exception e) {
-            log.error("MDS 分钟摄入异常", e);
-            return null;
-        }
-    }
-
-    private static String str(Object o) {
-        return o == null ? null : String.valueOf(o);
     }
 
     private static long lng(Object o) {

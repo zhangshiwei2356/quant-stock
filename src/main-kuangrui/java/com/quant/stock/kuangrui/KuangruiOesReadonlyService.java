@@ -3,11 +3,40 @@ package com.quant.stock.kuangrui;
 import com.quant.stock.config.QuantProperties;
 import com.quant.stock.trade.dto.OrderDTO;
 import com.quant360.api.callback.OesCallBack;
+import com.quant360.api.client.Client;
 import com.quant360.api.client.impl.OesClientImpl;
 import com.quant360.api.model.ClientLogonReq;
 import com.quant360.api.model.ClientLogonRsp;
+import com.quant360.api.model.oes.OesCashTrsfReq;
+import com.quant360.api.model.oes.OesClientOverview;
+import com.quant360.api.model.oes.OesOrdCancelReq;
+import com.quant360.api.model.oes.OesOrdReq;
+import com.quant360.api.model.oes.OesQryCashAssetFilter;
+import com.quant360.api.model.oes.OesQryCashAssetRsp;
+import com.quant360.api.model.oes.OesQryCashTransferSerialFilter;
+import com.quant360.api.model.oes.OesQryCashTransferSerialRsp;
+import com.quant360.api.model.oes.OesQryCommissionRateFilter;
+import com.quant360.api.model.oes.OesQryCommissionRateRsp;
+import com.quant360.api.model.oes.OesQryCounterCashFilter;
+import com.quant360.api.model.oes.OesQryCounterCashRsp;
+import com.quant360.api.model.oes.OesQryInvAcctFilter;
+import com.quant360.api.model.oes.OesQryInvAcctRsp;
+import com.quant360.api.model.oes.OesQryOrdFilter;
+import com.quant360.api.model.oes.OesQryOrdRsp;
+import com.quant360.api.model.oes.OesQryStkHoldingFilter;
+import com.quant360.api.model.oes.OesQryStkHoldingRsp;
+import com.quant360.api.model.oes.OesQryStockFilter;
+import com.quant360.api.model.oes.OesQryStockRsp;
+import com.quant360.api.model.oes.OesQryTradingDayRsp;
+import com.quant360.api.model.oes.OesQryTrdFilter;
+import com.quant360.api.model.oes.OesQryTrdRsp;
 import com.quant360.api.model.oes.enu.OesBusinessType;
+import com.quant360.api.model.oes.enu.OesBuySellType;
+import com.quant360.api.model.oes.enu.OesCashDirect;
+import com.quant360.api.model.oes.enu.OesCashTrsfType;
 import com.quant360.api.model.oes.enu.OesLogonEncryptType;
+import com.quant360.api.model.oes.enu.OesMarketId;
+import com.quant360.api.model.oes.enu.OesOrdType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -23,7 +52,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -37,7 +65,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 宽睿 OES：登录 + {@code sendRptSync} + 只读查询（M2）；可选报撤与回报队列（M3，{@code oes.order-enabled}）。
- * 仅 {@code -Pkuangrui} 编译；API 调用经反射适配资料包签名差异。
+ * 仅 {@code -Pkuangrui} 编译；查询/报撤/银证主路径为强类型 Filter/Req + {@code Client.QueryMode.ALL}。
  * <p>
  * M5b：断线异步 close → 懒重连 + {@code sendRptSync}；回调内勿重活。
  * </p>
@@ -51,10 +79,6 @@ import java.util.concurrent.atomic.AtomicReference;
         "quant.kuangrui.oes.enabled"
 }, havingValue = "true")
 public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderService {
-
-    private static final int OES_ORD_TYPE_LMT = 0;
-    private static final int OES_BS_BUY = 1;
-    private static final int OES_BS_SELL = 2;
 
     private final QuantProperties quantProperties;
     private final org.springframework.beans.factory.ObjectProvider<KuangruiCredentialStore> credentialStoreProvider;
@@ -153,13 +177,18 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
     @Override
     public List<Map<String, Object>> queryCash() {
         ensureReadyOrThrow();
-        List<?> raw = invokeOesQuery(
-                new String[]{"queryCashAsset", "queryCashAssets", "queryCash"},
-                new String[]{
-                        "com.quant360.api.model.oes.OesQryCashAssetFilter",
-                        "com.quant360.api.model.oes.qry.OesQryCashAssetFilter",
-                        "com.quant360.api.model.OesQryCashAssetFilter"
-                });
+        List<?> raw = Collections.emptyList();
+        try {
+            OesQryCashAssetRsp rsp = client.queryCashAsset(new OesQryCashAssetFilter(), Client.QueryMode.ALL);
+            if (rsp != null && rsp.getQryItems() != null) {
+                raw = rsp.getQryItems();
+            }
+            log.info("[oes] queryCashAsset 返回 {} 条", raw.size());
+        } catch (Exception e) {
+            lastError.set(e.getMessage());
+            log.error("[oes] queryCashAsset 失败: {}", e.getMessage(), e);
+            return Collections.emptyList();
+        }
         List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
         for (Object item : raw) {
             out.add(OesViewMapper.cash(
@@ -175,13 +204,18 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
     @Override
     public List<Map<String, Object>> queryHoldings() {
         ensureReadyOrThrow();
-        List<?> raw = invokeOesQuery(
-                new String[]{"queryStkHolding", "queryStockHolding", "queryHolding", "queryStkHoldings"},
-                new String[]{
-                        "com.quant360.api.model.oes.OesQryStkHoldingFilter",
-                        "com.quant360.api.model.oes.qry.OesQryStkHoldingFilter",
-                        "com.quant360.api.model.OesQryStkHoldingFilter"
-                });
+        List<?> raw = Collections.emptyList();
+        try {
+            OesQryStkHoldingRsp rsp = client.queryStkHolding(new OesQryStkHoldingFilter(), Client.QueryMode.ALL);
+            if (rsp != null && rsp.getQryItems() != null) {
+                raw = rsp.getQryItems();
+            }
+            log.info("[oes] queryStkHolding 返回 {} 条", raw.size());
+        } catch (Exception e) {
+            lastError.set(e.getMessage());
+            log.error("[oes] queryStkHolding 失败: {}", e.getMessage(), e);
+            return Collections.emptyList();
+        }
         List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
         for (Object item : raw) {
             String code = str(firstGetter(item, "getSecurityId", "getSecurityID", "getInstrId"));
@@ -198,14 +232,18 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
     @Override
     public List<Map<String, Object>> queryOrders() {
         ensureReadyOrThrow();
-        List<?> raw = invokeOesQuery(
-                new String[]{"queryOrder", "queryOrders", "queryOrd"},
-                new String[]{
-                        "com.quant360.api.model.oes.OesQryOrdFilter",
-                        "com.quant360.api.model.oes.qry.OesQryOrdFilter",
-                        "com.quant360.api.model.oes.OesQryOrderFilter",
-                        "com.quant360.api.model.OesQryOrdFilter"
-                });
+        List<?> raw = Collections.emptyList();
+        try {
+            OesQryOrdRsp rsp = client.queryOrder(new OesQryOrdFilter(), Client.QueryMode.ALL);
+            if (rsp != null && rsp.getQryItems() != null) {
+                raw = rsp.getQryItems();
+            }
+            log.info("[oes] queryOrder 返回 {} 条", raw.size());
+        } catch (Exception e) {
+            lastError.set(e.getMessage());
+            log.error("[oes] queryOrder 失败: {}", e.getMessage(), e);
+            return Collections.emptyList();
+        }
         List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
         for (Object item : raw) {
             String code = str(firstGetter(item, "getSecurityId", "getSecurityID"));
@@ -227,14 +265,18 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
     @Override
     public List<Map<String, Object>> queryTrades() {
         ensureReadyOrThrow();
-        List<?> raw = invokeOesQuery(
-                new String[]{"queryTrade", "queryTrades", "queryTrd"},
-                new String[]{
-                        "com.quant360.api.model.oes.OesQryTrdFilter",
-                        "com.quant360.api.model.oes.qry.OesQryTrdFilter",
-                        "com.quant360.api.model.oes.OesQryTradeFilter",
-                        "com.quant360.api.model.OesQryTrdFilter"
-                });
+        List<?> raw = Collections.emptyList();
+        try {
+            OesQryTrdRsp rsp = client.queryTrade(new OesQryTrdFilter(), Client.QueryMode.ALL);
+            if (rsp != null && rsp.getQryItems() != null) {
+                raw = rsp.getQryItems();
+            }
+            log.info("[oes] queryTrade 返回 {} 条", raw.size());
+        } catch (Exception e) {
+            lastError.set(e.getMessage());
+            log.error("[oes] queryTrade 失败: {}", e.getMessage(), e);
+            return Collections.emptyList();
+        }
         List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
         for (Object item : raw) {
             String code = str(firstGetter(item, "getSecurityId", "getSecurityID"));
@@ -252,19 +294,26 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
     @Override
     public List<Map<String, Object>> queryStock(String code) {
         ensureReadyOrThrow();
-        Object filter = newInstance("com.quant360.api.model.oes.OesQryStockFilter");
         String norm = OesViewMapper.normalizeCode(code);
-        if (filter != null && norm != null && !norm.isEmpty()) {
-            setBean(filter, "setSecurityId", norm);
-            setBean(filter, "setSecurityID", norm);
-            int mkt = KuangruiExchangeIds.fromStockCode(norm);
-            if (mkt > 0) {
-                setBean(filter, "setMktId", Integer.valueOf(mkt));
+        OesQryStockFilter filter = new OesQryStockFilter();
+        if (norm != null && !norm.isEmpty()) {
+            filter.setSecurityId(norm);
+            OesMarketId mktId = toOesMarket(KuangruiExchangeIds.fromStockCode(norm));
+            if (mktId != null) {
+                filter.setMktId(mktId);
             }
         }
-        List<?> raw = invokeQueryListWithFilter("queryStock", filter);
-        if (raw.isEmpty()) {
-            raw = invokeQueryListWithFilter("queryStockItem", filter);
+        List<?> raw = Collections.emptyList();
+        try {
+            OesQryStockRsp rsp = client.queryStock(filter, Client.QueryMode.ALL);
+            if (rsp != null && rsp.getQryItems() != null) {
+                raw = rsp.getQryItems();
+            }
+            log.info("[oes] queryStock 返回 {} 条", raw.size());
+        } catch (Exception e) {
+            lastError.set(e.getMessage());
+            log.error("[oes] queryStock 失败: {}", e.getMessage(), e);
+            return Collections.emptyList();
         }
         List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
         for (Object item : raw) {
@@ -276,21 +325,15 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
     @Override
     public Map<String, Object> queryTradingDay() {
         ensureReadyOrThrow();
-        Object ret = invokeReturning(client, "queryTradingDay");
-        if (ret == null) {
-            ret = invokeReturning(client, "queryTradingDay", new Object[]{null});
-        }
         int day = 0;
-        if (ret instanceof Number) {
-            day = ((Number) ret).intValue();
-        } else if (ret instanceof List && !((List<?>) ret).isEmpty()) {
-            day = (int) lng(firstGetter(((List<?>) ret).get(0),
-                    "getTradingDay", "getTrdDay", "getTradeDate"));
-        } else if (ret != null) {
-            day = (int) lng(firstGetter(ret, "getTradingDay", "getTrdDay", "getTradeDate"));
-            if (day == 0) {
-                day = (int) lng(ret);
+        try {
+            OesQryTradingDayRsp rsp = client.queryTradingDay();
+            if (rsp != null) {
+                day = rsp.getTradingDay();
             }
+        } catch (Exception e) {
+            lastError.set(e.getMessage());
+            log.error("[oes] queryTradingDay 失败: {}", e.getMessage(), e);
         }
         if (day <= 0) {
             Map<String, Object> empty = new LinkedHashMap<String, Object>();
@@ -307,8 +350,19 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
     @Override
     public List<Map<String, Object>> queryCommissionRate() {
         ensureReadyOrThrow();
-        Object filter = newInstance("com.quant360.api.model.oes.OesQryCommissionRateFilter");
-        List<?> raw = invokeQueryListWithFilter("queryCommissionRate", filter);
+        List<?> raw = Collections.emptyList();
+        try {
+            OesQryCommissionRateRsp rsp =
+                    client.queryCommissionRate(new OesQryCommissionRateFilter(), Client.QueryMode.ALL);
+            if (rsp != null && rsp.getQryItems() != null) {
+                raw = rsp.getQryItems();
+            }
+            log.info("[oes] queryCommissionRate 返回 {} 条", raw.size());
+        } catch (Exception e) {
+            lastError.set(e.getMessage());
+            log.error("[oes] queryCommissionRate 失败: {}", e.getMessage(), e);
+            return Collections.emptyList();
+        }
         List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
         for (Object item : raw) {
             Object fr = firstGetter(item, "getFeeRate", "getCommissionRate", "getRate");
@@ -335,7 +389,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
         ensureReadyOrThrow();
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         try {
-            Object ov = invokeReturning(client, "queryClientOverview");
+            OesClientOverview ov = client.queryClientOverview();
             if (ov == null) {
                 m.put("ok", false);
                 m.put("message", "queryClientOverview 返回 null");
@@ -389,12 +443,18 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
     @Override
     public List<Map<String, Object>> queryInvAcct() {
         ensureReadyOrThrow();
-        List<?> raw = invokeOesQuery(
-                new String[]{"queryInvAcct", "queryInvAcctExt"},
-                new String[]{
-                        "com.quant360.api.model.oes.OesQryInvAcctFilter",
-                        "com.quant360.api.model.oes.qry.OesQryInvAcctFilter"
-                });
+        List<?> raw = Collections.emptyList();
+        try {
+            OesQryInvAcctRsp rsp = client.queryInvAcct(new OesQryInvAcctFilter(), Client.QueryMode.ALL);
+            if (rsp != null && rsp.getQryItems() != null) {
+                raw = rsp.getQryItems();
+            }
+            log.info("[oes] queryInvAcct 返回 {} 条", raw.size());
+        } catch (Exception e) {
+            lastError.set(e.getMessage());
+            log.error("[oes] queryInvAcct 失败: {}", e.getMessage(), e);
+            return Collections.emptyList();
+        }
         List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
         for (Object item : raw) {
             out.add(OesViewMapper.invAcct(
@@ -413,21 +473,19 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
     @Override
     public List<Map<String, Object>> queryCounterCash(String cashAcctId) {
         ensureReadyOrThrow();
-        Object filter = newInstance("com.quant360.api.model.oes.OesQryCounterCashFilter");
+        OesQryCounterCashFilter filter = new OesQryCounterCashFilter();
         String acct = cashAcctId == null ? null : cashAcctId.trim();
-        if (filter != null && acct != null && !acct.isEmpty()) {
-            setBean(filter, "setCashAcctId", acct);
-        }
-        List<?> raw;
-        if (filter != null) {
-            raw = invokeQueryListWithFilter("queryCounterCash", filter);
-        } else {
-            raw = invokeOesQuery(
-                    new String[]{"queryCounterCash"},
-                    new String[]{"com.quant360.api.model.oes.OesQryCounterCashFilter"});
+        if (acct != null && !acct.isEmpty()) {
+            filter.setCashAcctId(acct);
         }
         List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
-        for (Object item : raw) {
+        try {
+            OesQryCounterCashRsp rsp = client.queryCounterCash(filter);
+            Object item = rsp == null ? null : rsp.getCounterCashItem();
+            if (item == null) {
+                log.info("[oes] queryCounterCash 返回空");
+                return out;
+            }
             out.add(OesViewMapper.counterCash(
                     str(firstGetter(item, "getCashAcctId")),
                     str(firstGetter(item, "getCustId")),
@@ -437,10 +495,18 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
                     lng(firstGetter(item, "getCounterDrawableBal")),
                     Boolean.TRUE.equals(firstGetter(item, "isCashTrsfDisabled"))
             ));
+        } catch (Exception e) {
+            lastError.set(e.getMessage());
+            log.error("[oes] queryCounterCash 失败: {}", e.getMessage(), e);
+            return Collections.emptyList();
         }
         return out;
     }
 
+    /**
+     * 可买/可卖量：{@code OesQryMaxTradableQtyReq}/{@code queryMaxTradableQty} 不在当前 OesClient 公开 API
+     * （含 0.17/0.19 资料包）；保留反射以便未来 0.19+ 扩展 jar 出现时仍可探测。
+     */
     @Override
     public Map<String, Object> queryMaxTradableQty(String code, String side, BigDecimal priceYuan) {
         ensureReadyOrThrow();
@@ -461,21 +527,18 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
             Object req = newInstance("com.quant360.api.model.oes.OesQryMaxTradableQtyReq");
             if (req == null) {
                 fail.put("ok", false);
-                fail.put("message", "无法创建 OesQryMaxTradableQtyReq");
+                fail.put("message", "无法创建 OesQryMaxTradableQtyReq（需 0.19+ API）");
                 return fail;
             }
             setBean(req, "setSecurityId", norm);
             int mkt = KuangruiExchangeIds.fromStockCode(norm);
-            Object mktEnum = resolveOesMarket(mkt);
+            OesMarketId mktEnum = toOesMarket(mkt);
             if (mktEnum != null) {
                 setBean(req, "setMktId", mktEnum);
             } else if (mkt > 0) {
                 setBean(req, "setMktId", Integer.valueOf(mkt));
             }
-            Object bs = resolveOesBsType(sell);
-            if (bs != null) {
-                setBean(req, "setBsType", bs);
-            }
+            setBean(req, "setBsType", toOesBsType(sell));
             int pxMilli = KuangruiPriceScale.toMilliInt(priceYuan);
             setBean(req, "setOrdPrice", Integer.valueOf(pxMilli));
 
@@ -517,18 +580,22 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
     @Override
     public List<Map<String, Object>> queryCashTransferSerial(String cashAcctId) {
         ensureReadyOrThrow();
-        Object filter = newInstance("com.quant360.api.model.oes.OesQryCashTransferSerialFilter");
+        OesQryCashTransferSerialFilter filter = new OesQryCashTransferSerialFilter();
         String acct = cashAcctId == null ? null : cashAcctId.trim();
-        if (filter != null && acct != null && !acct.isEmpty()) {
-            setBean(filter, "setCashAcctId", acct);
+        if (acct != null && !acct.isEmpty()) {
+            filter.setCashAcctId(acct);
         }
-        List<?> raw;
-        if (filter != null) {
-            raw = invokeQueryListWithFilter("queryCashTransferSerial", filter);
-        } else {
-            raw = invokeOesQuery(
-                    new String[]{"queryCashTransferSerial"},
-                    new String[]{"com.quant360.api.model.oes.OesQryCashTransferSerialFilter"});
+        List<?> raw = Collections.emptyList();
+        try {
+            OesQryCashTransferSerialRsp rsp = client.queryCashTransferSerial(filter, Client.QueryMode.ALL);
+            if (rsp != null && rsp.getQryItems() != null) {
+                raw = rsp.getQryItems();
+            }
+            log.info("[oes] queryCashTransferSerial 返回 {} 条", raw.size());
+        } catch (Exception e) {
+            lastError.set(e.getMessage());
+            log.error("[oes] queryCashTransferSerial 失败: {}", e.getMessage(), e);
+            return Collections.emptyList();
         }
         List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
         for (Object item : raw) {
@@ -560,33 +627,21 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
         return String.valueOf(o);
     }
 
-    private static Object resolveOesMarket(int mkt) {
-        try {
-            Class<?> clz = Class.forName("com.quant360.api.model.oes.enu.OesMarketId");
-            String name;
-            if (mkt == KuangruiExchangeIds.SZSE) {
-                name = "OES_MKT_ID_SZ_A";
-            } else if (mkt == KuangruiExchangeIds.BSE) {
-                name = "OES_MKT_BJ";
-            } else if (mkt == KuangruiExchangeIds.SSE) {
-                name = "OES_MKT_ID_SH_A";
-            } else {
-                return null;
-            }
-            return clz.getMethod("valueOf", String.class).invoke(null, name);
-        } catch (Exception e) {
-            return null;
+    private static OesMarketId toOesMarket(int mkt) {
+        if (mkt == KuangruiExchangeIds.SZSE) {
+            return OesMarketId.OES_MKT_ID_SZ_A;
         }
+        if (mkt == KuangruiExchangeIds.BSE) {
+            return OesMarketId.OES_MKT_EXT_BJ;
+        }
+        if (mkt == KuangruiExchangeIds.SSE) {
+            return OesMarketId.OES_MKT_ID_SH_A;
+        }
+        return null;
     }
 
-    private static Object resolveOesBsType(boolean sell) {
-        try {
-            Class<?> clz = Class.forName("com.quant360.api.model.oes.enu.OesBuySellType");
-            String name = sell ? "OES_BS_TYPE_S" : "OES_BS_TYPE_B";
-            return clz.getMethod("valueOf", String.class).invoke(null, name);
-        } catch (Exception e) {
-            return null;
-        }
+    private static OesBuySellType toOesBsType(boolean sell) {
+        return sell ? OesBuySellType.OES_BS_TYPE_S : OesBuySellType.OES_BS_TYPE_B;
     }
 
     private Map<String, Object> mapStockItem(Object item) {
@@ -602,44 +657,6 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
                 (int) lng(firstGetter(item, "getSuspFlag", "getSuspendFlag", "getIsSuspend")),
                 (int) lng(firstGetter(item, "getSecurityStatus", "getSecurityStatusFlag", "getProductStatus"))
         );
-    }
-
-    private List<?> invokeQueryListWithFilter(String methodName, Object filter) {
-        OesClientImpl c = client;
-        if (c == null) {
-            return Collections.emptyList();
-        }
-        List<Object> filters = new ArrayList<Object>();
-        if (filter != null) {
-            filters.add(filter);
-        }
-        OesQueryListInvoker.Result r = OesQueryListInvoker.invokeWithFilters(
-                c, new String[]{methodName}, filters);
-        return finishQueryResult(methodName, r);
-    }
-
-    /** 增强查询：多方法名 / Filter 类 / 回调收集；失败写入 lastError 并打 error 日志。 */
-    private List<?> invokeOesQuery(String[] methodNames, String[] filterClasses) {
-        OesClientImpl c = client;
-        if (c == null) {
-            return Collections.emptyList();
-        }
-        OesQueryListInvoker.Result r = OesQueryListInvoker.invoke(c, methodNames, filterClasses);
-        return finishQueryResult(methodNames[0], r);
-    }
-
-    private List<?> finishQueryResult(String methodName, OesQueryListInvoker.Result r) {
-        if (!r.ok) {
-            lastError.set(r.detail);
-            log.error("[oes] {} 查询失败: {}", methodName, r.detail);
-            return Collections.emptyList();
-        }
-        if (r.list.isEmpty()) {
-            log.info("[oes] {} 返回 0 条 via {}", methodName, r.methodUsed);
-        } else {
-            log.info("[oes] {} 返回 {} 条 via {}", methodName, r.list.size(), r.methodUsed);
-        }
-        return r.list;
     }
 
     private static Object firstGetter(Object target, String... getters) {
@@ -703,40 +720,29 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
             }
             String code = OesViewMapper.normalizeCode(stockCode);
             int mkt = KuangruiExchangeIds.fromStockCode(code);
-            if (mkt == 0 || qty < 100 || priceYuan == null) {
+            OesMarketId mktId = toOesMarket(mkt);
+            if (mktId == null || qty < 100 || priceYuan == null) {
                 return OesPlaceResult.fail(clSeqNo, "非法标的/数量/价格");
             }
             int pxMilli = KuangruiPriceScale.toMilliInt(priceYuan);
             if (pxMilli <= 0) {
                 return OesPlaceResult.fail(clSeqNo, "价格毫级无效");
             }
-            Object req = newInstance("com.quant360.api.model.oes.OesOrdReq");
-            if (req == null) {
-                return OesPlaceResult.fail(clSeqNo, "无法创建 OesOrdReq");
-            }
-            setBean(req, "setClSeqNo", Integer.valueOf(clSeqNo));
-            setBean(req, "setMktId", Integer.valueOf(mkt));
-            setBean(req, "setOrdType", Integer.valueOf(OES_ORD_TYPE_LMT));
-            setBean(req, "setBsType", Integer.valueOf(side == OrderDTO.Side.SELL ? OES_BS_SELL : OES_BS_BUY));
-            setBean(req, "setSecurityId", code);
-            setBean(req, "setOrdQty", Integer.valueOf(qty));
-            setBean(req, "setOrdPrice", Integer.valueOf(pxMilli));
-            Object ret = invokeReturning(client, "sendOrdReq", req);
-            if (ret == null) {
-                ret = invokeReturning(client, "sendOrderReq", req);
-            }
-            if (ret instanceof Number && ((Number) ret).intValue() < 0) {
-                return OesPlaceResult.fail(clSeqNo, "sendOrdReq 返回 " + ret);
-            }
-            long clOrdId = lng(invokeGetter(ret, "getClOrdId"));
-            if (clOrdId == 0L && ret instanceof Number) {
-                // 部分版本返回 int 错误码 0=成功
-                clOrdId = 0L;
-            }
+            OesOrdReq req = new OesOrdReq();
+            req.setClSeqNo(clSeqNo);
+            req.setMktId(mktId);
+            req.setOrdType(OesOrdType.valueOf(mktId, 0));
+            req.setBsType(side == OrderDTO.Side.SELL
+                    ? OesBuySellType.OES_BS_TYPE_S
+                    : OesBuySellType.OES_BS_TYPE_B);
+            req.setSecurityId(code);
+            req.setOrdQty(qty);
+            req.setOrdPrice(pxMilli);
+            client.sendOrdReq(req);
             log.info("[oes] 报单已发 clSeqNo={} {} {}@{} x{} clientId={}",
                     clSeqNo, side, code, priceYuan, qty, clientOrderId);
             lastError.set(null);
-            return OesPlaceResult.ok(clSeqNo, clOrdId);
+            return OesPlaceResult.ok(clSeqNo, 0L);
         } catch (Exception e) {
             lastError.set(e.getMessage());
             log.error("[oes] 报单失败 clSeqNo={}: {}", clSeqNo, e.getMessage(), e);
@@ -757,30 +763,17 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
             }
             String code = OesViewMapper.normalizeCode(stockCode);
             int mkt = KuangruiExchangeIds.fromStockCode(code);
-            Object req = newInstance("com.quant360.api.model.oes.OesOrdCancelReq");
-            if (req == null) {
-                // 部分版本撤单也用 OesOrdReq + origClSeqNo
-                req = newInstance("com.quant360.api.model.oes.OesOrdReq");
-            }
-            if (req == null) {
-                throw new IllegalStateException("无法创建撤单请求对象");
-            }
-            setBean(req, "setClSeqNo", Integer.valueOf(nextInternalCancelSeq(origClSeqNo)));
-            setBean(req, "setOrigClSeqNo", Integer.valueOf(origClSeqNo));
-            if (mkt > 0) {
-                setBean(req, "setMktId", Integer.valueOf(mkt));
+            OesOrdCancelReq req = new OesOrdCancelReq();
+            req.setClSeqNo(nextInternalCancelSeq(origClSeqNo));
+            req.setOrigClSeqNo(origClSeqNo);
+            OesMarketId mktId = toOesMarket(mkt);
+            if (mktId != null) {
+                req.setMktId(mktId);
             }
             if (code != null && !code.isEmpty()) {
-                setBean(req, "setSecurityId", code);
+                req.setSecurityId(code);
             }
-            Object ret = invokeReturning(client, "sendOrdCancelReq", req);
-            if (ret == null) {
-                ret = invokeReturning(client, "sendOrderCancelReq", req);
-            }
-            if (ret instanceof Number && ((Number) ret).intValue() < 0) {
-                log.error("[oes] 撤单返回码 {}", ret);
-                return false;
-            }
+            client.sendOrdCancelReq(req);
             log.info("[oes] 撤单已发 origClSeqNo={} code={}", origClSeqNo, code);
             return true;
         } catch (Exception e) {
@@ -810,42 +803,33 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
             if (amtMilli <= 0L) {
                 return OesPlaceResult.fail(clSeqNo, "金额毫级无效");
             }
-            Object dirEnum = resolveOesCashDirect(direct);
+            OesCashDirect dirEnum = toOesCashDirect(direct);
             if (dirEnum == null) {
                 return OesPlaceResult.fail(clSeqNo, "direct 须为 IN 或 OUT");
             }
-            Object typeEnum = resolveOesCashTrsfType(trsfType);
+            OesCashTrsfType typeEnum = toOesCashTrsfType(trsfType);
             if (typeEnum == null) {
                 return OesPlaceResult.fail(clSeqNo, "trsfType 无效（可用 BANK/COUNTER/COUNTER_BANK/OES_TO_OES）");
             }
-            Object req = newInstance("com.quant360.api.model.oes.OesCashTrsfReq");
-            if (req == null) {
-                return OesPlaceResult.fail(clSeqNo, "无法创建 OesCashTrsfReq");
-            }
-            setBean(req, "setClSeqNo", Integer.valueOf(clSeqNo));
-            setBean(req, "setDirect", dirEnum);
-            setBean(req, "setTrsfType", typeEnum);
-            setBean(req, "setOccurAmt", Long.valueOf(amtMilli));
+            OesCashTrsfReq req = new OesCashTrsfReq();
+            req.setClSeqNo(clSeqNo);
+            req.setDirect(dirEnum);
+            req.setTrsfType(typeEnum);
+            req.setOccurAmt(amtMilli);
             String acct = cashAcctId == null ? null : cashAcctId.trim();
             if (acct != null && !acct.isEmpty()) {
-                setBean(req, "setCashAcctId", acct);
+                req.setCashAcctId(acct);
             }
             // 密码仅写入请求，不落日志/响应
             if (trdPasswd != null && !trdPasswd.isEmpty()) {
-                setBean(req, "setTrdPasswd", trdPasswd);
+                req.setTrdPasswd(trdPasswd);
             }
             if (trsfPasswd != null && !trsfPasswd.isEmpty()) {
-                setBean(req, "setTrsfPasswd", trsfPasswd);
+                req.setTrsfPasswd(trsfPasswd);
             }
-            if (!hasClientMethod("sendCashTrsfReq", 1)) {
-                return OesPlaceResult.fail(clSeqNo, "客户端无 sendCashTrsfReq");
-            }
-            Object sent = invokeReturning(client, "sendCashTrsfReq", req);
-            if (sent instanceof Number && ((Number) sent).intValue() < 0) {
-                return OesPlaceResult.fail(clSeqNo, "sendCashTrsfReq 返回 " + sent);
-            }
+            client.sendCashTrsfReq(req);
             log.info("[oes] 银证已发 clSeqNo={} direct={} trsfType={} amountYuan={} cashAcctId={}",
-                    clSeqNo, enumName(dirEnum), enumName(typeEnum), amountYuan,
+                    clSeqNo, dirEnum.name(), typeEnum.name(), amountYuan,
                     acct == null ? "" : acct);
             lastError.set(null);
             return OesPlaceResult.ok(clSeqNo, 0L);
@@ -856,7 +840,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
         }
     }
 
-    private static Object resolveOesCashDirect(String direct) {
+    private static OesCashDirect toOesCashDirect(String direct) {
         if (direct == null) {
             return null;
         }
@@ -864,49 +848,37 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
         if (d.isEmpty()) {
             return null;
         }
-        String name;
         if ("IN".equals(d) || "OES_CASH_DIRECT_IN".equals(d) || "TRANSFER_IN".equals(d)
                 || "BANK_TO_SEC".equals(d)) {
-            name = "OES_CASH_DIRECT_IN";
-        } else if ("OUT".equals(d) || "OES_CASH_DIRECT_OUT".equals(d) || "TRANSFER_OUT".equals(d)
+            return OesCashDirect.OES_CASH_DIRECT_IN;
+        }
+        if ("OUT".equals(d) || "OES_CASH_DIRECT_OUT".equals(d) || "TRANSFER_OUT".equals(d)
                 || "SEC_TO_BANK".equals(d)) {
-            name = "OES_CASH_DIRECT_OUT";
-        } else {
-            return null;
+            return OesCashDirect.OES_CASH_DIRECT_OUT;
         }
-        try {
-            Class<?> clz = Class.forName("com.quant360.api.model.oes.enu.OesCashDirect");
-            return clz.getMethod("valueOf", String.class).invoke(null, name);
-        } catch (Exception e) {
-            return null;
-        }
+        return null;
     }
 
     /**
      * 默认 OES↔银行；别名 BANK/COUNTER/COUNTER_BANK/OES_TO_OES。
      */
-    private static Object resolveOesCashTrsfType(String trsfType) {
+    private static OesCashTrsfType toOesCashTrsfType(String trsfType) {
         String t = trsfType == null ? "" : trsfType.trim().toUpperCase();
-        String name;
         if (t.isEmpty() || "BANK".equals(t) || "OES_BANK".equals(t)
                 || "OES_FUND_TRSF_TYPE_OES_BANK".equals(t)) {
-            name = "OES_FUND_TRSF_TYPE_OES_BANK";
-        } else if ("COUNTER".equals(t) || "OES_COUNTER".equals(t)
+            return OesCashTrsfType.OES_FUND_TRSF_TYPE_OES_BANK;
+        }
+        if ("COUNTER".equals(t) || "OES_COUNTER".equals(t)
                 || "OES_FUND_TRSF_TYPE_OES_COUNTER".equals(t)) {
-            name = "OES_FUND_TRSF_TYPE_OES_COUNTER";
-        } else if ("COUNTER_BANK".equals(t) || "OES_FUND_TRSF_TYPE_COUNTER_BANK".equals(t)) {
-            name = "OES_FUND_TRSF_TYPE_COUNTER_BANK";
-        } else if ("OES_TO_OES".equals(t) || "OES_FUND_TRSF_TYPE_OES_TO_OES".equals(t)) {
-            name = "OES_FUND_TRSF_TYPE_OES_TO_OES";
-        } else {
-            return null;
+            return OesCashTrsfType.OES_FUND_TRSF_TYPE_OES_COUNTER;
         }
-        try {
-            Class<?> clz = Class.forName("com.quant360.api.model.oes.enu.OesCashTrsfType");
-            return clz.getMethod("valueOf", String.class).invoke(null, name);
-        } catch (Exception e) {
-            return null;
+        if ("COUNTER_BANK".equals(t) || "OES_FUND_TRSF_TYPE_COUNTER_BANK".equals(t)) {
+            return OesCashTrsfType.OES_FUND_TRSF_TYPE_COUNTER_BANK;
         }
+        if ("OES_TO_OES".equals(t) || "OES_FUND_TRSF_TYPE_OES_TO_OES".equals(t)) {
+            return OesCashTrsfType.OES_FUND_TRSF_TYPE_OES_TO_OES;
+        }
+        return null;
     }
 
     @Override
@@ -1341,19 +1313,6 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
         rptSynced.set(true);
         lastError.set(null);
         log.info("[oes] sendRptSync 完成 lastInMsgSeq={} via {}", seq, r.methodUsed);
-    }
-
-    private boolean hasClientMethod(String name, int argCount) {
-        OesClientImpl c = client;
-        if (c == null || name == null) {
-            return false;
-        }
-        for (Method m : c.getClass().getMethods()) {
-            if (m.getName().equals(name) && m.getParameterTypes().length == argCount) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private Object invokeReturning(Object target, String name, Object... args) {

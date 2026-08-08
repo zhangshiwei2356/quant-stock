@@ -2654,7 +2654,7 @@
       sdk: 'queryCashAsset',
       stage: 'M2 只读',
       html:
-        '<p>OES 查询通道：查资金资产（可用/可取等）。Demo 习惯：Filter + <code>QueryMode.ALL</code> → <code>getQryItems</code>。</p>'
+        '<p>OES 查询通道：查资金资产（可用/可取等）。主路径强类型 Filter + <code>QueryMode.ALL</code> → <code>getQryItems</code>。</p>'
         + '<ul><li>运维：<code>GET /api/ops/kuangrui/oes/cash</code></li>'
         + '<li>登录后应 <code>sendRptSync</code>；同步失败可<strong>查询降级</strong>仍可查资金</li>'
         + '<li>本应用：运维点测 + <code>position-pnl-sync</code> 纸面对账</li></ul>'

@@ -366,9 +366,9 @@ sequenceDiagram
 - 对照：**应用说明 → 能力与待办**；宽睿对接：**宽睿对接 → 宽睿文档梳理**（M0✓ → M1～M4 可选✓ → M5a/M5b/撤单小修/仿真浸泡/查询增强/M6 银证✓；具名约 22/24；**下一步** 批量按需 → L2/两融后置）
 - 宽睿 **M0**：资料包 `OESAPI-JAVA-v0.19.4.0`；探针 **OES+MDS 登录成功** → `M0_STATUS=COMPLETE`
 - 宽睿 **M1**（可选，默认关）：MDS L1 → `market_1min(MDS)`；运维 `/api/ops/kuangrui/mds/*`
-- 宽睿 **M2**（可选，默认关）：OES 只读对账；登录后 `sendRptSync` 多签名适配；同步失败可 **查询降级**；查资金/持仓等经 `OesQueryListInvoker`（对齐 Demo：`Filter + QueryMode.ALL` → `Rsp.getQryItems()`；兼 List/回调/多 Filter）；出参含 `rptSyncEngine`；运维 `/api/ops/kuangrui/oes/{status,cash,...}`
+- 宽睿 **M2**（可选，默认关）：OES 只读对账；登录后 `sendRptSync` 多签名适配；同步失败可 **查询降级**；查资金/持仓等主路径为强类型 `Filter + QueryMode.ALL` → `Rsp.getQryItems()`（`OesQueryListInvoker` 仅测试/兜底）；出参含 `rptSyncEngine`；运维 `/api/ops/kuangrui/oes/{status,cash,...}`
 - 宽睿 **M3**（可选，默认关）：`oes.order-enabled=true` + `trade-mode=sdk`；限价报/撤；`sync-orders` 按柜台状态推进；OES live **撤单确认制**（勿乐观假撤）；状态 `6`→本地 CANCELLED；`GET /api/ops/kuangrui/oes/order-status`
-- 宽睿 **M4**（可选，默认关）：`static-enabled=true`；MDS 证券静态对齐 Demo（`Filter + QueryMode.ALL` → `getQryItems`，失败兜底 List）/ 状态 / 时段 + OES 涨跌停·停牌·股本·交易日·佣金；失败回退本地启发式；运维 `/api/ops/kuangrui/static/*`
+- 宽睿 **M4**（可选，默认关）：`static-enabled=true`；MDS/OES 静态与费率主路径均为强类型 `Filter + QueryMode.ALL` → `getQryItems`（MDS 失败可兜底 List）/ 状态 / 时段 + OES 涨跌停·停牌·股本·交易日·佣金；失败回退本地启发式；运维 `/api/ops/kuangrui/static/*`
 - 宽睿 **M5a**（可选，默认关）：MDS `onDisConn` 异步 close→退避重登/重订阅；`market-collect` 死连接/全失败回退本地；status 含断线/重连计数
 - 宽睿 **M5b**（可选，默认关）：OES 断线先 close 再重建 + `sendRptSync`；status 暴露断线/重连计数
 - 宽睿 **④ 仿真浸泡**（2026-08-08）：`.\scripts\kuangrui\m5-soak.ps1` → `scripts/kuangrui/out/m5-soak-report.*`（登录→MDS pull/订→OES reconcile→买撤→sync→static）；`oes/stock` 仿真偶发超时记 soft-WARN
