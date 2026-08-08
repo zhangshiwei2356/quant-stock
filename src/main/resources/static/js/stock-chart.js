@@ -2353,7 +2353,25 @@
       // 必须是严格 boolean：jQuery toggleClass(cls, null/undefined) 会变成“切换”而非“关闭”
       var open = !!(bodyId && id === bodyId);
       $(this).attr('aria-expanded', open ? 'true' : 'false').toggleClass('open', open);
-      $('#' + id).toggleClass('open', open);
+      var $panel = $('#' + id);
+      if (!$panel.length) {
+        return;
+      }
+      var el = $panel[0];
+      if (open) {
+        $panel.addClass('open');
+        var h = el.scrollHeight || 0;
+        $panel.css('max-height', '0');
+        void el.offsetHeight;
+        $panel.css('max-height', Math.max(h + 8, 48) + 'px');
+      } else {
+        if ($panel.hasClass('open')) {
+          $panel.css('max-height', (el.scrollHeight || 0) + 'px');
+          void el.offsetHeight;
+        }
+        $panel.css('max-height', '0');
+        $panel.removeClass('open');
+      }
     });
   }
 

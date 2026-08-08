@@ -22,7 +22,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css?v=20260808-kr-intro-ui"/>
+  <link rel="stylesheet" href="/css/style.css?v=20260808-sidebar-ab"/>
   <script src="/js/jquery.min.js"></script>
   <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/echarts.min.js"></script>
@@ -55,17 +55,19 @@
 <div class="layout">
   <aside class="sidebar">
     <div class="sidebar-head">
-      <span class="sidebar-title">功能导航</span>
-      <span class="sidebar-head-tag">MENU</span>
+      <img class="sidebar-brand-logo" src="/images/logo.png?v=1" alt="" width="22" height="22"/>
+      <div class="sidebar-brand-text">
+        <span class="sidebar-title">Quant Stock</span>
+        <span class="sidebar-head-tag">导航</span>
+      </div>
     </div>
 
     <section class="nav-group" data-group="workbench" aria-label="工作台">
-      <div class="nav-group-rail" aria-hidden="true"><span>工作台</span></div>
+      <div class="nav-group-title">工作台</div>
       <div class="nav-group-body">
         <div class="side-nav" data-nav="pool">
           <button type="button" class="side-nav-toggle" data-body="poolBody" data-mode="pool"
                   data-intro="/docs/nav-pool.html" data-intro-title="行情浏览" aria-expanded="false">
-            <span class="nav-idx">01</span>
             <span class="nav-label">行情浏览</span>
             <span class="chevron">▸</span>
           </button>
@@ -78,7 +80,6 @@
         <div class="side-nav" data-nav="single">
           <button type="button" class="side-nav-toggle" data-body="singleBody" data-mode="single"
                   data-intro="/docs/nav-single.html" data-intro-title="个股回测" aria-expanded="false">
-            <span class="nav-idx">02</span>
             <span class="nav-label">个股回测</span>
             <span class="chevron">▸</span>
           </button>
@@ -94,7 +95,6 @@
         <div class="side-nav" data-nav="portfolio">
           <button type="button" class="side-nav-toggle" data-body="portfolioBody" data-mode="portfolio"
                   data-intro="/docs/nav-portfolio.html" data-intro-title="组合回测" aria-expanded="false">
-            <span class="nav-idx">03</span>
             <span class="nav-label">组合回测</span>
             <span class="chevron">▸</span>
           </button>
@@ -109,7 +109,6 @@
         <div class="side-nav" data-nav="tradepool">
           <button type="button" class="side-nav-toggle" data-body="tradepoolBody" data-mode="tradepool"
                   data-intro="/docs/nav-tradepool.html" data-intro-title="目标池" aria-expanded="false">
-            <span class="nav-idx">04</span>
             <span class="nav-label">目标池</span>
             <span class="chevron">▸</span>
           </button>
@@ -126,7 +125,6 @@
         <div class="side-nav" data-nav="account">
           <button type="button" class="side-nav-toggle" data-body="accountBody" data-mode="account"
                   data-intro="/docs/nav-account.html" data-intro-title="账户概览" aria-expanded="false">
-            <span class="nav-idx">05</span>
             <span class="nav-label">账户概览</span>
             <span class="chevron">▸</span>
           </button>
@@ -158,7 +156,6 @@
         <div class="side-nav" data-nav="schedule">
           <button type="button" class="side-nav-toggle" data-body="scheduleBody" data-mode="schedule"
                   data-intro="/docs/nav-schedule.html" data-intro-title="运维中心" aria-expanded="false">
-            <span class="nav-idx">06</span>
             <span class="nav-label">运维中心</span>
             <span class="chevron">▸</span>
           </button>
@@ -174,7 +171,6 @@
         <div class="side-nav" data-nav="strategy">
           <button type="button" class="side-nav-toggle" data-body="strategyBody" data-mode="strategy"
                   data-intro="/docs/nav-strategy.html" data-intro-title="策略管理" aria-expanded="false">
-            <span class="nav-idx">07</span>
             <span class="nav-label">策略管理</span>
             <span class="chevron">▸</span>
           </button>
@@ -188,7 +184,6 @@
         <div class="side-nav" data-nav="dbtables">
           <button type="button" class="side-nav-toggle" data-body="dbtablesBody" data-mode="dbtables"
                   data-intro="/docs/nav-dbtables.html" data-intro-title="数据表" aria-expanded="false">
-            <span class="nav-idx">08</span>
             <span class="nav-label">数据表</span>
             <span class="chevron">▸</span>
           </button>
@@ -200,12 +195,11 @@
     </section>
 
     <section class="nav-group nav-group--docs" data-group="docs" aria-label="扩展与文档">
-      <div class="nav-group-rail" aria-hidden="true"><span>扩展与文档</span></div>
+      <div class="nav-group-title">扩展与文档</div>
       <div class="nav-group-body">
         <div class="side-nav" data-nav="kuangrui">
           <button type="button" class="side-nav-toggle" data-body="kuangruiBody" data-mode="kuangrui"
                   data-intro="/docs/nav-kuangrui.html" data-intro-title="宽睿对接" aria-expanded="false">
-            <span class="nav-idx">09</span>
             <span class="nav-label">宽睿对接</span>
             <span class="chevron">▸</span>
           </button>
@@ -224,7 +218,6 @@
         <div class="side-nav" data-nav="stock-knowledge">
           <button type="button" class="side-nav-toggle" data-body="stockKnowledgeMenu" data-mode="doc"
                   data-intro="/docs/nav-stock-knowledge.html" data-intro-title="量化知识" aria-expanded="false">
-            <span class="nav-idx">10</span>
             <span class="nav-label">量化知识</span>
             <span class="chevron">▸</span>
           </button>
@@ -234,7 +227,6 @@
         <div class="side-nav" data-nav="app-related">
           <button type="button" class="side-nav-toggle" data-body="appRelatedMenu" data-mode="doc"
                   data-intro="/docs/nav-app-related.html" data-intro-title="应用说明" aria-expanded="false">
-            <span class="nav-idx">11</span>
             <span class="nav-label">应用说明</span>
             <span class="chevron">▸</span>
           </button>
@@ -243,7 +235,7 @@
       </div>
     </section>
 
-    <p class="sidebar-foot">点菜单展开介绍 · 再点收起回首页 · 点 QS 亦可回初始化页</p>
+    <p class="sidebar-foot">再点一级可回首页 · 点顶栏 Logo 亦可</p>
   </aside>
 
   <div class="main">
@@ -1711,6 +1703,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260808-kr-intro-ui"></script>
+<script src="/js/stock-chart.js?v=20260808-sidebar-ab"></script>
 </body>
 </html>
