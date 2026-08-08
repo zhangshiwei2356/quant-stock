@@ -2870,7 +2870,7 @@
       }
 
       if (slot.panel && slot.panel !== 'overview') {
-        var goLabel = slot.key === 'Account' ? '查询账号 / 登录' : '进入点测';
+        var goLabel = slot.key === 'Account' ? '账号登录' : '进入点测';
         var $go = $('<button type="button" class="secondary kr-status-go"/>')
           .text(goLabel)
           .attr('data-kr-jump', slot.panel);
