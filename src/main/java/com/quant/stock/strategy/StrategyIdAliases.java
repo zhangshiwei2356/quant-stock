@@ -39,20 +39,20 @@ public final class StrategyIdAliases {
         if (raw == null) {
             return null;
         }
-        String t = raw.trim();
-        if (t.isEmpty()) {
+        String trimmed = raw.trim();
+        if (trimmed.isEmpty()) {
             return null;
         }
-        if (registry != null && registry.contains(t)) {
-            return registry.resolve(t).name();
+        if (registry != null && registry.contains(trimmed)) {
+            return registry.resolve(trimmed).name();
         }
-        String mapped = ALIAS_TO_CANONICAL.get(t.toLowerCase(Locale.ROOT));
+        String mapped = ALIAS_TO_CANONICAL.get(trimmed.toLowerCase(Locale.ROOT));
         if (mapped != null) {
             if (registry == null || registry.contains(mapped)) {
                 return mapped;
             }
         }
-        return t;
+        return trimmed;
     }
 
     /**

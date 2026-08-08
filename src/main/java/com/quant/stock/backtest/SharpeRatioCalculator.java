@@ -73,29 +73,29 @@ public final class SharpeRatioCalculator {
 
     /** 每年收益期数（用于 √N 年化）。 */
     static double annualizationFactor(String period) {
-        String p = StringUtils.hasText(period) ? period.trim().toUpperCase(Locale.ROOT) : "DAY";
-        if ("DAY".equals(p)) {
+        String periodKey = StringUtils.hasText(period) ? period.trim().toUpperCase(Locale.ROOT) : "DAY";
+        if ("DAY".equals(periodKey)) {
             return TRADING_DAYS;
         }
-        if ("WEEK".equals(p)) {
+        if ("WEEK".equals(periodKey)) {
             return 52;
         }
-        if ("MONTH".equals(p)) {
+        if ("MONTH".equals(periodKey)) {
             return 12;
         }
-        if ("MIN_1".equals(p) || "MIN1".equals(p) || "1MIN".equals(p)) {
+        if ("MIN_1".equals(periodKey) || "MIN1".equals(periodKey) || "1MIN".equals(periodKey)) {
             return MINUTES_PER_DAY * TRADING_DAYS;
         }
-        if ("MIN_5".equals(p) || "MIN5".equals(p) || "5MIN".equals(p)) {
+        if ("MIN_5".equals(periodKey) || "MIN5".equals(periodKey) || "5MIN".equals(periodKey)) {
             return (MINUTES_PER_DAY / 5.0) * TRADING_DAYS;
         }
-        if ("MIN_15".equals(p) || "MIN15".equals(p) || "15MIN".equals(p)) {
+        if ("MIN_15".equals(periodKey) || "MIN15".equals(periodKey) || "15MIN".equals(periodKey)) {
             return (MINUTES_PER_DAY / 15.0) * TRADING_DAYS;
         }
-        if ("MIN_30".equals(p) || "MIN30".equals(p) || "30MIN".equals(p)) {
+        if ("MIN_30".equals(periodKey) || "MIN30".equals(periodKey) || "30MIN".equals(periodKey)) {
             return (MINUTES_PER_DAY / 30.0) * TRADING_DAYS;
         }
-        if ("MIN_60".equals(p) || "MIN60".equals(p) || "60MIN".equals(p)) {
+        if ("MIN_60".equals(periodKey) || "MIN60".equals(periodKey) || "60MIN".equals(periodKey)) {
             return (MINUTES_PER_DAY / 60.0) * TRADING_DAYS;
         }
         return TRADING_DAYS;

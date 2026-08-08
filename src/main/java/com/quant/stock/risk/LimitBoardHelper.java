@@ -32,8 +32,8 @@ public final class LimitBoardHelper {
         if (stockCode == null) {
             return MAIN_LIMIT;
         }
-        String c = stockCode.trim();
-        if (c.startsWith("688") || c.startsWith("3")) {
+        String trimmed = stockCode.trim();
+        if (trimmed.startsWith("688") || trimmed.startsWith("3")) {
             return GEM_STAR_LIMIT;
         }
         return MAIN_LIMIT;

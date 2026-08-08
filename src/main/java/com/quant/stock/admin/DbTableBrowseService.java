@@ -393,10 +393,10 @@ public class DbTableBrowseService {
         if (val instanceof byte[]) {
             return "[BLOB " + ((byte[]) val).length + " bytes]";
         }
-        String s = String.valueOf(val);
-        if (s.length() > CELL_MAX_LEN) {
-            return s.substring(0, CELL_MAX_LEN) + "…(" + s.length() + "字)";
+        String cellText = String.valueOf(val);
+        if (cellText.length() > CELL_MAX_LEN) {
+            return cellText.substring(0, CELL_MAX_LEN) + "…(" + cellText.length() + "字)";
         }
-        return s;
+        return cellText;
     }
 }

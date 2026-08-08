@@ -134,8 +134,9 @@ public final class OesRptSyncInvoker {
         // 附带扫描：所有含 Rpt/Report/Sync 的方法名，便于对照资料包
         Set<String> related = new LinkedHashSet<String>();
         for (Method m : collectMethods(client.getClass())) {
-            String n = m.getName().toLowerCase(Locale.ROOT);
-            if (n.contains("rpt") || n.contains("report") || n.contains("sync")) {
+            String methodNameLower = m.getName().toLowerCase(Locale.ROOT);
+            if (methodNameLower.contains("rpt") || methodNameLower.contains("report")
+                    || methodNameLower.contains("sync")) {
                 related.add(formatSig(m));
             }
         }
@@ -151,9 +152,9 @@ public final class OesRptSyncInvoker {
             sb.append("；相关方法: ").append(related);
         }
         if (!errors.isEmpty()) {
-            int n = Math.min(errors.size(), 8);
+            int maxErrorsToShow = Math.min(errors.size(), 8);
             sb.append("；尝试: ");
-            for (int i = 0; i < n; i++) {
+            for (int i = 0; i < maxErrorsToShow; i++) {
                 if (i > 0) {
                     sb.append(" | ");
                 }
@@ -238,16 +239,16 @@ public final class OesRptSyncInvoker {
         if (name == null) {
             return false;
         }
-        String n = name.toLowerCase(Locale.ROOT);
-        return n.contains("rptsync")
-                || n.contains("reportsync")
-                || n.contains("reportsynchronization")
-                || "initmsgid".equals(n);
+        String methodNameLower = name.toLowerCase(Locale.ROOT);
+        return methodNameLower.contains("rptsync")
+                || methodNameLower.contains("reportsync")
+                || methodNameLower.contains("reportsynchronization")
+                || "initmsgid".equals(methodNameLower);
     }
 
     private static boolean isInitOnlyName(String name) {
-        String n = name.toLowerCase(Locale.ROOT);
-        return n.startsWith("init") || n.contains("initrpt");
+        String methodNameLower = name.toLowerCase(Locale.ROOT);
+        return methodNameLower.startsWith("init") || methodNameLower.contains("initrpt");
     }
 
     private static Result tryNoArgSend(Object client, List<String> errors, Set<String> signatures) {
@@ -532,10 +533,10 @@ public final class OesRptSyncInvoker {
         if (t == null || t.getMessage() == null) {
             return "";
         }
-        String s = t.getMessage().trim();
-        if (s.length() > 180) {
-            return s.substring(0, 180) + "...";
+        String message = t.getMessage().trim();
+        if (message.length() > 180) {
+            return message.substring(0, 180) + "...";
         }
-        return s;
+        return message;
     }
 }

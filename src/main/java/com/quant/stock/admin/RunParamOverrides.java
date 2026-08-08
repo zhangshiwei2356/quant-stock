@@ -50,11 +50,11 @@ public final class RunParamOverrides {
             if (e.getValue() == null) {
                 continue;
             }
-            String s = String.valueOf(e.getValue()).trim();
-            if (s.isEmpty() || "null".equalsIgnoreCase(s)) {
+            String valueText = String.valueOf(e.getValue()).trim();
+            if (valueText.isEmpty() || "null".equalsIgnoreCase(valueText)) {
                 continue;
             }
-            out.put(e.getKey().trim(), s);
+            out.put(e.getKey().trim(), valueText);
         }
         return out;
     }

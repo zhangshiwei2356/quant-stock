@@ -107,9 +107,9 @@ public class PortfolioBackTestEngine {
     static String resolveEngine(BackTestQueryDTO query, BaseStrategy strategy) {
         String raw = query == null ? null : query.getEngine();
         if (raw != null && !raw.trim().isEmpty()) {
-            String e = raw.trim().toLowerCase(Locale.ROOT);
-            if ("session".equals(e) || "classic".equals(e)) {
-                return e;
+            String engineKey = raw.trim().toLowerCase(Locale.ROOT);
+            if ("session".equals(engineKey) || "classic".equals(engineKey)) {
+                return engineKey;
             }
             throw new IllegalArgumentException("engine 仅支持 classic|session，当前=" + raw);
         }

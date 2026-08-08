@@ -167,18 +167,18 @@ public final class OesViewMapper {
         if (securityId == null) {
             return "";
         }
-        String c = securityId.trim();
-        if (c.isEmpty()) {
+        String code = securityId.trim();
+        if (code.isEmpty()) {
             return "";
         }
         // 去掉可能的市场后缀
-        int dot = c.indexOf('.');
+        int dot = code.indexOf('.');
         if (dot > 0) {
-            c = c.substring(0, dot);
+            code = code.substring(0, dot);
         }
-        String digits = c.replaceAll("[^0-9]", "");
+        String digits = code.replaceAll("[^0-9]", "");
         if (digits.isEmpty()) {
-            return c;
+            return code;
         }
         while (digits.length() < 6) {
             digits = "0" + digits;

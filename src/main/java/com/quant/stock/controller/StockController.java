@@ -231,9 +231,9 @@ public class StockController {
     /** classic 默认；SessionStrategy（如 overnightGap）未显式指定时强制 session。 */
     private String resolveEngine(String engine, String strategyId) {
         if (engine != null && !engine.trim().isEmpty()) {
-            String e = engine.trim().toLowerCase();
-            if ("session".equals(e) || "classic".equals(e)) {
-                return e;
+            String engineKey = engine.trim().toLowerCase();
+            if ("session".equals(engineKey) || "classic".equals(engineKey)) {
+                return engineKey;
             }
             throw new IllegalArgumentException("engine 仅支持 classic|session，当前=" + engine);
         }

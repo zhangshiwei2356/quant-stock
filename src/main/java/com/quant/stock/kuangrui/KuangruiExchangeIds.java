@@ -23,11 +23,11 @@ public final class KuangruiExchangeIds {
         if (code == null) {
             return 0;
         }
-        String c = code.trim();
-        if (c.length() < 1) {
+        String trimmed = code.trim();
+        if (trimmed.length() < 1) {
             return 0;
         }
-        char first = c.charAt(0);
+        char first = trimmed.charAt(0);
         if (first == '6') {
             return SSE;
         }
@@ -45,12 +45,12 @@ public final class KuangruiExchangeIds {
         if (code == null) {
             return 0;
         }
-        String c = code.trim();
-        if (c.isEmpty()) {
+        String trimmed = code.trim();
+        if (trimmed.isEmpty()) {
             return 0;
         }
         try {
-            return Integer.parseInt(c);
+            return Integer.parseInt(trimmed);
         } catch (NumberFormatException e) {
             log.error("宽睿交易所 ID 解析异常", e);
             return 0;

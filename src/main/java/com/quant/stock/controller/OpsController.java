@@ -147,10 +147,10 @@ public class OpsController {
         List<String> list = null;
         if (codes != null && !codes.trim().isEmpty()) {
             list = new ArrayList<String>();
-            for (String p : codes.split(",")) {
-                String c = p.trim();
-                if (!c.isEmpty()) {
-                    list.add(c);
+            for (String part : codes.split(",")) {
+                String code = part.trim();
+                if (!code.isEmpty()) {
+                    list.add(code);
                 }
             }
         } else if ("pool".equalsIgnoreCase(scope)) {

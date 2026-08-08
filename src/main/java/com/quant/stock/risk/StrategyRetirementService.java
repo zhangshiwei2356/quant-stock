@@ -201,10 +201,10 @@ public class StrategyRetirementService {
                 retiredOn = null;
             }
         }
-        String r = m.get("reason");
-        reason = r == null || r.trim().isEmpty() ? null : r.trim();
-        String n = m.get("note");
-        note = n == null || n.trim().isEmpty() ? null : n.trim();
+        String reasonRaw = m.get("reason");
+        reason = reasonRaw == null || reasonRaw.trim().isEmpty() ? null : reasonRaw.trim();
+        String noteRaw = m.get("note");
+        note = noteRaw == null || noteRaw.trim().isEmpty() ? null : noteRaw.trim();
         clearForceArm();
     }
 

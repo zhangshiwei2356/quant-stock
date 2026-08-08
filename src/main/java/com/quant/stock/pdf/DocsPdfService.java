@@ -124,9 +124,9 @@ public class DocsPdfService {
     }
 
     private static String sanitizeFragment(String html) {
-        String s = html == null ? "" : html;
-        s = s.replaceAll("(?s)<!--.*?-->", "");
-        Document doc = Jsoup.parseBodyFragment(s);
+        String htmlText = html == null ? "" : html;
+        htmlText = htmlText.replaceAll("(?s)<!--.*?-->", "");
+        Document doc = Jsoup.parseBodyFragment(htmlText);
         doc.outputSettings().syntax(Document.OutputSettings.Syntax.xml).prettyPrint(false);
         doc.select("script, style, button, noscript").remove();
         for (Element el : doc.select("[onclick], [onload], [style]")) {

@@ -163,9 +163,9 @@ public class BackTestHistoryStore {
         }
         String kindFilter = null;
         if (StringUtils.hasText(kind)) {
-            String k = kind.trim().toUpperCase();
-            if (!"ALL".equals(k)) {
-                kindFilter = k;
+            String kindUpper = kind.trim().toUpperCase();
+            if (!"ALL".equals(kindUpper)) {
+                kindFilter = kindUpper;
             }
         }
         List<BtBacktestRecordDO> rows = backtestRecordMapper.selectSummaryByStrategyId(
@@ -190,9 +190,9 @@ public class BackTestHistoryStore {
         }
         String kindFilter = null;
         if (StringUtils.hasText(kind)) {
-            String k = kind.trim().toUpperCase();
-            if (!"ALL".equals(k)) {
-                kindFilter = k;
+            String kindUpper = kind.trim().toUpperCase();
+            if (!"ALL".equals(kindUpper)) {
+                kindFilter = kindUpper;
             }
         }
         List<BtBacktestRecordDO> rows = backtestRecordMapper.selectSummaryByStrategyIds(

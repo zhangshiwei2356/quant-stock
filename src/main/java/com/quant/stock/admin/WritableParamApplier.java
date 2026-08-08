@@ -126,11 +126,11 @@ public final class WritableParamApplier {
         if (raw == null) {
             throw new IllegalArgumentException("布尔值不能为空");
         }
-        String s = raw.trim().toLowerCase();
-        if ("true".equals(s) || "1".equals(s) || "yes".equals(s) || "on".equals(s)) {
+        String boolText = raw.trim().toLowerCase();
+        if ("true".equals(boolText) || "1".equals(boolText) || "yes".equals(boolText) || "on".equals(boolText)) {
             return true;
         }
-        if ("false".equals(s) || "0".equals(s) || "no".equals(s) || "off".equals(s)) {
+        if ("false".equals(boolText) || "0".equals(boolText) || "no".equals(boolText) || "off".equals(boolText)) {
             return false;
         }
         throw new IllegalArgumentException("非法布尔: " + raw);

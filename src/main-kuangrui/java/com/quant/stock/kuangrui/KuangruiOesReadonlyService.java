@@ -844,16 +844,16 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
         if (direct == null) {
             return null;
         }
-        String d = direct.trim().toUpperCase();
-        if (d.isEmpty()) {
+        String directKey = direct.trim().toUpperCase();
+        if (directKey.isEmpty()) {
             return null;
         }
-        if ("IN".equals(d) || "OES_CASH_DIRECT_IN".equals(d) || "TRANSFER_IN".equals(d)
-                || "BANK_TO_SEC".equals(d)) {
+        if ("IN".equals(directKey) || "OES_CASH_DIRECT_IN".equals(directKey) || "TRANSFER_IN".equals(directKey)
+                || "BANK_TO_SEC".equals(directKey)) {
             return OesCashDirect.OES_CASH_DIRECT_IN;
         }
-        if ("OUT".equals(d) || "OES_CASH_DIRECT_OUT".equals(d) || "TRANSFER_OUT".equals(d)
-                || "SEC_TO_BANK".equals(d)) {
+        if ("OUT".equals(directKey) || "OES_CASH_DIRECT_OUT".equals(directKey) || "TRANSFER_OUT".equals(directKey)
+                || "SEC_TO_BANK".equals(directKey)) {
             return OesCashDirect.OES_CASH_DIRECT_OUT;
         }
         return null;
@@ -863,19 +863,19 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
      * 默认 OES↔银行；别名 BANK/COUNTER/COUNTER_BANK/OES_TO_OES。
      */
     private static OesCashTrsfType toOesCashTrsfType(String trsfType) {
-        String t = trsfType == null ? "" : trsfType.trim().toUpperCase();
-        if (t.isEmpty() || "BANK".equals(t) || "OES_BANK".equals(t)
-                || "OES_FUND_TRSF_TYPE_OES_BANK".equals(t)) {
+        String trsfTypeKey = trsfType == null ? "" : trsfType.trim().toUpperCase();
+        if (trsfTypeKey.isEmpty() || "BANK".equals(trsfTypeKey) || "OES_BANK".equals(trsfTypeKey)
+                || "OES_FUND_TRSF_TYPE_OES_BANK".equals(trsfTypeKey)) {
             return OesCashTrsfType.OES_FUND_TRSF_TYPE_OES_BANK;
         }
-        if ("COUNTER".equals(t) || "OES_COUNTER".equals(t)
-                || "OES_FUND_TRSF_TYPE_OES_COUNTER".equals(t)) {
+        if ("COUNTER".equals(trsfTypeKey) || "OES_COUNTER".equals(trsfTypeKey)
+                || "OES_FUND_TRSF_TYPE_OES_COUNTER".equals(trsfTypeKey)) {
             return OesCashTrsfType.OES_FUND_TRSF_TYPE_OES_COUNTER;
         }
-        if ("COUNTER_BANK".equals(t) || "OES_FUND_TRSF_TYPE_COUNTER_BANK".equals(t)) {
+        if ("COUNTER_BANK".equals(trsfTypeKey) || "OES_FUND_TRSF_TYPE_COUNTER_BANK".equals(trsfTypeKey)) {
             return OesCashTrsfType.OES_FUND_TRSF_TYPE_COUNTER_BANK;
         }
-        if ("OES_TO_OES".equals(t) || "OES_FUND_TRSF_TYPE_OES_TO_OES".equals(t)) {
+        if ("OES_TO_OES".equals(trsfTypeKey) || "OES_FUND_TRSF_TYPE_OES_TO_OES".equals(trsfTypeKey)) {
             return OesCashTrsfType.OES_FUND_TRSF_TYPE_OES_TO_OES;
         }
         return null;
@@ -1137,12 +1137,12 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
         };
     }
 
-    private void handleCallback(String name, Object[] args) {
-        if (name == null) {
+    private void handleCallback(String methodName, Object[] args) {
+        if (methodName == null) {
             return;
         }
-        String n = name.toLowerCase();
-        if (n.contains("disconn")) {
+        String methodNameLower = methodName.toLowerCase();
+        if (methodNameLower.contains("disconn")) {
             // 回调内勿重活：打标后异步 close，确保下次 ensureClient 先 close 再重建
             log.error("[oes] 连接中断");
             rptSynced.set(false);
@@ -1156,9 +1156,10 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
             return;
         }
         Object body = args[0];
-        if (n.contains("trd") || n.contains("trade")) {
+        if (methodNameLower.contains("trd") || methodNameLower.contains("trade")) {
             enqueueTrade(body);
-        } else if (n.contains("ord") || n.contains("order") || n.contains("rpt")) {
+        } else if (methodNameLower.contains("ord") || methodNameLower.contains("order")
+                || methodNameLower.contains("rpt")) {
             enqueueOrder(body);
         }
     }

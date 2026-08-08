@@ -572,10 +572,10 @@ public class DataHealthService {
         if (code != null && (code.startsWith("8") || code.startsWith("4"))) {
             return "bj";
         }
-        String n = name == null ? "" : name;
-        String upper = n.toUpperCase(Locale.ROOT);
-        if (n.contains("退") || n.contains("摘牌") || upper.startsWith("PT") || upper.contains("PT")
-                || upper.contains("退市")) {
+        String securityName = name == null ? "" : name;
+        String nameUpper = securityName.toUpperCase(Locale.ROOT);
+        if (securityName.contains("退") || securityName.contains("摘牌") || nameUpper.startsWith("PT")
+                || nameUpper.contains("PT") || nameUpper.contains("退市")) {
             return "likely_delisted";
         }
         return "missing";

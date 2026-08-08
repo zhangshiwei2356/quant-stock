@@ -413,9 +413,10 @@ public final class OesQueryListInvoker {
                         continue;
                     }
                     // 跳过明显的会话/请求头
-                    String cn = a.getClass().getSimpleName().toLowerCase(Locale.ROOT);
-                    if (cn.contains("session") || cn.contains("msghead") || cn.contains("filter")
-                            || cn.contains("cursor") || cn.contains("channel")) {
+                    String argClassNameLower = a.getClass().getSimpleName().toLowerCase(Locale.ROOT);
+                    if (argClassNameLower.contains("session") || argClassNameLower.contains("msghead")
+                            || argClassNameLower.contains("filter")
+                            || argClassNameLower.contains("cursor") || argClassNameLower.contains("channel")) {
                         continue;
                     }
                     bucket.add(a);
@@ -453,7 +454,7 @@ public final class OesQueryListInvoker {
         if (t == null || t.getMessage() == null) {
             return "";
         }
-        String s = t.getMessage().trim();
-        return s.length() > 160 ? s.substring(0, 160) + "..." : s;
+        String message = t.getMessage().trim();
+        return message.length() > 160 ? message.substring(0, 160) + "..." : message;
     }
 }

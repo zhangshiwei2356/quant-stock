@@ -281,9 +281,9 @@ public class CoreMarketBarService {
         if (raw == null || raw.trim().isEmpty()) {
             return "auto";
         }
-        String v = raw.trim().toLowerCase();
-        if ("table".equals(v) || "aggregate".equals(v) || "auto".equals(v)) {
-            return v;
+        String sourceKey = raw.trim().toLowerCase();
+        if ("table".equals(sourceKey) || "aggregate".equals(sourceKey) || "auto".equals(sourceKey)) {
+            return sourceKey;
         }
         return "auto";
     }

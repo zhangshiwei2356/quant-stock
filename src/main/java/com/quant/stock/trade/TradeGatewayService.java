@@ -300,8 +300,8 @@ public class TradeGatewayService {
                     order.getStockCode(), order.getPrice(), order.getVolume());
             return orderId;
         }
-        String u = IdUtil.fastSimpleUUID();
-        String orderId = "S" + (u.length() > 31 ? u.substring(0, 31) : u);
+        String simpleUuid = IdUtil.fastSimpleUUID();
+        String orderId = "S" + (simpleUuid.length() > 31 ? simpleUuid.substring(0, 31) : simpleUuid);
         log.info("模拟下单成功 orderId={} clientId={} {} {}@{} x{}",
                 orderId, order.getClientOrderId(), order.getSide(),
                 order.getStockCode(), order.getPrice(), order.getVolume());

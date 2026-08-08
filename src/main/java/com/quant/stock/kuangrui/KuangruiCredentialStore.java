@@ -260,8 +260,8 @@ public class KuangruiCredentialStore {
         if (s == null) {
             return null;
         }
-        String t = s.trim();
-        return t.isEmpty() ? null : t;
+        String trimmed = s.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private static final class CipherBlob {
