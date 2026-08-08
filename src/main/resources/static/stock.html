@@ -22,7 +22,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css?v=20260808-strategy-sharpe"/>
+  <link rel="stylesheet" href="/css/style.css?v=20260808-kr-acc-query"/>
   <script src="/js/jquery.min.js"></script>
   <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/echarts.min.js"></script>
@@ -894,43 +894,82 @@
     <div id="viewKuangruiAccount" class="workspace-view" hidden>
       <section class="panel">
         <h3>宽睿 · 账号登录</h3>
-        <p class="hint">先连仿真柜台验柜，成功后再将用户名明文、密码 AES 密文写入库；取密优先库内 active，否则环境变量。主密钥在独立表 <code>kuangrui_crypto_key</code>（同库仅防误读）。须 <code>-Pkuangrui</code>。</p>
+        <p class="hint">左侧点「查询当前账号」看生效用户（无密码）；登录会先验柜再密文入库。取密：库内 active 优先，否则环境变量。须 <code>-Pkuangrui</code>。</p>
+        <div class="toolbar kr-acc-toolbar">
+          <button type="button" id="btnKrAccCurrent">查询当前账号</button>
+          <button type="button" id="btnKrAccRefresh" class="secondary">刷新完整状态</button>
+          <span class="field-hint" id="krAccToolbarMeta">GET /api/ops/kuangrui/account/current</span>
+        </div>
         <div class="kr-acc-current" id="krAccCurrentBox">
           <div class="kr-acc-current-main">
             <span class="kr-acc-current-label">当前登录账号</span>
             <strong class="kr-acc-current-user mono" id="krAccCurrentUser">—</strong>
             <span class="kr-pill kr-pill--mute" id="krAccCurrentSrc">来源 —</span>
           </div>
-          <p class="hint" id="krAccCurrentMeta">进入本页或点「查询当前账号」刷新</p>
-          <div class="toolbar" style="margin-top:8px;flex-wrap:wrap;gap:8px;">
-            <button type="button" id="btnKrAccCurrent">查询当前账号</button>
-            <button type="button" id="btnKrAccRefresh" class="secondary">刷新完整状态</button>
-          </div>
+          <p class="hint" id="krAccCurrentMeta">进入本页会自动查询；也可点上方或左侧「查询当前账号」</p>
         </div>
         <div class="kr-bench">
-          <div class="kr-bench-apis">
-            <div class="kr-api-card">
-              <h4>登录并保存</h4>
+          <div class="kr-bench-apis" id="krAccCards">
+            <div class="kr-api-card" data-kr-acc-api="current">
+              <div class="kr-api-card-head">
+                <h4>查询当前账号</h4>
+                <span class="kr-api-method">GET</span>
+              </div>
+              <p class="hint">返回 <code>currentUsername</code> / 凭据来源（db|env）；不含密码</p>
+              <div class="toolbar">
+                <button type="button" class="btn-kr-acc-current">调用</button>
+              </div>
+            </div>
+            <div class="kr-api-card" data-kr-acc-api="status">
+              <div class="kr-api-card-head">
+                <h4>完整状态</h4>
+                <span class="kr-api-method">GET</span>
+              </div>
+              <p class="hint"><code>/account/status</code>：库内/env、最近验柜、开关提示</p>
+              <div class="toolbar">
+                <button type="button" class="secondary btn-kr-acc-status">调用</button>
+              </div>
+            </div>
+            <div class="kr-api-card" data-kr-acc-api="login">
+              <div class="kr-api-card-head">
+                <h4>登录并保存</h4>
+                <span class="kr-api-method">POST</span>
+              </div>
               <div class="toolbar" style="flex-wrap:wrap;gap:8px;">
                 <label class="field-inline">用户名 <input type="text" id="krAccUser" autocomplete="username" style="width:140px;"/></label>
                 <label class="field-inline">密码 <input type="password" id="krAccPass" autocomplete="current-password" style="width:140px;"/></label>
                 <button type="button" id="btnKrAccLogin">登录并保存</button>
-                <button type="button" id="btnKrAccLogout" class="secondary">清除当前账号</button>
+              </div>
+            </div>
+            <div class="kr-api-card" data-kr-acc-api="logout">
+              <div class="kr-api-card-head">
+                <h4>清除当前账号</h4>
+                <span class="kr-api-method">POST</span>
+              </div>
+              <p class="hint">清除库内 active；历史保留；回退环境变量（若有）</p>
+              <div class="toolbar">
+                <button type="button" id="btnKrAccLogout" class="secondary">清除</button>
               </div>
             </div>
           </div>
           <aside class="kr-result kr-bench-result is-empty" id="krAccResult">
             <div class="kr-result-head">
               <h4>状态 / 结果</h4>
-              <p class="hint" id="krAccResultMeta">加载中…</p>
+              <p class="hint" id="krAccResultMeta">点左侧「查询当前账号」或「调用」</p>
             </div>
             <div class="kr-result-cols">
               <div class="kr-result-block">
-                <span class="kr-result-label">入参</span>
+                <div class="kr-result-label-row">
+                  <span class="kr-result-label">入参</span>
+                  <button type="button" class="secondary kr-copy-btn" data-kr-copy="krAccReq">复制</button>
+                </div>
                 <pre class="kr-json" id="krAccReq">—</pre>
               </div>
               <div class="kr-result-block">
-                <span class="kr-result-label">出参</span>
+                <div class="kr-result-label-row">
+                  <span class="kr-result-label">出参</span>
+                  <button type="button" class="secondary kr-copy-btn" data-kr-copy="krAccRsp">复制</button>
+                </div>
                 <pre class="kr-json" id="krAccRsp">—</pre>
               </div>
             </div>
@@ -1643,6 +1682,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260808-strategy-sharpe"></script>
+<script src="/js/stock-chart.js?v=20260808-kr-acc-query"></script>
 </body>
 </html>

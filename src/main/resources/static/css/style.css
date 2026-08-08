@@ -3609,6 +3609,12 @@ tbody tr:hover { background: var(--row-hover); }
   margin-top: 2px;
 }
 .kr-api-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.kr-acc-toolbar {
+  margin-top: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
 .kr-acc-current {
   margin-top: 12px;
   padding: 12px 14px;
@@ -3668,6 +3674,17 @@ tbody tr:hover { background: var(--row-hover); }
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+}
+.kr-api-method {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--muted, #667085);
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel-solid) 85%, transparent);
 }
 .kr-api-card h4 {
   margin: 0;

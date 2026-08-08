@@ -208,7 +208,7 @@ sequenceDiagram
 | 二级 | 功能 |
 |------|------|
 | 接入总览 | 账号凭据 / MDS / OES / 报撤 / 静态状态卡（LIVE 徽章、中文键值、hint、原始 JSON）+ 快捷入口 |
-| 账号登录 | 先 OES 验柜，成功后用户名明文 + 密码 AES-GCM 密文入库；取密 **DB active 优先**，否则 `QUANT_KUANGRUI_USER`/`PASSWORD`；页内可「查询当前账号」看 `currentUsername`；主密钥在独立表 `kuangrui_crypto_key`（同库仅防误读；两表不进数据表白名单） |
+| 账号登录 | 页顶按钮 + 左侧 API 卡「查询当前账号」→ `GET /api/ops/kuangrui/account/current`（`currentUsername`，无密码）；登录先验柜再密文入库；取密 **DB active 优先**，否则 env；主密钥表 `kuangrui_crypto_key`（两表不进数据表白名单） |
 | OES 只读 | 左列表点测；右侧固定入参/出参（可一键复制）；资金/持仓/委托/成交/快照/对账/证券/交易日/佣金/stop |
 | MDS 行情 | 同上布局（入参/出参可一键复制）；状态/静态/证券状态/时段/合并静态；pull·subscribe·flush·stop（写操作二次确认） |
 | 报撤试单 | 左表单 + 右侧结果（可一键复制出参）；`place-test`/`cancel-test`；须 `orderLive`；页面二次确认 |

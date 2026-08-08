@@ -2495,6 +2495,7 @@
     setKuangruiMenuActive(panel);
     if (panel === 'account') {
       $('#viewKuangruiAccount').prop('hidden', false);
+      markKrAccCard('current');
       loadKrAccountCurrent();
     } else if (panel === 'oes') {
       $('#viewKuangruiOes').prop('hidden', false);
@@ -2816,8 +2817,9 @@
       }
 
       if (slot.panel && slot.panel !== 'overview') {
+        var goLabel = slot.key === 'Account' ? '查询账号 / 登录' : '进入点测';
         var $go = $('<button type="button" class="secondary kr-status-go"/>')
-          .text('进入点测')
+          .text(goLabel)
           .attr('data-kr-jump', slot.panel);
         $c.append($go);
       }
@@ -2881,6 +2883,14 @@
     paintSummary();
   }
 
+  function markKrAccCard(api) {
+    var $cards = $('#krAccCards .kr-api-card');
+    $cards.removeClass('is-active');
+    if (api) {
+      $cards.filter('[data-kr-acc-api="' + api + '"]').addClass('is-active');
+    }
+  }
+
   function paintKrAccCurrent(d) {
     var user = (d && (d.currentUsername || d.activeUsername)) || '';
     var src = (d && d.credSource) || 'none';
@@ -2898,6 +2908,9 @@
       ? ('生效账号 ' + user + (d.lastLoginAt ? ' · 最近验柜 ' + d.lastLoginAt : ''))
       : ((d && d.message) || '当前无可用账号');
     $('#krAccCurrentMeta').text(meta);
+    $('#krAccToolbarMeta').text(has
+      ? ('当前：' + (user || '—') + ' · ' + src)
+      : 'GET /api/ops/kuangrui/account/current');
     $('#krAccCurrentBox').toggleClass('is-empty', !has).toggleClass('is-ready', has);
     if (has && user && !($('#krAccUser').val() || '').trim()) {
       $('#krAccUser').val(user);
@@ -2919,13 +2932,15 @@
     });
   }
 
-  function loadKrAccountStatus() {
+  function loadKrAccountStatus(opts) {
+    opts = opts || {};
+    var $btn = opts.$btn || $('#btnKrAccRefresh');
     krInvoke({
       method: 'GET',
       url: '/api/ops/kuangrui/account/status',
-      $btn: $('#btnKrAccRefresh'),
+      $btn: $btn,
       resultPrefix: 'krAcc',
-      label: '账号状态',
+      label: '完整状态',
       onDone: function (rsp) {
         paintKrAccCurrent(rsp);
       }
@@ -5321,9 +5336,16 @@
       krCopyByPreId($(this).attr('data-kr-copy'));
     }
   );
-  $('#btnKrAccCurrent').on('click', function () { loadKrAccountCurrent(); });
-  $('#btnKrAccRefresh').on('click', function () { loadKrAccountStatus(); });
+  $('#btnKrAccCurrent, #krAccCards .btn-kr-acc-current').on('click', function () {
+    markKrAccCard('current');
+    loadKrAccountCurrent({ $btn: $(this) });
+  });
+  $('#btnKrAccRefresh, #krAccCards .btn-kr-acc-status').on('click', function () {
+    markKrAccCard('status');
+    loadKrAccountStatus({ $btn: $(this) });
+  });
   $('#btnKrAccLogin').on('click', function () {
+    markKrAccCard('login');
     var user = ($('#krAccUser').val() || '').trim();
     var pass = $('#krAccPass').val() || '';
     if (!user || !pass) {
@@ -5363,6 +5385,7 @@
   });
   $('#btnKrAccLogout').on('click', function () {
     if (!window.confirm('确认清除库内当前 active 账号？历史行保留；将回退环境变量（若有）。')) return;
+    markKrAccCard('logout');
     krInvoke({
       method: 'POST',
       url: '/api/ops/kuangrui/account/logout',
