@@ -2003,9 +2003,9 @@
   }
 
   var knowledgeTopics = [
-    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260808-plan' },
+    { id: 'app', group: 'app', title: '系统概述', src: '/docs/app.html?v=20260808-shell-dash' },
     { id: 'readme', group: 'app', title: '项目 README', src: '/api/docs/readme' },
-    { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260803-data-source' },
+    { id: 'rules', group: 'app', title: '交易规则', src: '/docs/rules.html?v=20260808-shell-dash' },
     { id: 'memo', group: 'app', title: '能力与待办', src: '/docs/memo.html?v=20260808-plan' },
     { id: 'kuangrui', group: 'kuangrui', title: '宽睿文档梳理', src: '/docs/kuangrui.html?v=20260808-plan' },
     { id: 'ashare', group: 'stock', title: 'A股基础', src: '/docs/ashare.html?v=20260720-nav-rename' },
@@ -2027,7 +2027,7 @@
     { id: 'backtest', group: 'stock', title: '回测要点', src: '/docs/backtest.html?v=20260720-nav-rename' }
   ];
   var knowledgeHtmlCache = {};
-  var HOME_SRC = '/docs/home.html?v=20260808-sync-nav';
+  var HOME_SRC = '/docs/home.html?v=20260808-shell-dash';
   var homePanelReady = false;
   var pendingHomeLead = null;
   var docsPdfBusy = false;
@@ -2303,6 +2303,8 @@
   function loadHomePanel(done) {
     if (homePanelReady) {
       syncHomeActionsFromNav();
+      loadHomeDashboardMetrics();
+      renderHomeRecent();
       if (typeof done === 'function') done();
       return;
     }
@@ -2311,6 +2313,8 @@
         $('#homeMount').html(html);
         homePanelReady = true;
         syncHomeActionsFromNav();
+        loadHomeDashboardMetrics();
+        renderHomeRecent();
         if (pendingHomeLead != null) {
           $('#homeLead').text(pendingHomeLead);
           pendingHomeLead = null;
@@ -2318,7 +2322,7 @@
         if (typeof done === 'function') done();
       })
       .fail(function () {
-        $('#homeMount').html('<section class="panel home-panel"><p class="home-lead">欢迎页加载失败：' + HOME_SRC + '</p></section>');
+        $('#homeMount').html('<section class="panel home-panel"><p class="home-lead">工作台加载失败：' + HOME_SRC + '</p></section>');
         if (typeof done === 'function') done();
       });
   }
@@ -2373,9 +2377,19 @@
         $panel.removeClass('open');
       }
     });
+    try {
+      if (bodyId) {
+        localStorage.setItem(NAV_OPEN_BODY_KEY, bodyId);
+      } else {
+        localStorage.removeItem(NAV_OPEN_BODY_KEY);
+      }
+    } catch (e) {}
   }
 
   var SIDEBAR_COLLAPSE_KEY = 'quant-sidebar-collapsed';
+  var NAV_OPEN_BODY_KEY = 'quant-nav-open-body';
+  var NAV_SESSION_KEY = 'quant-nav-session';
+  var NAV_RECENT_KEY = 'quant-nav-recent';
   var sidebarIconCollapsed = false;
 
   function setSidebarCollapsed(collapsed) {
@@ -2384,9 +2398,9 @@
     var $btn = $('#btnSidebarCollapse');
     if ($btn.length) {
       $btn.attr('aria-expanded', sidebarIconCollapsed ? 'false' : 'true');
-      $btn.attr('title', sidebarIconCollapsed ? '展开导航' : '收起导航');
-      $btn.attr('aria-label', sidebarIconCollapsed ? '展开导航' : '收起导航');
-      $btn.text(sidebarIconCollapsed ? '»' : '«');
+      $btn.attr('title', sidebarIconCollapsed ? '展开导航' : '收起为图标导航');
+      $btn.attr('aria-label', sidebarIconCollapsed ? '展开导航' : '收起为图标导航');
+      $btn.find('.sidebar-collapse-label').text(sidebarIconCollapsed ? '展开导航' : '收起导航');
     }
     try {
       localStorage.setItem(SIDEBAR_COLLAPSE_KEY, sidebarIconCollapsed ? '1' : '0');
@@ -2424,6 +2438,300 @@
     });
   }
 
+  function saveNavSession( partial) {
+    var cur = {};
+    try {
+      cur = JSON.parse(localStorage.getItem(NAV_SESSION_KEY) || '{}') || {};
+    } catch (e) {
+      cur = {};
+    }
+    Object.keys(partial || {}).forEach(function (k) {
+      cur[k] = partial[k];
+    });
+    try {
+      localStorage.setItem(NAV_SESSION_KEY, JSON.stringify(cur));
+    } catch (e) {}
+  }
+
+  function pushRecentVisit(item) {
+    if (!item || !item.key) return;
+    var list = [];
+    try {
+      list = JSON.parse(localStorage.getItem(NAV_RECENT_KEY) || '[]') || [];
+    } catch (e) {
+      list = [];
+    }
+    list = list.filter(function (x) { return x && x.key !== item.key; });
+    list.unshift({
+      key: item.key,
+      label: item.label || item.key,
+      mode: item.mode || '',
+      panel: item.panel || '',
+      at: Date.now()
+    });
+    if (list.length > 6) list = list.slice(0, 6);
+    try {
+      localStorage.setItem(NAV_RECENT_KEY, JSON.stringify(list));
+    } catch (e) {}
+    renderHomeRecent();
+  }
+
+  function formatMoney(v) {
+    var n = Number(v);
+    if (!isFinite(n)) return '—';
+    var abs = Math.abs(n);
+    var s = abs.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return (n < 0 ? '-' : '') + s;
+  }
+
+  function formatPct(v) {
+    var n = Number(v);
+    if (!isFinite(n)) return '';
+    return (n * 100).toFixed(2) + '%';
+  }
+
+  function updateBreadcrumb(parts) {
+    var $bc = $('#appBreadcrumb').empty();
+    if (!$bc.length) return;
+    $bc.append($('<button type="button" class="crumb-link"/>').attr('data-crumb', 'home').text('首页'));
+    (parts || []).forEach(function (p) {
+      $bc.append($('<span class="crumb-sep"/>').text('/'));
+      if (p && p.bodyId) {
+        $bc.append($('<button type="button" class="crumb-link"/>')
+          .attr('data-crumb-body', p.bodyId)
+          .text(p.label || ''));
+      } else {
+        $bc.append($('<span class="crumb-current"/>').text((p && p.label) || ''));
+      }
+    });
+  }
+
+  function breadcrumbForMode(mode, panelLabel) {
+    var $btn = $('.side-nav-toggle[data-mode="' + mode + '"]').first();
+    if (mode === 'doc') {
+      $btn = $('.side-nav-toggle.open').first();
+    }
+    var group = $btn.closest('.nav-group').attr('data-group') === 'docs' ? '扩展与文档' : '工作台';
+    var title = $.trim($btn.attr('data-intro-title') || $btn.find('.nav-label').text() || mode);
+    var bodyId = $btn.attr('data-body') || '';
+    var parts = [{ label: group }, { label: title, bodyId: bodyId }];
+    if (panelLabel) parts.push({ label: panelLabel });
+    updateBreadcrumb(parts);
+  }
+
+  function loadHomeDashboardMetrics() {
+    $('#homeMetricEquity, #homeMetricDayPnl, #homeMetricStrategy, #homeMetricAlerts').text('—');
+    $('#homeMetricEquityHint').text('加载中…');
+    $('#homeMetricDayPnlHint').text('加载中…');
+    $('#homeMetricStrategyHint').text('加载中…');
+    $('#homeMetricAlertsHint').text('加载中…');
+
+    $.getJSON('/api/account/summary')
+      .done(function (d) {
+        d = d || {};
+        $('#homeMetricEquity').text(formatMoney(d.equity));
+        $('#homeMetricEquityHint').text(d.source === 'LOCAL_SIM' ? '本地模拟账本' : (d.source || '账户'));
+        var day = d.dayPnl;
+        var pct = formatPct(d.dayPnlPct);
+        var dayTxt = formatMoney(day);
+        if (pct) dayTxt += '（' + pct + '）';
+        $('#homeMetricDayPnl').text(dayTxt);
+        var prev = Number(d.prevCloseEquity);
+        $('#homeMetricDayPnlHint').text(prev > 0 ? '相对昨收权益' : '暂无昨收基准');
+        if (Number(day) > 0) $('#homeMetricDayPnl').addClass('is-up').removeClass('is-down');
+        else if (Number(day) < 0) $('#homeMetricDayPnl').addClass('is-down').removeClass('is-up');
+        else $('#homeMetricDayPnl').removeClass('is-up is-down');
+      })
+      .fail(function () {
+        $('#homeMetricEquityHint').text('账户接口不可用');
+        $('#homeMetricDayPnlHint').text('账户接口不可用');
+      });
+
+    $.getJSON('/api/ops/strategies')
+      .done(function (d) {
+        d = d || {};
+        var id = d.activeStrategy || '';
+        var label = id || '—';
+        var list = d.strategies || [];
+        for (var i = 0; i < list.length; i++) {
+          if (list[i] && String(list[i].id) === String(id)) {
+            label = list[i].label || list[i].displayName || id;
+            break;
+          }
+        }
+        $('#homeMetricStrategy').text(label || '—');
+        $('#homeMetricStrategyHint').text(id ? ('id: ' + id) : '未设置激活策略');
+      })
+      .fail(function () {
+        $('#homeMetricStrategyHint').text('策略接口不可用');
+      });
+
+    $.getJSON('/api/ops/data-health/status')
+      .done(function (st) {
+        st = st || {};
+        var r = st.result;
+        if (!r && st.hasLastResult === false) {
+          $('#homeMetricAlerts').text('—');
+          $('#homeMetricAlertsHint').text('尚未执行覆盖检查');
+          return;
+        }
+        if (!r) {
+          return $.getJSON('/api/ops/data-health').done(function (res) {
+            applyHealthMetric(res);
+          }).fail(function () {
+            $('#homeMetricAlertsHint').text('健康接口不可用');
+          });
+        }
+        applyHealthMetric(r);
+      })
+      .fail(function () {
+        $.getJSON('/api/ops/data-health')
+          .done(applyHealthMetric)
+          .fail(function () {
+            $('#homeMetricAlertsHint').text('健康接口不可用');
+          });
+      });
+  }
+
+  function applyHealthMetric(res) {
+    res = res || {};
+    var n = res.warnCount;
+    if (n == null) n = (res.items && res.items.length) || 0;
+    $('#homeMetricAlerts').text(String(n));
+    $('#homeMetricAlertsHint').text(res.asOf ? ('覆盖检查 · ' + String(res.asOf).slice(0, 16)) : (res.hint || '数据健康'));
+  }
+
+  function renderHomeRecent() {
+    var $box = $('#homeRecent');
+    var $list = $('#homeRecentList');
+    if (!$list.length) return;
+    var list = [];
+    try {
+      list = JSON.parse(localStorage.getItem(NAV_RECENT_KEY) || '[]') || [];
+    } catch (e) {
+      list = [];
+    }
+    $list.empty();
+    if (!list.length) {
+      $box.prop('hidden', true);
+      return;
+    }
+    $box.prop('hidden', false);
+    list.forEach(function (it) {
+      $list.append($('<button type="button" class="home-recent-item"/>')
+        .attr('data-recent-key', it.key)
+        .text(it.label || it.key));
+    });
+  }
+
+  function enterWorkspaceByKey(key) {
+    switch (String(key || '')) {
+      case 'pool':
+        showMode('pool');
+        pushRecentVisit({ key: 'pool', label: '行情浏览', mode: 'pool' });
+        break;
+      case 'single':
+        showMode('single', { panel: 'workspace' });
+        pushRecentVisit({ key: 'single', label: '个股回测', mode: 'single', panel: 'workspace' });
+        break;
+      case 'portfolio':
+        showMode('portfolio', { panel: 'workspace' });
+        pushRecentVisit({ key: 'portfolio', label: '组合回测', mode: 'portfolio', panel: 'workspace' });
+        break;
+      case 'tradepool':
+        showTradePool('pool');
+        pushRecentVisit({ key: 'tradepool', label: '目标池', mode: 'tradepool', panel: 'pool' });
+        break;
+      case 'account':
+        showMode('account', { panel: 'funds' });
+        pushRecentVisit({ key: 'account', label: '账户概览', mode: 'account', panel: 'funds' });
+        break;
+      case 'schedule':
+        showSchedulePanel('jobs');
+        pushRecentVisit({ key: 'schedule', label: '运维中心', mode: 'schedule', panel: 'jobs' });
+        break;
+      case 'strategy':
+        showStrategyEval();
+        pushRecentVisit({ key: 'strategy', label: '策略管理', mode: 'strategy' });
+        break;
+      case 'dbtables':
+        showMode('dbtables');
+        pushRecentVisit({ key: 'dbtables', label: '数据表', mode: 'dbtables' });
+        break;
+      case 'kuangrui':
+        showKuangruiPanel('overview');
+        pushRecentVisit({ key: 'kuangrui', label: '宽睿对接', mode: 'kuangrui', panel: 'overview' });
+        break;
+      case 'knowledge':
+        setSideNavOpen('stockKnowledgeMenu');
+        ensureSidebarExpanded();
+        openKnowledge('ashare');
+        pushRecentVisit({ key: 'knowledge', label: '量化知识', mode: 'doc' });
+        break;
+      case 'app':
+        setSideNavOpen('appRelatedMenu');
+        ensureSidebarExpanded();
+        openKnowledge('app');
+        pushRecentVisit({ key: 'app', label: '应用说明', mode: 'doc' });
+        break;
+      default:
+        break;
+    }
+  }
+
+  function buildHeaderHelpMenu() {
+    var $box = $('#headerHelpIntros').empty();
+    $('.side-nav-toggle').each(function () {
+      var $btn = $(this);
+      var src = $btn.attr('data-intro');
+      var title = $btn.attr('data-intro-title') || $.trim($btn.find('.nav-label').text());
+      var bodyId = $btn.attr('data-body');
+      if (!src || !title) return;
+      $box.append($('<button type="button" class="header-help-item" role="menuitem"/>')
+        .attr('data-help-intro', src)
+        .attr('data-help-title', title)
+        .attr('data-help-body', bodyId || '')
+        .text(title));
+    });
+  }
+
+  function initHeaderHelp() {
+    buildHeaderHelpMenu();
+    $('#btnHeaderHelp').on('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var open = $('#headerHelpMenu').prop('hidden');
+      $('#headerHelpMenu').prop('hidden', !open);
+      $(this).attr('aria-expanded', open ? 'true' : 'false');
+    });
+    $(document).on('click.headerHelp', function (e) {
+      if (!$(e.target).closest('#headerHelp').length) {
+        $('#headerHelpMenu').prop('hidden', true);
+        $('#btnHeaderHelp').attr('aria-expanded', 'false');
+      }
+    });
+    $('#headerHelpMenu').on('click', '[data-help-intro]', function () {
+      var src = $(this).attr('data-help-intro');
+      var title = $(this).attr('data-help-title') || '功能介绍';
+      var bodyId = $(this).attr('data-help-body') || null;
+      $('#headerHelpMenu').prop('hidden', true);
+      $('#btnHeaderHelp').attr('aria-expanded', 'false');
+      showNavIntro({
+        bodyId: bodyId,
+        title: title,
+        src: src + (src.indexOf('?') >= 0 ? '&' : '?') + 'v=20260808-shell-dash'
+      });
+      updateBreadcrumb([{ label: '帮助' }, { label: title }]);
+    });
+    $('#headerHelpMenu').on('click', '[data-help-knowledge]', function () {
+      var id = $(this).attr('data-help-knowledge');
+      $('#headerHelpMenu').prop('hidden', true);
+      $('#btnHeaderHelp').attr('aria-expanded', 'false');
+      if (id === 'readme') openKnowledge('readme');
+      else openKnowledge('app');
+    });
+  }
+
   var homeCollapsed = false;
 
   function setHomeCollapsed(collapsed) {
@@ -2431,7 +2739,7 @@
     var onHome = !$('#viewHome').prop('hidden');
     $('#viewHome').toggleClass('home-collapsed', homeCollapsed);
     $('body').toggleClass('home-theme-peek', homeCollapsed && onHome);
-    $('#btnExpandHome').prop('hidden', !(homeCollapsed && onHome));
+    $('#btnExpandHome').prop('hidden', true);
   }
 
   function hideAllWorkspaceViews() {
@@ -2541,6 +2849,8 @@
       $('#viewTradePool').prop('hidden', false);
       loadTradePoolManage();
     }
+    breadcrumbForMode('tradepool', panel === 'history' ? '扫描历史' : '当前池');
+    saveNavSession({ mode: 'tradepool', panel: panel });
     resizeCharts();
   }
 
@@ -2592,6 +2902,10 @@
       $('#viewKuangruiOverview').prop('hidden', false);
       loadKrOverview();
     }
+    breadcrumbForMode('kuangrui', panel === 'account' ? '账号登录'
+      : (panel === 'oes' ? 'OES 只读' : (panel === 'mds' ? 'MDS 行情'
+        : (panel === 'order' ? '报撤试单' : '接入总览'))));
+    saveNavSession({ mode: 'kuangrui', panel: panel });
     resizeCharts();
   }
 
@@ -3508,6 +3822,8 @@
       $('#viewSchedule').prop('hidden', false);
       loadScheduleJobs();
     }
+    breadcrumbForMode('schedule', panel === 'health' ? '数据健康' : (panel === 'params' ? '运行参数' : '任务管理'));
+    saveNavSession({ mode: 'schedule', panel: panel });
     resizeCharts();
   }
 
@@ -3542,6 +3858,8 @@
     $('#viewStrategy').prop('hidden', false);
     loadStrategyOverview();
     pollStrategySeedStatus(false);
+    breadcrumbForMode('strategy', '策略总览');
+    saveNavSession({ mode: 'strategy', panel: 'eval' });
     resizeCharts();
   }
 
@@ -4075,6 +4393,12 @@
       $('#viewAcctFunds').prop('hidden', false);
       loadAccountOverview();
     }
+    var acctLabels = {
+      funds: '资金权益', positions: '当前持仓', orders: '委托记录', cashflows: '权益日结',
+      risklogs: '风控事件', riskdash: '风控日报', papergap: '纸面对账'
+    };
+    breadcrumbForMode('account', acctLabels[panel] || panel);
+    saveNavSession({ mode: 'account', panel: panel });
     resizeCharts();
   }
 
@@ -4619,7 +4943,7 @@
       });
   }
 
-  /** 初始化页：无一级菜单展开时展示 */
+  /** 首页仪表盘 */
   function showHome(options) {
     options = options || {};
     $('body').removeClass('mode-doc');
@@ -4630,14 +4954,12 @@
     if (options.collapseNav !== false) {
       setSideNavOpen(null);
     }
-    var lead = options.lead || '左侧尚未展开菜单。点击下方入口，或展开左侧一级菜单进入对应功能。';
-    setHomeLead(lead);
-    // 进入欢迎页默认展开；若显式要求保持收起则沿用
-    var collapsed = options.keepCollapsed ? homeCollapsed : false;
-    setHomeCollapsed(collapsed);
+    setHomeCollapsed(false);
+    updateBreadcrumb([]);
+    saveNavSession({ mode: 'home', panel: '' });
     loadHomePanel(function () {
-      setHomeLead(lead);
-      setHomeCollapsed(collapsed);
+      loadHomeDashboardMetrics();
+      renderHomeRecent();
     });
   }
 
@@ -4665,6 +4987,9 @@
       }
       renderStockPicker('single');
       focusSinglePanel(options.panel || lastSinglePanel || 'workspace');
+      var sp = options.panel || lastSinglePanel || 'workspace';
+      breadcrumbForMode('single', sp === 'batch' ? '批量扫描' : (sp === 'history' ? '回测历史' : '回测工作台'));
+      saveNavSession({ mode: 'single', panel: sp });
     } else if (lastWorkspaceMode === 'portfolio') {
       $('#viewPortfolio').prop('hidden', false);
       if (expandNav) setSideNavOpen('portfolioBody');
@@ -4672,6 +4997,9 @@
       syncPortfolioCodes();
       loadPortfolioHistory();
       focusPortfolioPanel(options.panel || lastPortfolioPanel || 'workspace');
+      var pp = options.panel || lastPortfolioPanel || 'workspace';
+      breadcrumbForMode('portfolio', pp === 'history' ? '回测历史' : '回测工作台');
+      saveNavSession({ mode: 'portfolio', panel: pp });
     } else if (lastWorkspaceMode === 'tradepool') {
       showTradePool(options.panel || lastTpPanel || 'pool');
       return;
@@ -4697,6 +5025,8 @@
       if (expandNav) setSideNavOpen('poolBody');
       renderStockPicker('pool');
       setTimeout(function () { $('#poolStockQ').trigger('focus'); }, 80);
+      breadcrumbForMode('pool');
+      saveNavSession({ mode: 'pool', panel: '' });
     }
     resizeCharts();
   }
@@ -4786,6 +5116,8 @@
       $('#dbTableHead').html('<tr><th>请选择左侧表</th></tr>');
       $('#dbTableBody').html('<tr><td class="empty-state">暂无数据</td></tr>');
       updateDbPager(0, 1, 20, 0);
+      breadcrumbForMode('dbtables');
+      saveNavSession({ mode: 'dbtables', panel: '', table: '' });
       resizeCharts();
       return;
     }
@@ -4794,6 +5126,8 @@
     dbTableState.page = 1;
     dbTableState.size = parseInt($('#dbTablePageSize').val(), 10) || 20;
     $('#dbtablesMenu li[data-table="' + tableName + '"]').addClass('active');
+    breadcrumbForMode('dbtables', tableName);
+    saveNavSession({ mode: 'dbtables', panel: '', table: tableName });
     loadDbTablePage();
     resizeCharts();
   }
@@ -5601,6 +5935,19 @@
     $('#knowledgeTitle').text(topic.title);
     $('#knowledgeBody').html('<p>加载中…</p>');
     try { $('#knowledgePanel')[0].scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
+    var groupLabel = topic.group === 'app' ? '应用说明' : (topic.group === 'kuangrui' ? '宽睿对接' : '量化知识');
+    updateBreadcrumb([
+      { label: '扩展与文档' },
+      { label: groupLabel, bodyId: menuId },
+      { label: topic.title }
+    ]);
+    saveNavSession({ mode: 'doc', panel: id, menuBodyId: menuId });
+    pushRecentVisit({
+      key: topic.group === 'app' ? 'app' : (topic.group === 'kuangrui' ? 'kuangrui' : 'knowledge'),
+      label: topic.title,
+      mode: 'doc',
+      panel: id
+    });
 
     function render(html) {
       $('#knowledgeBody').html(html || '<p>暂无内容</p>');
@@ -5684,22 +6031,12 @@
     var $btn = $(this);
     var bodyId = $btn.attr('data-body');
     var wasOpen = $btn.attr('aria-expanded') === 'true';
-
-    // 再次点击已展开的一级菜单：全部收起，右侧回到全局初始化页
+    // 标准后台：一级仅展开/收起，不换页、不跳介绍
     if (wasOpen) {
-      showHome();
-      return;
+      setSideNavOpen(null);
+    } else {
+      setSideNavOpen(bodyId);
     }
-
-    // 展开一级菜单：展示该菜单专属介绍页（不展示全局初始化页）
-    var introSrc = $btn.attr('data-intro');
-    var introTitle = $btn.attr('data-intro-title') || $btn.clone().children().remove().end().text().trim();
-    if (introSrc) {
-      showNavIntro({ bodyId: bodyId, title: introTitle, src: introSrc + (introSrc.indexOf('?') >= 0 ? '&' : '?') + 'v=20260720-pdf-fix' });
-      return;
-    }
-    // 无介绍配置时回退到原工作台
-    showMode($btn.attr('data-mode'));
   });
 
   $('#viewNavIntro').on('click', '[data-enter-mode]', function () {
@@ -7344,27 +7681,41 @@
     }
   });
 
+  $('#viewHome').on('click', '[data-enter]', function () {
+    enterWorkspaceByKey($(this).attr('data-enter'));
+  });
+
+  $('#viewHome').on('click', '[data-recent-key]', function () {
+    enterWorkspaceByKey($(this).attr('data-recent-key'));
+  });
+
   $('#viewHome').on('click', '[data-open-nav]', function () {
     var bodyId = $(this).attr('data-open-nav');
-    var $btn = $('.side-nav-toggle[data-body="' + bodyId + '"]');
-    if (!$btn.length) return;
-    if ($btn.attr('aria-expanded') === 'true') return;
-    $btn.trigger('click');
+    var mode = $(this).attr('data-mode') || '';
+    if (mode === 'doc') {
+      if (bodyId === 'stockKnowledgeMenu') enterWorkspaceByKey('knowledge');
+      else enterWorkspaceByKey('app');
+      return;
+    }
+    var map = {
+      poolBody: 'pool', singleBody: 'single', portfolioBody: 'portfolio', tradepoolBody: 'tradepool',
+      accountBody: 'account', scheduleBody: 'schedule', strategyBody: 'strategy',
+      dbtablesBody: 'dbtables', kuangruiBody: 'kuangrui'
+    };
+    enterWorkspaceByKey(map[bodyId] || mode);
   });
 
-  $('#viewHome').on('click', '#btnCollapseHome', function () {
-    setHomeCollapsed(true);
-    toast('欢迎页已收起，可切换主题欣赏背景', 'info', { place: 'theme' });
+  $('#appBreadcrumb').on('click', '[data-crumb="home"]', function () {
+    showHome();
   });
-
-  $('#btnExpandHome').on('click', function () {
-    setHomeCollapsed(false);
-    toast('已展开欢迎页', 'ok');
+  $('#appBreadcrumb').on('click', '[data-crumb-body]', function () {
+    var bodyId = $(this).attr('data-crumb-body');
+    if (bodyId) setSideNavOpen(bodyId);
   });
 
   $('#btnBrandHome').on('click', function () {
-    showHome({ lead: '已回到初始化页。点击下方入口，或展开左侧一级菜单进入对应功能。' });
-    toast('已收起菜单，回到初始化页', 'ok');
+    showHome();
+    toast('已回到首页工作台', 'ok');
   });
 
   $('#stockKnowledgeMenu, #appRelatedMenu').on('click', 'li', function () {
@@ -7377,6 +7728,7 @@
 
   $('#btnEnterPool').on('click', function () {
     showMode('pool');
+    pushRecentVisit({ key: 'pool', label: '行情浏览', mode: 'pool' });
   });
 
   $('#btnEnterSingle').on('click', function () {
@@ -7564,14 +7916,45 @@
       });
   }
 
+  function restoreNavSession() {
+    var sess = null;
+    try {
+      sess = JSON.parse(localStorage.getItem(NAV_SESSION_KEY) || 'null');
+    } catch (e) {
+      sess = null;
+    }
+    if (!sess || !sess.mode || sess.mode === 'home') {
+      return false;
+    }
+    try {
+      if (sess.mode === 'single') showMode('single', { panel: sess.panel || 'workspace' });
+      else if (sess.mode === 'portfolio') showMode('portfolio', { panel: sess.panel || 'workspace' });
+      else if (sess.mode === 'tradepool') showTradePool(sess.panel || 'pool');
+      else if (sess.mode === 'account') showMode('account', { panel: sess.panel || 'funds' });
+      else if (sess.mode === 'schedule') showSchedulePanel(sess.panel || 'jobs');
+      else if (sess.mode === 'strategy') showStrategyEval();
+      else if (sess.mode === 'dbtables') showMode('dbtables', { table: sess.table || '' });
+      else if (sess.mode === 'kuangrui') showKuangruiPanel(sess.panel || 'overview');
+      else if (sess.mode === 'pool') showMode('pool');
+      else if (sess.mode === 'doc' && sess.panel) openKnowledge(sess.panel);
+      else return false;
+      return true;
+    } catch (e2) {
+      return false;
+    }
+  }
+
   initKnowledge();
   initSidebarCollapse();
+  initHeaderHelp();
   initTheme();
   loadSummary();
   loadPool();
   loadDbTablesMenu();
   loadStrategyOptions();
-  showHome();
+  if (!restoreNavSession()) {
+    showHome();
+  }
   bindCapitalHint($('#initCapital'), $('#initCapitalHint'));
   bindCapitalHint($('#pfInitCapital'), $('#pfInitCapitalHint'));
 })();

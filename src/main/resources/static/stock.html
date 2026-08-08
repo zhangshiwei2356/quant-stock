@@ -22,7 +22,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/css/style.css?v=20260808-sidebar-svg"/>
+  <link rel="stylesheet" href="/css/style.css?v=20260808-shell-dash"/>
   <script src="/js/jquery.min.js"></script>
   <script src="/js/html2pdf.bundle.min.js"></script>
   <script src="/js/echarts.min.js"></script>
@@ -35,7 +35,7 @@
 <div id="toastHost" aria-live="polite"></div>
 <button type="button" id="btnExpandHome" class="home-expand-fab" hidden title="展开欢迎页">显示欢迎页</button>
 <header class="app-header">
-  <button type="button" class="brand" id="btnBrandHome" title="回到初始化页（收起全部菜单）" aria-label="Quant Stock，回到初始化页">
+  <button type="button" class="brand" id="btnBrandHome" title="回到首页仪表盘" aria-label="Quant Stock，回到首页仪表盘">
     <img class="brand-logo" src="/images/logo.png?v=1" alt="ZSW" width="40" height="40"/>
     <div>
       <div class="brand-title">Quant Stock</div>
@@ -43,6 +43,16 @@
     </div>
   </button>
   <div class="header-actions">
+    <div class="header-help" id="headerHelp">
+      <button type="button" id="btnHeaderHelp" class="header-help-btn secondary" aria-expanded="false" aria-haspopup="true" title="帮助与模块介绍">帮助</button>
+      <div class="header-help-menu" id="headerHelpMenu" hidden role="menu">
+        <div class="header-help-label">模块介绍</div>
+        <div id="headerHelpIntros"></div>
+        <div class="header-help-sep"></div>
+        <button type="button" class="header-help-item" data-help-knowledge="app" role="menuitem">应用说明</button>
+        <button type="button" class="header-help-item" data-help-knowledge="readme" role="menuitem">项目 README</button>
+      </div>
+    </div>
     <label class="theme-field" for="themeSelect">主题
       <select id="themeSelect" aria-label="主题选择">
         <option value="cosmos" selected>浪花</option>
@@ -54,16 +64,6 @@
 </header>
 <div class="layout">
   <aside class="sidebar">
-    <div class="sidebar-head">
-      <img class="sidebar-brand-logo" src="/images/logo.png?v=1" alt="" width="22" height="22"/>
-      <div class="sidebar-brand-text">
-        <span class="sidebar-title">Quant Stock</span>
-        <span class="sidebar-head-tag">导航</span>
-      </div>
-      <button type="button" id="btnSidebarCollapse" class="sidebar-collapse-btn"
-              title="收起导航" aria-label="收起导航" aria-expanded="true">«</button>
-    </div>
-
     <section class="nav-group" data-group="workbench" aria-label="工作台">
       <div class="nav-group-title">工作台</div>
       <div class="nav-group-body">
@@ -281,10 +281,20 @@
       </div>
     </section>
 
-    <p class="sidebar-foot">再点一级可回首页 · 点顶栏 Logo 亦可</p>
+    <div class="sidebar-foot-bar">
+      <button type="button" id="btnSidebarCollapse" class="sidebar-collapse-btn"
+              title="收起为图标导航" aria-label="收起为图标导航" aria-expanded="true">
+        <svg class="sidebar-collapse-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/><path d="M9 4v16"/></svg>
+        <span class="sidebar-collapse-label">收起导航</span>
+      </button>
+    </div>
   </aside>
 
   <div class="main">
+    <nav class="app-breadcrumb" id="appBreadcrumb" aria-label="面包屑">
+      <button type="button" class="crumb-link" data-crumb="home">首页</button>
+    </nav>
+
     <section class="panel knowledge-panel" id="knowledgePanel" hidden>
       <div class="knowledge-head">
         <h3 id="knowledgeTitle">说明</h3>
@@ -293,9 +303,9 @@
       <article id="knowledgeBody" class="knowledge-body"></article>
     </section>
 
-    <!-- 初始化 / 全部收起时的欢迎页：正文见 /docs/home.html -->
+    <!-- 首页仪表盘：正文见 /docs/home.html -->
     <div id="viewHome" class="workspace-view">
-      <div id="homeMount"><p class="home-lead">加载欢迎页…</p></div>
+      <div id="homeMount"><p class="home-lead">加载工作台…</p></div>
     </div>
 
     <!-- 一级菜单介绍页：正文见 /docs/nav-*.html -->
@@ -1749,6 +1759,6 @@
     </div>
   </div>
 </div>
-<script src="/js/stock-chart.js?v=20260808-sidebar-cd"></script>
+<script src="/js/stock-chart.js?v=20260808-shell-dash"></script>
 </body>
 </html>

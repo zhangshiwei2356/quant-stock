@@ -1,30 +1,100 @@
-<!-- 初始化 / 欢迎页片段：由 stock.html 的 #viewHome 加载 -->
-<!-- 入口按钮以侧栏 .side-nav-toggle 为准，JS 加载后会 syncHomeActionsFromNav 对齐；下列为无 JS 时的回退清单 -->
-<section class="panel home-panel" id="homePanel">
-  <div class="home-toolbar">
-    <button type="button" id="btnCollapseHome" class="secondary home-collapse-btn" title="收起欢迎页，查看主题背景">收起 · 查看主题</button>
+<!-- 首页仪表盘：由 stock.html 的 #viewHome 加载 -->
+<section class="panel home-panel home-dashboard" id="homePanel">
+  <div class="home-dash-head">
+    <h3 class="home-title">工作台</h3>
+    <p class="home-dash-sub">本地模拟账本与运维概览 · 数据不可用时显示「—」</p>
   </div>
-  <p class="home-brand">Quant Stock</p>
-  <h3 class="home-title">开始使用</h3>
-  <p class="home-lead" id="homeLead">左侧尚未展开菜单。点击下方入口，或展开左侧一级菜单进入对应功能。</p>
-  <div class="home-actions" id="homeActions">
-    <button type="button" class="home-action" data-open-nav="poolBody" data-mode="pool">行情浏览</button>
-    <button type="button" class="home-action" data-open-nav="singleBody" data-mode="single">个股回测</button>
-    <button type="button" class="home-action" data-open-nav="portfolioBody" data-mode="portfolio">组合回测</button>
-    <button type="button" class="home-action" data-open-nav="tradepoolBody" data-mode="tradepool">目标池</button>
-    <button type="button" class="home-action" data-open-nav="accountBody" data-mode="account">账户概览</button>
-    <button type="button" class="home-action" data-open-nav="scheduleBody" data-mode="schedule">运维中心</button>
-    <button type="button" class="home-action" data-open-nav="strategyBody" data-mode="strategy">策略管理</button>
-    <button type="button" class="home-action" data-open-nav="dbtablesBody" data-mode="dbtables">数据表</button>
-    <button type="button" class="home-action secondary" data-open-nav="kuangruiBody" data-mode="kuangrui">宽睿对接</button>
-    <button type="button" class="home-action secondary" data-open-nav="stockKnowledgeMenu" data-mode="doc">量化知识</button>
-    <button type="button" class="home-action secondary" data-open-nav="appRelatedMenu" data-mode="doc">应用说明</button>
+
+  <div class="home-metrics" id="homeMetrics">
+    <article class="home-metric-card" data-metric="equity">
+      <div class="home-metric-label">总资产</div>
+      <div class="home-metric-value" id="homeMetricEquity">—</div>
+      <div class="home-metric-hint" id="homeMetricEquityHint">本地模拟</div>
+    </article>
+    <article class="home-metric-card" data-metric="dayPnl">
+      <div class="home-metric-label">今日盈亏</div>
+      <div class="home-metric-value" id="homeMetricDayPnl">—</div>
+      <div class="home-metric-hint" id="homeMetricDayPnlHint">相对昨收权益</div>
+    </article>
+    <article class="home-metric-card" data-metric="strategy">
+      <div class="home-metric-label">运行中策略</div>
+      <div class="home-metric-value home-metric-value--sm" id="homeMetricStrategy">—</div>
+      <div class="home-metric-hint" id="homeMetricStrategyHint">纸面激活</div>
+    </article>
+    <article class="home-metric-card" data-metric="alerts">
+      <div class="home-metric-label">待处理告警</div>
+      <div class="home-metric-value" id="homeMetricAlerts">—</div>
+      <div class="home-metric-hint" id="homeMetricAlertsHint">数据健康覆盖</div>
+    </article>
   </div>
-  <ul class="home-tips">
-    <li>点击任一一级菜单：右侧先展示<strong>该菜单介绍页</strong>；再点左侧二级项进入具体功能或文档</li>
-    <li>再点同一一级菜单：收起菜单并回到本初始化页</li>
-    <li>页头可切换主题；点 <b>QS / Quant Stock</b> 可随时收起全部菜单回到本页</li>
-    <li>也可点右上「收起 · 查看主题」欣赏动态背景</li>
-    <li>下方入口与左侧一级菜单保持同步；介绍页见 <code>docs/nav-*.html</code></li>
-  </ul>
+
+  <div class="home-recent" id="homeRecent" hidden>
+    <h4 class="home-section-title">最近访问</h4>
+    <div class="home-recent-list" id="homeRecentList"></div>
+  </div>
+
+  <div class="home-entry-groups" id="homeEntryGroups">
+    <section class="home-entry-group">
+      <h4 class="home-section-title">核心分析</h4>
+      <div class="home-entry-grid">
+        <button type="button" class="home-entry-card" data-enter="pool">
+          <span class="home-entry-name">行情浏览</span>
+          <span class="home-entry-desc">全市场选股与多周期 K 线</span>
+        </button>
+        <button type="button" class="home-entry-card" data-enter="single">
+          <span class="home-entry-name">个股回测</span>
+          <span class="home-entry-desc">目标池单股回测 / 扫描 / 历史</span>
+        </button>
+        <button type="button" class="home-entry-card" data-enter="portfolio">
+          <span class="home-entry-name">组合回测</span>
+          <span class="home-entry-desc">多股共享资金池回测</span>
+        </button>
+        <button type="button" class="home-entry-card" data-enter="strategy">
+          <span class="home-entry-name">策略管理</span>
+          <span class="home-entry-desc">策略总览与评分</span>
+        </button>
+      </div>
+    </section>
+    <section class="home-entry-group">
+      <h4 class="home-section-title">交易管理</h4>
+      <div class="home-entry-grid">
+        <button type="button" class="home-entry-card" data-enter="tradepool">
+          <span class="home-entry-name">目标池</span>
+          <span class="home-entry-desc">扫描入池与池内标的</span>
+        </button>
+        <button type="button" class="home-entry-card" data-enter="account">
+          <span class="home-entry-name">账户概览</span>
+          <span class="home-entry-desc">资金、持仓与风控</span>
+        </button>
+        <button type="button" class="home-entry-card" data-enter="schedule">
+          <span class="home-entry-name">运维中心</span>
+          <span class="home-entry-desc">任务、健康与运行参数</span>
+        </button>
+      </div>
+    </section>
+    <section class="home-entry-group">
+      <h4 class="home-section-title">辅助工具</h4>
+      <div class="home-entry-grid">
+        <button type="button" class="home-entry-card" data-enter="dbtables">
+          <span class="home-entry-name">数据表</span>
+          <span class="home-entry-desc">白名单表只读浏览</span>
+        </button>
+        <button type="button" class="home-entry-card" data-enter="kuangrui">
+          <span class="home-entry-name">宽睿对接</span>
+          <span class="home-entry-desc">OES / MDS 联调</span>
+        </button>
+        <button type="button" class="home-entry-card" data-enter="knowledge">
+          <span class="home-entry-name">量化知识</span>
+          <span class="home-entry-desc">指标与交易规则文档</span>
+        </button>
+        <button type="button" class="home-entry-card" data-enter="app">
+          <span class="home-entry-name">应用说明</span>
+          <span class="home-entry-desc">概述、README、能力与待办</span>
+        </button>
+      </div>
+    </section>
+  </div>
+
+  <!-- 无 JS 回退：与侧栏一级对齐的简入口 -->
+  <div class="home-actions" id="homeActions" hidden></div>
 </section>
