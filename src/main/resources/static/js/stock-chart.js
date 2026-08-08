@@ -2023,7 +2023,7 @@
     { id: 'position', group: 'stock', title: '仓位与金字塔', src: '/docs/position.html?v=20260720-nav-rename' },
     { id: 'risk', group: 'stock', title: '账户风控', src: '/docs/risk.html?v=20260720-nav-rename' },
     { id: 'fill', group: 'stock', title: '撮合时机', src: '/docs/fill.html?v=20260720-nav-rename' },
-    { id: 'metrics', group: 'stock', title: '权益回撤与胜率', src: '/docs/metrics.html?v=20260720-nav-rename' },
+    { id: 'metrics', group: 'stock', title: '夏普·回撤与胜率', src: '/docs/metrics.html?v=20260808-sharpe-metrics' },
     { id: 'backtest', group: 'stock', title: '回测要点', src: '/docs/backtest.html?v=20260720-nav-rename' }
   ];
   var knowledgeHtmlCache = {};

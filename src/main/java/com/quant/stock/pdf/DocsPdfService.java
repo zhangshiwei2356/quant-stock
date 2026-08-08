@@ -64,7 +64,7 @@ public class DocsPdfService {
         list.add(new Topic("position", "stock", "仓位与金字塔", "position.html"));
         list.add(new Topic("risk", "stock", "账户风控", "risk.html"));
         list.add(new Topic("fill", "stock", "撮合时机", "fill.html"));
-        list.add(new Topic("metrics", "stock", "权益回撤与胜率", "metrics.html"));
+        list.add(new Topic("metrics", "stock", "夏普·回撤与胜率", "metrics.html"));
         list.add(new Topic("backtest", "stock", "回测要点", "backtest.html"));
         TOPICS = Collections.unmodifiableList(list);
     }
