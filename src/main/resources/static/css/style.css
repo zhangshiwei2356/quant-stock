@@ -3731,8 +3731,10 @@ tbody tr:hover { background: var(--row-hover); }
 .kr-bench-result.is-empty {
   padding-bottom: 12px;
 }
-.kr-bench-result.is-empty .kr-result-cols {
-  display: none;
+/* 空态仍展示入参/出参区与复制按钮，避免「没有复制入口」 */
+.kr-bench-result.is-empty .kr-json {
+  opacity: 0.55;
+  min-height: 2.5em;
 }
 .kr-result-head h4 {
   margin: 0;
@@ -3744,6 +3746,7 @@ tbody tr:hover { background: var(--row-hover); }
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 4px;
+  flex-wrap: wrap;
 }
 .kr-result-head .hint {
   margin: 0;
@@ -3776,13 +3779,22 @@ tbody tr:hover { background: var(--row-hover); }
 }
 .kr-copy-btn {
   flex-shrink: 0;
-  padding: 2px 10px;
+  padding: 4px 12px;
   font-size: 12px;
   line-height: 1.4;
+  cursor: pointer;
 }
 .kr-copy-btn--sm {
-  padding: 1px 8px;
-  font-size: 11px;
+  padding: 2px 10px;
+  font-size: 12px;
+}
+.kr-copy-btn--rsp {
+  background: var(--accent, #2563eb);
+  color: #fff;
+  border-color: transparent;
+}
+.kr-copy-btn--rsp:hover:not(:disabled) {
+  filter: brightness(1.05);
 }
 .kr-bench-result .kr-json {
   max-height: min(240px, 32vh);

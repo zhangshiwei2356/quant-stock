@@ -2495,16 +2495,20 @@
     setKuangruiMenuActive(panel);
     if (panel === 'account') {
       $('#viewKuangruiAccount').prop('hidden', false);
+      ensureKrCopyControls('krAcc');
       markKrAccCard('current');
       loadKrAccountCurrent();
     } else if (panel === 'oes') {
       $('#viewKuangruiOes').prop('hidden', false);
+      ensureKrCopyControls('krOes');
       ensureKrOesCards();
     } else if (panel === 'mds') {
       $('#viewKuangruiMds').prop('hidden', false);
+      ensureKrCopyControls('krMds');
       ensureKrMdsCards();
     } else if (panel === 'order') {
       $('#viewKuangruiOrder').prop('hidden', false);
+      ensureKrCopyControls('krOrder');
       refreshKrOrderGate();
     } else {
       $('#viewKuangruiOverview').prop('hidden', false);
@@ -2517,14 +2521,80 @@
     try { return JSON.stringify(obj == null ? null : obj, null, 2); } catch (e) { return String(obj); }
   }
 
+  /** 确保结果区有复制按钮（旧缓存 HTML / 空态隐藏时也能点到）。 */
+  function ensureKrCopyControls(prefix) {
+    var $panel = $('#' + prefix + 'Result');
+    if (!$panel.length) return;
+    var $head = $panel.find('.kr-result-head').first();
+    if ($head.length) {
+      var $row = $head.children('.kr-result-head-row');
+      if (!$row.length) {
+        var $h4 = $head.children('h4').first();
+        if ($h4.length) {
+          $row = $('<div class="kr-result-head-row"/>');
+          $h4.before($row);
+          $row.append($h4);
+        } else {
+          $row = $('<div class="kr-result-head-row"/>').prependTo($head);
+          $row.append($('<h4/>').text('调用结果'));
+        }
+      }
+      if (!$row.find('[data-kr-copy="' + prefix + 'Rsp"]').length) {
+        $row.append(
+          $('<button type="button" class="kr-copy-btn kr-copy-btn--rsp"/>')
+            .attr('data-kr-copy', prefix + 'Rsp')
+            .attr('title', '复制出参 JSON')
+            .text('复制出参')
+        );
+      } else {
+        $row.find('[data-kr-copy="' + prefix + 'Rsp"]')
+          .addClass('kr-copy-btn kr-copy-btn--rsp')
+          .text(function (_i, t) {
+            return (t && String(t).indexOf('出参') >= 0) ? t : '复制出参';
+          });
+      }
+    }
+    [
+      { id: prefix + 'Req', label: '入参' },
+      { id: prefix + 'Rsp', label: '出参' }
+    ].forEach(function (b) {
+      var $pre = $('#' + b.id);
+      if (!$pre.length) return;
+      var $block = $pre.closest('.kr-result-block');
+      if (!$block.length) {
+        $block = $('<div class="kr-result-block"/>').insertBefore($pre);
+        $block.append($pre);
+      }
+      var $labelRow = $block.children('.kr-result-label-row');
+      if (!$labelRow.length) {
+        $labelRow = $('<div class="kr-result-label-row"/>').prependTo($block);
+        $labelRow.append($('<span class="kr-result-label"/>').text(b.label));
+      }
+      if (!$labelRow.find('[data-kr-copy="' + b.id + '"]').length) {
+        var cls = 'secondary kr-copy-btn kr-copy-btn--sm';
+        if (b.id === prefix + 'Rsp') cls += ' kr-copy-btn--rsp';
+        $labelRow.append(
+          $('<button type="button"/>')
+            .attr('class', cls)
+            .attr('data-kr-copy', b.id)
+            .attr('title', '复制' + b.label)
+            .text(b.id === prefix + 'Rsp' ? '复制出参' : '复制')
+        );
+      }
+    });
+  }
+
   function krFillResult(prefix, meta, req, rsp) {
+    ensureKrCopyControls(prefix);
     $('#' + prefix + 'ResultMeta').text(meta || '');
     $('#' + prefix + 'Req').text(krPretty(req));
     $('#' + prefix + 'Rsp').text(krPretty(rsp));
     var $panel = $('#' + prefix + 'Result');
-    $panel.removeClass('is-empty kr-result-flash');
-    void $panel[0].offsetWidth;
-    $panel.addClass('kr-result-flash is-filled');
+    if ($panel.length) {
+      $panel.removeClass('is-empty kr-result-flash');
+      void $panel[0].offsetWidth;
+      $panel.addClass('kr-result-flash is-filled');
+    }
   }
 
   /** 一键复制宽睿点测入参/出参文本（排查用）。 */
@@ -5327,15 +5397,16 @@
   $('#viewKuangruiOverview').on('click', '[data-kr-jump]', function () {
     showKuangruiPanel($(this).attr('data-kr-jump') || 'overview');
   });
-  // OES / MDS / 报撤试单结果区：一键复制入参或出参
-  $('#viewKuangruiOes, #viewKuangruiMds, #viewKuangruiOrder, #viewKuangruiAccount').on(
-    'click',
-    '[data-kr-copy]',
-    function (e) {
-      e.preventDefault();
-      krCopyByPreId($(this).attr('data-kr-copy'));
-    }
-  );
+  // 宽睿结果区复制（委托到 document，避免视图切换/动态补按钮后失效）
+  $(document).on('click', '[data-kr-copy]', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    krCopyByPreId($(this).attr('data-kr-copy'));
+  });
+  // 进入宽睿各页时预挂复制控件
+  ['krOes', 'krMds', 'krOrder', 'krAcc'].forEach(function (p) {
+    ensureKrCopyControls(p);
+  });
   $('#btnKrAccCurrent, #krAccCards .btn-kr-acc-current').on('click', function () {
     markKrAccCard('current');
     loadKrAccountCurrent({ $btn: $(this) });
