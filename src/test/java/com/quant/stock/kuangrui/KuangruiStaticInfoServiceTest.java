@@ -138,6 +138,11 @@ class KuangruiStaticInfoServiceTest {
         }
 
         @Override
+        public List<Map<String, Object>> queryCashTransferSerial(String cashAcctId) {
+            return Collections.emptyList();
+        }
+
+        @Override
         public void stop() {
             // no-op
         }

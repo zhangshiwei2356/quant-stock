@@ -15,7 +15,7 @@
     <li><b>证券状态 / 静态信息（MDS+OES）</b> — <b>M4 可选已落地</b>（默认关）· <code>static-enabled</code></li>
     <li><b>交易日 / 市场时段（OES+MDS）</b> — <b>M4 可选已落地</b>（默认关）· <code>queryTradingDay</code> 为柜台<strong>当前交易日单日</strong>，非整年日历</li>
     <li><b>真实佣金费率（OES）</b> — <b>M4 可选已落地</b>（默认关）· <code>queryCommissionRate</code></li>
-    <li><b>银证转账（OES，真仓运维）</b> — <b>计划⑥ M6</b> · <code>sendCashTrsfReq</code> + <code>queryCashTransferSerial</code>（sim 可不接；排在 M5+浸泡与查询增强之后）</li>
+    <li><b>银证转账（OES，真仓运维）</b> — <b>⑥ M6 可选已落地</b>（默认关）· <code>sendCashTrsfReq</code> + <code>queryCashTransferSerial</code>；运维二次确认试转；不改 sim 账本；与报撤共用 <code>oes.order-enabled</code></li>
     <li><b>历史 K 线全市场源</b> — 部分：本地库/种子 · MDS 偏实时，不替代多年回测历史；需另源或自建落库管道</li>
     <li><b>复权因子</b>（除权除息）— 未落地 · 宽睿包未覆盖；需复权因子或前复权行情源</li>
     <li><b>资金流向</b>（主力净流入/北向）— 未落地 · 无专用接口；L2 逐笔可自算近似，北向需另源</li>
@@ -24,8 +24,8 @@
     <li><b>新闻舆情 / 另类数据</b> — 未落地 · 宽睿不覆盖</li>
     <li><b>两融 / 期权 / ETF 申赎 / 新股中签</b> — 未规划 · OES 有完整接口族，当前现货模拟策略范围外</li>
   </ol>
-  <p style="margin:0"><b>一句总结</b>：宽睿现货 <strong>M0✓ → M1～M4 可选✓ → M5a/M5b/撤单小修/仿真浸泡/查询增强✓</strong>（默认关；具名接口约 20/24）；
-    <strong>下一步</strong>：⑥ <b>M6 银证</b> → ⑦ L2/两融后置。
+  <p style="margin:0"><b>一句总结</b>：宽睿现货 <strong>M0✓ → M1～M4 可选✓ → M5a/M5b/撤单小修/仿真浸泡/查询增强/M6 银证✓</strong>（默认关；具名接口约 22/24）；
+    <strong>下一步</strong>：批量 <code>sendBatchOrdsReq</code>（按需）→ ⑦ L2/两融后置。
     详见「宽睿对接 → 宽睿文档梳理」。默认仍 sim/db。</p>
 </div>
 
@@ -108,12 +108,13 @@
     <li><b>文档 PDF</b> — 已落地 · 量化知识 / 应用说明介绍页一键导出（服务端 iText，<code>GET /api/docs/pdf/{stock|app}</code>；应用说明包不含宽睿梳理，见「宽睿对接」）</li>
     <li><b>项目 README 在线查看</b> — 已落地 · 应用说明 →「项目 README」；<code>GET /api/docs/readme</code> 实时渲染仓库根目录 Markdown（含 Mermaid 架构图）</li>
     <li><b>本地可调度任务</b> — 已落地 · <code>scan-and-trade</code>、<code>pool-rebuild</code>、<code>after-market-batch-scan</code>、<code>settle-after-close</code>、<code>data-validate</code>、<code>factor-daily-rebuild</code>、<code>day-collect</code>、<code>pool-minute-backfill</code>、<code>sync-orders</code>、<code>position-pnl-sync</code>；入池粗筛可读 <code>factor_daily</code>；运维「执行一次」全部后台跑：弹框与页内横幅同步进度（可收起）；长任务（TDX / 因子 / 入池 / 校验 / 行情采集）上报 <code>i/n</code>（入池含因子预刷与粗筛扫描两段）；scan/sync/settle 锁忙与业务失败均返回错误而非假成功</li>
-    <li><b>宽睿资料梳理</b> — 已落地（文档）· <code>OESAPI-JAVA-v0.19.4.0</code>；「宽睿文档梳理」含接入面盘点（约 20/24）与 <b>最新计划 M6 银证</b>（2026-08-08）</li>
+    <li><b>宽睿资料梳理</b> — 已落地（文档）· <code>OESAPI-JAVA-v0.19.4.0</code>；「宽睿文档梳理」含接入面盘点（约 22/24）与 <b>M6 银证已落地</b>（2026-08-08）</li>
     <li><b>宽睿 M0 环境脚手架</b> — 已完成 · jar <code>0.19.4.0</code>；阿里云模拟；探针 OES+MDS 登录成功；主应用仍默认 sim/db</li>
     <li><b>宽睿 M1 MDS L1 落库</b> — 可选已落地 · 开关默认关；分钟桶写 <code>market_1min(MDS)</code></li>
     <li><b>宽睿 M2 OES 只读对账</b> — 可选已落地 · 开关默认关；登录后 <code>sendRptSync</code>；同步失败可查询降级；查资金/持仓等 <code>OesQueryListInvoker</code>（<code>QueryMode.ALL</code>+<code>getQryItems</code>）；运维 <code>/api/ops/kuangrui/oes/*</code></li>
     <li><b>宽睿 M3 OES 报撤</b> — 可选已落地 · <code>oes.order-enabled</code> 默认关；限价报/撤；sync 按回报/查询推进</li>
     <li><b>宽睿 M4 静态/费率</b> — 可选已落地 · <code>static-enabled</code> 默认关；涨跌停/停牌/股本/交易日/佣金可覆盖本地</li>
+    <li><b>宽睿 M6 银证</b> — 可选已落地 · 与报撤共用 <code>order-enabled</code>；运维流水查询 + 试转（二次确认）；不改 sim 账本</li>
   </ol>
 </details>
 

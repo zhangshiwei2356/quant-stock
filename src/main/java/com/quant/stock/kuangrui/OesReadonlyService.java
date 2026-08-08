@@ -77,6 +77,12 @@ public interface OesReadonlyService {
      */
     Map<String, Object> queryMaxTradableQty(String code, String side, java.math.BigDecimal priceYuan);
 
+    /**
+     * M6：银证/出入金流水（{@code queryCashTransferSerial}）。
+     * {@code cashAcctId} 可空。
+     */
+    List<Map<String, Object>> queryCashTransferSerial(String cashAcctId);
+
     /** 关闭客户端连接。 */
     void stop();
 

@@ -200,6 +200,68 @@ public class KuangruiOesOpsFacade {
         }
     }
 
+    /** M6：银证/出入金流水。 */
+    public Map<String, Object> cashTransferSerial(String cashAcctId) {
+        return queryBlock("cashTransferSerial", new QueryCall() {
+            @Override
+            public Object call() {
+                return oesReadonlyService.queryCashTransferSerial(cashAcctId);
+            }
+        });
+    }
+
+    /**
+     * M6：银证/出入金试转（须 orderLive；页面二次确认；不改 sim 账本）。
+     * 响应不含密码字段。
+     */
+    public Map<String, Object> cashTransferTest(String direct, BigDecimal amountYuan, String cashAcctId,
+                                              String trsfType, String trdPasswd, String trsfPasswd) {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        m.putAll(orderStatus());
+        if (oesOrderService == null || !oesOrderService.isOrderLive()) {
+            m.put("ok", false);
+            m.put("hint", "报撤未 live。银证与报撤共用 oes.order-enabled；请配置 quant.kuangrui.enabled + oes.enabled + oes.order-enabled=true，"
+                    + "并以 mvn -Pkuangrui 启动");
+            return m;
+        }
+        if (amountYuan == null || amountYuan.compareTo(BigDecimal.ZERO) <= 0) {
+            m.put("ok", false);
+            m.put("message", "amount 须为正（元）");
+            return m;
+        }
+        String dir = direct == null ? "" : direct.trim().toUpperCase();
+        if (!"IN".equals(dir) && !"OUT".equals(dir)
+                && !"OES_CASH_DIRECT_IN".equals(dir) && !"OES_CASH_DIRECT_OUT".equals(dir)) {
+            // 允许 BANK_TO_SEC / SEC_TO_BANK 等别名，交给实现解析；空则拒
+            if (dir.isEmpty()) {
+                m.put("ok", false);
+                m.put("message", "direct 须为 IN（银行→证券）或 OUT（证券→银行）");
+                return m;
+            }
+        }
+        int clSeq = testClSeq.incrementAndGet();
+        try {
+            OesOrderService.OesPlaceResult r = oesOrderService.sendCashTrsf(
+                    clSeq, direct, amountYuan, cashAcctId, trsfType, trdPasswd, trsfPasswd);
+            m.put("ok", r != null && r.isAccepted());
+            m.put("accepted", r != null && r.isAccepted());
+            m.put("clSeqNo", r == null ? clSeq : r.getClSeqNo());
+            m.put("message", r == null ? "null result"
+                    : (r.isAccepted() ? "银证请求已发出（非柜台最终确认；请查流水）" : r.getMessage()));
+            m.put("direct", direct == null ? "" : direct.trim());
+            m.put("amount", amountYuan);
+            m.put("cashAcctId", cashAcctId == null ? "" : cashAcctId.trim());
+            m.put("trsfType", trsfType == null || trsfType.trim().isEmpty() ? "BANK" : trsfType.trim());
+            // 故意不回传密码
+            return m;
+        } catch (Exception e) {
+            log.error("[oes-ops] cashTransferTest 失败: {}", e.getMessage(), e);
+            m.put("ok", false);
+            m.put("message", e.getMessage());
+            return m;
+        }
+    }
+
     /** 联调页限价试单（须 orderLive；不改金叉主路径）。 */
     public Map<String, Object> placeTest(String code, String side, BigDecimal priceYuan, Integer qty,
                                          String clientOrderId) {

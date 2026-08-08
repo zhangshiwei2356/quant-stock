@@ -131,6 +131,37 @@ public final class OesViewMapper {
         return m;
     }
 
+    /**
+     * M6：银证/出入金流水项（金额毫→元）。
+     */
+    public static Map<String, Object> cashTransfer(int clSeqNo,
+                                                   String cashAcctId,
+                                                   String direct,
+                                                   String trsfType,
+                                                   String trsfStatus,
+                                                   long occurAmtMilli,
+                                                   int counterEntrustNo,
+                                                   int rejReason,
+                                                   String rejReasonInfo,
+                                                   String allotSerialNo,
+                                                   int operDate,
+                                                   int operTime) {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        m.put("clSeqNo", clSeqNo);
+        m.put("cashAcctId", nullToEmpty(cashAcctId));
+        m.put("direct", nullToEmpty(direct));
+        m.put("trsfType", nullToEmpty(trsfType));
+        m.put("trsfStatus", nullToEmpty(trsfStatus));
+        m.put("occurAmt", KuangruiPriceScale.toYuanAllowZero(occurAmtMilli));
+        m.put("counterEntrustNo", counterEntrustNo);
+        m.put("rejReason", rejReason);
+        m.put("rejReasonInfo", nullToEmpty(rejReasonInfo));
+        m.put("allotSerialNo", nullToEmpty(allotSerialNo));
+        m.put("operDate", operDate);
+        m.put("operTime", operTime);
+        return m;
+    }
+
     /** 6 位数字代码；非法原样 trim。 */
     public static String normalizeCode(String securityId) {
         if (securityId == null) {

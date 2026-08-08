@@ -9,8 +9,8 @@
   更新：2026-08-08 ·
   <b>M0</b> 仿真登录 COMPLETE ·
   <b>M1</b>～<b>M4</b> 可选已落地（默认关）·
-  现货具名接口约 <b>20/24</b> 已接 ·
-  <b>最新计划</b>：① M5 连接韧性 → ② 报撤小修+浸泡 → ③ 查询/效率增强 → ④ <b>M6 银证</b>（真仓）→ ⑤ L2/批量/两融后置。
+  现货具名接口约 <b>22/24</b> 已接 ·
+  <b>最新计划</b>：①～⑤ M5 韧性/撤单/浸泡/查询增强 <b>已落地</b> → ⑥ <b>M6 银证已落地</b>（真仓运维；sim 可不接）→ ⑦ L2/批量/两融后置。
   侧栏「扩展与文档 → <b>宽睿对接</b>」可点测运维 API；含账号登录与二级「宽睿文档梳理」；接口「介绍」弹层对齐本页摘要；报撤须 yml <code>order-enabled</code>。
 </p>
 
@@ -68,7 +68,7 @@
       <tr><td>总览 / 柜台资金</td><td><code>queryClientOverview</code> / <code>queryCounterCash</code></td><td><b>M5+ 已用</b>：运维点测；纸面对账补强</td></tr>
       <tr><td>股东账户 / 可买量</td><td><code>queryInvAcct</code> / <code>queryMaxTradableQty</code></td><td><b>M5+ 已用</b>：运维点测；可买量可选挂钩下单前校验</td></tr>
       <tr><td>佣金 / 产品 / 交易日</td><td><code>queryCommissionRate</code> / <code>queryStock</code> / <code>queryTradingDay</code></td><td><b>M4 已用</b>：可开关覆盖本地费率/日历/涨跌停</td></tr>
-      <tr><td>银证转账</td><td><code>sendCashTrsfReq</code> / <code>queryCashTransferSerial</code></td><td><b>计划 M6</b>：真仓运维；sim 可不接</td></tr>
+      <tr><td>银证转账</td><td><code>sendCashTrsfReq</code> / <code>queryCashTransferSerial</code></td><td><b>M6 已用</b>：运维点测（二次确认）；不改 sim 账本</td></tr>
       <tr><td>两融 / 期权 / ETF</td><td>扩展接口族</td><td>超出现货范围，不做</td></tr>
     </tbody>
   </table>
@@ -178,6 +178,12 @@
         <td><code>queryClientOverview</code> / <code>queryCounterCash</code> / <code>queryInvAcct</code> / <code>queryMaxTradableQty</code>；MDS pull 优先 <code>qrySnapshotList</code></td>
         <td>运维 <code>/api/ops/kuangrui/oes/{client-overview,counter-cash,inv-acct,max-tradable-qty}</code>；MDS pull 自动批量</td>
       </tr>
+      <tr>
+        <td><b>M6 银证</b></td>
+        <td><b>可选已落地</b>（默认关 · 2026-08-08）</td>
+        <td><code>sendCashTrsfReq</code> + <code>queryCashTransferSerial</code>；与报撤共用 <code>order-enabled</code>；不改 sim 账本</td>
+        <td>运维 <code>GET .../cash-transfer-serial</code>、<code>POST .../cash-transfer-test</code>（二次确认）；报撤试单页可点测</td>
+      </tr>
     </tbody>
   </table>
 
@@ -195,27 +201,27 @@
 
   <h5 style="margin:12px 0 4px;">接入面盘点（现货具名接口 · 2026-08-08）</h5>
   <p class="hint" style="margin:0 0 8px;">
-    口径：手册典型 SDK 名（非 jar 全部重载）。MDS≈8、OES≈16，合计约 24；已接 20（≈83%）。
+    口径：手册典型 SDK 名（非 jar 全部重载）。MDS≈8、OES≈16，合计约 24；已接 22（≈92%）。
     整包含 L2/两融等远大于此；主路径有意裁剪。
   </p>
   <table>
     <thead><tr><th>状态</th><th>接口</th></tr></thead>
     <tbody>
       <tr>
-        <td><b>已接（20）</b></td>
+        <td><b>已接（22）</b></td>
         <td>
           MDS：<code>subscribeMarketData</code>、<code>qryMktDataSnapshot</code>、<code>qrySnapshotList</code>、<code>qrySecurityStatus</code>、<code>qryTrdSessionStatus</code>、<code>qryStockStaticInfo</code>；
-          OES：<code>sendRptSync</code>、<code>sendOrdReq</code>、<code>sendOrdCancelReq</code>、
+          OES：<code>sendRptSync</code>、<code>sendOrdReq</code>、<code>sendOrdCancelReq</code>、<code>sendCashTrsfReq</code>、
           <code>queryCashAsset</code>、<code>queryStkHolding</code>、<code>queryOrder</code>、<code>queryTrade</code>、
           <code>queryStock</code>、<code>queryTradingDay</code>、<code>queryCommissionRate</code>、
-          <code>queryClientOverview</code>、<code>queryCounterCash</code>、<code>queryInvAcct</code>、<code>queryMaxTradableQty</code>
+          <code>queryClientOverview</code>、<code>queryCounterCash</code>、<code>queryInvAcct</code>、<code>queryMaxTradableQty</code>、
+          <code>queryCashTransferSerial</code>
         </td>
       </tr>
       <tr>
         <td><b>计划接入</b></td>
         <td>
-          批量 <code>sendBatchOrdsReq</code>（按需）；
-          <b>M6 银证</b>：<code>sendCashTrsfReq</code> + <code>queryCashTransferSerial</code>
+          批量 <code>sendBatchOrdsReq</code>（按需）
         </td>
       </tr>
       <tr>
@@ -227,7 +233,7 @@
 
   <h5 style="margin:12px 0 4px;">最新接入计划（2026-08-08）</h5>
   <p class="hint" style="margin:0 0 8px;">
-    现货主路径 M0～M4 + <b>M5a/M5b/撤单小修/仿真浸泡/查询增强已落地</b>（默认关）。下一步：真仓银证。
+    现货主路径 M0～M4 + <b>M5a/M5b/撤单小修/仿真浸泡/查询增强/M6 银证已落地</b>（默认关）。下一步：批量按需 / L2·两融后置。
     SDK 无公开 reconnect，须应用层实现（回调内勿重活）。
   </p>
   <table>
@@ -273,10 +279,10 @@
         <td><b>M6 银证</b></td>
         <td>真仓资金运维</td>
         <td>
-          <code>sendCashTrsfReq</code> + <code>queryCashTransferSerial</code>；
-          宽睿对接页点测（二次确认）；sim 账本可不接。
+          <b>已落地</b>：<code>sendCashTrsfReq</code> + <code>queryCashTransferSerial</code>；
+          宽睿对接页点测（二次确认）；sim 账本不接。
         </td>
-        <td>仿真/真仓可发起转入转出并查流水；失败可观测</td>
+        <td>✓ 运维可发起转入转出并查流水；失败可观测</td>
       </tr>
       <tr>
         <td>⑦</td>

@@ -2773,6 +2773,15 @@
         + '<ul><li>运维：<code>GET /api/ops/kuangrui/oes/max-tradable-qty?code=&amp;side=&amp;price=</code></li>'
         + '<li>可选挂钩下单前校验；当前仅运维点测</li></ul>'
     },
+    'queryCashTransferSerial': {
+      title: '银证流水',
+      sdk: 'queryCashTransferSerial',
+      stage: 'M6 银证',
+      html:
+        '<p>OES <code>queryCashTransferSerial</code>：出入金/银证流水（金额已换算为元）。</p>'
+        + '<ul><li>运维：<code>GET /api/ops/kuangrui/oes/cash-transfer-serial?cashAcctId=</code>（可选）</li>'
+        + '<li>只读；与试转配对核对状态</li></ul>'
+    },
     'oes.stop': {
       title: '关闭连接',
       sdk: 'stop',
@@ -2877,6 +2886,16 @@
       html:
         '<p>OES 撤单 <code>sendOrdCancelReq</code>。须报撤门禁打开；建议等回报/查询确认（细态闭环仍在 M3/M5 小修）。</p>'
         + '<ul><li>运维：<code>POST /api/ops/kuangrui/oes/cancel-test</code></li></ul>'
+    },
+    'sendCashTrsfReq': {
+      title: '银证转账',
+      sdk: 'sendCashTrsfReq',
+      stage: 'M6 银证',
+      html:
+        '<p>OES 出入金 <code>sendCashTrsfReq</code>（联调试转）。与报撤共用 <code>orderLive</code>；不改本地 sim 账本。</p>'
+        + '<ul><li>运维：<code>POST /api/ops/kuangrui/oes/cash-transfer-test</code></li>'
+        + '<li>方向 IN=银行→证券 / OUT=证券→银行；默认类型 BANK（OES↔银行）</li>'
+        + '<li>页面二次确认；密码仅发柜台，响应不回显；发出≠柜台最终确认，请查流水</li></ul>'
     },
     'account.login': {
       title: '登录并保存',
@@ -2999,8 +3018,8 @@
       return;
     }
     if ($btn && $btn.length) krMarkActiveCard($btn.closest('.kr-api-card'));
-    var reqView = { method: method, url: url };
-    if (data != null) {
+    var reqView = opts.reqView || { method: method, url: url };
+    if (!opts.reqView && data != null) {
       if (method === 'GET') reqView.query = data;
       else reqView.body = data;
     }
@@ -3352,6 +3371,7 @@
       { title: '股东账户', sdk: 'queryInvAcct', method: 'GET', path: '/api/ops/kuangrui/oes/inv-acct' },
       { title: '主柜资金', sdk: 'queryCounterCash', method: 'GET', path: '/api/ops/kuangrui/oes/counter-cash', cashAcct: true },
       { title: '可买卖量', sdk: 'queryMaxTradableQty', method: 'GET', path: '/api/ops/kuangrui/oes/max-tradable-qty', tradable: true },
+      { title: '银证流水', sdk: 'queryCashTransferSerial', method: 'GET', path: '/api/ops/kuangrui/oes/cash-transfer-serial', cashAcct: true },
       { title: '关闭连接', sdk: 'stop', method: 'POST', path: '/api/ops/kuangrui/oes/stop', confirm: '确认关闭 OES 客户端连接？' }
     ];
     apis.forEach(function (a) {
@@ -3389,10 +3409,10 @@
           : 'orderLive=<b>false</b>，试单按钮禁用。' + (hint ? ' ' + hint : '')
           + ' 开关：<code>quant.kuangrui.oes.order-enabled</code>（yml，默认 false）。'
       );
-      $('#btnKrPlace, #btnKrCancel').prop('disabled', !krOrderLive);
+      $('#btnKrPlace, #btnKrCancel, #btnKrCashTrsf').prop('disabled', !krOrderLive);
     }).fail(function () {
       krOrderLive = false;
-      $('#btnKrPlace, #btnKrCancel').prop('disabled', true);
+      $('#btnKrPlace, #btnKrCancel, #btnKrCashTrsf').prop('disabled', true);
       $('#krOrderGateHint').text('无法读取 order-status');
     });
   }
@@ -5795,6 +5815,46 @@
       $btn: $('#btnKrCancel'),
       resultPrefix: 'krOrder',
       label: '撤单试单'
+    });
+  });
+  $('#btnKrCashTrsf').on('click', function () {
+    var body = {
+      direct: $('#krCashDirect').val(),
+      amount: Number($('#krCashAmt').val()),
+      cashAcctId: ($('#krCashAcct').val() || '').trim() || undefined,
+      trsfType: $('#krCashTrsfType').val(),
+      trdPasswd: $('#krCashTrdPwd').val() || undefined,
+      trsfPasswd: $('#krCashTrsfPwd').val() || undefined
+    };
+    var msg = '确认银证试转？\n' + body.direct + ' amount=' + body.amount
+      + ' type=' + body.trsfType
+      + (body.cashAcctId ? (' acct=' + body.cashAcctId) : '')
+      + '\n（须 order-enabled；将调用柜台；不改本地 sim 账本）';
+    var reqView = {
+      method: 'POST',
+      url: '/api/ops/kuangrui/oes/cash-transfer-test',
+      body: {
+        direct: body.direct,
+        amount: body.amount,
+        cashAcctId: body.cashAcctId,
+        trsfType: body.trsfType,
+        trdPasswd: body.trdPasswd ? '***' : undefined,
+        trsfPasswd: body.trsfPasswd ? '***' : undefined
+      }
+    };
+    krInvoke({
+      method: 'POST',
+      url: '/api/ops/kuangrui/oes/cash-transfer-test',
+      data: body,
+      confirm: msg,
+      $btn: $('#btnKrCashTrsf'),
+      resultPrefix: 'krOrder',
+      label: '银证试转',
+      reqView: reqView,
+      onDone: function () {
+        $('#krCashTrdPwd').val('');
+        $('#krCashTrsfPwd').val('');
+      }
     });
   });
 

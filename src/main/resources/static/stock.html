@@ -1063,6 +1063,37 @@
                 <button type="button" id="btnKrCancel" class="secondary">撤单试单</button>
               </div>
             </div>
+            <div class="kr-api-card" data-kr-intro="sendCashTrsfReq">
+              <div class="kr-api-card-head">
+                <h4>银证转账 <code>sendCashTrsfReq</code></h4>
+                <div class="kr-api-card-actions">
+                  <button type="button" class="kr-api-intro" data-kr-intro="sendCashTrsfReq" title="查看接口说明">介绍</button>
+                </div>
+              </div>
+              <p class="hint mono kr-api-path">POST /api/ops/kuangrui/oes/cash-transfer-test</p>
+              <p class="hint">真仓运维；不改本地 sim 账本。须 orderLive；提交前弹框确认。密码仅发柜台，不回显。</p>
+              <div class="toolbar kr-api-params">
+                <label class="field-inline">方向
+                  <select id="krCashDirect">
+                    <option value="IN">IN 银行→证券</option>
+                    <option value="OUT" selected>OUT 证券→银行</option>
+                  </select>
+                </label>
+                <label class="field-inline">金额(元) <input type="number" id="krCashAmt" step="0.01" value="100" style="width:100px;"/></label>
+                <label class="field-inline">资金账号 <input type="text" id="krCashAcct" placeholder="可选" style="width:120px;"/></label>
+                <label class="field-inline">类型
+                  <select id="krCashTrsfType">
+                    <option value="BANK" selected>BANK OES↔银行</option>
+                    <option value="COUNTER">COUNTER OES↔主柜</option>
+                    <option value="COUNTER_BANK">COUNTER_BANK 主柜↔银行</option>
+                    <option value="OES_TO_OES">OES_TO_OES</option>
+                  </select>
+                </label>
+                <label class="field-inline">交易密码 <input type="password" id="krCashTrdPwd" autocomplete="off" style="width:100px;"/></label>
+                <label class="field-inline">转账密码 <input type="password" id="krCashTrsfPwd" autocomplete="off" style="width:100px;"/></label>
+                <button type="button" id="btnKrCashTrsf">银证试转</button>
+              </div>
+            </div>
           </div>
           <aside class="kr-result kr-bench-result is-empty" id="krOrderResult">
             <div class="kr-result-head">

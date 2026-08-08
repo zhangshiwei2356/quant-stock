@@ -363,7 +363,7 @@ sequenceDiagram
   - `sync-orders`：`trade-mode=sdk` 时推进成交；默认本地桩；OES `order-enabled` live 时按回报/查询推进（不假推进）；OES 只读 live 时另打对账日志
   - `position-pnl-sync`：本地成本 + 最新价浮盈日志；OES live 时附加柜台资金/持仓对账
 - 页面标「未实现/缺外部默认」：`market-collect`（本地骨架；**可选**宽睿 MDS live 时 pull/flush，见下）
-- 对照：**应用说明 → 能力与待办**；宽睿对接：**宽睿对接 → 宽睿文档梳理**（M0✓ → M1～M4 可选✓ → M5a/M5b/撤单小修/仿真浸泡/查询增强✓；具名约 20/24；**下一步** **M6 银证** → L2/两融后置）
+- 对照：**应用说明 → 能力与待办**；宽睿对接：**宽睿对接 → 宽睿文档梳理**（M0✓ → M1～M4 可选✓ → M5a/M5b/撤单小修/仿真浸泡/查询增强/M6 银证✓；具名约 22/24；**下一步** 批量按需 → L2/两融后置）
 - 宽睿 **M0**：资料包 `OESAPI-JAVA-v0.19.4.0`；探针 **OES+MDS 登录成功** → `M0_STATUS=COMPLETE`
 - 宽睿 **M1**（可选，默认关）：MDS L1 → `market_1min(MDS)`；运维 `/api/ops/kuangrui/mds/*`
 - 宽睿 **M2**（可选，默认关）：OES 只读对账；登录后 `sendRptSync` 多签名适配；同步失败可 **查询降级**；查资金/持仓等经 `OesQueryListInvoker`（对齐 Demo：`Filter + QueryMode.ALL` → `Rsp.getQryItems()`；兼 List/回调/多 Filter）；出参含 `rptSyncEngine`；运维 `/api/ops/kuangrui/oes/{status,cash,...}`
@@ -373,7 +373,7 @@ sequenceDiagram
 - 宽睿 **M5b**（可选，默认关）：OES 断线先 close 再重建 + `sendRptSync`；status 暴露断线/重连计数
 - 宽睿 **④ 仿真浸泡**（2026-08-08）：`.\scripts\kuangrui\m5-soak.ps1` → `scripts/kuangrui/out/m5-soak-report.*`（登录→MDS pull/订→OES reconcile→买撤→sync→static）；`oes/stock` 仿真偶发超时记 soft-WARN
 - 宽睿 **M5+ 查询增强**（可选，默认关）：`queryClientOverview` / `queryCounterCash` / `queryInvAcct` / `queryMaxTradableQty`；MDS pull 优先 `qrySnapshotList` 批量；运维 `/api/ops/kuangrui/oes/{client-overview,counter-cash,inv-acct,max-tradable-qty}`
-- 宽睿 **计划**（剩余 · 2026-08-08）：⑥ **M6 银证** `sendCashTrsfReq`+流水查询（真仓）；批量 `sendBatchOrdsReq`（按需）；⑦ 后置 L2/UDP/两融/期权/ETF。详见「宽睿文档梳理」
+- 宽睿 **计划**（剩余 · 2026-08-08）：批量 `sendBatchOrdsReq`（按需）；⑦ 后置 L2/UDP/两融/期权/ETF。**M6 银证已落地**（`sendCashTrsfReq`+流水查询；运维二次确认；不改 sim 账本）。详见「宽睿文档梳理」
 
 ---
 

@@ -118,6 +118,13 @@ class TradeGatewayServiceTest {
             }
 
             @Override
+            public OesPlaceResult sendCashTrsf(int clSeqNo, String direct, BigDecimal amountYuan,
+                                               String cashAcctId, String trsfType,
+                                               String trdPasswd, String trsfPasswd) {
+                return OesPlaceResult.fail(clSeqNo, "fake 不支持银证");
+            }
+
+            @Override
             public List<OesOrderEvent> pollEvents() {
                 List<OesOrderEvent> out = new ArrayList<OesOrderEvent>();
                 OesOrderEvent e;

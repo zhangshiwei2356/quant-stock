@@ -706,6 +706,36 @@ public class OpsController {
         });
     }
 
+    /** M6：OES 银证/出入金流水。 */
+    @GetMapping("/kuangrui/oes/cash-transfer-serial")
+    public Map<String, Object> kuangruiOesCashTransferSerial(
+            @RequestParam(value = "cashAcctId", required = false) String cashAcctId) {
+        return oesOrDbOff(new OesCall() {
+            @Override
+            public Map<String, Object> call(KuangruiOesOpsFacade f) {
+                return f.cashTransferSerial(cashAcctId);
+            }
+        });
+    }
+
+    /** M6：OES 银证试转（须 orderLive；页面二次确认；不改 sim 账本）。 */
+    @PostMapping("/kuangrui/oes/cash-transfer-test")
+    public Map<String, Object> kuangruiOesCashTransferTest(@RequestBody Map<String, Object> body) {
+        final Map<String, Object> b = body == null ? new LinkedHashMap<String, Object>() : body;
+        return oesOrDbOff(new OesCall() {
+            @Override
+            public Map<String, Object> call(KuangruiOesOpsFacade f) {
+                return f.cashTransferTest(
+                        asStr(b.get("direct")),
+                        asBd(b.get("amount")),
+                        asStr(b.get("cashAcctId")),
+                        asStr(b.get("trsfType")),
+                        asStr(b.get("trdPasswd")),
+                        asStr(b.get("trsfPasswd")));
+            }
+        });
+    }
+
     /** M4：静态/费率门面状态。 */
     @GetMapping("/kuangrui/static/status")
     public Map<String, Object> kuangruiStaticStatus() {

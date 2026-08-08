@@ -108,8 +108,24 @@ class KuangruiOesHelpersTest {
         assertTrue(noop.queryCounterCash(null).isEmpty());
         assertEquals(Boolean.FALSE, noop.queryClientOverview().get("ok"));
         assertEquals(Boolean.FALSE, noop.queryMaxTradableQty("600036", "BUY", new BigDecimal("10")).get("ok"));
+        assertTrue(noop.queryCashTransferSerial(null).isEmpty());
         assertEquals("noop", noop.status().get("impl"));
         assertEquals(Boolean.FALSE, noop.snapshot().get("ok"));
+
+        NoopOesOrderService orderNoop = new NoopOesOrderService();
+        assertFalse(orderNoop.isOrderLive());
+        assertFalse(orderNoop.sendCashTrsf(1, "OUT", new BigDecimal("100"), null, "BANK", null, null).isAccepted());
+    }
+
+    @Test
+    void viewMapper_cashTransfer() {
+        Map<String, Object> row = OesViewMapper.cashTransfer(
+                12, "8888", "OES_CASH_DIRECT_OUT", "OES_FUND_TRSF_TYPE_OES_BANK",
+                "OES_CASH_TRSF_STAT_DONE", 1_000_000L, 99, 0, "", "A001", 20260808, 93000);
+        assertEquals(Integer.valueOf(12), row.get("clSeqNo"));
+        assertEquals("8888", row.get("cashAcctId"));
+        assertEquals(new BigDecimal("100.0000"), row.get("occurAmt"));
+        assertEquals("OES_CASH_DIRECT_OUT", row.get("direct"));
     }
 
     @Test

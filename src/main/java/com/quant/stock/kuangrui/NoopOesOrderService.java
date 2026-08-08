@@ -45,6 +45,13 @@ public class NoopOesOrderService implements OesOrderService {
     }
 
     @Override
+    public OesPlaceResult sendCashTrsf(int clSeqNo, String direct, BigDecimal amountYuan,
+                                       String cashAcctId, String trsfType,
+                                       String trdPasswd, String trsfPasswd) {
+        return OesPlaceResult.fail(clSeqNo, "OES 银证转账未启用");
+    }
+
+    @Override
     public List<OesOrderEvent> pollEvents() {
         return Collections.emptyList();
     }

@@ -514,6 +514,42 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
         }
     }
 
+    @Override
+    public List<Map<String, Object>> queryCashTransferSerial(String cashAcctId) {
+        ensureReadyOrThrow();
+        Object filter = newInstance("com.quant360.api.model.oes.OesQryCashTransferSerialFilter");
+        String acct = cashAcctId == null ? null : cashAcctId.trim();
+        if (filter != null && acct != null && !acct.isEmpty()) {
+            setBean(filter, "setCashAcctId", acct);
+        }
+        List<?> raw;
+        if (filter != null) {
+            raw = invokeQueryListWithFilter("queryCashTransferSerial", filter);
+        } else {
+            raw = invokeOesQuery(
+                    new String[]{"queryCashTransferSerial"},
+                    new String[]{"com.quant360.api.model.oes.OesQryCashTransferSerialFilter"});
+        }
+        List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
+        for (Object item : raw) {
+            out.add(OesViewMapper.cashTransfer(
+                    (int) lng(firstGetter(item, "getClSeqNo")),
+                    str(firstGetter(item, "getCashAcctId")),
+                    enumName(firstGetter(item, "getDirect")),
+                    enumName(firstGetter(item, "getTrsfType")),
+                    enumName(firstGetter(item, "getTrsfStatus")),
+                    lng(firstGetter(item, "getOccurAmt")),
+                    (int) lng(firstGetter(item, "getCounterEntrustNo")),
+                    (int) lng(firstGetter(item, "getRejReason")),
+                    str(firstGetter(item, "getRejReasonInfo")),
+                    str(firstGetter(item, "getAllotSerialNo")),
+                    (int) lng(firstGetter(item, "getOperDate")),
+                    (int) lng(firstGetter(item, "getOperTime"))
+            ));
+        }
+        return out;
+    }
+
     private static String enumName(Object o) {
         if (o == null) {
             return "";
@@ -751,6 +787,125 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
             lastError.set(e.getMessage());
             log.error("[oes] 撤单失败 origClSeqNo={}: {}", origClSeqNo, e.getMessage(), e);
             return false;
+        }
+    }
+
+    @Override
+    public OesPlaceResult sendCashTrsf(int clSeqNo, String direct, BigDecimal amountYuan,
+                                       String cashAcctId, String trsfType,
+                                       String trdPasswd, String trsfPasswd) {
+        if (!isOrderLive()) {
+            return OesPlaceResult.fail(clSeqNo, "oes.order-enabled=false");
+        }
+        try {
+            ensureReadyOrThrow();
+            if (!rptSynced.get()) {
+                return OesPlaceResult.fail(clSeqNo, "回报未同步(rptSynced=false)，禁止银证；可先查资金。详情: "
+                        + lastError.get());
+            }
+            if (amountYuan == null || amountYuan.compareTo(BigDecimal.ZERO) <= 0) {
+                return OesPlaceResult.fail(clSeqNo, "amount 须为正");
+            }
+            long amtMilli = KuangruiPriceScale.toMilliLong(amountYuan);
+            if (amtMilli <= 0L) {
+                return OesPlaceResult.fail(clSeqNo, "金额毫级无效");
+            }
+            Object dirEnum = resolveOesCashDirect(direct);
+            if (dirEnum == null) {
+                return OesPlaceResult.fail(clSeqNo, "direct 须为 IN 或 OUT");
+            }
+            Object typeEnum = resolveOesCashTrsfType(trsfType);
+            if (typeEnum == null) {
+                return OesPlaceResult.fail(clSeqNo, "trsfType 无效（可用 BANK/COUNTER/COUNTER_BANK/OES_TO_OES）");
+            }
+            Object req = newInstance("com.quant360.api.model.oes.OesCashTrsfReq");
+            if (req == null) {
+                return OesPlaceResult.fail(clSeqNo, "无法创建 OesCashTrsfReq");
+            }
+            setBean(req, "setClSeqNo", Integer.valueOf(clSeqNo));
+            setBean(req, "setDirect", dirEnum);
+            setBean(req, "setTrsfType", typeEnum);
+            setBean(req, "setOccurAmt", Long.valueOf(amtMilli));
+            String acct = cashAcctId == null ? null : cashAcctId.trim();
+            if (acct != null && !acct.isEmpty()) {
+                setBean(req, "setCashAcctId", acct);
+            }
+            // 密码仅写入请求，不落日志/响应
+            if (trdPasswd != null && !trdPasswd.isEmpty()) {
+                setBean(req, "setTrdPasswd", trdPasswd);
+            }
+            if (trsfPasswd != null && !trsfPasswd.isEmpty()) {
+                setBean(req, "setTrsfPasswd", trsfPasswd);
+            }
+            if (!hasClientMethod("sendCashTrsfReq", 1)) {
+                return OesPlaceResult.fail(clSeqNo, "客户端无 sendCashTrsfReq");
+            }
+            Object sent = invokeReturning(client, "sendCashTrsfReq", req);
+            if (sent instanceof Number && ((Number) sent).intValue() < 0) {
+                return OesPlaceResult.fail(clSeqNo, "sendCashTrsfReq 返回 " + sent);
+            }
+            log.info("[oes] 银证已发 clSeqNo={} direct={} trsfType={} amountYuan={} cashAcctId={}",
+                    clSeqNo, enumName(dirEnum), enumName(typeEnum), amountYuan,
+                    acct == null ? "" : acct);
+            lastError.set(null);
+            return OesPlaceResult.ok(clSeqNo, 0L);
+        } catch (Exception e) {
+            lastError.set(e.getMessage());
+            log.error("[oes] 银证失败 clSeqNo={}: {}", clSeqNo, e.getMessage(), e);
+            return OesPlaceResult.fail(clSeqNo, e.getMessage());
+        }
+    }
+
+    private static Object resolveOesCashDirect(String direct) {
+        if (direct == null) {
+            return null;
+        }
+        String d = direct.trim().toUpperCase();
+        if (d.isEmpty()) {
+            return null;
+        }
+        String name;
+        if ("IN".equals(d) || "OES_CASH_DIRECT_IN".equals(d) || "TRANSFER_IN".equals(d)
+                || "BANK_TO_SEC".equals(d)) {
+            name = "OES_CASH_DIRECT_IN";
+        } else if ("OUT".equals(d) || "OES_CASH_DIRECT_OUT".equals(d) || "TRANSFER_OUT".equals(d)
+                || "SEC_TO_BANK".equals(d)) {
+            name = "OES_CASH_DIRECT_OUT";
+        } else {
+            return null;
+        }
+        try {
+            Class<?> clz = Class.forName("com.quant360.api.model.oes.enu.OesCashDirect");
+            return clz.getMethod("valueOf", String.class).invoke(null, name);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * 默认 OES↔银行；别名 BANK/COUNTER/COUNTER_BANK/OES_TO_OES。
+     */
+    private static Object resolveOesCashTrsfType(String trsfType) {
+        String t = trsfType == null ? "" : trsfType.trim().toUpperCase();
+        String name;
+        if (t.isEmpty() || "BANK".equals(t) || "OES_BANK".equals(t)
+                || "OES_FUND_TRSF_TYPE_OES_BANK".equals(t)) {
+            name = "OES_FUND_TRSF_TYPE_OES_BANK";
+        } else if ("COUNTER".equals(t) || "OES_COUNTER".equals(t)
+                || "OES_FUND_TRSF_TYPE_OES_COUNTER".equals(t)) {
+            name = "OES_FUND_TRSF_TYPE_OES_COUNTER";
+        } else if ("COUNTER_BANK".equals(t) || "OES_FUND_TRSF_TYPE_COUNTER_BANK".equals(t)) {
+            name = "OES_FUND_TRSF_TYPE_COUNTER_BANK";
+        } else if ("OES_TO_OES".equals(t) || "OES_FUND_TRSF_TYPE_OES_TO_OES".equals(t)) {
+            name = "OES_FUND_TRSF_TYPE_OES_TO_OES";
+        } else {
+            return null;
+        }
+        try {
+            Class<?> clz = Class.forName("com.quant360.api.model.oes.enu.OesCashTrsfType");
+            return clz.getMethod("valueOf", String.class).invoke(null, name);
+        } catch (Exception e) {
+            return null;
         }
     }
 
@@ -1186,6 +1341,19 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
         rptSynced.set(true);
         lastError.set(null);
         log.info("[oes] sendRptSync 完成 lastInMsgSeq={} via {}", seq, r.methodUsed);
+    }
+
+    private boolean hasClientMethod(String name, int argCount) {
+        OesClientImpl c = client;
+        if (c == null || name == null) {
+            return false;
+        }
+        for (Method m : c.getClass().getMethods()) {
+            if (m.getName().equals(name) && m.getParameterTypes().length == argCount) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private Object invokeReturning(Object target, String name, Object... args) {

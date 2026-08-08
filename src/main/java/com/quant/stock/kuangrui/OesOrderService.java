@@ -37,6 +37,19 @@ public interface OesOrderService {
     boolean cancelByClSeqNo(int origClSeqNo, String stockCode);
 
     /**
+     * M6：银证/出入金委托（{@code sendCashTrsfReq}）。须 {@link #isOrderLive()}。
+     * <p>
+     * {@code direct}：IN=转入（银行→证券）/ OUT=转出（证券→银行）；
+     * {@code amountYuan} 为正数（元）；{@code trsfType} 可空，默认 OES↔银行。
+     * </p>
+     *
+     * @return 已发出则 {@link OesPlaceResult#isAccepted()} 为 true（非柜台最终确认）
+     */
+    OesPlaceResult sendCashTrsf(int clSeqNo, String direct, java.math.BigDecimal amountYuan,
+                                String cashAcctId, String trsfType,
+                                String trdPasswd, String trsfPasswd);
+
+    /**
      * 取出自上次以来缓存的委托/成交回报事件（供 sync-orders 推进状态）。
      */
     List<OesOrderEvent> pollEvents();
