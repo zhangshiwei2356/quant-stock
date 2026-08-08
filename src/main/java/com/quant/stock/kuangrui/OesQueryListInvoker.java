@@ -16,6 +16,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * 宽睿 OES 查询列表反射适配：兼容 {@code List queryXxx(Filter)}、无参、
+ * {@code List queryXxx(Filter, QueryMode)}（0.19.x 常见）、
  * {@code int queryXxx(Filter, Callback)} 以及数组返回。
  */
 public final class OesQueryListInvoker {
@@ -111,19 +112,29 @@ public final class OesQueryListInvoker {
                         continue;
                     }
                     if (pts.length == 2) {
-                        // Filter + Callback / Cursor
+                        // Filter + QueryMode / Callback
+                        Result emptyOk = null;
                         Result r = tryTwoArg(client, m, null, errors);
-                        if (r.ok) {
+                        if (r.ok && !r.list.isEmpty()) {
                             return r;
                         }
+                        if (r.ok) {
+                            emptyOk = r;
+                        }
                         for (Object f : filters) {
-                            if (f != null && !pts[0].isInstance(f)) {
+                            if (f != null && !pts[0].isInstance(f) && !pts[0].isEnum()) {
                                 continue;
                             }
                             r = tryTwoArg(client, m, f, errors);
-                            if (r.ok) {
+                            if (r.ok && !r.list.isEmpty()) {
                                 return r;
                             }
+                            if (r.ok && emptyOk == null) {
+                                emptyOk = r;
+                            }
+                        }
+                        if (emptyOk != null) {
+                            return emptyOk;
                         }
                     }
                 } catch (Exception e) {
@@ -172,7 +183,17 @@ public final class OesQueryListInvoker {
 
     private static Result tryTwoArg(Object client, Method m, Object filter, List<String> errors) {
         Class<?>[] pts = m.getParameterTypes();
-        Class<?> cbType = pts[1];
+        Class<?> second = pts[1];
+
+        // 0.19.x：queryCashAsset(Filter, Client.QueryMode) — 第二参为枚举，禁止传 null（会 NPE ordinal）
+        if (second.isEnum()) {
+            return tryTwoArgWithEnum(client, m, filter, second, errors);
+        }
+        // 偶发：QueryMode 在前、Filter 在后
+        if (pts[0].isEnum()) {
+            return tryTwoArgEnumFirst(client, m, filter, pts[0], errors);
+        }
+
         // 1) 第二参 null（部分 Cursor/可选回调）
         try {
             Object ret = m.invoke(client, filter, null);
@@ -193,11 +214,11 @@ public final class OesQueryListInvoker {
         }
 
         // 2) 回调代理收集
-        if (cbType.isInterface()) {
+        if (second.isInterface()) {
             List<Object> bucket = new CopyOnWriteArrayList<Object>();
             Object cb = Proxy.newProxyInstance(
-                    cbType.getClassLoader(),
-                    new Class[]{cbType},
+                    second.getClassLoader(),
+                    new Class[]{second},
                     new CollectingHandler(bucket));
             try {
                 Object ret = m.invoke(client, filter, cb);
@@ -212,6 +233,77 @@ public final class OesQueryListInvoker {
             }
         }
         return Result.fail("two-arg failed");
+    }
+
+    private static Result tryTwoArgWithEnum(Object client, Method m, Object filter,
+                                            Class<?> enumType, List<String> errors) {
+        return tryEnumModes(client, m, filter, enumType, errors, false);
+    }
+
+    private static Result tryTwoArgEnumFirst(Object client, Method m, Object filter,
+                                             Class<?> enumType, List<String> errors) {
+        return tryEnumModes(client, m, filter, enumType, errors, true);
+    }
+
+    /**
+     * 枚举第二参（或第一参）逐常量试；优先返回非空列表，避免错误 mode 空结果短路。
+     */
+    private static Result tryEnumModes(Object client, Method m, Object filter,
+                                       Class<?> enumType, List<String> errors, boolean enumFirst) {
+        Object[] modes = orderEnumConstants(enumType.getEnumConstants());
+        if (modes.length == 0) {
+            String msg = formatSig(m) + ": 枚举 " + enumType.getSimpleName() + " 无常量";
+            errors.add(msg);
+            return Result.fail(msg);
+        }
+        Result emptyOk = null;
+        for (Object mode : modes) {
+            String tag = formatSig(m) + "#" + String.valueOf(mode);
+            try {
+                Object ret = enumFirst ? m.invoke(client, mode, filter) : m.invoke(client, filter, mode);
+                Result r = coerceListResult(ret, null, tag);
+                if (r.ok) {
+                    if (!r.list.isEmpty()) {
+                        return r;
+                    }
+                    if (emptyOk == null) {
+                        emptyOk = r;
+                    }
+                    continue;
+                }
+                errors.add(tag + ": " + r.detail);
+            } catch (Exception e) {
+                Throwable cause = e.getCause() != null ? e.getCause() : e;
+                errors.add(tag + ": " + cause.getClass().getSimpleName() + " " + safeMsg(cause));
+            }
+        }
+        if (emptyOk != null) {
+            return emptyOk;
+        }
+        return Result.fail(enumFirst ? "enum-first failed" : "enum modes failed");
+    }
+
+    /** 优先尝试 ALL / DEFAULT 等常见查询模式，其余按声明顺序跟进。 */
+    private static Object[] orderEnumConstants(Object[] constants) {
+        if (constants == null || constants.length == 0) {
+            return new Object[0];
+        }
+        List<Object> preferred = new ArrayList<Object>();
+        List<Object> rest = new ArrayList<Object>();
+        for (Object c : constants) {
+            if (c == null) {
+                continue;
+            }
+            String n = String.valueOf(c).toUpperCase(Locale.ROOT);
+            if (n.contains("ALL") || n.contains("DEFAULT") || n.contains("NORMAL")
+                    || n.contains("FULL") || n.equals("DEF") || n.contains("ANY")) {
+                preferred.add(c);
+            } else {
+                rest.add(c);
+            }
+        }
+        preferred.addAll(rest);
+        return preferred.toArray();
     }
 
     private static Result coerceListResult(Object ret, List<?> callbackBucket, String via) {
