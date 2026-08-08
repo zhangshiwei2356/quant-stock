@@ -2027,7 +2027,7 @@
     { id: 'backtest', group: 'stock', title: '回测要点', src: '/docs/backtest.html?v=20260720-nav-rename' }
   ];
   var knowledgeHtmlCache = {};
-  var HOME_SRC = '/docs/home.html?v=20260720-nav-rename';
+  var HOME_SRC = '/docs/home.html?v=20260808-sync-nav';
   var homePanelReady = false;
   var pendingHomeLead = null;
   var docsPdfBusy = false;
@@ -2264,8 +2264,45 @@
     return parts.length > 1 ? parts : [s];
   }
 
+  /**
+   * 欢迎页入口与侧栏一级菜单对齐（避免 home.html 漏加新菜单）。
+   * 按侧栏 .side-nav-toggle 顺序重建 #homeActions。
+   */
+  function syncHomeActionsFromNav() {
+    var $actions = $('#homeActions');
+    if (!$actions.length) {
+      $actions = $('#homeMount .home-actions').first();
+    }
+    if (!$actions.length) {
+      return;
+    }
+    var $frag = $(document.createDocumentFragment());
+    $('.side-nav-toggle').each(function () {
+      var $btn = $(this);
+      var bodyId = $btn.attr('data-body');
+      var mode = $btn.attr('data-mode') || '';
+      var label = $.trim($btn.find('.nav-label').first().text())
+          || $.trim($btn.attr('data-intro-title') || '');
+      if (!bodyId || !label) {
+        return;
+      }
+      var $a = $('<button type="button" class="home-action"/>')
+          .attr('data-open-nav', bodyId)
+          .attr('data-mode', mode)
+          .text(label);
+      if (mode === 'doc') {
+        $a.addClass('secondary');
+      }
+      $frag.append($a);
+    });
+    if ($frag[0].childNodes.length) {
+      $actions.empty().append($frag);
+    }
+  }
+
   function loadHomePanel(done) {
     if (homePanelReady) {
+      syncHomeActionsFromNav();
       if (typeof done === 'function') done();
       return;
     }
@@ -2273,6 +2310,7 @@
       .done(function (html) {
         $('#homeMount').html(html);
         homePanelReady = true;
+        syncHomeActionsFromNav();
         if (pendingHomeLead != null) {
           $('#homeLead').text(pendingHomeLead);
           pendingHomeLead = null;
