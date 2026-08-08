@@ -894,42 +894,17 @@
     <div id="viewKuangruiAccount" class="workspace-view" hidden>
       <section class="panel">
         <h3>宽睿 · 账号登录</h3>
-        <p class="hint">左侧点「查询当前账号」看生效用户（无密码）；登录会先验柜再密文入库。取密：库内 active 优先，否则环境变量。须 <code>-Pkuangrui</code>。</p>
-        <div class="toolbar kr-acc-toolbar">
-          <button type="button" id="btnKrAccCurrent">查询当前账号</button>
-          <button type="button" id="btnKrAccRefresh" class="secondary">刷新完整状态</button>
-          <span class="field-hint" id="krAccToolbarMeta">GET /api/ops/kuangrui/account/current</span>
-        </div>
+        <p class="hint">进入本页自动展示当前生效账号（无密码）。登录先验柜再密文入库；取密库内 active 优先，否则环境变量。须 <code>-Pkuangrui</code>。</p>
         <div class="kr-acc-current" id="krAccCurrentBox">
           <div class="kr-acc-current-main">
             <span class="kr-acc-current-label">当前登录账号</span>
             <strong class="kr-acc-current-user mono" id="krAccCurrentUser">—</strong>
             <span class="kr-pill kr-pill--mute" id="krAccCurrentSrc">来源 —</span>
           </div>
-          <p class="hint" id="krAccCurrentMeta">进入本页会自动查询；也可点上方或左侧「查询当前账号」</p>
+          <p class="hint" id="krAccCurrentMeta">进入本页自动查询</p>
         </div>
         <div class="kr-bench">
           <div class="kr-bench-apis" id="krAccCards">
-            <div class="kr-api-card" data-kr-acc-api="current">
-              <div class="kr-api-card-head">
-                <h4>查询当前账号</h4>
-                <span class="kr-api-method">GET</span>
-              </div>
-              <p class="hint">返回 <code>currentUsername</code> / 凭据来源（db|env）；不含密码</p>
-              <div class="toolbar">
-                <button type="button" class="btn-kr-acc-current">调用</button>
-              </div>
-            </div>
-            <div class="kr-api-card" data-kr-acc-api="status">
-              <div class="kr-api-card-head">
-                <h4>完整状态</h4>
-                <span class="kr-api-method">GET</span>
-              </div>
-              <p class="hint"><code>/account/status</code>：库内/env、最近验柜、开关提示</p>
-              <div class="toolbar">
-                <button type="button" class="secondary btn-kr-acc-status">调用</button>
-              </div>
-            </div>
             <div class="kr-api-card" data-kr-acc-api="login">
               <div class="kr-api-card-head">
                 <h4>登录并保存</h4>
@@ -955,7 +930,7 @@
           <aside class="kr-result kr-bench-result is-empty" id="krAccResult">
             <div class="kr-result-head">
               <h4>状态 / 结果</h4>
-              <p class="hint" id="krAccResultMeta">点左侧「查询当前账号」或「调用」</p>
+              <p class="hint" id="krAccResultMeta">登录或清除后在此展示出入参</p>
             </div>
             <div class="kr-result-cols">
               <div class="kr-result-block">

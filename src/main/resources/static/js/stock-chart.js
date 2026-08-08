@@ -2961,43 +2961,27 @@
       ? ('生效账号 ' + user + (d.lastLoginAt ? ' · 最近验柜 ' + d.lastLoginAt : ''))
       : ((d && d.message) || '当前无可用账号');
     $('#krAccCurrentMeta').text(meta);
-    $('#krAccToolbarMeta').text(has
-      ? ('当前：' + (user || '—') + ' · ' + src)
-      : 'GET /api/ops/kuangrui/account/current');
     $('#krAccCurrentBox').toggleClass('is-empty', !has).toggleClass('is-ready', has);
     if (has && user && !($('#krAccUser').val() || '').trim()) {
       $('#krAccUser').val(user);
     }
   }
 
-  function loadKrAccountCurrent(opts) {
-    opts = opts || {};
-    var $btn = opts.$btn || $('#btnKrAccCurrent');
-    krInvoke({
-      method: 'GET',
-      url: '/api/ops/kuangrui/account/current',
-      $btn: $btn,
-      resultPrefix: 'krAcc',
-      label: '查询当前账号',
-      onDone: function (rsp) {
-        paintKrAccCurrent(rsp);
-      }
-    });
-  }
-
-  function loadKrAccountStatus(opts) {
-    opts = opts || {};
-    var $btn = opts.$btn || $('#btnKrAccRefresh');
-    krInvoke({
-      method: 'GET',
-      url: '/api/ops/kuangrui/account/status',
-      $btn: $btn,
-      resultPrefix: 'krAcc',
-      label: '完整状态',
-      onDone: function (rsp) {
-        paintKrAccCurrent(rsp);
-      }
-    });
+  /** 进入账号页时静默拉取当前生效账号（只更新上方展示条，不占结果区）。 */
+  function loadKrAccountCurrent() {
+    $('#krAccCurrentMeta').text('正在查询当前账号…');
+    $.getJSON('/api/ops/kuangrui/account/current')
+      .done(function (rsp) {
+        paintKrAccCurrent(rsp || {});
+      })
+      .fail(function (xhr) {
+        paintKrAccCurrent({
+          hasCred: false,
+          credSource: 'none',
+          message: (xhr && xhr.responseJSON && xhr.responseJSON.message)
+            || ('查询失败 HTTP ' + (xhr && xhr.status))
+        });
+      });
   }
 
   function ensureKrOesCards() {
@@ -5389,14 +5373,6 @@
   // 进入宽睿各页时预挂复制控件
   ['krOes', 'krMds', 'krOrder', 'krAcc'].forEach(function (p) {
     ensureKrCopyControls(p);
-  });
-  $('#btnKrAccCurrent, #krAccCards .btn-kr-acc-current').on('click', function () {
-    markKrAccCard('current');
-    loadKrAccountCurrent({ $btn: $(this) });
-  });
-  $('#btnKrAccRefresh, #krAccCards .btn-kr-acc-status').on('click', function () {
-    markKrAccCard('status');
-    loadKrAccountStatus({ $btn: $(this) });
   });
   $('#btnKrAccLogin').on('click', function () {
     markKrAccCard('login');
