@@ -122,6 +122,84 @@ public class KuangruiOesOpsFacade {
         });
     }
 
+    /** M5+：客户端总览。 */
+    public Map<String, Object> clientOverview() {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        m.put("live", oesReadonlyService.isLive());
+        if (!oesReadonlyService.isLive()) {
+            putOesNotLive(m);
+            return m;
+        }
+        try {
+            if (!oesReadonlyService.ensureReady()) {
+                m.put("ok", false);
+                m.putAll(oesReadonlyService.status());
+                m.put("message", readyFailMessage(m));
+                return m;
+            }
+            Map<String, Object> ov = oesReadonlyService.queryClientOverview();
+            m.putAll(ov);
+            if (!m.containsKey("ok")) {
+                m.put("ok", true);
+            }
+            return m;
+        } catch (Exception e) {
+            log.error("[oes-ops] clientOverview 失败: {}", e.getMessage(), e);
+            m.put("ok", false);
+            m.put("message", e.getMessage());
+            return m;
+        }
+    }
+
+    /** M5+：股东账户。 */
+    public Map<String, Object> invAcct() {
+        return queryBlock("invAcct", new QueryCall() {
+            @Override
+            public Object call() {
+                return oesReadonlyService.queryInvAcct();
+            }
+        });
+    }
+
+    /** M5+：主柜资金。 */
+    public Map<String, Object> counterCash(String cashAcctId) {
+        return queryBlock("counterCash", new QueryCall() {
+            @Override
+            public Object call() {
+                return oesReadonlyService.queryCounterCash(cashAcctId);
+            }
+        });
+    }
+
+    /** M5+：最大可买卖数量。 */
+    public Map<String, Object> maxTradableQty(String code, String side, BigDecimal priceYuan) {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        m.put("live", oesReadonlyService.isLive());
+        if (!oesReadonlyService.isLive()) {
+            putOesNotLive(m);
+            return m;
+        }
+        try {
+            if (!oesReadonlyService.ensureReady()) {
+                m.put("ok", false);
+                m.putAll(oesReadonlyService.status());
+                m.put("message", readyFailMessage(m));
+                return m;
+            }
+            Map<String, Object> r = oesReadonlyService.queryMaxTradableQty(code, side, priceYuan);
+            m.putAll(r);
+            if (!m.containsKey("ok")) {
+                m.put("ok", true);
+            }
+            return m;
+        } catch (Exception e) {
+            log.error("[oes-ops] maxTradableQty 失败: {}", e.getMessage(), e);
+            m.put("ok", false);
+            m.put("message", e.getMessage());
+            return m;
+        }
+    }
+
     /** 联调页限价试单（须 orderLive；不改金叉主路径）。 */
     public Map<String, Object> placeTest(String code, String side, BigDecimal priceYuan, Integer qty,
                                          String clientOrderId) {

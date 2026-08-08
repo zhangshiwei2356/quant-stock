@@ -119,8 +119,10 @@ public class ScheduleJobHandlers {
         try {
             Map<String, Object> st = mdsMinuteIngestService.status();
             boolean subscribed = Boolean.TRUE.equals(st.get("subscribed"));
+            boolean disconnected = Boolean.TRUE.equals(st.get("disconnected"));
             int upserted = 0;
-            if (subscribed && doFlush) {
+            // 订阅断线：勿假装 flush 成功，改走 pull 触发懒重连；仍失败则回退本地
+            if (subscribed && doFlush && !disconnected) {
                 upserted = mdsMinuteIngestService.flushBuckets();
                 log.info("[market-collect] MDS 订阅模式 flush upserted={}", upserted);
                 return true;
@@ -136,10 +138,20 @@ public class ScheduleJobHandlers {
                     codes.addAll(quantProperties.stockCodeList());
                 }
                 upserted = mdsMinuteIngestService.pullAndPersist(codes);
-                log.info("[market-collect] MDS pull codes={} upserted={}", codes.size(), upserted);
+                st = mdsMinuteIngestService.status();
+                log.info("[market-collect] MDS pull codes={} upserted={} disconnected={} lastError={}",
+                        codes.size(), upserted, st.get("disconnected"), st.get("lastError"));
+                if (mdsUnhealthy(st) && upserted <= 0) {
+                    log.error("[market-collect] MDS 死连接/全失败，回退本地");
+                    return false;
+                }
                 return true;
             }
             if (doFlush) {
+                if (disconnected || mdsUnhealthy(st)) {
+                    log.error("[market-collect] MDS 断线且仅 flush，回退本地");
+                    return false;
+                }
                 upserted = mdsMinuteIngestService.flushBuckets();
                 log.info("[market-collect] MDS flush upserted={}", upserted);
                 return true;
@@ -149,6 +161,30 @@ public class ScheduleJobHandlers {
             return false;
         }
         return false;
+    }
+
+    /** 断线、未登录或 lastError 标明连接问题 → 勿挡本地回退。 */
+    private static boolean mdsUnhealthy(Map<String, Object> st) {
+        if (st == null) {
+            return true;
+        }
+        if (Boolean.TRUE.equals(st.get("disconnected"))) {
+            return true;
+        }
+        if (Boolean.FALSE.equals(st.get("connected")) && Boolean.FALSE.equals(st.get("loggedIn"))) {
+            return true;
+        }
+        Object err = st.get("lastError");
+        if (err == null) {
+            return false;
+        }
+        String msg = String.valueOf(err).toLowerCase();
+        return msg.contains("disconnect")
+                || msg.contains("登录失败")
+                || msg.contains("logon")
+                || msg.contains("退避重连")
+                || msg.contains("缺少 mds")
+                || msg.contains("无宽睿账号");
     }
 
     /**

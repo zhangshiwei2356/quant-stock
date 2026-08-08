@@ -9,7 +9,7 @@
   更新：2026-08-08 ·
   <b>M0</b> 仿真登录 COMPLETE ·
   <b>M1</b>～<b>M4</b> 可选已落地（默认关）·
-  现货具名接口约 <b>15/24</b> 已接 ·
+  现货具名接口约 <b>20/24</b> 已接 ·
   <b>最新计划</b>：① M5 连接韧性 → ② 报撤小修+浸泡 → ③ 查询/效率增强 → ④ <b>M6 银证</b>（真仓）→ ⑤ L2/批量/两融后置。
   侧栏「扩展与文档 → <b>宽睿对接</b>」可点测运维 API；含账号登录与二级「宽睿文档梳理」；接口「介绍」弹层对齐本页摘要；报撤须 yml <code>order-enabled</code>。
 </p>
@@ -47,7 +47,7 @@
     <thead><tr><th>能力</th><th>典型接口 / 回调</th><th>对本应用</th></tr></thead>
     <tbody>
       <tr><td>行情订阅</td><td><code>subscribeMarketData</code> → L1 股票/指数/期权</td><td><b>M1 已用</b>：目标池 L1 → 分钟桶</td></tr>
-      <tr><td>快照查询</td><td><code>qryMktDataSnapshot</code> / <code>qrySnapshotList</code></td><td><b>M1 已用</b>：pull 补当前分钟</td></tr>
+      <tr><td>快照查询</td><td><code>qryMktDataSnapshot</code> / <code>qrySnapshotList</code></td><td><b>M1+M5+ 已用</b>：pull 优先批量 <code>qrySnapshotList</code>，失败回退单只</td></tr>
       <tr><td>Level2</td><td>L2 快照/增量/逐笔等</td><td>后置</td></tr>
       <tr><td>证券实时状态</td><td><code>qrySecurityStatus</code> / <code>onSecurityStatus</code></td><td><b>M4 已用</b>：停复牌（可开关回退量≤0）</td></tr>
       <tr><td>交易时段</td><td><code>qryTrdSessionStatus</code> / <code>onTrdSessionStatus</code></td><td><b>M4 已用</b>：开市/休市查询</td></tr>
@@ -65,7 +65,8 @@
       <tr><td>回报同步</td><td><code>sendRptSync</code></td><td><b>登录后必做</b>；超时易断连</td></tr>
       <tr><td>查委托 / 成交</td><td><code>queryOrder</code> / <code>queryTrade</code></td><td><b>M2/M3</b>：对账 + sync 推进补强</td></tr>
       <tr><td>查资金 / 持仓</td><td><code>queryCashAsset</code> / <code>queryStkHolding</code></td><td><b>M2 已用</b>：运维查询 + <code>position-pnl-sync</code> 对账</td></tr>
-      <tr><td>总览 / 柜台资金</td><td><code>queryClientOverview</code> / <code>queryCounterCash</code></td><td><b>计划 M5 后增强</b>：纸面对账补强</td></tr>
+      <tr><td>总览 / 柜台资金</td><td><code>queryClientOverview</code> / <code>queryCounterCash</code></td><td><b>M5+ 已用</b>：运维点测；纸面对账补强</td></tr>
+      <tr><td>股东账户 / 可买量</td><td><code>queryInvAcct</code> / <code>queryMaxTradableQty</code></td><td><b>M5+ 已用</b>：运维点测；可买量可选挂钩下单前校验</td></tr>
       <tr><td>佣金 / 产品 / 交易日</td><td><code>queryCommissionRate</code> / <code>queryStock</code> / <code>queryTradingDay</code></td><td><b>M4 已用</b>：可开关覆盖本地费率/日历/涨跌停</td></tr>
       <tr><td>银证转账</td><td><code>sendCashTrsfReq</code> / <code>queryCashTransferSerial</code></td><td><b>计划 M6</b>：真仓运维；sim 可不接</td></tr>
       <tr><td>两融 / 期权 / ETF</td><td>扩展接口族</td><td>超出现货范围，不做</td></tr>
@@ -98,10 +99,10 @@
   <table>
     <thead><tr><th>本应用模块</th><th>现状</th><th>宽睿可补</th><th>仍缺</th></tr></thead>
     <tbody>
-      <tr><td><code>market-collect</code> / MDS 摄入</td><td><b>M1 可选已落地</b>（默认关）</td><td>L1 订阅/查询→分钟桶→<code>market_1min(MDS)</code>；运维 MDS/TDX 抽样对账已落地</td><td><b>M5a</b> 断线清客户端/重连；死连接勿挡本地回退；L2 后置</td></tr>
-      <tr><td><code>TradeGatewayService</code></td><td>sim 即时；sdk 本地桩或 <b>M3 可选</b> OES</td><td>限价报/撤 + 回报/查询推进（粗状态映射已有）</td><td>撤单确认闭环；<code>PARTIALLY_CANCELED(6)</code>→本地 CANCELLED；批量后置</td></tr>
-      <tr><td><code>sync-orders</code></td><td>本地桩或 <b>M3</b> OES 推进 + M2 对账日志</td><td><code>queryOrder</code>/<code>queryTrade</code>+回报</td><td>同上细态；ErrorCode 可读原因可选</td></tr>
-      <tr><td><code>position-pnl-sync</code></td><td>本地成本+最新价 + <b>M2 可选</b> OES 对账</td><td><code>queryCashAsset</code>/<code>queryStkHolding</code></td><td>可选增强 overview/invAcct/可买量</td></tr>
+      <tr><td><code>market-collect</code> / MDS 摄入</td><td><b>M1+M5a 可选已落地</b>（默认关）</td><td>L1 订阅/查询→分钟桶→<code>market_1min(MDS)</code>；断线异步 close→退避重登/重订阅；死连接勿挡本地回退；运维 MDS/TDX 抽样对账</td><td>L2 后置；仿真浸泡验收</td></tr>
+      <tr><td><code>TradeGatewayService</code></td><td>sim 即时；sdk 本地桩或 <b>M3+M5 小修可选</b> OES</td><td>限价报/撤；撤单确认制；状态 <code>6</code>→本地 CANCELLED（保留已成量）</td><td>批量后置；仿真浸泡</td></tr>
+      <tr><td><code>sync-orders</code></td><td>本地桩或 <b>M3</b> OES 推进 + M2 对账日志</td><td><code>queryOrder</code>/<code>queryTrade</code>+回报；撤单靠回报收束</td><td>ErrorCode 可读原因可选</td></tr>
+      <tr><td><code>position-pnl-sync</code></td><td>本地成本+最新价 + <b>M2 可选</b> OES 对账</td><td><code>queryCashAsset</code>/<code>queryStkHolding</code>；M5+ overview/invAcct/可买量可点测</td><td>—</td></tr>
       <tr><td>停复牌 / 涨跌停 / 股本</td><td>量≤0、规则估算、启发式；<b>M4 可选</b>宽睿价</td><td>MDS 静态+状态；OES <code>queryStock</code></td><td>随 M5 连接韧性；ST 日切可并存本地表</td></tr>
       <tr><td>交易日历 / 佣金</td><td>静态节假日 / 配置近似；<b>M4 可选</b> OES</td><td><code>queryTradingDay</code> / <code>queryCommissionRate</code></td><td>—</td></tr>
       <tr><td>复权 / 财报 / 舆情</td><td>未落地</td><td>资料包基本不覆盖</td><td>其他数据源</td></tr>
@@ -147,6 +148,36 @@
         <td>MDS 静态/状态/时段 + OES 产品/交易日/佣金；业务总闸 <code>static-enabled</code>（失败回退本地启发式）</td>
         <td>运维 <code>/api/ops/kuangrui/static/*</code>、<code>oes/{stock,trading-day,commission-rate}</code>、<code>mds/{stock-static,security-status,session-status}</code></td>
       </tr>
+      <tr>
+        <td><b>M5a MDS 韧性</b></td>
+        <td><b>可选已落地</b>（默认关 · 2026-08-08）</td>
+        <td><code>onDisConn</code> 异步 close→退避重登→需则重订阅；status 含 <code>disconnected</code>/<code>disconnectCount</code>/<code>reconnectCount</code>；<code>market-collect</code> 死连接/全失败回退本地</td>
+        <td>运维 <code>GET /api/ops/kuangrui/mds/status</code>；断线后看 reconnect 字段与采集日志</td>
+      </tr>
+      <tr>
+        <td><b>M5b OES 韧性</b></td>
+        <td><b>可选已落地</b>（默认关 · 2026-08-08）</td>
+        <td>断线异步 close；<code>ensureClient</code> 先 close 再重建 + <code>sendRptSync</code>；status 暴露断线/重连计数</td>
+        <td>运维 <code>GET /api/ops/kuangrui/oes/status</code></td>
+      </tr>
+      <tr>
+        <td><b>M3/M5 撤单小修</b></td>
+        <td><b>可选已落地</b>（2026-08-08）</td>
+        <td>OES live 撤单确认制（勿乐观假撤）；柜台状态 <code>6</code>→本地 <code>CANCELLED</code>（保留已成量）</td>
+        <td><code>TradeGatewayServiceTest</code> / <code>KuangruiOesHelpersTest</code></td>
+      </tr>
+      <tr>
+        <td><b>④ 仿真浸泡</b></td>
+        <td><b>COMPLETE</b>（2026-08-08）</td>
+        <td>阿里云仿真：登录(DB) → MDS stop/pull/订 → OES reconcile → place/cancel → <code>sync-orders</code> → trading-day/佣金/MDS 静态抽检；脚本可复现</td>
+        <td><code>.\scripts\kuangrui\m5-soak.ps1</code> → <code>scripts/kuangrui/out/m5-soak-report.txt</code>；注：<code>oes/stock</code> 仿真偶发超时记 soft-WARN</td>
+      </tr>
+      <tr>
+        <td><b>M5+ 查询增强</b></td>
+        <td><b>可选已落地</b>（默认关 · 2026-08-08）</td>
+        <td><code>queryClientOverview</code> / <code>queryCounterCash</code> / <code>queryInvAcct</code> / <code>queryMaxTradableQty</code>；MDS pull 优先 <code>qrySnapshotList</code></td>
+        <td>运维 <code>/api/ops/kuangrui/oes/{client-overview,counter-cash,inv-acct,max-tradable-qty}</code>；MDS pull 自动批量</td>
+      </tr>
     </tbody>
   </table>
 
@@ -164,26 +195,26 @@
 
   <h5 style="margin:12px 0 4px;">接入面盘点（现货具名接口 · 2026-08-08）</h5>
   <p class="hint" style="margin:0 0 8px;">
-    口径：手册典型 SDK 名（非 jar 全部重载）。MDS≈8、OES≈16，合计约 24；已接 15（≈63%）。
+    口径：手册典型 SDK 名（非 jar 全部重载）。MDS≈8、OES≈16，合计约 24；已接 20（≈83%）。
     整包含 L2/两融等远大于此；主路径有意裁剪。
   </p>
   <table>
     <thead><tr><th>状态</th><th>接口</th></tr></thead>
     <tbody>
       <tr>
-        <td><b>已接（15）</b></td>
+        <td><b>已接（20）</b></td>
         <td>
-          MDS：<code>subscribeMarketData</code>、<code>qryMktDataSnapshot</code>、<code>qrySecurityStatus</code>、<code>qryTrdSessionStatus</code>、<code>qryStockStaticInfo</code>；
+          MDS：<code>subscribeMarketData</code>、<code>qryMktDataSnapshot</code>、<code>qrySnapshotList</code>、<code>qrySecurityStatus</code>、<code>qryTrdSessionStatus</code>、<code>qryStockStaticInfo</code>；
           OES：<code>sendRptSync</code>、<code>sendOrdReq</code>、<code>sendOrdCancelReq</code>、
           <code>queryCashAsset</code>、<code>queryStkHolding</code>、<code>queryOrder</code>、<code>queryTrade</code>、
-          <code>queryStock</code>、<code>queryTradingDay</code>、<code>queryCommissionRate</code>
+          <code>queryStock</code>、<code>queryTradingDay</code>、<code>queryCommissionRate</code>、
+          <code>queryClientOverview</code>、<code>queryCounterCash</code>、<code>queryInvAcct</code>、<code>queryMaxTradableQty</code>
         </td>
       </tr>
       <tr>
         <td><b>计划接入</b></td>
         <td>
-          增强：<code>queryClientOverview</code> / <code>queryCounterCash</code> / <code>queryInvAcct</code> / <code>queryMaxTradableQty</code> /
-          <code>qrySnapshotList</code>；批量 <code>sendBatchOrdsReq</code>（按需）；
+          批量 <code>sendBatchOrdsReq</code>（按需）；
           <b>M6 银证</b>：<code>sendCashTrsfReq</code> + <code>queryCashTransferSerial</code>
         </td>
       </tr>
@@ -196,7 +227,7 @@
 
   <h5 style="margin:12px 0 4px;">最新接入计划（2026-08-08）</h5>
   <p class="hint" style="margin:0 0 8px;">
-    现货主路径 M0～M4 <b>代码可选已落地</b>（默认关）。优先把「能连稳、报撤对」做完，再补查询增强与真仓银证。
+    现货主路径 M0～M4 + <b>M5a/M5b/撤单小修/仿真浸泡/查询增强已落地</b>（默认关）。下一步：真仓银证。
     SDK 无公开 reconnect，须应用层实现（回调内勿重活）。
   </p>
   <table>
@@ -205,52 +236,37 @@
       <tr>
         <td>①</td>
         <td><b>M5a MDS</b></td>
-        <td>连接韧性（最先）</td>
-        <td>
-          现状：<code>onDisConn</code> 只清 <code>subscribed</code>，不清 <code>client</code>；
-          <code>ensureClient</code> 见非空直接返回 → 易顶死连接；
-          <code>market-collect</code> pull 空窗时仍可能挡本地回退。
-          改：异步 <code>closeClient</code> → 退避重登 → 需则重订阅；全失败勿冒充成功。
-        </td>
-        <td>断线后采集可自愈或明确回退本地；status 可见断线/重连</td>
+        <td>连接韧性</td>
+        <td><b>已落地</b>：异步 close→退避重登/重订阅；死连接勿挡本地回退；status 可见断线/重连</td>
+        <td>✓ 代码可选；浸泡已跑</td>
       </tr>
       <tr>
         <td>②</td>
         <td><b>M5b OES</b></td>
         <td>连接韧性</td>
-        <td>
-          现状：断线置 <code>client=null</code> 可懒重连，但未先 <code>close</code>。
-          改：先 close 再重建 + <code>sendRptSync</code>；退避；status 暴露断线计数。
-        </td>
-        <td>断线后只读/报撤可恢复；仿真无长期假死</td>
+        <td><b>已落地</b>：先 close 再重建 + <code>sendRptSync</code>；status 暴露断线计数</td>
+        <td>✓ 代码可选；浸泡已跑</td>
       </tr>
       <tr>
         <td>③</td>
         <td><b>M3/M5 小修</b></td>
         <td>状态与撤单</td>
-        <td>
-          <code>PARTIALLY_CANCELED(6)</code>→本地 <code>CANCELLED</code>（保留已成量）；
-          撤单等回报/查询确认，勿乐观假撤。
-        </td>
-        <td>单测覆盖状态 6；撤拒不永久假撤</td>
+        <td><b>已落地</b>：状态 <code>6</code>→CANCELLED；撤单确认制</td>
+        <td>✓ 单测覆盖</td>
       </tr>
       <tr>
         <td>④</td>
         <td><b>验收</b></td>
         <td>仿真浸泡</td>
-        <td>开关开一轮：登录 → MDS pull/订 → OES reconcile → 买/卖/撤 → sync → static 抽检</td>
-        <td>有日志/运维结果可复现</td>
+        <td><b>已落地</b>：<code>scripts/kuangrui/m5-soak.ps1</code>；报告 <code>scripts/kuangrui/out/m5-soak-report.*</code></td>
+        <td>✓ 可复现；OES stock 查询仿真 soft-WARN</td>
       </tr>
       <tr>
         <td>⑤</td>
         <td><b>M5+ 增强</b></td>
         <td>查询 / 效率</td>
-        <td>
-          <code>queryClientOverview</code> / <code>queryCounterCash</code> /
-          <code>queryInvAcct</code> / <code>queryMaxTradableQty</code>；
-          MDS <code>qrySnapshotList</code> 批量 pull；需要时再 <code>sendBatchOrdsReq</code>
-        </td>
-        <td>运维点测可查；可买量可挂钩下单前校验（可选）</td>
+        <td><b>已落地</b>：overview / counterCash / invAcct / 可买量；MDS <code>qrySnapshotList</code> 批量 pull（失败回退单只）；批量下单仍按需后置</td>
+        <td>✓ 运维点测可查</td>
       </tr>
       <tr>
         <td>⑥</td>

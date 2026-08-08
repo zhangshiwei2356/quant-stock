@@ -85,6 +85,32 @@ public class NoopOesReadonlyService implements OesReadonlyService {
     }
 
     @Override
+    public Map<String, Object> queryClientOverview() {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        m.put("ok", false);
+        m.put("live", false);
+        return m;
+    }
+
+    @Override
+    public List<Map<String, Object>> queryInvAcct() {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<Map<String, Object>> queryCounterCash(String cashAcctId) {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public Map<String, Object> queryMaxTradableQty(String code, String side, java.math.BigDecimal priceYuan) {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        m.put("ok", false);
+        m.put("live", false);
+        return m;
+    }
+
+    @Override
     public void stop() {
         // no-op
     }

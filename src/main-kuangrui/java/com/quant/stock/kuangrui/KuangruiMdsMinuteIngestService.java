@@ -33,14 +33,24 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 宽睿 MDS L1 → market_1min(MDS)。仅 {@code -Pkuangrui} 编译进主包。
+ * <p>
+ * M5a：断线异步 close → 退避重登 → 需则重订阅；回调内不做重活。
+ * </p>
  */
 @Slf4j
 @Service
@@ -53,13 +63,31 @@ import java.util.concurrent.atomic.AtomicReference;
 }, havingValue = "true")
 public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
 
+    private static final long RECONNECT_BASE_MS = 1_000L;
+    private static final long RECONNECT_MAX_MS = 60_000L;
+
     private final QuantProperties quantProperties;
     private final MdsMinuteAggregator aggregator;
     private final org.springframework.beans.factory.ObjectProvider<KuangruiCredentialStore> credentialStoreProvider;
 
     private final Object clientLock = new Object();
     private final AtomicBoolean subscribed = new AtomicBoolean(false);
+    private final AtomicBoolean disconnected = new AtomicBoolean(false);
+    private final AtomicBoolean wantSubscribe = new AtomicBoolean(false);
+    private final AtomicBoolean cleanupScheduled = new AtomicBoolean(false);
     private final AtomicReference<String> lastError = new AtomicReference<String>();
+    private final AtomicInteger disconnectCount = new AtomicInteger(0);
+    private final AtomicInteger reconnectCount = new AtomicInteger(0);
+    private final AtomicInteger backoffAttempt = new AtomicInteger(0);
+    private final AtomicLong nextReconnectAtMs = new AtomicLong(0L);
+    private final AtomicReference<List<String>> lastSubscribeCodes =
+            new AtomicReference<List<String>>(Collections.<String>emptyList());
+    private final ScheduledExecutorService reconnectExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "mds-reconnect");
+        t.setDaemon(true);
+        return t;
+    });
+    private volatile ScheduledFuture<?> reconnectFuture;
     private volatile MdsClientImpl client;
 
     public KuangruiMdsMinuteIngestService(QuantProperties quantProperties,
@@ -78,10 +106,18 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
     @Override
     public Map<String, Object> status() {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
+        boolean connected = client != null && !disconnected.get();
         m.put("live", true);
         m.put("impl", "kuangrui-mds");
         m.put("loggedIn", client != null);
+        m.put("connected", connected);
+        m.put("disconnected", disconnected.get());
         m.put("subscribed", subscribed.get());
+        m.put("wantSubscribe", wantSubscribe.get());
+        m.put("disconnectCount", disconnectCount.get());
+        m.put("reconnectCount", reconnectCount.get());
+        m.put("reconnectInProgress", reconnectFuture != null && !reconnectFuture.isDone());
+        m.put("nextReconnectAtMs", nextReconnectAtMs.get());
         m.put("lastError", lastError.get());
         m.put("configPath", resolveMdsConfig().toString());
         m.put("configExists", Files.isRegularFile(resolveMdsConfig()));
@@ -108,16 +144,175 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
             return 0;
         }
         int ok = 0;
-        for (String code : codes) {
+        int fail = 0;
+        // M5+：优先 qrySnapshotList 批量；失败再逐只 qryMktDataSnapshot
+        List<String> remain = new ArrayList<String>(codes);
+        try {
+            int batched = pullBySnapshotList(remain);
+            if (batched > 0) {
+                ok += batched;
+                remain.clear();
+            }
+        } catch (Exception e) {
+            log.error("[mds] qrySnapshotList 批量失败，回退单只查询: {}", e.getMessage(), e);
+            if (looksLikeDisconnect(e)) {
+                markDisconnectedAndScheduleCleanup(client, "pull-error: " + e.getMessage());
+                return 0;
+            }
+        }
+        for (String code : remain) {
             try {
                 if (queryOne(code)) {
                     ok++;
                 }
             } catch (Exception e) {
+                fail++;
                 log.error("[mds] 查询失败 code={}: {}", code, e.getMessage(), e);
+                if (looksLikeDisconnect(e)) {
+                    markDisconnectedAndScheduleCleanup(client, "pull-error: " + e.getMessage());
+                    break;
+                }
             }
         }
+        if (ok == 0 && fail > 0 && disconnected.get()) {
+            return 0;
+        }
         return aggregator.flush(true);
+    }
+
+    /**
+     * 批量快照查询（{@code qrySnapshotList}）。按交易所分批，单批最多 80 只。
+     *
+     * @return 成功喂入分钟桶的条数；0 表示未走批量或无有效结果
+     */
+    private int pullBySnapshotList(List<String> codes) throws Exception {
+        if (client == null || codes == null || codes.isEmpty()) {
+            return 0;
+        }
+        Map<Integer, List<String>> byExch = new LinkedHashMap<Integer, List<String>>();
+        for (String code : codes) {
+            int exch = KuangruiExchangeIds.fromStockCode(code);
+            int instr = KuangruiExchangeIds.toInstrId(code);
+            if (exch == 0 || instr == 0) {
+                continue;
+            }
+            List<String> bucket = byExch.get(Integer.valueOf(exch));
+            if (bucket == null) {
+                bucket = new ArrayList<String>();
+                byExch.put(Integer.valueOf(exch), bucket);
+            }
+            bucket.add(code);
+        }
+        if (byExch.isEmpty()) {
+            return 0;
+        }
+        int fed = 0;
+        boolean anyBatchOk = false;
+        for (Map.Entry<Integer, List<String>> e : byExch.entrySet()) {
+            List<String> list = e.getValue();
+            for (int from = 0; from < list.size(); from += 80) {
+                int to = Math.min(from + 80, list.size());
+                List<String> chunk = list.subList(from, to);
+                int n = querySnapshotListChunk(e.getKey().intValue(), chunk);
+                if (n >= 0) {
+                    anyBatchOk = true;
+                    fed += n;
+                }
+            }
+        }
+        if (!anyBatchOk) {
+            return 0;
+        }
+        log.info("[mds] qrySnapshotList 批量喂入 {} 条 / {} 标的", fed, codes.size());
+        return fed;
+    }
+
+    /** @return 喂入条数；-1 表示本批调用失败（调用方回退单只） */
+    private int querySnapshotListChunk(int exch, List<String> codes) {
+        try {
+            Object filter = newInstance("com.quant360.api.model.mds.MdsQrySnapshotListFilter");
+            if (filter == null) {
+                return -1;
+            }
+            setBean(filter, "setExchId", toExch(exch));
+            setBean(filter, "setMdProductType", MdsSecurityType.MDS_SECURITY_TYPE_STOCK);
+            Object mdLevel = resolveMdsMdLevel1();
+            if (mdLevel != null) {
+                setBean(filter, "setMdLevel", mdLevel);
+            }
+            List<Object> entries = new ArrayList<Object>();
+            for (String code : codes) {
+                Object entry = newInstance("com.quant360.api.model.mds.MdsQrySecurityCodeEntry");
+                if (entry == null) {
+                    continue;
+                }
+                setBean(entry, "setExchId", toExch(exch));
+                setBean(entry, "setMdProductType", MdsSecurityType.MDS_SECURITY_TYPE_STOCK);
+                setBean(entry, "setInstrId", Integer.valueOf(KuangruiExchangeIds.toInstrId(code)));
+                entries.add(entry);
+            }
+            if (entries.isEmpty()) {
+                return 0;
+            }
+            setBean(filter, "setSecurityCodeCnt", Integer.valueOf(entries.size()));
+            setBean(filter, "setSecurityCodeList", entries);
+
+            Object mode = resolveClientQueryModeAll();
+            Object rsp;
+            if (mode != null) {
+                rsp = invokeReturning(client, "qrySnapshotList", filter, mode);
+            } else {
+                rsp = invokeReturning(client, "qrySnapshotList", filter);
+            }
+            if (rsp == null) {
+                return -1;
+            }
+            Object items = firstGetter(rsp, "getQryItems", "getItems");
+            if (!(items instanceof List)) {
+                return -1;
+            }
+            int fed = 0;
+            for (Object snap : (List<?>) items) {
+                if (snap == null) {
+                    continue;
+                }
+                Object head = firstGetter(snap, "getHead", "getSnapshotHead");
+                Object stock = firstGetter(snap, "getStock", "getStockSnapshotBody");
+                if (head instanceof MdsMktDataSnapshotHead && stock instanceof MdsStockSnapshotBody) {
+                    feed((MdsMktDataSnapshotHead) head, (MdsStockSnapshotBody) stock);
+                    fed++;
+                } else if (snap instanceof MdsMktDataSnapshotBase) {
+                    MdsMktDataSnapshotBase base = (MdsMktDataSnapshotBase) snap;
+                    if (base.getHead() != null && base.getStock() != null) {
+                        feed(base.getHead(), base.getStock());
+                        fed++;
+                    }
+                }
+            }
+            return fed;
+        } catch (Exception e) {
+            log.error("[mds] qrySnapshotList chunk 失败 exch={} size={}: {}",
+                    exch, codes.size(), e.getMessage(), e);
+            return -1;
+        }
+    }
+
+    private static Object resolveClientQueryModeAll() {
+        try {
+            Class<?> clz = Class.forName("com.quant360.api.client.Client$QueryMode");
+            return clz.getMethod("valueOf", String.class).invoke(null, "ALL");
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static Object resolveMdsMdLevel1() {
+        try {
+            Class<?> clz = Class.forName("com.quant360.api.model.mds.enu.MdsMdLevel");
+            return clz.getMethod("valueOf", String.class).invoke(null, "MDS_MD_LEVEL_1");
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     @Override
@@ -128,8 +323,11 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
         }
         synchronized (clientLock) {
             try {
+                cancelScheduledReconnect();
                 ensureClient();
                 doSubscribe(codes);
+                lastSubscribeCodes.set(new ArrayList<String>(codes));
+                wantSubscribe.set(true);
                 subscribed.set(true);
                 lastError.set(null);
                 log.info("[mds] 已订阅 L1 codes={}", codes.size());
@@ -145,8 +343,11 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
     @Override
     public void stopSubscribe() {
         synchronized (clientLock) {
+            wantSubscribe.set(false);
             subscribed.set(false);
+            cancelScheduledReconnect();
             closeClient();
+            disconnected.set(false);
         }
     }
 
@@ -441,11 +642,6 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
         }
     }
 
-    @PreDestroy
-    public void destroy() {
-        stopSubscribe();
-    }
-
     private boolean queryOne(String code) throws Exception {
         int exch = KuangruiExchangeIds.fromStockCode(code);
         int instr = KuangruiExchangeIds.toInstrId(code);
@@ -500,8 +696,17 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
 
     private void ensureClient() throws Exception {
         synchronized (clientLock) {
-            if (client != null) {
+            if (client != null && !disconnected.get()) {
                 return;
+            }
+            long nextAt = nextReconnectAtMs.get();
+            long now = System.currentTimeMillis();
+            if (client == null && disconnected.get() && nextAt > now) {
+                throw new IllegalStateException("MDS 退避重连中，约 " + (nextAt - now) + "ms 后重试");
+            }
+            if (client != null) {
+                // 断线后 client 非空却不可用：先 close 再重建，避免顶死连接
+                closeClient();
             }
             Path cfg = resolveMdsConfig();
             if (!Files.isRegularFile(cfg)) {
@@ -519,9 +724,8 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
             c.initCallBack(new MdsCallBack() {
                 @Override
                 public void onDisConn(MdsClient cl) {
-                    log.error("[mds] 连接中断");
-                    subscribed.set(false);
-                    lastError.set("disconnected");
+                    // 回调内勿重活：只打标 + 异步 close/重连
+                    markDisconnectedAndScheduleCleanup(cl, "disconnected");
                 }
 
                 @Override
@@ -555,9 +759,13 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
                     log.error("MDS 分钟摄入异常", ignore);
                     // ignore
                 }
+                armBackoff();
                 throw new IllegalStateException("MDS 登录失败 rsp=" + rsp);
             }
             client = c;
+            disconnected.set(false);
+            backoffAttempt.set(0);
+            nextReconnectAtMs.set(0L);
             lastError.set(null);
             log.info("[mds] 登录成功 applVerId={}", rsp.getApplVerId());
         }
@@ -584,9 +792,108 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
         );
     }
 
+    private void markDisconnectedAndScheduleCleanup(MdsClient dead, String reason) {
+        log.error("[mds] 连接中断 reason={}", reason);
+        subscribed.set(false);
+        disconnected.set(true);
+        lastError.set(reason == null ? "disconnected" : reason);
+        disconnectCount.incrementAndGet();
+        if (!cleanupScheduled.compareAndSet(false, true)) {
+            return;
+        }
+        reconnectExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    synchronized (clientLock) {
+                        if (client != null && (dead == null || client == dead || disconnected.get())) {
+                            closeClient();
+                        }
+                    }
+                    scheduleReconnectIfNeeded();
+                } finally {
+                    cleanupScheduled.set(false);
+                }
+            }
+        });
+    }
+
+    private void scheduleReconnectIfNeeded() {
+        if (!wantSubscribe.get()) {
+            // pull 路径由 ensureClient 懒重连；仅订阅模式主动退避重登
+            armBackoff();
+            return;
+        }
+        cancelScheduledReconnect();
+        long delay = armBackoff();
+        reconnectFuture = reconnectExecutor.schedule(new Runnable() {
+            @Override
+            public void run() {
+                synchronized (clientLock) {
+                    if (!wantSubscribe.get()) {
+                        return;
+                    }
+                    try {
+                        ensureClient();
+                        List<String> codes = lastSubscribeCodes.get();
+                        if (codes != null && !codes.isEmpty()) {
+                            doSubscribe(codes);
+                            subscribed.set(true);
+                        }
+                        reconnectCount.incrementAndGet();
+                        lastError.set(null);
+                        log.info("[mds] 断线重连并重订阅成功 codes={}",
+                                codes == null ? 0 : codes.size());
+                    } catch (Exception e) {
+                        lastError.set(e.getMessage());
+                        log.error("[mds] 断线重连失败: {}", e.getMessage(), e);
+                        scheduleReconnectIfNeeded();
+                    }
+                }
+            }
+        }, delay, TimeUnit.MILLISECONDS);
+        log.info("[mds] 已调度退避重连 delayMs={}", delay);
+    }
+
+    private long armBackoff() {
+        int attempt = backoffAttempt.getAndIncrement();
+        long delay = RECONNECT_BASE_MS;
+        for (int i = 0; i < attempt && delay < RECONNECT_MAX_MS; i++) {
+            delay = Math.min(RECONNECT_MAX_MS, delay * 2L);
+        }
+        nextReconnectAtMs.set(System.currentTimeMillis() + delay);
+        return delay;
+    }
+
+    private void cancelScheduledReconnect() {
+        ScheduledFuture<?> f = reconnectFuture;
+        reconnectFuture = null;
+        if (f != null) {
+            f.cancel(false);
+        }
+    }
+
+    private static boolean looksLikeDisconnect(Exception e) {
+        if (e == null) {
+            return false;
+        }
+        String msg = e.getMessage();
+        if (msg == null) {
+            msg = e.getClass().getSimpleName();
+        } else {
+            msg = msg.toLowerCase();
+        }
+        return msg.contains("disconnect")
+                || msg.contains("closed")
+                || msg.contains("socket")
+                || msg.contains("connection")
+                || msg.contains("broken");
+    }
+
     private void closeClient() {
         MdsClientImpl c = client;
         client = null;
+        subscribed.set(false);
         if (c != null) {
             try {
                 c.close();
@@ -594,6 +901,14 @@ public class KuangruiMdsMinuteIngestService implements MdsMinuteIngestService {
                 log.error("[mds] close: {}", e.getMessage(), e);
             }
         }
+    }
+
+    @PreDestroy
+    public void destroy() {
+        wantSubscribe.set(false);
+        cancelScheduledReconnect();
+        stopSubscribe();
+        reconnectExecutor.shutdownNow();
     }
 
     private Path resolveMdsConfig() {

@@ -2739,6 +2739,40 @@
         '<p>OES <code>queryCommissionRate</code>：佣金费率，可开关覆盖配置近似费率。</p>'
         + '<ul><li>运维：<code>GET /api/ops/kuangrui/oes/commission-rate</code></li></ul>'
     },
+    'queryClientOverview': {
+      title: '客户端总览',
+      sdk: 'queryClientOverview',
+      stage: 'M5+ 查询增强',
+      html:
+        '<p>OES <code>queryClientOverview</code>：客户/资金账户/股东账户摘要，补强纸面对账。</p>'
+        + '<ul><li>运维：<code>GET /api/ops/kuangrui/oes/client-overview</code></li>'
+        + '<li>只读；不改金叉主路径</li></ul>'
+    },
+    'queryInvAcct': {
+      title: '股东账户',
+      sdk: 'queryInvAcct',
+      stage: 'M5+ 查询增强',
+      html:
+        '<p>OES <code>queryInvAcct</code>：股东账户列表（市场、状态、权限等）。</p>'
+        + '<ul><li>运维：<code>GET /api/ops/kuangrui/oes/inv-acct</code></li></ul>'
+    },
+    'queryCounterCash': {
+      title: '主柜资金',
+      sdk: 'queryCounterCash',
+      stage: 'M5+ 查询增强',
+      html:
+        '<p>OES <code>queryCounterCash</code>：主柜可用/可取资金（与 OES 内存资金互补）。</p>'
+        + '<ul><li>运维：<code>GET /api/ops/kuangrui/oes/counter-cash?cashAcctId=</code>（账号可选）</li></ul>'
+    },
+    'queryMaxTradableQty': {
+      title: '可买卖量',
+      sdk: 'queryMaxTradableQty',
+      stage: 'M5+ 查询增强',
+      html:
+        '<p>OES <code>queryMaxTradableQty</code>：给定证券/方向/限价下的最大可买卖数量。</p>'
+        + '<ul><li>运维：<code>GET /api/ops/kuangrui/oes/max-tradable-qty?code=&amp;side=&amp;price=</code></li>'
+        + '<li>可选挂钩下单前校验；当前仅运维点测</li></ul>'
+    },
     'oes.stop': {
       title: '关闭连接',
       sdk: 'stop',
@@ -2793,10 +2827,11 @@
     'pull': {
       title: 'Pull 落库',
       sdk: 'pull',
-      stage: 'M1 MDS L1',
+      stage: 'M1 / M5+',
       html:
         '<p>主动 pull L1 快照并写入分钟桶 → <code>market_1min(data_source=MDS)</code>。</p>'
         + '<ul><li>运维：<code>POST /api/ops/kuangrui/mds/pull</code></li>'
+        + '<li>M5+ 优先 <code>qrySnapshotList</code> 批量，失败回退单只 <code>qryMktDataSnapshot</code></li>'
         + '<li>价按元后四位 ÷10000；写操作二次确认</li></ul>'
     },
     'subscribe': {
@@ -2915,9 +2950,30 @@
       $card.append($('<div class="toolbar kr-api-params"/>')
         .append($('<label class="field-inline"/>').html('代码 <input type="text" class="kr-code" value="600036" style="width:88px;"/>')));
     }
+    if (a.tradable) {
+      $card.append($('<div class="toolbar kr-api-params"/>')
+        .append($('<label class="field-inline"/>').html('代码 <input type="text" class="kr-code" value="600036" style="width:88px;"/>'))
+        .append($('<label class="field-inline"/>').html('方向 <select class="kr-side"><option value="BUY">BUY</option><option value="SELL">SELL</option></select>'))
+        .append($('<label class="field-inline"/>').html('价格 <input type="text" class="kr-price" value="10.00" style="width:72px;"/>')));
+    }
+    if (a.cashAcct) {
+      $card.append($('<div class="toolbar kr-api-params"/>')
+        .append($('<label class="field-inline"/>').html('资金账号 <input type="text" class="kr-cash-acct" placeholder="可选" style="width:120px;"/>')));
+    }
     $btn.on('click', function () {
       var data = undefined;
       if (a.code) data = { code: $card.find('.kr-code').val() };
+      if (a.tradable) {
+        data = {
+          code: $card.find('.kr-code').val(),
+          side: $card.find('.kr-side').val(),
+          price: $card.find('.kr-price').val()
+        };
+      }
+      if (a.cashAcct) {
+        var acct = ($card.find('.kr-cash-acct').val() || '').trim();
+        data = acct ? { cashAcctId: acct } : {};
+      }
       krInvoke({
         method: a.method,
         url: a.path,
@@ -3292,6 +3348,10 @@
       { title: '证券产品', sdk: 'queryStock', method: 'GET', path: '/api/ops/kuangrui/oes/stock', code: true },
       { title: '交易日', sdk: 'queryTradingDay', method: 'GET', path: '/api/ops/kuangrui/oes/trading-day' },
       { title: '佣金', sdk: 'queryCommissionRate', method: 'GET', path: '/api/ops/kuangrui/oes/commission-rate' },
+      { title: '客户端总览', sdk: 'queryClientOverview', method: 'GET', path: '/api/ops/kuangrui/oes/client-overview' },
+      { title: '股东账户', sdk: 'queryInvAcct', method: 'GET', path: '/api/ops/kuangrui/oes/inv-acct' },
+      { title: '主柜资金', sdk: 'queryCounterCash', method: 'GET', path: '/api/ops/kuangrui/oes/counter-cash', cashAcct: true },
+      { title: '可买卖量', sdk: 'queryMaxTradableQty', method: 'GET', path: '/api/ops/kuangrui/oes/max-tradable-qty', tradable: true },
       { title: '关闭连接', sdk: 'stop', method: 'POST', path: '/api/ops/kuangrui/oes/stop', confirm: '确认关闭 OES 客户端连接？' }
     ];
     apis.forEach(function (a) {

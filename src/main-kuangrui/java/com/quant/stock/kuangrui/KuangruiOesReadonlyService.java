@@ -29,12 +29,18 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 宽睿 OES：登录 + {@code sendRptSync} + 只读查询（M2）；可选报撤与回报队列（M3，{@code oes.order-enabled}）。
  * 仅 {@code -Pkuangrui} 编译；API 调用经反射适配资料包签名差异。
+ * <p>
+ * M5b：断线异步 close → 懒重连 + {@code sendRptSync}；回调内勿重活。
+ * </p>
  */
 @Slf4j
 @Service
@@ -55,9 +61,18 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
 
     private final Object clientLock = new Object();
     private final AtomicBoolean rptSynced = new AtomicBoolean(false);
+    private final AtomicBoolean disconnected = new AtomicBoolean(false);
+    private final AtomicBoolean cleanupScheduled = new AtomicBoolean(false);
     private final AtomicReference<String> lastError = new AtomicReference<String>();
     private final AtomicReference<String> applVerId = new AtomicReference<String>();
+    private final AtomicInteger disconnectCount = new AtomicInteger(0);
+    private final AtomicInteger reconnectCount = new AtomicInteger(0);
     private final ConcurrentLinkedQueue<OesOrderEvent> eventQueue = new ConcurrentLinkedQueue<OesOrderEvent>();
+    private final ScheduledExecutorService disconnectExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "oes-disconnect");
+        t.setDaemon(true);
+        return t;
+    });
     private volatile OesClientImpl client;
     private volatile long lastInMsgSeq;
 
@@ -82,10 +97,15 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
     @Override
     public Map<String, Object> status() {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
+        boolean connected = client != null && !disconnected.get();
         m.put("live", true);
         m.put("orderLive", isOrderLive());
         m.put("impl", "kuangrui-oes");
         m.put("loggedIn", client != null);
+        m.put("connected", connected);
+        m.put("disconnected", disconnected.get());
+        m.put("disconnectCount", disconnectCount.get());
+        m.put("reconnectCount", reconnectCount.get());
         m.put("rptSynced", rptSynced.get());
         m.put("syncDegraded", client != null && !rptSynced.get());
         m.put("rptSyncEngine", "OesRptSyncInvoker/v2");
@@ -308,6 +328,229 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
             ));
         }
         return out;
+    }
+
+    @Override
+    public Map<String, Object> queryClientOverview() {
+        ensureReadyOrThrow();
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        try {
+            Object ov = invokeReturning(client, "queryClientOverview");
+            if (ov == null) {
+                m.put("ok", false);
+                m.put("message", "queryClientOverview 返回 null");
+                return m;
+            }
+            m.put("ok", true);
+            m.put("clientId", lng(firstGetter(ov, "getClientId")));
+            m.put("clientName", str(firstGetter(ov, "getClientName")));
+            m.put("clientMemo", str(firstGetter(ov, "getClientMemo")));
+            m.put("clientType", enumName(firstGetter(ov, "getClientType")));
+            m.put("clientStatus", enumName(firstGetter(ov, "getClientStatus")));
+            m.put("apiForbidden", Boolean.TRUE.equals(firstGetter(ov, "isApiForbidden")));
+            m.put("logonTime", lng(firstGetter(ov, "getLogonTime")));
+            m.put("currOrdConnected", lng(firstGetter(ov, "getCurrOrdConnected")));
+            m.put("currRptConnected", lng(firstGetter(ov, "getCurrRptConnected")));
+            m.put("currQryConnected", lng(firstGetter(ov, "getCurrQryConnected")));
+            m.put("associatedCustCnt", lng(firstGetter(ov, "getAssociatedCustCnt")));
+            m.put("applVerId", applVerId.get());
+            List<Map<String, Object>> custs = new ArrayList<Map<String, Object>>();
+            Object custItems = firstGetter(ov, "getCustItems");
+            if (custItems instanceof List) {
+                for (Object c : (List<?>) custItems) {
+                    if (c == null) {
+                        continue;
+                    }
+                    Map<String, Object> row = new LinkedHashMap<String, Object>();
+                    row.put("custId", str(firstGetter(c, "getCustId")));
+                    row.put("custName", str(firstGetter(c, "getCustName")));
+                    row.put("status", enumName(firstGetter(c, "getStatus")));
+                    row.put("cashAcctId", str(firstGetter(
+                            firstGetter(c, "getSpotCashAcct", "getCashAcct"), "getCashAcctId")));
+                    row.put("shInvAcctId", str(firstGetter(
+                            firstGetter(c, "getShSpotInvAcct", "getShInvAcct"), "getInvAcctId")));
+                    row.put("szInvAcctId", str(firstGetter(
+                            firstGetter(c, "getSzSpotInvAcct", "getSzInvAcct"), "getInvAcctId")));
+                    custs.add(row);
+                }
+            }
+            m.put("custItems", custs);
+            m.put("count", custs.size());
+            return m;
+        } catch (Exception e) {
+            lastError.set(e.getMessage());
+            log.error("[oes] queryClientOverview 失败: {}", e.getMessage(), e);
+            m.put("ok", false);
+            m.put("message", e.getMessage());
+            return m;
+        }
+    }
+
+    @Override
+    public List<Map<String, Object>> queryInvAcct() {
+        ensureReadyOrThrow();
+        List<?> raw = invokeOesQuery(
+                new String[]{"queryInvAcct", "queryInvAcctExt"},
+                new String[]{
+                        "com.quant360.api.model.oes.OesQryInvAcctFilter",
+                        "com.quant360.api.model.oes.qry.OesQryInvAcctFilter"
+                });
+        List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
+        for (Object item : raw) {
+            out.add(OesViewMapper.invAcct(
+                    str(firstGetter(item, "getInvAcctId")),
+                    str(firstGetter(item, "getCustId")),
+                    (int) lng(firstGetter(item, "getMktId")),
+                    enumName(firstGetter(item, "getStatus")),
+                    Boolean.TRUE.equals(firstGetter(item, "isTradeDisabled")),
+                    (int) lng(firstGetter(item, "getPbuId")),
+                    (int) lng(firstGetter(item, "getSubscriptionQuota"))
+            ));
+        }
+        return out;
+    }
+
+    @Override
+    public List<Map<String, Object>> queryCounterCash(String cashAcctId) {
+        ensureReadyOrThrow();
+        Object filter = newInstance("com.quant360.api.model.oes.OesQryCounterCashFilter");
+        String acct = cashAcctId == null ? null : cashAcctId.trim();
+        if (filter != null && acct != null && !acct.isEmpty()) {
+            setBean(filter, "setCashAcctId", acct);
+        }
+        List<?> raw;
+        if (filter != null) {
+            raw = invokeQueryListWithFilter("queryCounterCash", filter);
+        } else {
+            raw = invokeOesQuery(
+                    new String[]{"queryCounterCash"},
+                    new String[]{"com.quant360.api.model.oes.OesQryCounterCashFilter"});
+        }
+        List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
+        for (Object item : raw) {
+            out.add(OesViewMapper.counterCash(
+                    str(firstGetter(item, "getCashAcctId")),
+                    str(firstGetter(item, "getCustId")),
+                    str(firstGetter(item, "getCustName")),
+                    str(firstGetter(item, "getBankId")),
+                    lng(firstGetter(item, "getCounterAvailableBal")),
+                    lng(firstGetter(item, "getCounterDrawableBal")),
+                    Boolean.TRUE.equals(firstGetter(item, "isCashTrsfDisabled"))
+            ));
+        }
+        return out;
+    }
+
+    @Override
+    public Map<String, Object> queryMaxTradableQty(String code, String side, BigDecimal priceYuan) {
+        ensureReadyOrThrow();
+        Map<String, Object> fail = new LinkedHashMap<String, Object>();
+        String norm = OesViewMapper.normalizeCode(code);
+        if (norm == null || norm.isEmpty()) {
+            fail.put("ok", false);
+            fail.put("message", "code 不能为空");
+            return fail;
+        }
+        if (priceYuan == null || priceYuan.compareTo(BigDecimal.ZERO) <= 0) {
+            fail.put("ok", false);
+            fail.put("message", "price 须为正");
+            return fail;
+        }
+        boolean sell = side != null && "SELL".equalsIgnoreCase(side.trim());
+        try {
+            Object req = newInstance("com.quant360.api.model.oes.OesQryMaxTradableQtyReq");
+            if (req == null) {
+                fail.put("ok", false);
+                fail.put("message", "无法创建 OesQryMaxTradableQtyReq");
+                return fail;
+            }
+            setBean(req, "setSecurityId", norm);
+            int mkt = KuangruiExchangeIds.fromStockCode(norm);
+            Object mktEnum = resolveOesMarket(mkt);
+            if (mktEnum != null) {
+                setBean(req, "setMktId", mktEnum);
+            } else if (mkt > 0) {
+                setBean(req, "setMktId", Integer.valueOf(mkt));
+            }
+            Object bs = resolveOesBsType(sell);
+            if (bs != null) {
+                setBean(req, "setBsType", bs);
+            }
+            int pxMilli = KuangruiPriceScale.toMilliInt(priceYuan);
+            setBean(req, "setOrdPrice", Integer.valueOf(pxMilli));
+
+            Object ret = invokeReturning(client, "queryMaxTradableQty", req);
+            Object item = ret;
+            if (ret != null) {
+                Object nested = firstGetter(ret, "getMaxTradableQtyItem");
+                if (nested != null) {
+                    item = nested;
+                }
+            }
+            if (item == null) {
+                fail.put("ok", false);
+                fail.put("message", "queryMaxTradableQty 返回空");
+                fail.put("code", norm);
+                return fail;
+            }
+            Map<String, Object> m = OesViewMapper.maxTradableQty(
+                    str(firstGetter(item, "getSecurityId", "getSecurityID")),
+                    sell ? "SELL" : "BUY",
+                    lng(firstGetter(item, "getOrdPrice")),
+                    lng(firstGetter(item, "getMinTradableQty")),
+                    lng(firstGetter(item, "getMaxTradableQty"))
+            );
+            if (m.get("code") == null || String.valueOf(m.get("code")).isEmpty()) {
+                m.put("code", norm);
+            }
+            return m;
+        } catch (Exception e) {
+            lastError.set(e.getMessage());
+            log.error("[oes] queryMaxTradableQty 失败: {}", e.getMessage(), e);
+            fail.put("ok", false);
+            fail.put("message", e.getMessage());
+            fail.put("code", norm);
+            return fail;
+        }
+    }
+
+    private static String enumName(Object o) {
+        if (o == null) {
+            return "";
+        }
+        if (o instanceof Enum) {
+            return ((Enum<?>) o).name();
+        }
+        return String.valueOf(o);
+    }
+
+    private static Object resolveOesMarket(int mkt) {
+        try {
+            Class<?> clz = Class.forName("com.quant360.api.model.oes.enu.OesMarketId");
+            String name;
+            if (mkt == KuangruiExchangeIds.SZSE) {
+                name = "OES_MKT_ID_SZ_A";
+            } else if (mkt == KuangruiExchangeIds.BSE) {
+                name = "OES_MKT_BJ";
+            } else if (mkt == KuangruiExchangeIds.SSE) {
+                name = "OES_MKT_ID_SH_A";
+            } else {
+                return null;
+            }
+            return clz.getMethod("valueOf", String.class).invoke(null, name);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static Object resolveOesBsType(boolean sell) {
+        try {
+            Class<?> clz = Class.forName("com.quant360.api.model.oes.enu.OesBuySellType");
+            String name = sell ? "OES_BS_TYPE_S" : "OES_BS_TYPE_B";
+            return clz.getMethod("valueOf", String.class).invoke(null, name);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private Map<String, Object> mapStockItem(Object item) {
@@ -560,6 +803,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
     public void stop() {
         synchronized (clientLock) {
             rptSynced.set(false);
+            disconnected.set(false);
             eventQueue.clear();
             closeClient();
         }
@@ -568,6 +812,7 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
     @PreDestroy
     public void destroy() {
         stop();
+        disconnectExecutor.shutdownNow();
     }
 
     private void ensureReadyOrThrow() {
@@ -578,8 +823,12 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
 
     private void ensureClient() throws Exception {
         synchronized (clientLock) {
-            if (client != null && rptSynced.get()) {
+            if (client != null && rptSynced.get() && !disconnected.get()) {
                 return;
+            }
+            // 断线后须先 close 再重建，避免假死连接
+            if (client != null && disconnected.get()) {
+                closeClient();
             }
             // 已登录：再尝试一次 sync；失败则保持查询通道（降级）
             if (client != null) {
@@ -635,12 +884,17 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
                 }
                 throw new IllegalStateException("OES 登录失败 rsp=" + rsp);
             }
+            boolean wasReconnect = disconnectCount.get() > 0;
             client = c;
+            disconnected.set(false);
             lastInMsgSeq = rsp.getLastInMsgSeq();
             applVerId.set(rsp.getApplVerId());
             lastError.set(null);
-            log.info("[oes] 登录成功 applVerId={} lastInMsgSeq={} credSource={}",
-                    rsp.getApplVerId(), lastInMsgSeq, cred.getSource());
+            if (wasReconnect) {
+                reconnectCount.incrementAndGet();
+            }
+            log.info("[oes] 登录成功 applVerId={} lastInMsgSeq={} credSource={} reconnectCount={}",
+                    rsp.getApplVerId(), lastInMsgSeq, cred.getSource(), reconnectCount.get());
             try {
                 doRptSync(lastInMsgSeq);
             } catch (Exception syncEx) {
@@ -762,10 +1016,13 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
         }
         String n = name.toLowerCase();
         if (n.contains("disconn")) {
+            // 回调内勿重活：打标后异步 close，确保下次 ensureClient 先 close 再重建
             log.error("[oes] 连接中断");
             rptSynced.set(false);
+            disconnected.set(true);
             lastError.set("disconnected");
-            client = null;
+            disconnectCount.incrementAndGet();
+            scheduleDisconnectCleanup();
             return;
         }
         if (args == null || args.length == 0) {
@@ -777,6 +1034,26 @@ public class KuangruiOesReadonlyService implements OesReadonlyService, OesOrderS
         } else if (n.contains("ord") || n.contains("order") || n.contains("rpt")) {
             enqueueOrder(body);
         }
+    }
+
+    private void scheduleDisconnectCleanup() {
+        if (!cleanupScheduled.compareAndSet(false, true)) {
+            return;
+        }
+        disconnectExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    synchronized (clientLock) {
+                        if (disconnected.get()) {
+                            closeClient();
+                        }
+                    }
+                } finally {
+                    cleanupScheduled.set(false);
+                }
+            }
+        });
     }
 
     private void enqueueOrder(Object item) {

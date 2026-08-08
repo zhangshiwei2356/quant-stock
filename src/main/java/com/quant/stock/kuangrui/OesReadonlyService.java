@@ -54,6 +54,29 @@ public interface OesReadonlyService {
     /** M4：佣金费率列表（费率已换算为小数，如 0.0003）。 */
     List<Map<String, Object>> queryCommissionRate();
 
+    /**
+     * M5+：客户端总览（{@code queryClientOverview}）。
+     * 含客户/资金账户/股东账户摘要；失败返回空 Map（含 {@code ok=false}）。
+     */
+    Map<String, Object> queryClientOverview();
+
+    /**
+     * M5+：股东账户列表（{@code queryInvAcct}）。
+     */
+    List<Map<String, Object>> queryInvAcct();
+
+    /**
+     * M5+：主柜资金（{@code queryCounterCash}）。
+     * {@code cashAcctId} 可空（空则不过滤）。
+     */
+    List<Map<String, Object>> queryCounterCash(String cashAcctId);
+
+    /**
+     * M5+：最大可买卖数量（{@code queryMaxTradableQty}）。
+     * {@code side} 为 BUY/SELL；{@code priceYuan} 限价（元）。
+     */
+    Map<String, Object> queryMaxTradableQty(String code, String side, java.math.BigDecimal priceYuan);
+
     /** 关闭客户端连接。 */
     void stop();
 

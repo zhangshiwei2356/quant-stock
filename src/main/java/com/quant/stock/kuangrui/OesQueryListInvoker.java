@@ -304,7 +304,8 @@ public final class OesQueryListInvoker {
             return null;
         }
         String[] getters = {"getQryItems", "getItems", "getCashAssetItems", "getStkHoldingItems",
-                "getOrdItems", "getTrdItems", "getStockItems"};
+                "getOrdItems", "getTrdItems", "getStockItems",
+                "getCounterCashItem", "getMaxTradableQtyItem"};
         for (String g : getters) {
             try {
                 Method m = rsp.getClass().getMethod(g);
@@ -322,6 +323,10 @@ public final class OesQueryListInvoker {
                         list.add(Array.get(v, i));
                     }
                     return list;
+                }
+                // 单对象应答（如 CounterCash / MaxTradableQty）
+                if (v != null && ("getCounterCashItem".equals(g) || "getMaxTradableQtyItem".equals(g))) {
+                    return Collections.singletonList(v);
                 }
             } catch (NoSuchMethodException ignore) {
                 // 候选 getter 不存在属正常，换下一个

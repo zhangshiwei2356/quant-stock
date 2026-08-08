@@ -244,15 +244,15 @@ quant:
 
 业务挂钩（仅 `static-enabled`）：开仓停牌/涨跌停/股本、当日交易日、`TradeCostModel` 默认佣金。
 
-## 最新接入计划（未落地 · 2026-08-08）
+## 最新接入计划（2026-08-08）
 
-现货主路径 M0～M4 已可选落地（具名接口约 15/24）。推荐顺序：
+现货主路径 M0～M4 + **M5a/M5b/撤单小修/仿真浸泡/查询增强已可选落地**（具名接口约 20/24）。剩余顺序：
 
-1. **M5a MDS**：`onDisConn` → 异步 `closeClient`；退避重登；需则重订阅；`market-collect` 死连接/全失败勿挡本地回退  
-2. **M5b OES**：断线先 `close` 再重建 + `sendRptSync`  
-3. **报撤小修**：`PARTIALLY_CANCELED(6)`→本地 `CANCELLED`；撤单确认制  
-4. **仿真浸泡**验收  
-5. **查询/效率增强**：overview / invAcct / 可买量 / `qrySnapshotList`；批量下单按需  
+1. ~~**M5a MDS**：`onDisConn` → 异步 `closeClient`；退避重登；需则重订阅；`market-collect` 死连接/全失败勿挡本地回退~~ ✓  
+2. ~~**M5b OES**：断线先 `close` 再重建 + `sendRptSync`~~ ✓  
+3. ~~**报撤小修**：`PARTIALLY_CANCELED(6)`→本地 `CANCELLED`；撤单确认制~~ ✓  
+4. ~~**仿真浸泡**验收~~ ✓（`.\scripts\kuangrui\m5-soak.ps1` → `scripts/kuangrui/out/m5-soak-report.*`）  
+5. ~~**查询/效率增强**：overview / invAcct / 可买量 / `qrySnapshotList`~~ ✓（批量下单仍按需）  
 6. **M6 银证**（真仓）：`sendCashTrsfReq` + `queryCashTransferSerial`（sim 可不接）  
 7. **后置**：L2/UDP；两融/期权/ETF 不进主路径  
 

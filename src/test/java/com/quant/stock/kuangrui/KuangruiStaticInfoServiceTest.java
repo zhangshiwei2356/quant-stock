@@ -111,6 +111,33 @@ class KuangruiStaticInfoServiceTest {
         }
 
         @Override
+        public Map<String, Object> queryClientOverview() {
+            Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("ok", true);
+            m.put("clientId", 1);
+            return m;
+        }
+
+        @Override
+        public List<Map<String, Object>> queryInvAcct() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public List<Map<String, Object>> queryCounterCash(String cashAcctId) {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public Map<String, Object> queryMaxTradableQty(String code, String side, java.math.BigDecimal priceYuan) {
+            Map<String, Object> m = new LinkedHashMap<String, Object>();
+            m.put("ok", true);
+            m.put("code", code);
+            m.put("maxTradableQty", 1000L);
+            return m;
+        }
+
+        @Override
         public void stop() {
             // no-op
         }

@@ -127,8 +127,12 @@ public class TradeGatewayService {
 
     /**
      * 撤销未完结委托（SUBMITTED / PARTIAL）。已成交部分不回滚。
+     * <p>
+     * OES live：仅发撤单请求，等回报/查询确认后再置 {@code CANCELLED}（勿乐观假撤）。
+     * sim / 无 OES：本地即时撤销。
+     * </p>
      *
-     * @return 撤销后的委托；不可撤或不存在时返回 null
+     * @return 撤销后的委托；不可撤或不存在时返回 null；OES 已发撤但未确认时仍返回原委托（状态未变）
      */
     public OrderDTO cancelOrder(String orderId) {
         if (orderId == null || orderId.trim().isEmpty()) {
@@ -151,7 +155,10 @@ public class TradeGatewayService {
                 log.error("OES 撤单请求失败 orderId={} clSeqNo={}", orderId, clSeq);
                 return null;
             }
-            // 请求已发：先本地置 CANCELLED（与原桩行为一致）；回报若拒绝可在后续增强
+            // 确认制：不本地置 CANCELLED；由 syncFromOes 根据状态 5/6/7 收束
+            log.info("OES 撤单已发，等待回报确认 orderId={} clSeqNo={} status={}",
+                    orderId, clSeq, order.getStatus());
+            return order;
         }
         order.setStatus(OrderDTO.Status.CANCELLED);
         if (order.getFilledVolume() == null) {
@@ -165,11 +172,16 @@ public class TradeGatewayService {
     /**
      * 改价=撤补重置队尾（P0-95）：撤销未完结委托后以新价/新量重新下单（新 orderId，不保队列优先级）。
      *
-     * @return 新委托；撤单失败或参数非法时 null
+     * @return 新委托；撤单失败、OES 撤单待确认或参数非法时 null
      */
     public OrderDTO replaceOrder(String orderId, BigDecimal newPrice, Integer newVolume) {
         OrderDTO old = cancelOrder(orderId);
         if (old == null) {
+            return null;
+        }
+        if (old.getStatus() != OrderDTO.Status.CANCELLED) {
+            log.error("改价补单：OES 撤单待确认，暂不补单 orderId={} status={}",
+                    orderId, old.getStatus());
             return null;
         }
         int remain = old.getVolume() == null ? 0 : old.getVolume();

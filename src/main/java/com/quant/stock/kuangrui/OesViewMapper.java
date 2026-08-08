@@ -76,6 +76,61 @@ public final class OesViewMapper {
         return m;
     }
 
+    /** M5+：主柜资金（毫→元）。 */
+    public static Map<String, Object> counterCash(String cashAcctId,
+                                                  String custId,
+                                                  String custName,
+                                                  String bankId,
+                                                  long counterAvailableBal,
+                                                  long counterDrawableBal,
+                                                  boolean cashTrsfDisabled) {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        m.put("cashAcctId", nullToEmpty(cashAcctId));
+        m.put("custId", nullToEmpty(custId));
+        m.put("custName", nullToEmpty(custName));
+        m.put("bankId", nullToEmpty(bankId));
+        m.put("counterAvailableBal", KuangruiPriceScale.toYuanAllowZero(counterAvailableBal));
+        m.put("counterDrawableBal", KuangruiPriceScale.toYuanAllowZero(counterDrawableBal));
+        m.put("cashTrsfDisabled", cashTrsfDisabled);
+        return m;
+    }
+
+    /** M5+：股东账户。 */
+    public static Map<String, Object> invAcct(String invAcctId,
+                                              String custId,
+                                              int mktId,
+                                              String statusLabel,
+                                              boolean tradeDisabled,
+                                              int pbuId,
+                                              int subscriptionQuota) {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        m.put("invAcctId", nullToEmpty(invAcctId));
+        m.put("custId", nullToEmpty(custId));
+        m.put("mktId", mktId);
+        m.put("status", nullToEmpty(statusLabel));
+        m.put("tradeDisabled", tradeDisabled);
+        m.put("pbuId", pbuId);
+        m.put("subscriptionQuota", subscriptionQuota);
+        return m;
+    }
+
+    /** M5+：最大可买卖数量。 */
+    public static Map<String, Object> maxTradableQty(String securityId,
+                                                    String side,
+                                                    long ordPriceMilli,
+                                                    long minTradableQty,
+                                                    long maxTradableQty) {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        m.put("code", normalizeCode(securityId));
+        m.put("side", nullToEmpty(side));
+        BigDecimal px = KuangruiPriceScale.toYuan(ordPriceMilli);
+        m.put("ordPrice", px == null ? BigDecimal.ZERO : px);
+        m.put("minTradableQty", minTradableQty);
+        m.put("maxTradableQty", maxTradableQty);
+        m.put("ok", true);
+        return m;
+    }
+
     /** 6 位数字代码；非法原样 trim。 */
     public static String normalizeCode(String securityId) {
         if (securityId == null) {
@@ -240,11 +295,11 @@ public final class OesViewMapper {
     public static String toLocalStatusName(int oesStatus) {
         switch (oesStatus) {
             case 3:
-            case 6:
                 return "PARTIAL";
             case 8:
                 return "FILLED";
             case 5:
+            case 6: // PARTIALLY_CANCELED：余量已撤，本地收束为 CANCELLED（保留已成量）
             case 7:
                 return "CANCELLED";
             default:

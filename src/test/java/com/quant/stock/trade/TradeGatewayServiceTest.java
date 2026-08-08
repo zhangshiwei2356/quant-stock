@@ -146,8 +146,31 @@ class TradeGatewayServiceTest {
 
         OrderDTO o2 = gw.placeOrder("600036", OrderDTO.Side.SELL, new BigDecimal("10"), 100, "oes2");
         assertEquals(OrderDTO.Status.SUBMITTED, o2.getStatus());
-        OrderDTO cancelled = gw.cancelOrder(o2.getOrderId());
-        assertEquals(OrderDTO.Status.CANCELLED, cancelled.getStatus());
+        OrderDTO cancelSent = gw.cancelOrder(o2.getOrderId());
+        // 确认制：OES live 仅发撤，本地状态不变
+        assertEquals(OrderDTO.Status.SUBMITTED, cancelSent.getStatus());
+        q.offer(new OesOrderService.OesOrderEvent(
+                OesOrderService.OesOrderEvent.Kind.ORDER,
+                2, 1002L, "600036", 7, 0, 0, null));
+        gw.syncOrderStatus();
+        assertEquals(OrderDTO.Status.CANCELLED, gw.queryOrder(o2.getOrderId()).getStatus());
+
+        // PARTIALLY_CANCELED(6) → 本地 CANCELLED（保留已成量）
+        OrderDTO o3 = gw.placeOrder("600036", OrderDTO.Side.BUY, new BigDecimal("10"), 200, "oes3");
+        q.offer(new OesOrderService.OesOrderEvent(
+                OesOrderService.OesOrderEvent.Kind.ORDER,
+                3, 1003L, "600036", 3, 100, 0, null));
+        gw.syncOrderStatus();
+        assertEquals(OrderDTO.Status.PARTIAL, gw.queryOrder(o3.getOrderId()).getStatus());
+        assertEquals(100, gw.queryOrder(o3.getOrderId()).getFilledVolume().intValue());
+        OrderDTO cancelPartial = gw.cancelOrder(o3.getOrderId());
+        assertEquals(OrderDTO.Status.PARTIAL, cancelPartial.getStatus());
+        q.offer(new OesOrderService.OesOrderEvent(
+                OesOrderService.OesOrderEvent.Kind.ORDER,
+                3, 1003L, "600036", 6, 100, 0, null));
+        gw.syncOrderStatus();
+        assertEquals(OrderDTO.Status.CANCELLED, gw.queryOrder(o3.getOrderId()).getStatus());
+        assertEquals(100, gw.queryOrder(o3.getOrderId()).getFilledVolume().intValue());
     }
 
     private static ObjectProvider<LiveLedgerService> emptyLedger() {

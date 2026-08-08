@@ -658,6 +658,54 @@ public class OpsController {
         });
     }
 
+    /** M5+：OES 客户端总览。 */
+    @GetMapping("/kuangrui/oes/client-overview")
+    public Map<String, Object> kuangruiOesClientOverview() {
+        return oesOrDbOff(new OesCall() {
+            @Override
+            public Map<String, Object> call(KuangruiOesOpsFacade f) {
+                return f.clientOverview();
+            }
+        });
+    }
+
+    /** M5+：OES 股东账户。 */
+    @GetMapping("/kuangrui/oes/inv-acct")
+    public Map<String, Object> kuangruiOesInvAcct() {
+        return oesOrDbOff(new OesCall() {
+            @Override
+            public Map<String, Object> call(KuangruiOesOpsFacade f) {
+                return f.invAcct();
+            }
+        });
+    }
+
+    /** M5+：OES 主柜资金。 */
+    @GetMapping("/kuangrui/oes/counter-cash")
+    public Map<String, Object> kuangruiOesCounterCash(
+            @RequestParam(value = "cashAcctId", required = false) String cashAcctId) {
+        return oesOrDbOff(new OesCall() {
+            @Override
+            public Map<String, Object> call(KuangruiOesOpsFacade f) {
+                return f.counterCash(cashAcctId);
+            }
+        });
+    }
+
+    /** M5+：OES 最大可买卖数量。 */
+    @GetMapping("/kuangrui/oes/max-tradable-qty")
+    public Map<String, Object> kuangruiOesMaxTradableQty(
+            @RequestParam(value = "code", required = false) String code,
+            @RequestParam(value = "side", required = false) String side,
+            @RequestParam(value = "price", required = false) BigDecimal price) {
+        return oesOrDbOff(new OesCall() {
+            @Override
+            public Map<String, Object> call(KuangruiOesOpsFacade f) {
+                return f.maxTradableQty(code, side, price);
+            }
+        });
+    }
+
     /** M4：静态/费率门面状态。 */
     @GetMapping("/kuangrui/static/status")
     public Map<String, Object> kuangruiStaticStatus() {

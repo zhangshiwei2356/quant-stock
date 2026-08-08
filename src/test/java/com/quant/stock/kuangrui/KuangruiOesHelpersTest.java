@@ -40,6 +40,28 @@ class KuangruiOesHelpersTest {
         assertEquals("REJECTED", OesViewMapper.ordStatusLabel(11));
         assertEquals("FILLED", OesViewMapper.toLocalStatusName(8));
         assertEquals("CANCELLED", OesViewMapper.toLocalStatusName(7));
+        assertEquals("CANCELLED", OesViewMapper.toLocalStatusName(6));
+        assertEquals("PARTIAL", OesViewMapper.toLocalStatusName(3));
+        assertEquals("PARTIAL_CANCELLED", OesViewMapper.ordStatusLabel(6));
+    }
+
+    @Test
+    void viewMapper_m5PlusViews() {
+        Map<String, Object> cc = OesViewMapper.counterCash("C1", "U1", "n", "B", 1_000_000L, 500_000L, false);
+        assertEquals("C1", cc.get("cashAcctId"));
+        assertEquals(new BigDecimal("100.0000"), cc.get("counterAvailableBal"));
+        assertEquals(new BigDecimal("50.0000"), cc.get("counterDrawableBal"));
+
+        Map<String, Object> inv = OesViewMapper.invAcct("A001", "U1", 1, "NORMAL", false, 100, 0);
+        assertEquals("A001", inv.get("invAcctId"));
+        assertEquals(1, inv.get("mktId"));
+
+        Map<String, Object> mt = OesViewMapper.maxTradableQty("600036", "BUY", 100000L, 100L, 5000L);
+        assertEquals("600036", mt.get("code"));
+        assertEquals("BUY", mt.get("side"));
+        assertEquals(5000L, mt.get("maxTradableQty"));
+        assertEquals(new BigDecimal("10.0000"), mt.get("ordPrice"));
+        assertEquals(true, mt.get("ok"));
     }
 
     @Test
@@ -82,6 +104,10 @@ class KuangruiOesHelpersTest {
         assertTrue(noop.queryStock("600036").isEmpty());
         assertTrue(noop.queryTradingDay().isEmpty());
         assertTrue(noop.queryCommissionRate().isEmpty());
+        assertTrue(noop.queryInvAcct().isEmpty());
+        assertTrue(noop.queryCounterCash(null).isEmpty());
+        assertEquals(Boolean.FALSE, noop.queryClientOverview().get("ok"));
+        assertEquals(Boolean.FALSE, noop.queryMaxTradableQty("600036", "BUY", new BigDecimal("10")).get("ok"));
         assertEquals("noop", noop.status().get("impl"));
         assertEquals(Boolean.FALSE, noop.snapshot().get("ok"));
     }
